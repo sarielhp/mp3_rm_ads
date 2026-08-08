@@ -7,14 +7,17 @@ Automatically detects and removes advertisement, sponsor, and promotional segmen
 - **Local Whisper Transcription**: Uses local Whisper GPU server for fast, offline transcription
 - **Configurable LLM Detection**: Supports multiple LLM providers (local Ollama, OpenRouter, etc.)
 - **Smart Ad Detection**: Detects host-read sponsor plugs, midroll/preroll ads, promotional breaks
-- **Batch Processing**: Process multiple files in sequence
+- **Batch Processing**: Process multiple files in sequence, or pass a directory to process all MP3s
 - **SRT/TXT Export**: Export transcripts in multiple formats
 - **Recut Mode**: Re-cut audio using existing metadata without re-transcribing
+- **Chunked Transcription**: Split long audio into overlapping chunks for reliability (`--use-chunks`)
+- **Docker Progress Monitoring**: Auto-detects local whisper Docker container and shows real progress/ETA
+- **Auto-fallback**: Detects whisper decode failures and automatically retries with chunked transcription
 
 ## Workflow
 
 ```
-1. Transcribe audio → Whisper GPU server
+1. Transcribe audio → Whisper GPU server (HTTP API)
 2. Detect ads → LLM (local or remote)
 3. Merge intervals → Combine adjacent ad segments
 4. Cut audio → ffmpeg
@@ -37,24 +40,38 @@ gem install rainbow
 
 ## Configuration
 
-The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first run.
+The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first run, using the local machine's IP address automatically.
 
 ```json
 {
-  "whisper_url": "http://localhost:8088/inference",
+  "whisper_url": "http://<local_ip>:8088/inference",
+  "whisper_speed_factor": 7.0,
+  "whisper_docker_container": "",
+  "chunk_duration_sec": 0,
+  "parallel_chunks": 1,
   "active_profile_id": 1,
   "profiles": [
     {
       "id": 1,
       "name": "Ollama Local (llama3.1:8b)",
       "type": "ollama",
-      "url": "http://localhost:11434/v1/chat/completions",
+      "url": "http://<local_ip>:11434/v1/chat/completions",
       "model": "llama3.1:8b",
       "api_key": ""
     }
   ]
 }
 ```
+
+### Config Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `whisper_url` | Auto-detected | Whisper server HTTP endpoint |
+| `whisper_speed_factor` | 7.0 | Estimated transcription speed multiplier (for ETA display) |
+| `whisper_docker_container` | Auto-detected | Docker container name for progress polling |
+| `chunk_duration_sec` | 0 (disabled) | Split audio into chunks of this duration (seconds) |
+| `parallel_chunks` | 1 | Number of chunks to transcribe in parallel |
 
 ## Usage
 
@@ -64,12 +81,29 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 # Process a single episode
 ./mp3_rm_ads episode.mp3
 
+# Process all MP3s in a directory
+./mp3_rm_ads /path/to/podcasts/
+
 # Process multiple episodes
 ./mp3_rm_ads episode1.mp3 episode2.mp3 episode3.mp3
 
 # Quiet mode
 ./mp3_rm_ads -q episode.mp3
 ```
+
+### Chunked Transcription
+
+For long files that whisper fails to decode, use chunked transcription:
+
+```bash
+# Enable chunking (10-minute chunks with 30s overlap)
+./mp3_rm_ads --use-chunks episode.mp3
+
+# Or enable permanently in config:
+# "chunk_duration_sec": 600
+```
+
+The script also auto-detects whisper decode failures and falls back to chunking automatically.
 
 ### Export Options
 
@@ -124,13 +158,15 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 - `episode.transcript.txt` (human-readable transcript)
 - `episode.srt` (subtitle file)
 - `episode.cuts.json` (ad cut metadata)
+- `.work/` (temporary chunk files, auto-cleaned)
 
 ## Architecture
 
 ### Whisper Integration
-- Local Whisper GPU server for transcription
-- Fast, offline processing
-- Configurable URL in config
+- Local Whisper GPU server for transcription via HTTP API
+- Docker log polling for real-time progress and error detection
+- Auto-detects local whisper container by image name or exposed port
+- Falls back to chunked transcription on decode failures
 
 ### LLM Integration
 - Supports multiple providers:
@@ -150,6 +186,7 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 - FFmpeg
 - Whisper GPU server (local or remote)
 - LLM API access (local or remote)
+- Docker (optional, for progress monitoring)
 
 ## License
 

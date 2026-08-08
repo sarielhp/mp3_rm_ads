@@ -15,6 +15,7 @@ require 'json'
 require 'tempfile'
 require 'open3'
 require 'fileutils'
+require 'socket'
 
 begin
   require 'rainbow'
@@ -63,6 +64,7 @@ DEFAULT_CONFIG = {
   "_instructions" => "Configuration file for mp3_rm_ads. Select profiles by ID or set active_profile_id.",
   "whisper_url" => "http://192.168.1.230:8088/inference",
   "whisper_speed_factor" => 7.0,
+  "whisper_docker_container" => "",
   "chunk_duration_sec" => 0,
   "parallel_chunks" => 1,
   "active_profile_id" => 1,
@@ -102,10 +104,27 @@ DEFAULT_CONFIG = {
   ]
 }.freeze
 
+def local_ip
+  Socket.ip_address_list.each do |addr|
+    next unless addr.ipv4? && !addr.ipv4_loopback? && !addr.ipv4_multicast?
+    ip = addr.ip_address
+    return ip unless ip.start_with?('127.', '169.254.')
+  end
+  '127.0.0.1'
+rescue StandardError
+  '127.0.0.1'
+end
+
 def ensure_config_exists
   FileUtils.mkdir_p(CONFIG_DIR)
   unless File.exist?(CONFIG_FILE)
-    File.write(CONFIG_FILE, JSON.pretty_generate(DEFAULT_CONFIG) + "\n")
+    config = DEFAULT_CONFIG.dup
+    ip = local_ip
+    config['whisper_url'] = "http://#{ip}:8088/inference"
+    config['profiles'].each do |p|
+      p['url'] = p['url'].sub('192.168.1.230', ip) if p['url'].include?('192.168.1.230')
+    end
+    File.write(CONFIG_FILE, JSON.pretty_generate(config) + "\n")
     puts "⚙️  Created default configuration file at: '#{CONFIG_FILE}'"
   end
 end
@@ -449,7 +468,131 @@ def validate_transcript_sanity(transcription_data, total_duration, quiet: false)
   true
 end
 
-def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.0, speed_factor: 7.0)
+def fetch_docker_logs(container_name, tail: 50)
+  return '' if container_name.to_s.empty?
+  result = ''
+  $docker_mutex.synchronize do
+    stdout, stderr, status = Open3.capture3('docker', 'logs', '--tail', tail.to_s, container_name)
+    if status.success?
+      result = (stderr && !stderr.empty? ? stderr : stdout) || ''
+      result = result.encode('UTF-8', invalid: :replace, undef: :replace)
+    end
+  end
+  result
+rescue StandardError
+  ''
+end
+
+def poll_whisper_docker_progress(container_name)
+  return nil if container_name.to_s.empty?
+
+  log_text = fetch_docker_logs(container_name, tail: 20)
+  return nil if log_text.empty?
+
+  has_failed = false
+  log_text.each_line do |line|
+    if line =~ /failed to (decode|encode)/i
+      has_failed = true
+    elsif line =~ /processing\s+audio\s*\((\d+):(\d+):(\d+)\.\d+\s*->\s*(\d+):(\d+):(\d+)\.\d+\)/
+      h, m, s = $4.to_i, $5.to_i, $6.to_f
+      current_end = h * 3600 + m * 60 + s
+      return current_end
+    elsif line =~ /processing\s+audio\s*\((\d+):(\d+)\.\d+\s*->\s*(\d+):(\d+)\.\d+\)/
+      m, s = $3.to_i, $4.to_f
+      current_end = m * 60 + s
+      return current_end
+    elsif line =~ /progress_common:\s*([\d.]+)%/
+      pct = $1.to_f
+      return pct / 100.0
+    end
+  end
+
+  return :failed_to_decode if has_failed
+  nil
+rescue StandardError
+  nil
+end
+
+def report_whisper_error(container_name)
+  log_text = fetch_docker_logs(container_name, tail: 50)
+  return if log_text.empty?
+
+  lines = log_text.lines.map(&:chomp)
+  err_idx = lines.index { |l| l =~ /failed to (decode|encode)/i }
+  return if err_idx.nil?
+
+  start_idx = [err_idx - 5, 0].max
+  end_idx = [err_idx + 5, lines.size - 1].min
+
+  puts "\n🐳 Whisper Docker logs (error context):"
+  (start_idx..end_idx).each do |i|
+    prefix = i == err_idx ? '>>>' : '   '
+    puts "  #{prefix} #{lines[i]}"
+  end
+end
+
+$docker_mutex = Mutex.new
+
+def detect_whisper_docker_container(whisper_url)
+  uri = URI.parse(whisper_url)
+  host = uri.host
+
+  is_local = case host
+  when 'localhost', '127.0.0.1', '0.0.0.0', '::1'
+    true
+  else
+    local_ips = Socket.ip_address_list.select { |a| a.ipv4? && !a.ipv4_loopback? && !a.ipv4_multicast? }.map { |a| a.ip_address }
+    local_ips << '127.0.0.1'
+    local_ips.include?(host)
+  end
+
+  return nil unless is_local
+
+  containers = []
+  $docker_mutex.synchronize do
+    stdout, status = Open3.capture2('docker', 'ps', '--format', '{{.ID}}\t{{.Image}}\t{{.Names}}')
+    return nil unless status.success?
+
+    stdout.each_line do |line|
+      id, image, name = line.strip.split("\t", 3)
+      containers << { id: id, image: image, name: name } if image
+    end
+  end
+
+  whisper_keywords = %w[whisper whisper.cpp whisper-cpp whispercpp]
+
+  containers.each do |c|
+    image_lower = c[:image].downcase
+    if whisper_keywords.any? { |kw| image_lower.include?(kw) }
+      return c[:name]
+    end
+  end
+
+  proxy_keywords = %w[traefik nginx caddy haproxy envoy]
+
+  containers.each do |c|
+    image_lower = c[:image].downcase
+    next if proxy_keywords.any? { |kw| image_lower.include?(kw) }
+
+    ports_stdout = nil
+    $docker_mutex.synchronize do
+      ports_stdout, status = Open3.capture2('docker', 'port', c[:id])
+      ports_stdout = nil unless status.success?
+    end
+    next unless ports_stdout
+
+    if ports_stdout.include?(uri.port.to_s)
+      return c[:name]
+    end
+  end
+
+  nil
+rescue StandardError
+  nil
+end
+
+def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.0, speed_factor: 7.0, docker_container: nil)
+  $decode_failed = false
   uri = URI.parse(whisper_url)
   boundary = "----RubyWhisperBoundary#{Time.now.to_i}#{rand(1000)}"
 
@@ -495,10 +638,29 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
 
       unless quiet
         est_total_seconds = (total_duration.to_f > 0 && speed_factor.to_f > 0) ? (total_duration.to_f / speed_factor.to_f) : 0.0
+        $decode_failed = false
         progress_thread = Thread.new do
           loop do
             elapsed = Time.now - start_time
-            if est_total_seconds > 0
+
+            docker_progress = poll_whisper_docker_progress(docker_container)
+            if docker_progress == :failed_to_decode
+              $decode_failed = true
+              print "\r⚠️ Whisper failed to decode audio (file too long or corrupted).   \n"
+              STDOUT.flush
+              break
+            elsif docker_progress.is_a?(Float) && docker_progress <= 1.0
+              pct = docker_progress
+              remaining = pct > 0 ? [(elapsed / pct) - elapsed, 0].max : est_total_seconds - elapsed
+              rem_str = remaining > 0 ? format_clock(remaining) : "00:00 (finishing...)"
+              print "\r⏳ Transcribing audio... #{sprintf('%5.1f', pct * 100)}% | Elapsed: #{format_clock(elapsed)} | Est. remaining: #{rem_str}   "
+            elsif docker_progress.is_a?(Numeric) && docker_progress > 0 && total_duration > 0
+              pct = docker_progress / total_duration
+              pct = [pct, 0.99].min
+              remaining = [(elapsed / pct) - elapsed, 0].max
+              rem_str = remaining > 0 ? format_clock(remaining) : "00:00 (finishing...)"
+              print "\r⏳ Transcribing audio... #{sprintf('%5.1f', pct * 100)}% | Elapsed: #{format_clock(elapsed)} | Est. remaining: #{rem_str}   "
+            elsif est_total_seconds > 0
               remaining = [est_total_seconds - elapsed, 0].max
               rem_str = remaining > 0 ? format_clock(remaining) : "00:00 (finishing...)"
               print "\r⏳ Transcribing audio... Elapsed: #{format_clock(elapsed)} | Est. remaining: #{rem_str}   "
@@ -506,7 +668,7 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
               print "\r⏳ Transcribing audio... Elapsed: #{format_clock(elapsed)}   "
             end
             STDOUT.flush
-            sleep 0.5
+            sleep 2
           end
         end
       end
@@ -518,6 +680,10 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
         progress_thread.join rescue nil
         elapsed = Time.now - start_time
         print "\r⏳ Transcription finished in #{format_clock(elapsed)}!#{' ' * 30}\n" unless quiet
+      end
+
+      if $decode_failed
+        raise "Whisper failed to decode audio (file too long or corrupted)"
       end
 
       if resp.code == '200'
@@ -535,6 +701,14 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
         progress_thread.kill
         progress_thread.join rescue nil
         print "\r#{' ' * 75}\r" unless quiet
+      end
+
+      if $decode_failed || e.message.include?('failed to')
+        unless quiet
+          puts "\n⚠️ Whisper failed to process audio: #{e.message}"
+          report_whisper_error(docker_container)
+        end
+        raise
       end
 
       if attempt < max_retries
@@ -558,6 +732,10 @@ def split_audio_chunks(audio_path, chunk_duration: 600, overlap: 30)
   total_dur = get_audio_duration(audio_path)
   return [] if total_dur <= 0
 
+  base_dir = File.dirname(File.expand_path(audio_path))
+  work_dir = File.join(base_dir, '.work')
+  FileUtils.mkdir_p(work_dir)
+
   chunks = []
   start = 0.0
   index = 0
@@ -567,8 +745,7 @@ def split_audio_chunks(audio_path, chunk_duration: 600, overlap: 30)
     chunk_start = [start - overlap, 0].max
     chunk_end = [end_time + overlap, total_dur].min
 
-    tempfile = Tempfile.new(["chunk_#{format('%04d', index)}", '.mp3'])
-    tempfile.close
+    chunk_path = File.join(work_dir, "chunk_#{format('%04d', index)}.mp3")
 
     cmd = [
       'ffmpeg', '-y', '-loglevel', 'error',
@@ -577,12 +754,12 @@ def split_audio_chunks(audio_path, chunk_duration: 600, overlap: 30)
       '-to', sprintf('%.3f', chunk_end),
       '-c:a', 'libmp3lame',
       '-b:a', '192k',
-      tempfile.path
+      chunk_path
     ]
     system(*cmd)
 
     chunks << {
-      path: tempfile.path,
+      path: chunk_path,
       start_offset: chunk_start,
       end_offset: chunk_end,
       actual_start: start,
@@ -597,9 +774,13 @@ def split_audio_chunks(audio_path, chunk_duration: 600, overlap: 30)
   chunks
 end
 
-def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0, speed_factor: 7.0, chunk_duration: 600, parallel: 1)
+def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0, speed_factor: 7.0, chunk_duration: 600, parallel: 1, docker_container: nil)
   chunks = split_audio_chunks(audio_path, chunk_duration: chunk_duration)
-  return transcribe_whisper(audio_path, whisper_url, quiet: quiet, total_duration: total_duration, speed_factor: speed_factor) if chunks.size <= 1
+  if chunks.size <= 1
+    work_dir = File.join(File.dirname(File.expand_path(audio_path)), '.work')
+    FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
+    return transcribe_whisper(audio_path, whisper_url, quiet: quiet, total_duration: total_duration, speed_factor: speed_factor, docker_container: docker_container)
+  end
 
   all_segments = []
   chunk_duration_est = chunk_duration.to_f
@@ -626,7 +807,8 @@ def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0
           whisper_url,
           quiet: true,
           total_duration: chunk_duration_est,
-          speed_factor: speed_factor
+          speed_factor: speed_factor,
+          docker_container: docker_container
         )
 
         File.unlink(chunk[:path]) rescue nil
@@ -644,14 +826,29 @@ def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0
       chunk = result[:chunk]
       next unless chunk_data && chunk_data['segments']
 
+      is_first = chunk[:index] == 0
+      is_last = chunk[:index] == chunks.size - 1
+      cut_start = chunk[:actual_start]
+      cut_end = chunk[:actual_end]
+
       chunk_data['segments'].each do |seg|
         seg_start = seg['start'].to_f + chunk[:start_offset]
         seg_end = seg['end'].to_f + chunk[:start_offset]
 
-        next if seg_end <= chunk[:actual_start] || seg_start >= chunk[:actual_end]
-
-        seg['start'] = [seg_start, chunk[:actual_start]].max
-        seg['end'] = [seg_end, chunk[:actual_end]].min
+        if is_first
+          next if seg_end <= cut_start
+          seg['start'] = [seg_start, cut_start].max
+          seg['end'] = [seg_end, cut_end].min
+        elsif is_last
+          next if seg_start >= cut_end
+          seg['start'] = [seg_start, cut_start].max
+          seg['end'] = [seg_end, cut_end].min
+        else
+          mid = cut_end
+          next if seg_start >= mid
+          seg['start'] = [seg_start, cut_start].max
+          seg['end'] = [seg_end, mid].min
+        end
 
         if seg['words']
           seg['words'].each do |w|
@@ -676,7 +873,7 @@ def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0
       if seg['start'].to_f <= last['end'].to_f + 0.5
         if seg['end'].to_f > last['end'].to_f
           last['end'] = seg['end']
-          last['text'] = [last['text'], seg['text']].compact.join(' ')
+          last['text'] = seg['text']
         end
       else
         merged_segments << seg
@@ -685,6 +882,9 @@ def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0
   end
 
   full_text = merged_segments.map { |s| s['text'] }.join(' ')
+
+  work_dir = File.join(File.dirname(File.expand_path(audio_path)), '.work')
+  FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
 
   {
     'text' => full_text,
@@ -1315,7 +1515,9 @@ ARGV.each_with_index do |input_file, idx|
     t0_recut = Time.now
     puts "🎬 Cutting ads with ffmpeg (#{keep_segments.size} non-ad clips)..." unless cli_options[:quiet]
 
-    temp_output_file = "#{output_file}.tmp#{File.extname(output_file)}"
+    work_dir = File.join(File.dirname(File.expand_path(output_file)), '.work')
+    FileUtils.mkdir_p(work_dir)
+    temp_output_file = File.join(work_dir, "#{File.basename(output_file)}.tmp#{File.extname(output_file)}")
 
     if cut_audio_ffmpeg(source_audio_file, keep_segments, temp_output_file)
       recut_duration = Time.now - t0_recut
@@ -1327,6 +1529,7 @@ ARGV.each_with_index do |input_file, idx|
       end
 
       FileUtils.mv(temp_output_file, output_file)
+      FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
 
       new_duration = get_audio_duration(output_file)
       actual_cut = total_duration - new_duration
@@ -1345,6 +1548,9 @@ ARGV.each_with_index do |input_file, idx|
         puts "=" * 65 + "\n"
 
         puts "🎉 Success! Recut ad-free episode saved to: '#{output_file}'"
+      else
+        FileUtils.rm_f(temp_output_file)
+        FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
       end
     end
 
@@ -1367,8 +1573,16 @@ ARGV.each_with_index do |input_file, idx|
     puts "⏱️  Step 1/3 (Transcript Loaded) finished in #{format_clock(step1_duration)}" unless cli_options[:quiet]
   else
     puts "🚀 Step 1/3: Transcribing audio via AMD GPU Whisper server..." unless cli_options[:quiet]
-    chunk_duration = (config['chunk_duration_sec'] || 600).to_i
+    chunk_duration = (config['chunk_duration_sec'] || 0).to_i
     use_chunks = cli_options[:use_chunks] || (chunk_duration > 0 && total_duration > chunk_duration * 1.5)
+    docker_container = config['whisper_docker_container'].to_s
+    if docker_container.empty?
+      docker_container = detect_whisper_docker_container(config['whisper_url'])
+      unless cli_options[:quiet] || docker_container.nil?
+        puts "   🐳 Auto-detected whisper Docker container: '#{docker_container}'"
+      end
+    end
+    docker_container = nil if docker_container.to_s.empty?
 
     if use_chunks
       parallel_chunks = (config['parallel_chunks'] || 1).to_i
@@ -1381,16 +1595,41 @@ ARGV.each_with_index do |input_file, idx|
         total_duration: total_duration,
         speed_factor: speed_factor,
         chunk_duration: chunk_duration,
-        parallel: parallel_chunks
+        parallel: parallel_chunks,
+        docker_container: docker_container
       )
     else
-      transcription_data = transcribe_whisper(
-        source_audio_file,
-        config['whisper_url'],
-        quiet: cli_options[:quiet],
-        total_duration: total_duration,
-        speed_factor: speed_factor
-      )
+      begin
+        transcription_data = transcribe_whisper(
+          source_audio_file,
+          config['whisper_url'],
+          quiet: cli_options[:quiet],
+          total_duration: total_duration,
+          speed_factor: speed_factor,
+          docker_container: docker_container
+        )
+      rescue => e
+        if e.message.include?('failed to') && total_duration > 300
+          unless cli_options[:quiet]
+            puts "\n⚠️ Whisper failed on full file (#{e.message})."
+            puts "   🔄 Automatically retrying with chunked transcription..."
+          end
+          chunk_duration = config['chunk_duration_sec'] || 600
+          chunk_duration = 600 if chunk_duration.to_i <= 0
+          transcription_data = transcribe_chunks(
+            source_audio_file,
+            config['whisper_url'],
+            quiet: cli_options[:quiet],
+            total_duration: total_duration,
+            speed_factor: speed_factor,
+            chunk_duration: chunk_duration.to_i,
+            parallel: 1,
+            docker_container: docker_container
+          )
+        else
+          raise
+        end
+      end
     end
     step1_duration = Time.now - t0_step1
     puts "⏱️  Step 1/3 (Transcription) finished in #{format_clock(step1_duration)}" unless cli_options[:quiet]
@@ -1476,7 +1715,9 @@ ARGV.each_with_index do |input_file, idx|
   t0_step3 = Time.now
   puts "🎬 Step 3/3: Cutting ads with ffmpeg (#{keep_segments.size} non-ad clips)..." unless cli_options[:quiet]
 
-  temp_output_file = "#{output_file}.tmp#{File.extname(output_file)}"
+  work_dir = File.join(File.dirname(File.expand_path(output_file)), '.work')
+  FileUtils.mkdir_p(work_dir)
+  temp_output_file = File.join(work_dir, "#{File.basename(output_file)}.tmp#{File.extname(output_file)}")
 
   if cut_audio_ffmpeg(source_audio_file, keep_segments, temp_output_file)
     step3_duration = Time.now - t0_step3
@@ -1488,6 +1729,7 @@ ARGV.each_with_index do |input_file, idx|
     end
 
     FileUtils.mv(temp_output_file, output_file)
+    FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
 
     new_duration = get_audio_duration(output_file)
     actual_cut = total_duration - new_duration
@@ -1513,6 +1755,7 @@ ARGV.each_with_index do |input_file, idx|
     end
   else
     FileUtils.rm_f(temp_output_file)
+    FileUtils.rm_rf(work_dir) if Dir.exist?(work_dir)
     puts "❌ Failed to output ad-free audio for '#{input_file}'."
   end
 end

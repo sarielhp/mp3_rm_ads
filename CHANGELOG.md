@@ -5,17 +5,31 @@ All notable changes to mp3_rm_ads will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- Initial release with core functionality
+- Dynamic `read_timeout` based on audio duration (fixes timeout on long files)
+- Chunked transcription: split long audio into overlapping 10-minute chunks (`--use-chunks`)
+- Parallel chunk transcription support (`parallel_chunks` config)
+- Auto-detection of whisper Docker container for progress monitoring
+- Real-time progress/ETA from Docker logs during transcription
+- Auto-fallback to chunked transcription when whisper fails to decode/encode
+- Directory argument support: recursively finds and processes all `.mp3` files
+- `--use-chunks` CLI flag to enable chunked transcription
+- `whisper_docker_container` config option for manual container specification
+- `chunk_duration_sec` and `parallel_chunks` config options
+- Error context display from Docker logs (5 lines before/after failure)
+- Local IP auto-detection for default config file generation
 
-### Features
-- Automatic ad detection using Whisper + LLM
-- Batch processing support
-- SRT/TXT transcript export
-- Recut mode for re-processing with existing metadata
-- Configurable LLM profiles (Ollama, OpenRouter, etc.)
-- Interval merging for adjacent ad segments
-- Skip processing if output files exist
-- Force options for re-transcribe and re-detection
+### Changed
+- Default config now uses local machine IP instead of hardcoded address
+- Temp files stored in `.work/` directory alongside audio files
+- Chunk merge logic uses overlap midpoint for clean deduplication
+- Progress thread polls every 2 seconds instead of 0.5
+- `Open3.capture3` used for Docker log fetching (fixes stderr leak)
+
+### Fixed
+- Whisper server timeout on files longer than ~70 minutes
+- Docker log output leaking to terminal (stderr vs stdout issue)
+- Redundant retries on whisper decode/encode failures
+- `.work/` directory cleanup on all exit paths (success, failure, early return)
 
 ## [1.0.0] - 2026-08-07
 
