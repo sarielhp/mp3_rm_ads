@@ -62,6 +62,9 @@ PROMPT
 DEFAULT_CONFIG = {
   "_instructions" => "Configuration file for mp3_rm_ads. Select profiles by ID or set active_profile_id.",
   "whisper_url" => "http://192.168.1.230:8088/inference",
+  "whisper_speed_factor" => 7.0,
+  "chunk_duration_sec" => 0,
+  "parallel_chunks" => 1,
   "active_profile_id" => 1,
   "profiles" => [
     {
@@ -325,6 +328,7 @@ def display_usage_and_help
   puts "  #{Rainbow('-txt, --txt').green.bold.ljust(35)} Export/convert transcript JSON to text (.txt)"
   puts "  #{Rainbow('--recut').green.bold.ljust(35)} Recut audio using .cuts.json (no Whisper/LLM)"
   puts "  #{Rainbow('--no-transcript').green.bold.ljust(35)} Disable saving default .transcript.json file"
+  puts "  #{Rainbow('--use-chunks').green.bold.ljust(35)} Split long audio into chunks for reliable transcription"
   puts "  #{Rainbow('--force-llm').green.bold.ljust(35)} Force re-running LLM ad detection even if .cuts.json exists"
   puts "  #{Rainbow('--force-transcribe').green.bold.ljust(35)} Force re-transcribing audio even if .transcript.json exists"
   puts "  #{Rainbow('--use-llm ID_OR_NAME').green.bold.ljust(35)} Select active LLM profile by ID or name"
@@ -467,10 +471,13 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
 
   body << "--#{boundary}--\r\n"
 
-  payload_body = body.join
+  payload_body = body.map { |s| s.dup.force_encoding('ASCII-8BIT') }.join
 
   max_retries = 5
   retry_delay = 5
+
+  est_transcribe_seconds = (total_duration.to_f > 0 && speed_factor.to_f > 0) ? (total_duration.to_f / speed_factor.to_f) : 900.0
+  read_timeout = [(est_transcribe_seconds * 1.5).to_i, 600].max
 
   (1..max_retries).each do |attempt|
     progress_thread = nil
@@ -479,7 +486,7 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
     begin
       http = Net::HTTP.new(uri.host, uri.port)
       http.use_ssl = (uri.scheme == 'https')
-      http.read_timeout = 600
+      http.read_timeout = read_timeout
       http.open_timeout = 10
 
       req = Net::HTTP::Post.new(uri.request_uri)
@@ -545,6 +552,145 @@ def transcribe_whisper(audio_path, whisper_url, quiet: false, total_duration: 0.
   end
 
   {}
+end
+
+def split_audio_chunks(audio_path, chunk_duration: 600, overlap: 30)
+  total_dur = get_audio_duration(audio_path)
+  return [] if total_dur <= 0
+
+  chunks = []
+  start = 0.0
+  index = 0
+
+  while start < total_dur
+    end_time = [start + chunk_duration, total_dur].min
+    chunk_start = [start - overlap, 0].max
+    chunk_end = [end_time + overlap, total_dur].min
+
+    tempfile = Tempfile.new(["chunk_#{format('%04d', index)}", '.mp3'])
+    tempfile.close
+
+    cmd = [
+      'ffmpeg', '-y', '-loglevel', 'error',
+      '-i', audio_path,
+      '-ss', sprintf('%.3f', chunk_start),
+      '-to', sprintf('%.3f', chunk_end),
+      '-c:a', 'libmp3lame',
+      '-b:a', '192k',
+      tempfile.path
+    ]
+    system(*cmd)
+
+    chunks << {
+      path: tempfile.path,
+      start_offset: chunk_start,
+      end_offset: chunk_end,
+      actual_start: start,
+      actual_end: end_time,
+      index: index
+    }
+
+    start = end_time
+    index += 1
+  end
+
+  chunks
+end
+
+def transcribe_chunks(audio_path, whisper_url, quiet: false, total_duration: 0.0, speed_factor: 7.0, chunk_duration: 600, parallel: 1)
+  chunks = split_audio_chunks(audio_path, chunk_duration: chunk_duration)
+  return transcribe_whisper(audio_path, whisper_url, quiet: quiet, total_duration: total_duration, speed_factor: speed_factor) if chunks.size <= 1
+
+  all_segments = []
+  chunk_duration_est = chunk_duration.to_f
+  mutex = Mutex.new
+
+  workers = [parallel, chunks.size].min
+  threads = []
+
+  chunks.each_slice(workers) do |batch|
+    batch_results = []
+    batch_threads = []
+
+    batch.each_with_index do |chunk, batch_idx|
+      batch_threads << Thread.new do
+        idx = chunk[:index]
+        unless quiet
+          mutex.synchronize do
+            puts "\n📄 Transcribing chunk #{idx + 1}/#{chunks.size} (#{format_time(chunk[:actual_start])} -> #{format_time(chunk[:actual_end])})..."
+          end
+        end
+
+        chunk_data = transcribe_whisper(
+          chunk[:path],
+          whisper_url,
+          quiet: true,
+          total_duration: chunk_duration_est,
+          speed_factor: speed_factor
+        )
+
+        File.unlink(chunk[:path]) rescue nil
+
+        mutex.synchronize do
+          batch_results << { data: chunk_data, chunk: chunk }
+        end
+      end
+    end
+
+    batch_threads.each(&:join)
+
+    batch_results.each do |result|
+      chunk_data = result[:data]
+      chunk = result[:chunk]
+      next unless chunk_data && chunk_data['segments']
+
+      chunk_data['segments'].each do |seg|
+        seg_start = seg['start'].to_f + chunk[:start_offset]
+        seg_end = seg['end'].to_f + chunk[:start_offset]
+
+        next if seg_end <= chunk[:actual_start] || seg_start >= chunk[:actual_end]
+
+        seg['start'] = [seg_start, chunk[:actual_start]].max
+        seg['end'] = [seg_end, chunk[:actual_end]].min
+
+        if seg['words']
+          seg['words'].each do |w|
+            w['start'] = (w['start'].to_f + chunk[:start_offset]) rescue w['start']
+            w['end'] = (w['end'].to_f + chunk[:start_offset]) rescue w['end']
+          end
+        end
+
+        all_segments << seg
+      end
+    end
+  end
+
+  all_segments.sort_by! { |s| s['start'].to_f }
+
+  merged_segments = []
+  all_segments.each do |seg|
+    if merged_segments.empty?
+      merged_segments << seg
+    else
+      last = merged_segments.last
+      if seg['start'].to_f <= last['end'].to_f + 0.5
+        if seg['end'].to_f > last['end'].to_f
+          last['end'] = seg['end']
+          last['text'] = [last['text'], seg['text']].compact.join(' ')
+        end
+      else
+        merged_segments << seg
+      end
+    end
+  end
+
+  full_text = merged_segments.map { |s| s['text'] }.join(' ')
+
+  {
+    'text' => full_text,
+    'segments' => merged_segments,
+    'language' => (all_segments.first && all_segments.first['language']) || 'he'
+  }
 end
 
 def save_json_transcript(input_file, transcription_data, custom_path = nil, quiet: false)
@@ -918,7 +1064,8 @@ cli_options = {
   set_default: nil,
   list_llms: false,
   copy_opencode: false,
-  quiet: false
+  quiet: false,
+  use_chunks: false
 }
 
 OptionParser.new do |opts|
@@ -954,6 +1101,10 @@ OptionParser.new do |opts|
 
   opts.on('--no-transcript', 'Disable saving default .transcript.json file') do
     cli_options[:save_transcript] = false
+  end
+
+  opts.on('--use-chunks', 'Split long audio into chunks for more reliable transcription') do
+    cli_options[:use_chunks] = true
   end
 
   opts.on('-q', '--quiet', 'Suppress progress and informational output') do
@@ -1028,6 +1179,22 @@ else
 end
 
 batch_start_time = Time.now
+
+expanded_args = []
+ARGV.each do |arg|
+  if File.directory?(arg)
+    mp3_files = Dir.glob(File.join(arg, '**', '*.mp3')).sort
+    if mp3_files.empty?
+      puts "⚠️  No MP3 files found in directory '#{arg}'." unless cli_options[:quiet]
+    else
+      expanded_args.concat(mp3_files)
+    end
+  else
+    expanded_args << arg
+  end
+end
+ARGV.replace(expanded_args)
+
 total_files = ARGV.size
 
 ARGV.each_with_index do |input_file, idx|
@@ -1200,13 +1367,31 @@ ARGV.each_with_index do |input_file, idx|
     puts "⏱️  Step 1/3 (Transcript Loaded) finished in #{format_clock(step1_duration)}" unless cli_options[:quiet]
   else
     puts "🚀 Step 1/3: Transcribing audio via AMD GPU Whisper server..." unless cli_options[:quiet]
-    transcription_data = transcribe_whisper(
-      source_audio_file,
-      config['whisper_url'],
-      quiet: cli_options[:quiet],
-      total_duration: total_duration,
-      speed_factor: speed_factor
-    )
+    chunk_duration = (config['chunk_duration_sec'] || 600).to_i
+    use_chunks = cli_options[:use_chunks] || (chunk_duration > 0 && total_duration > chunk_duration * 1.5)
+
+    if use_chunks
+      parallel_chunks = (config['parallel_chunks'] || 1).to_i
+      puts "   📦 Audio is #{format_time(total_duration)} long — splitting into #{((total_duration / chunk_duration).ceil)} chunks of #{format_time(chunk_duration)} for reliability..." unless cli_options[:quiet]
+      puts "   ⚡ Parallel chunks: #{parallel_chunks}" if parallel_chunks > 1 && !cli_options[:quiet]
+      transcription_data = transcribe_chunks(
+        source_audio_file,
+        config['whisper_url'],
+        quiet: cli_options[:quiet],
+        total_duration: total_duration,
+        speed_factor: speed_factor,
+        chunk_duration: chunk_duration,
+        parallel: parallel_chunks
+      )
+    else
+      transcription_data = transcribe_whisper(
+        source_audio_file,
+        config['whisper_url'],
+        quiet: cli_options[:quiet],
+        total_duration: total_duration,
+        speed_factor: speed_factor
+      )
+    end
     step1_duration = Time.now - t0_step1
     puts "⏱️  Step 1/3 (Transcription) finished in #{format_clock(step1_duration)}" unless cli_options[:quiet]
     is_newly_transcribed = true
