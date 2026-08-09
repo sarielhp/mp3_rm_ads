@@ -14,32 +14,69 @@
 |--------|---------|
 | `scripts/check.sh` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `scripts/format.sh` | Run `gofmt -s -w .` only |
+| `scripts/lint.sh` | Static analysis: `go vet` + `staticcheck` |
+| `scripts/map.sh` | Print package structure, key types, and exported functions |
 | `scripts/version.sh` | Print current version from `VERSION` file |
 | `scripts/bump-version.sh` | Increment patch version (0.0.1) in `VERSION` |
 | `scripts/commit.sh <msg>` | Run quality gate, stage all, commit with message |
 | `scripts/push.sh` | Push to origin, then bump version |
+| `scripts/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
 | `scripts/ci.sh` | Full CI pipeline (runs check.sh) |
+
+## Makefile
+
+A `Makefile` at the project root delegates to all scripts:
+
+| Target | Action |
+|--------|--------|
+| `make check` | Full quality gate |
+| `make lint` | Static analysis (vet + staticcheck) |
+| `make test` | Run tests |
+| `make build` | Build binary |
+| `make format` | Format code |
+| `make map` | Show architecture overview |
+| `make version` | Show current version |
+| `make bump` | Bump patch version |
+| `make commit` | Quality gate + commit |
+| `make push` | Push + bump version |
+| `make checkpoint` | Micro-commit all changes |
+| `make ci` | CI pipeline |
+| `make clean` | Remove binary |
 
 ### Workflow
 
 ```
 # Standard development loop:
-scripts/commit.sh "feat: add new feature"   # checks + commits
-scripts/push.sh                              # pushes + bumps version
+make commit msg="feat: add new feature"   # checks + commits
+make push                                   # pushes + bumps version
 
 # Quick checks without commit:
-scripts/check.sh
+make check
+
+# Explore architecture before making changes:
+make map
+
+# Save work state during long sessions:
+make checkpoint
 
 # Manual version bump:
-scripts/bump-version.sh
+make bump
 ```
 
 ## Version Management
 
 - Version is stored in `VERSION` file (semver: `major.minor.patch`)
-- Current version: 0.1.0
+- Current version: 0.1.1
 - After every successful push, the patch version is automatically bumped by 0.0.1
 - The version is not embedded in the Go binary (VERSION file is the source of truth)
+
+## File Sizing
+
+- **Target**: 150–300 lines per file (~1.5k–3k tokens)
+- **Trigger**: Split into logical units when exceeding 600 lines
+- **Rationale**: Files under 300 lines keep AI agent context focused and reduce
+  diff-drift during AST-based edits. Files over 600 lines cause measurable
+  degradation in edit accuracy and token efficiency.
 
 ## Temp File Policy
 
@@ -111,6 +148,20 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 - Ad detection: LLM API (Ollama, OpenRouter, etc.)
 - Audio cutting: ffmpeg filter_complex with concat
 - Config: `~/.config/mp3_rm_ads/config.json`
+
+## Agent Development Rules
+
+1. **Verification**: After modifying any Go file, run `make check` to verify.
+2. **Error Resolution**: If `make check` fails, focus on fixing the first reported
+   error before making additional changes.
+3. **Exploration**: Run `make map` before introducing new types to inspect
+   existing structs and interfaces.
+4. **Checkpointing**: Run `make checkpoint` after passing checks to preserve
+   working states during long sessions.
+5. **File Length**: Keep source files between 150-300 lines. Split large structs
+   across sibling files in the same package when exceeding 600 lines.
+6. **Commit Messages**: Use conventional commits format:
+   `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
 
 ## Test Suite
 
