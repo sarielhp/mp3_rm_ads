@@ -9,10 +9,9 @@ fi
 
 msg="$*"
 
-bash scripts/check.sh
+bash scripts/check.sh > /dev/null 2>&1
 
-git add -A
-git commit -m "$msg"
+git add -A > /dev/null 2>&1
+git commit -m "$msg" > /dev/null 2>&1
 
-echo ""
-echo "Committed: $msg"
+echo "Success $msg"

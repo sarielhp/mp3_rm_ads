@@ -18,10 +18,8 @@
 | `scripts/map.sh` | Print package structure, key types, and exported functions |
 | `scripts/version.sh` | Print current version from `VERSION` file |
 | `scripts/bump-version.sh` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
-| `scripts/commit.sh <msg>` | Run quality gate, stage all, commit with message |
-| `scripts/push.sh` | Push to origin, then bump version |
+| `scripts/commit.sh <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
 | `scripts/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
-| `scripts/ci.sh` | Full CI pipeline (runs check.sh) |
 
 ## Makefile
 
@@ -38,19 +36,16 @@ A `Makefile` at the project root delegates to all scripts:
 | `make version` | Show current version |
 | `make bump` | Bump patch version |
 | `make commit` | Quality gate + commit |
-| `make push` | Git push |
+| `make push` | Alias for `make bump` |
 | `make checkpoint` | Micro-commit all changes |
-| `make ci` | CI pipeline |
+| `make ci` | Alias for `make check` |
 | `make clean` | Remove binary |
 
 ### Workflow
 
 ```
 # Standard development loop:
-make commit msg="feat: add new feature"   # checks + commits
-make push                                   # git push
-
-# Manual version bump + push:
+make commit ARGS="feat: add new feature"   # quality gate + commits (silent)
 make bump                                   # bumps version, commits, pushes (silent)
 
 # Quick checks without commit:

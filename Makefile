@@ -36,13 +36,11 @@ bump:
 	@./scripts/bump-version.sh
 
 commit:
-	@./scripts/commit.sh
+	@./scripts/commit.sh $(ARGS)
 
-push:
-	@./scripts/push.sh
+push: bump
 
-ci:
-	@./scripts/ci.sh
+ci: check
 
 checkpoint:
 	@./scripts/checkpoint.sh

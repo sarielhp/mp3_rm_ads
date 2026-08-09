@@ -3,9 +3,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 if [[ -n $(git status --porcelain) ]]; then
-    git add -A
-    git commit -m "wip: checkpoint [$(date +'%H:%M:%S')]" --no-verify
+    git add -A > /dev/null 2>&1
+    git commit -m "wip: checkpoint [$(date +'%H:%M:%S')]" --no-verify > /dev/null 2>&1
     echo "Checkpoint saved."
-else
-    echo "Nothing to checkpoint."
 fi
