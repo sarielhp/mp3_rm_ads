@@ -1,0 +1,227 @@
+package main
+
+import (
+	"os"
+	"testing"
+	"time"
+)
+
+func TestSetDefaultProfile(t *testing.T) {
+	cfg := &Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "A", "", "", "", ""}, {2, "B", "", "", "", ""}}}
+	setDefaultProfile(cfg, 2)
+	if cfg.ActiveProfileID != 2 {
+		t.Error("default not updated")
+	}
+}
+
+func TestResolveAudioFiles(t *testing.T) {
+	d := t.TempDir()
+	f := d + "/t.mp3"
+	os.WriteFile(f, []byte("x"), 0644)
+	main, precut, src := resolveAudioFiles(f, CLIOptions{Quiet: true})
+	if main != f || precut != f+".precut" || src != f {
+		t.Error("resolveAudioFiles failed")
+	}
+}
+
+func TestParseFlags(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+	os.Args = []string{"p", "-q", "--srt", "--txt", "f.mp3"}
+	cli := parseFlags()
+	if !cli.Quiet || !cli.ExportSRT || !cli.ExportTXT {
+		t.Error("parseFlags failed")
+	}
+}
+
+func TestDockerFetchLogs(t *testing.T) {
+	if r := fetchDockerLogs("", 10); r != "" {
+		t.Error("should be empty")
+	}
+}
+
+func TestDockerPollProgress(t *testing.T) {
+	if r := pollWhisperDockerProgress(""); r != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestDockerDetectContainer(t *testing.T) {
+	if r := detectWhisperDockerContainer("https://remote.example.com"); r != "" {
+		t.Error("should be empty")
+	}
+}
+
+func TestExtractKeywordsLLM(t *testing.T) {
+	if r := extractKeywordsLLM("t", LLMProfile{URL: "http://invalid:1", Model: "m"}, true); r != "" {
+		t.Error("should be empty")
+	}
+}
+
+func TestDetectAdsLLM(t *testing.T) {
+	if r := detectAdsLLM("t", LLMProfile{URL: "http://invalid:1", Model: "m"}); r != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestResolveOutputFile(t *testing.T) {
+	if r := resolveOutputFile("/p/t.mp3", CLIOptions{}, 1); r != "/p/t.mp3" {
+		t.Error("default output")
+	}
+	if r := resolveOutputFile("/p/t.mp3", CLIOptions{Output: "/o/e.mp3"}, 1); r != "/o/e.mp3" {
+		t.Error("custom output")
+	}
+}
+
+func TestPrintTimingSummary(t *testing.T) {
+	printTimingSummary(100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+}
+
+func TestPrintFullSummary(t *testing.T) {
+	printFullSummary(100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+}
+
+func TestListProfiles(t *testing.T) {
+	listProfiles(Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "T", "t", "http://t", "m", ""}}})
+}
+
+func TestPrintUsage(t *testing.T) { printUsage() }
+
+func TestHandleRecutNoCutsFile(t *testing.T) {
+	handleRecut("t.mp3", "t.mp3", "t.precut", "t_af.mp3", "t", 100, LLMProfile{}, CLIOptions{Quiet: true}, time.Now())
+}
+
+func TestHandleTranscribeMinNoTruncate(t *testing.T) {
+	s := "t.mp3"
+	if r := handleTranscribeMin(&s, 100, CLIOptions{TranscribeMin: "200m", Quiet: true}); r != 100 {
+		t.Error("should return original")
+	}
+}
+
+func TestStep1Duration(t *testing.T) {
+	d := step1Duration(time.Now())
+	if d < 0 {
+		t.Error("negative")
+	}
+}
+
+func TestCheckPrecutSymlink(t *testing.T) {
+	d := t.TempDir()
+	f := d + "/t.mp3"
+	os.WriteFile(f, []byte("x"), 0644)
+	checkPrecutSymlink(f)
+}
+
+func TestFindMP3FilesNoDir(t *testing.T) {
+	files := findMP3Files("/nonexistent")
+	if files != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestCopyFileNonexistent(t *testing.T) { copyFile("/nonexistent/src", "/nonexistent/dst") }
+
+func TestSafeMoveNonexistent(t *testing.T) { safeMove("/nonexistent/src", "/nonexistent/dst") }
+
+func TestCheckPrecutSymlinkNonexistent(t *testing.T) { checkPrecutSymlink("/nonexistent") }
+
+func TestExtractID3TagsNonexistent(t *testing.T) {
+	if tags := extractID3Tags("/nonexistent"); tags != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestGetAudioDurationNonexistent(t *testing.T) {
+	if d := getAudioDuration("/nonexistent"); d != 0 {
+		t.Error("should be 0")
+	}
+}
+
+func TestValidateWavFileNonexistent(t *testing.T) {
+	if validateWavFile("/nonexistent") {
+		t.Error("should be false")
+	}
+}
+
+func TestConvertToWAVNonexistent(t *testing.T) {
+	if convertToWAV("/nonexistent/in", "/nonexistent/out") {
+		t.Error("should be false")
+	}
+}
+
+func TestTruncateAudioNonexistent(t *testing.T) {
+	if truncateAudio("/nonexistent/in", "/nonexistent/out", 10) {
+		t.Error("should be false")
+	}
+}
+
+func TestCutAudioFFmpegEmpty(t *testing.T) {
+	if cutAudioFFmpeg("in", nil, "out") {
+		t.Error("should be false")
+	}
+}
+
+func TestExecCommand(t *testing.T) {
+	if cmd := execCommand("echo", "hello"); cmd == nil {
+		t.Error("nil cmd")
+	}
+}
+
+func TestFetchOpenRouterModels(t *testing.T) { _ = fetchOpenRouterModels() }
+
+func TestDockerDetectContainerLocalhost(t *testing.T) {
+	_ = detectWhisperDockerContainer("http://127.0.0.1:8080")
+}
+
+func TestDockerPollProgressWithContainer(t *testing.T) { _ = pollWhisperDockerProgress("nonexistent") }
+
+func TestDockerFetchLogsWithContainer(t *testing.T) { _ = fetchDockerLogs("nonexistent", 10) }
+
+func TestMatchProgressHMSNoMatch(t *testing.T) {
+	_, _, _, ok := matchProgressHMS("no")
+	if ok {
+		t.Error("should not match")
+	}
+}
+
+func TestMatchProgressMSNoMatch(t *testing.T) {
+	_, _, ok := matchProgressMS("no")
+	if ok {
+		t.Error("should not match")
+	}
+}
+
+func TestMatchProgressPercentNoMatch(t *testing.T) {
+	_, ok := matchProgressPercent("no")
+	if ok {
+		t.Error("should not match")
+	}
+}
+
+func TestExtractJSONArrayNoMatch(t *testing.T) {
+	if r := extractJSONArray("no"); r != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestExtractJSONArrayUnclosed(t *testing.T) {
+	if r := extractJSONArray("[unclosed"); r != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestExtractJSONArrayInvalid(t *testing.T) {
+	if r := extractJSONArray("[bad]"); r != nil {
+		t.Error("should be nil")
+	}
+}
+
+func TestSyncMutex(t *testing.T) { m := syncMutex{ch: make(chan struct{}, 1)}; m.Lock(); m.Unlock() }
+
+func TestSyncMu(t *testing.T) { var m syncMu; m.Lock(); m.Unlock() }
+
+func TestValidateTranscriptSanityZeroDuration(t *testing.T) {
+	if !validateTranscriptSanity(&TranscriptionData{}, 0, true) {
+		t.Error("should be true")
+	}
+}
