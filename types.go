@@ -129,6 +129,8 @@ type CLIOptions struct {
 	PodcastsDir     string
 	SetPodcastsDir  bool
 	IsConfigCommand bool
+	IsDirCommand    bool
+	ShowHelp        bool
 	ListLLMs        bool
 	CopyOpenCode    bool
 	Quiet           bool

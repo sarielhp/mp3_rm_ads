@@ -56,36 +56,60 @@ func main() {
 	}
 
 	args := flag.Args()
-	if len(args) == 0 {
+
+	var expandedArgs []string
+
+	if cli.IsDirCommand {
+		if len(args) == 0 {
+			printUsage()
+			os.Exit(1)
+		}
+		dir := args[0]
+		removeWorkDirs(dir)
+		mp3Files := findMP3Files(dir)
+		if len(mp3Files) == 0 {
+			if !cli.Quiet {
+				fmt.Printf("No MP3 files found in directory '%s'.\n", dir)
+			}
+			return
+		}
+		expandedArgs = mp3Files
+	} else if len(args) == 0 {
 		if config.PodcastsDir != "" {
-			args = []string{config.PodcastsDir}
+			removeWorkDirs(config.PodcastsDir)
+			mp3Files := findMP3Files(config.PodcastsDir)
+			if len(mp3Files) == 0 {
+				if !cli.Quiet {
+					fmt.Printf("No MP3 files found in directory '%s'.\n", config.PodcastsDir)
+				}
+				return
+			}
+			expandedArgs = mp3Files
 		} else {
 			printUsage()
 			return
 		}
+	} else {
+		for _, arg := range args {
+			info, err := os.Stat(arg)
+			if err == nil && info.IsDir() {
+				removeWorkDirs(arg)
+				mp3Files := findMP3Files(arg)
+				if len(mp3Files) == 0 {
+					if !cli.Quiet {
+						fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
+					}
+				} else {
+					expandedArgs = append(expandedArgs, mp3Files...)
+				}
+			} else {
+				expandedArgs = append(expandedArgs, arg)
+			}
+		}
 	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
-
 	batchStartTime := time.Now()
-
-	var expandedArgs []string
-	for _, arg := range args {
-		info, err := os.Stat(arg)
-		if err == nil && info.IsDir() {
-			removeWorkDirs(arg)
-			mp3Files := findMP3Files(arg)
-			if len(mp3Files) == 0 {
-				if !cli.Quiet {
-					fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
-				}
-			} else {
-				expandedArgs = append(expandedArgs, mp3Files...)
-			}
-		} else {
-			expandedArgs = append(expandedArgs, arg)
-		}
-	}
 
 	totalFiles := len(expandedArgs)
 
@@ -409,6 +433,14 @@ func testWhisperServer(whisperURL string) {
 }
 
 func parseFlags() CLIOptions {
+	for _, a := range os.Args[1:] {
+		switch a {
+		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
+			printUsage()
+			os.Exit(0)
+		}
+	}
+
 	cli := CLIOptions{
 		SaveTranscript: true,
 	}
@@ -416,6 +448,10 @@ func parseFlags() CLIOptions {
 	args := os.Args[1:]
 	if len(args) > 0 && args[0] == "config" {
 		cli.IsConfigCommand = true
+		args = args[1:]
+	}
+	if len(args) > 0 && args[0] == "dir" {
+		cli.IsDirCommand = true
 		args = args[1:]
 	}
 
@@ -468,12 +504,18 @@ func printUsage() {
 	fmt.Println("  mp3_rm_ads - Automatic Podcast Ad & Sponsor Segment Remover")
 	fmt.Printf("%s\n", repeatStr("=", 75))
 	fmt.Println("\nUSAGE:")
-	fmt.Println("  mp3_rm_ads <file1.mp3> [file2.mp3 ...] [options]")
-	fmt.Println("  mp3_rm_ads <transcript.json> [options]")
-	fmt.Println("  mp3_rm_ads config --podcasts_dir <dir>")
+	fmt.Println("  mp3_rm_ads [command] [options]")
+	fmt.Println("\nCOMMANDS:")
+	fmt.Println("  <file1.mp3> [file2.mp3 ...]    Process individual MP3 files (default)")
+	fmt.Println("  <transcript.json> [options]    Process a transcript JSON file")
+	fmt.Println("  dir <directory> [options]      Recursively process all MP3s in a directory")
+	fmt.Println("  config [options]               Manage configuration")
+	fmt.Println("\nIf no command is given and podcasts_dir is configured,")
+	fmt.Println("it is equivalent to: mp3_rm_ads dir <podcasts_dir>")
 	fmt.Println("\nOPTIONS:")
 	fmt.Println("  -o, --output PATH              Output MP3 path or directory")
 	fmt.Println("  -q, --quiet                    Suppress progress and informational output")
+	fmt.Println("  -v, --verbose                  Verbose output (show detailed info)")
 	fmt.Println("  --srt                          Export/convert transcript JSON to SubRip (.srt)")
 	fmt.Println("  --txt                          Export/convert transcript JSON to text (.txt)")
 	fmt.Println("  --recut                        Recut audio using .cuts.json (no Whisper/LLM)")
@@ -485,6 +527,7 @@ func printUsage() {
 	fmt.Println("  --force-transcribe             Force re-transcribing audio even if .transcript.json exists")
 	fmt.Println("  --use-llm ID_OR_NAME           Select active LLM profile by ID or name")
 	fmt.Println("  --list-llms                    List all configured LLM profiles and exit")
+	fmt.Println("  --list-profiles                List all configured LLM profiles and exit")
 	fmt.Println("  --set-default ID               Set default LLM profile ID in config file")
 	fmt.Println("  --podcasts_dir DIR             Set default podcasts/media directory in config file")
 	fmt.Println("  --copy_llm_from_opencode       Import LLM settings from OpenCode config")
@@ -493,6 +536,8 @@ func printUsage() {
 	fmt.Println("\nEXAMPLES:")
 	fmt.Println("  mp3_rm_ads episode.mp3")
 	fmt.Println("  mp3_rm_ads episode1.mp3 episode2.mp3 episode3.mp3")
+	fmt.Println("  mp3_rm_ads dir ~/podcasts")
+	fmt.Println("  mp3_rm_ads dir ~/podcasts -q")
 	fmt.Println("  mp3_rm_ads config --podcasts_dir /path/to/podcasts")
 	fmt.Println("  mp3_rm_ads --recut episode.mp3")
 	fmt.Println("  mp3_rm_ads -q --srt episode.mp3")
