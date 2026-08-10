@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 )
 
@@ -280,4 +281,4 @@ func osGetenv(key, defaultVal string) string {
 	return val
 }
 
-var envGetenv = func(key string) string { return "" }
+var envGetenv = os.Getenv

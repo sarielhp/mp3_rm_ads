@@ -18,7 +18,6 @@ var defaultConfig = Config{
 	WhisperURL:         "http://192.168.1.230:8088/inference",
 	WhisperSpeedFactor: 7.0,
 	ChunkDurationSec:   0,
-	ParallelChunks:     1,
 	ActiveProfileID:    1,
 	Profiles: []LLMProfile{
 		{ID: 1, Name: "Ollama Local (llama3.1:8b)", Type: "ollama", URL: "http://192.168.1.230:11434/v1/chat/completions", Model: "llama3.1:8b"},
@@ -87,25 +86,52 @@ func replaceIP(url, ip string) string {
 }
 
 func loadConfig() Config {
-	ensureConfigExists()
 	data, err := os.ReadFile(configPath())
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Failed to read config: %v. Using defaults.\n", err)
 		return defaultConfig
 	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "Warning: Failed to parse config: %v. Using defaults.\n", err)
 		return defaultConfig
 	}
 	return cfg
 }
 
+var testConfigPath string
+
 func saveConfig(cfg Config) {
 	dir := configDir()
 	os.MkdirAll(dir, 0755)
 	data, _ := json.MarshalIndent(cfg, "", "  ")
-	os.WriteFile(configPath(), append(data, '\n'), 0644)
+	path := configPath()
+	if testConfigPath != "" {
+		path = testConfigPath
+	}
+	os.WriteFile(path, append(data, '\n'), 0644)
+}
+
+func setPodcastsDir(cfg *Config, dir string) {
+	cfg.PodcastsDir = dir
+	saveConfig(*cfg)
+	fmt.Printf("Default podcasts directory updated to: '%s'\n", dir)
+}
+
+func printConfig(cfg Config) {
+	fmt.Printf("Configuration file: '%s'\n", configPath())
+	podcastsDir := cfg.PodcastsDir
+	if podcastsDir == "" {
+		podcastsDir = "(not set)"
+	}
+	fmt.Printf("  podcasts_dir:             %s\n", podcastsDir)
+	fmt.Printf("  whisper_url:              %s\n", cfg.WhisperURL)
+	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
+	if cfg.WhisperDockerContainer != "" {
+		fmt.Printf("  whisper_docker_container: %s\n", cfg.WhisperDockerContainer)
+	}
+	if cfg.WhisperLanguage != "" {
+		fmt.Printf("  whisper_language:         %s\n", cfg.WhisperLanguage)
+	}
+	fmt.Printf("  active_profile_id:        %d\n", cfg.ActiveProfileID)
 }
 
 func getProfileCost(profile LLMProfile) CostInfo {

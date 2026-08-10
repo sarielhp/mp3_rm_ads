@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net"
+	"os"
 	"testing"
 )
 
@@ -75,4 +76,41 @@ func TestGetProfileCostUnknown(t *testing.T) {
 	if c.Type != "Unknown" {
 		t.Errorf("got %q", c.Type)
 	}
+}
+
+func TestSetPodcastsDir(t *testing.T) {
+	orig := testConfigPath
+	testConfigPath = t.TempDir() + "/config.json"
+	defer func() { testConfigPath = orig }()
+
+	cfg := &Config{WhisperURL: "http://localhost:8088"}
+	setPodcastsDir(cfg, "/tmp/my_podcasts")
+
+	if cfg.PodcastsDir != "/tmp/my_podcasts" {
+		t.Errorf("expected /tmp/my_podcasts, got %q", cfg.PodcastsDir)
+	}
+
+	data, err := os.ReadFile(testConfigPath)
+	if err != nil || len(data) == 0 {
+		t.Errorf("failed to read saved config file: %v", err)
+	}
+}
+
+func TestPrintConfig(t *testing.T) {
+	cfg := Config{
+		PodcastsDir:            "/tmp/podcasts",
+		WhisperURL:             "http://localhost:8088",
+		WhisperSpeedFactor:     7.0,
+		WhisperDockerContainer: "whisper",
+		WhisperLanguage:        "en",
+		ActiveProfileID:        1,
+	}
+	printConfig(cfg)
+
+	cfgEmpty := Config{
+		WhisperURL:         "http://localhost:8088",
+		WhisperSpeedFactor: 7.0,
+		ActiveProfileID:    1,
+	}
+	printConfig(cfgEmpty)
 }

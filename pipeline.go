@@ -67,14 +67,13 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		if len(mergedIntervals) == 0 {
 			fmt.Println("No cut intervals specified in metadata!")
 		} else {
-			fmt.Printf("\n%s\n", repeatStr("=", 65))
-			fmt.Printf("CUT INTERVALS TO REMOVE (%d segment(s)):\n", len(mergedIntervals))
-			fmt.Printf("%s\n", repeatStr("=", 65))
+			fmt.Println()
+			fmt.Println("CUT INTERVALS TO REMOVE:")
 			for _, m := range mergedIntervals {
 				duration := m.End - m.Start
 				fmt.Printf("  - [%s -> %s] (%.1fs)\n", formatTime(m.Start), formatTime(m.End), duration)
 			}
-			fmt.Printf("%s\n\n", repeatStr("=", 65))
+			fmt.Println()
 		}
 	}
 
@@ -111,15 +110,13 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		fileTotalDuration := time.Since(fileStartTime)
 
 		if !cli.Quiet {
-			fmt.Printf("\n%s\n", repeatStr("=", 65))
+			fmt.Println()
 			fmt.Println("DURATION & TIME SAVED SUMMARY (RECUT):")
-			fmt.Printf("%s\n", repeatStr("=", 65))
 			fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
 			fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs)\n", formatTime(actualCut), actualCut)
 			fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
 			fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
 			fmt.Printf("  - Total Recut Time:        %s\n", formatClock(fileTotalDuration.Seconds()))
-			fmt.Printf("%s\n\n", repeatStr("=", 65))
 			fmt.Printf("Success! Recut ad-free episode saved to: '%s'\n", outputFile)
 		}
 	} else {
@@ -143,13 +140,15 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 		}
 		step1Duration := time.Since(*t0Step1)
 		if !cli.Quiet {
+			fmt.Println()
 			fmt.Printf("Step 1/3 (Transcript Loaded) finished in %s\n", formatClock(step1Duration.Seconds()))
 		}
 		return &td, nil
 	}
 
 	if !cli.Quiet {
-		fmt.Println("Step 1/3: Transcribing audio via AMD GPU Whisper server...")
+		fmt.Println()
+		fmt.Println(boldYellow("Step 1/3: Transcribing audio via AMD GPU Whisper server..."))
 	}
 
 	if whisperPrompt == "" {
@@ -166,17 +165,19 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 		tagText := strings.Join(tagTexts, "\n")
 		if tagText != "" {
 			if !cli.Quiet {
-				keys := make([]string, 0, len(id3Tags))
-				for k := range id3Tags {
-					keys = append(keys, k)
+				if cli.Verbose {
+					keys := make([]string, 0, len(id3Tags))
+					for k := range id3Tags {
+						keys = append(keys, k)
+					}
+					fmt.Printf("   Extracted ID3 metadata: %s\n", strings.Join(keys, ", "))
 				}
-				fmt.Printf("   Extracted ID3 metadata: %s\n", strings.Join(keys, ", "))
 				fmt.Println("   Extracting keywords from metadata to improve transcription accuracy...")
 			}
 			extracted := extractKeywordsLLM(tagText, selectedProfile, cli.Quiet)
 			if extracted != "" {
 				whisperPrompt = extracted
-				if !cli.Quiet {
+				if cli.Verbose {
 					fmt.Printf("   Using keywords: %s\n", whisperPrompt)
 				}
 			}
@@ -191,7 +192,7 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 	dockerContainer := config.WhisperDockerContainer
 	if dockerContainer == "" {
 		dockerContainer = detectWhisperDockerContainer(config.WhisperURL)
-		if !cli.Quiet && dockerContainer != "" {
+		if cli.Verbose && dockerContainer != "" {
 			fmt.Printf("   Auto-detected whisper Docker container: '%s'\n", dockerContainer)
 		}
 	}
@@ -206,10 +207,6 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 	var err error
 
 	if useChunks {
-		parallelChunks := config.ParallelChunks
-		if parallelChunks < 1 {
-			parallelChunks = 1
-		}
 		if !cli.Quiet {
 			numChunks := int(totalDuration / float64(chunkDuration))
 			if numChunks < 1 {
@@ -217,13 +214,10 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 			}
 			fmt.Printf("   Audio is %s long - splitting into %d chunks of %s for reliability...\n",
 				formatTime(totalDuration), numChunks, formatTime(float64(chunkDuration)))
-			if parallelChunks > 1 {
-				fmt.Printf("   Parallel chunks: %d\n", parallelChunks)
-			}
 		}
 		transcriptionData, err = transcribeChunks(
 			sourceAudioFile, config.WhisperURL, cli.Quiet,
-			totalDuration, speedFactor, chunkDuration, parallelChunks,
+			totalDuration, speedFactor, chunkDuration,
 			dockerContainer, whisperPromptArg, whisperLangArg,
 		)
 	} else {
@@ -242,7 +236,7 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 			}
 			transcriptionData, err = transcribeChunks(
 				sourceAudioFile, config.WhisperURL, cli.Quiet,
-				totalDuration, speedFactor, chunkDur, 1,
+				totalDuration, speedFactor, chunkDur,
 				dockerContainer, whisperPromptArg, whisperLangArg,
 			)
 		}

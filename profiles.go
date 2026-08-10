@@ -101,7 +101,7 @@ func resolveAudioFiles(inputFile string, cli CLIOptions) (mainMP3File, precutFil
 	if fileExists(precutFile) {
 		checkPrecutSymlink(precutFile)
 		sourceAudioFile = precutFile
-		if !cli.Quiet {
+		if cli.Verbose {
 			fmt.Printf("Found existing pre-cut audio source: '%s'\n", precutFile)
 		}
 	} else if fileExists(mainMP3File) {
@@ -163,9 +163,8 @@ func printTimingSummary(originalDuration, newDuration, actualCut float64, pctCut
 }
 
 func printFullSummary(totalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
-	fmt.Printf("\n%s\n", repeatStr("=", 65))
+	fmt.Println()
 	fmt.Println("DURATION & TIME SAVED SUMMARY:")
-	fmt.Printf("%s\n", repeatStr("=", 65))
 	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
 	fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs across %d segment(s))\n", formatTime(actualCut), actualCut, numAds)
 	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
@@ -175,5 +174,4 @@ func printFullSummary(totalDuration, newDuration, actualCut float64, pctCut floa
 	fmt.Printf("      - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
 	fmt.Printf("      - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
 	fmt.Printf("      - Total File Processing:  %s\n", formatClock(total.Seconds()))
-	fmt.Printf("%s\n\n", repeatStr("=", 65))
 }

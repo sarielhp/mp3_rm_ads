@@ -104,13 +104,13 @@ type LLMProfile struct {
 
 type Config struct {
 	Instructions           string       `json:"_instructions"`
+	PodcastsDir            string       `json:"podcasts_dir"`
 	WhisperURL             string       `json:"whisper_url"`
 	WhisperSpeedFactor     float64      `json:"whisper_speed_factor"`
 	WhisperDockerContainer string       `json:"whisper_docker_container"`
 	WhisperLanguage        string       `json:"whisper_language"`
 	WhisperPrompt          string       `json:"whisper_prompt"`
 	ChunkDurationSec       int          `json:"chunk_duration_sec"`
-	ParallelChunks         int          `json:"parallel_chunks"`
 	ActiveProfileID        int          `json:"active_profile_id"`
 	Profiles               []LLMProfile `json:"profiles"`
 }
@@ -126,12 +126,17 @@ type CLIOptions struct {
 	ForceTranscribe bool
 	UseLLM          string
 	SetDefault      int
+	PodcastsDir     string
+	SetPodcastsDir  bool
+	IsConfigCommand bool
 	ListLLMs        bool
 	CopyOpenCode    bool
 	Quiet           bool
+	Verbose         bool
 	UseChunks       bool
 	TranscribeMin   string
 	ExtractKeywords bool
+	TestWhisper     bool
 }
 
 type CostInfo struct {

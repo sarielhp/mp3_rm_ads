@@ -104,7 +104,14 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 		readTimeout = 600
 	}
 
+	var progressDone chan struct{}
+
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if progressDone != nil {
+			close(progressDone)
+		}
+		progressDone = make(chan struct{})
+
 		startTime := time.Now()
 
 		client := &http.Client{
@@ -118,44 +125,18 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 		req.Header.Set("Content-Type", w.FormDataContentType())
 
 		if !quiet {
-			go func() {
+			go func(done chan struct{}) {
 				for {
-					elapsed := time.Since(startTime)
-
-					dockerProgress := pollWhisperDockerProgress(dockerContainer)
-					if dp, ok := dockerProgress.(*failedToDecodeType); ok && dp == failedToDecodeSentinel {
-						fmt.Print("\rWhisper failed to decode audio (file too long or corrupted).\n")
+					select {
+					case <-done:
 						return
-					} else if pct, ok := dockerProgress.(float64); ok && pct <= 1.0 {
-						remaining := (elapsed.Seconds() / pct) - elapsed.Seconds()
-						if remaining < 0 {
-							remaining = 0
-						}
-						remStr := formatClock(remaining)
-						fmt.Printf("\rTranscribing audio... %5.1f%% | Elapsed: %s | Est. remaining: %s   ", pct*100, formatClock(elapsed.Seconds()), remStr)
-					} else if pos, ok := dockerProgress.(float64); ok && pos > 0 && totalDuration > 0 {
-						pct := pos / totalDuration
-						if pct > 0.99 {
-							pct = 0.99
-						}
-						remaining := (elapsed.Seconds() / pct) - elapsed.Seconds()
-						if remaining < 0 {
-							remaining = 0
-						}
-						fmt.Printf("\rTranscribing audio... %5.1f%% | Elapsed: %s | Est. remaining: %s   ", pct*100, formatClock(elapsed.Seconds()), formatClock(remaining))
-					} else if estTranscribeSeconds > 0 {
-						remaining := estTranscribeSeconds - elapsed.Seconds()
-						if remaining < 0 {
-							remaining = 0
-						}
-						fmt.Printf("\rTranscribing audio... Elapsed: %s | Est. remaining: %s   ", formatClock(elapsed.Seconds()), formatClock(remaining))
-					} else {
+					default:
+						elapsed := time.Since(startTime)
 						fmt.Printf("\rTranscribing audio... Elapsed: %s   ", formatClock(elapsed.Seconds()))
+						time.Sleep(2 * time.Second)
 					}
-
-					time.Sleep(2 * time.Second)
 				}
-			}()
+			}(progressDone)
 		}
 
 		resp, err := client.Do(req)
@@ -168,6 +149,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 				time.Sleep(time.Duration(retryDelay) * time.Second)
 				continue
 			}
+			close(progressDone)
 			return nil, fmt.Errorf("failed to connect to Whisper GPU server at '%s' after %d attempts: %w", whisperURL, maxRetries, err)
 		}
 		defer resp.Body.Close()
@@ -180,12 +162,15 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(resp.Body)
 			if err != nil {
+				close(progressDone)
 				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 			var data TranscriptionData
 			if err := json.Unmarshal(body, &data); err != nil {
+				close(progressDone)
 				return nil, fmt.Errorf("failed to parse transcription JSON: %w", err)
 			}
+			close(progressDone)
 			return &data, nil
 		}
 
@@ -201,10 +186,11 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 		}
 	}
 
+	close(progressDone)
 	return nil, fmt.Errorf("whisper transcription failed after %d attempts", maxRetries)
 }
 
-func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, speedFactor float64, chunkDuration int, parallel int, dockerContainer string, prompt, language string) (*TranscriptionData, error) {
+func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*TranscriptionData, error) {
 	overlap := 30.0
 	maxChunk := float64(chunkDuration)
 	if maxChunk > 1200.0 {
@@ -291,149 +277,105 @@ func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, s
 	}
 
 	var allResults []chunkResult
-	var mu syncMu
-	workers := parallel
-	if workers > len(chunks) {
-		workers = len(chunks)
-	}
 
-	for i := 0; i < len(chunks); i += workers {
-		end := i + workers
-		if end > len(chunks) {
-			end = len(chunks)
+	for _, ch := range chunks {
+		if !quiet {
+			chunkLen := ch.actualEnd - ch.actualStart
+			fmt.Printf("\nWorking on chunk %d/%d: %s -> %s (%s)\n",
+				ch.index+1, numChunks,
+				formatTime(ch.actualStart), formatTime(ch.actualEnd), formatTime(chunkLen))
 		}
 
-		type batchResult struct {
-			data  *TranscriptionData
-			chunk chunkInfo
+		chunkPath := filepath.Join(workDir, fmt.Sprintf("chunk_%04d.wav", ch.index))
+		pcmData := make([]byte, ch.dataSize)
+		f, err := os.Open(wavPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open WAV for chunk %d: %w", ch.index, err)
 		}
-		var batchResults []batchResult
-		var batchMu syncMu
-
-		var wg syncWG
-		for _, ch := range chunks[i:end] {
-			ch := ch
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				if !quiet {
-					mu.Lock()
-					chunkLen := ch.actualEnd - ch.actualStart
-					fmt.Printf("\nWorking on chunk %d/%d: %s -> %s (%s)\n",
-						ch.index+1, numChunks,
-						formatTime(ch.actualStart), formatTime(ch.actualEnd), formatTime(chunkLen))
-					mu.Unlock()
-				}
-
-				chunkPath := filepath.Join(workDir, fmt.Sprintf("chunk_%04d.wav", ch.index))
-				pcmData := make([]byte, ch.dataSize)
-				f, err := os.Open(wavPath)
-				if err != nil {
-					return
-				}
-				_, err = f.ReadAt(pcmData, 44+ch.startByte)
-				f.Close()
-				if err != nil {
-					return
-				}
-
-				header := buildWavHeader(len(pcmData))
-				os.WriteFile(chunkPath, append(header, pcmData...), 0644)
-
-				if !validateWavFile(chunkPath) {
-					mu.Lock()
-					fmt.Printf("Chunk %d failed WAV validation\n", ch.index+1)
-					mu.Unlock()
-					return
-				}
-
-				chunkData, err := transcribeWhisper(
-					chunkPath, whisperURL, quiet,
-					ch.actualEnd-ch.actualStart, speedFactor,
-					dockerContainer, prompt, language, nil,
-				)
-				if err != nil {
-					return
-				}
-
-				os.Remove(chunkPath)
-
-				batchMu.Lock()
-				batchResults = append(batchResults, batchResult{data: chunkData, chunk: ch})
-				batchMu.Unlock()
-			}()
+		_, err = f.ReadAt(pcmData, 44+ch.startByte)
+		f.Close()
+		if err != nil {
+			return nil, fmt.Errorf("failed to read PCM data for chunk %d: %w", ch.index, err)
 		}
-		wg.Wait()
 
-		for _, br := range batchResults {
-			chunkData := br.data
-			ch := br.chunk
-			if chunkData == nil {
-				continue
-			}
+		header := buildWavHeader(len(pcmData))
+		os.WriteFile(chunkPath, append(header, pcmData...), 0644)
 
-			isFirst := ch.index == 0
-			isLast := ch.index == numChunks-1
-			cutStart := ch.actualStart
-			cutEnd := ch.actualEnd
+		if !validateWavFile(chunkPath) {
+			return nil, fmt.Errorf("chunk %d failed WAV validation", ch.index+1)
+		}
 
-			for _, seg := range chunkData.Segments {
-				segStart := seg.Start + ch.extractStart
-				segEnd := seg.End + ch.extractStart
+		chunkData, err := transcribeWhisper(
+			chunkPath, whisperURL, quiet,
+			ch.actualEnd-ch.actualStart, speedFactor,
+			dockerContainer, prompt, language, nil,
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to transcribe chunk %d: %w", ch.index+1, err)
+		}
 
-				if isFirst {
-					if segEnd <= cutStart {
-						continue
-					}
-					if segStart < cutStart {
-						seg.Start = cutStart
-					} else {
-						seg.Start = segStart
-					}
-					if segEnd > cutEnd {
-						seg.End = cutEnd
-					} else {
-						seg.End = segEnd
-					}
-				} else if isLast {
-					if segStart >= cutEnd {
-						continue
-					}
-					if segStart < cutStart {
-						seg.Start = cutStart
-					} else {
-						seg.Start = segStart
-					}
-					if segEnd > cutEnd {
-						seg.End = cutEnd
-					} else {
-						seg.End = segEnd
-					}
+		os.Remove(chunkPath)
+
+		isFirst := ch.index == 0
+		isLast := ch.index == numChunks-1
+		cutStart := ch.actualStart
+		cutEnd := ch.actualEnd
+
+		for _, seg := range chunkData.Segments {
+			segStart := seg.Start + ch.extractStart
+			segEnd := seg.End + ch.extractStart
+
+			if isFirst {
+				if segEnd <= cutStart {
+					continue
+				}
+				if segStart < cutStart {
+					seg.Start = cutStart
 				} else {
-					mid := cutEnd
-					if segStart >= mid {
-						continue
-					}
-					if segStart < cutStart {
-						seg.Start = cutStart
-					} else {
-						seg.Start = segStart
-					}
-					if segEnd > mid {
-						seg.End = mid
-					} else {
-						seg.End = segEnd
-					}
+					seg.Start = segStart
 				}
-
-				for i := range seg.Words {
-					seg.Words[i].Start += ch.extractStart
-					seg.Words[i].End += ch.extractStart
+				if segEnd > cutEnd {
+					seg.End = cutEnd
+				} else {
+					seg.End = segEnd
 				}
-
-				allResults = append(allResults, chunkResult{data: chunkData, chunk: ch})
+			} else if isLast {
+				if segStart >= cutEnd {
+					continue
+				}
+				if segStart < cutStart {
+					seg.Start = cutStart
+				} else {
+					seg.Start = segStart
+				}
+				if segEnd > cutEnd {
+					seg.End = cutEnd
+				} else {
+					seg.End = segEnd
+				}
+			} else {
+				mid := cutEnd
+				if segStart >= mid {
+					continue
+				}
+				if segStart < cutStart {
+					seg.Start = cutStart
+				} else {
+					seg.Start = segStart
+				}
+				if segEnd > mid {
+					seg.End = mid
+				} else {
+					seg.End = segEnd
+				}
 			}
+
+			for i := range seg.Words {
+				seg.Words[i].Start += ch.extractStart
+				seg.Words[i].End += ch.extractStart
+			}
+
+			allResults = append(allResults, chunkResult{data: chunkData, chunk: ch})
 		}
 	}
 
@@ -509,52 +451,4 @@ func trimSpace(s string) string {
 		end--
 	}
 	return s[start:end]
-}
-
-type syncMu struct {
-	mu syncMutex
-}
-
-func (m *syncMu) Lock() {
-	m.mu.Lock()
-}
-
-func (m *syncMu) Unlock() {
-	m.mu.Unlock()
-}
-
-type syncMutex struct {
-	ch chan struct{}
-}
-
-func (m *syncMutex) Lock() {
-	if m.ch == nil {
-		m.ch = make(chan struct{}, 1)
-	}
-	m.ch <- struct{}{}
-}
-
-func (m *syncMutex) Unlock() {
-	<-m.ch
-}
-
-type syncWG struct {
-	ch chan struct{}
-}
-
-func (wg *syncWG) Add(n int) {
-	if wg.ch == nil {
-		wg.ch = make(chan struct{}, 1)
-	}
-}
-
-func (wg *syncWG) Done() {
-	wg.ch <- struct{}{}
-}
-
-func (wg *syncWG) Wait() {
-	if wg.ch == nil {
-		return
-	}
-	<-wg.ch
 }

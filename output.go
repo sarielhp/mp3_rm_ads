@@ -159,6 +159,9 @@ func findMP3Files(dir string) []string {
 	}
 	for _, entry := range entries {
 		if entry.IsDir() {
+			if entry.Name() == ".work" {
+				continue
+			}
 			subFiles := findMP3Files(filepath.Join(dir, entry.Name()))
 			files = append(files, subFiles...)
 		} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".mp3") {

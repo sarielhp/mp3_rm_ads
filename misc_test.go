@@ -7,6 +7,9 @@ import (
 )
 
 func TestSetDefaultProfile(t *testing.T) {
+	orig := testConfigPath
+	testConfigPath = t.TempDir() + "/config.json"
+	defer func() { testConfigPath = orig }()
 	cfg := &Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "A", "", "", "", ""}, {2, "B", "", "", "", ""}}}
 	setDefaultProfile(cfg, 2)
 	if cfg.ActiveProfileID != 2 {
@@ -31,6 +34,16 @@ func TestParseFlags(t *testing.T) {
 	cli := parseFlags()
 	if !cli.Quiet || !cli.ExportSRT || !cli.ExportTXT {
 		t.Error("parseFlags failed")
+	}
+}
+
+func TestParseFlagsConfigPodcastsDir(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+	os.Args = []string{"mp3_rm_ads", "config", "--podcasts_dir", "/path/to/podcasts"}
+	cli := parseFlags()
+	if !cli.IsConfigCommand || cli.PodcastsDir != "/path/to/podcasts" {
+		t.Errorf("expected IsConfigCommand=true, PodcastsDir='/path/to/podcasts', got %v, %q", cli.IsConfigCommand, cli.PodcastsDir)
 	}
 }
 
@@ -215,10 +228,6 @@ func TestExtractJSONArrayInvalid(t *testing.T) {
 		t.Error("should be nil")
 	}
 }
-
-func TestSyncMutex(t *testing.T) { m := syncMutex{ch: make(chan struct{}, 1)}; m.Lock(); m.Unlock() }
-
-func TestSyncMu(t *testing.T) { var m syncMu; m.Lock(); m.Unlock() }
 
 func TestValidateTranscriptSanityZeroDuration(t *testing.T) {
 	if !validateTranscriptSanity(&TranscriptionData{}, 0, true) {
