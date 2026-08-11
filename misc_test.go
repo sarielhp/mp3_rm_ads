@@ -4,6 +4,8 @@ import (
 	"os"
 	"testing"
 	"time"
+
+	"github.com/sarielhp/clihelp"
 )
 
 func TestSetDefaultProfile(t *testing.T) {
@@ -98,7 +100,7 @@ func TestListProfiles(t *testing.T) {
 	listProfiles(Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "T", "t", "http://t", "m", ""}}})
 }
 
-func TestPrintUsage(t *testing.T) { printUsage() }
+func TestPrintUsage(t *testing.T) { clihelp.PrintGlobalUsage(buildUsageApp()) }
 
 func TestHandleRecutNoCutsFile(t *testing.T) {
 	handleRecut("t.mp3", "t.mp3", "t.precut", "t_af.mp3", "t", 100, LLMProfile{}, CLIOptions{Quiet: true}, time.Now())

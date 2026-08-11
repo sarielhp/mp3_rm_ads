@@ -11,6 +11,8 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/sarielhp/clihelp"
 )
 
 func main() {
@@ -32,7 +34,11 @@ func main() {
 	}
 
 	if cli.IsConfigCommand {
-		printConfig(config)
+		if cli.SetPodcastsDir || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
+			printConfig(config)
+		} else {
+			clihelp.PrintCommandUsage(buildUsageApp(), "config")
+		}
 		return
 	}
 
@@ -61,7 +67,7 @@ func main() {
 
 	if cli.IsDirCommand {
 		if len(args) == 0 {
-			printUsage()
+			clihelp.PrintCommandUsage(buildUsageApp(), "dir")
 			os.Exit(1)
 		}
 		dir := args[0]
@@ -74,6 +80,12 @@ func main() {
 			return
 		}
 		expandedArgs = mp3Files
+	} else if cli.IsFileCommand {
+		if len(args) == 0 {
+			clihelp.PrintCommandUsage(buildUsageApp(), "file")
+			os.Exit(1)
+		}
+		expandedArgs = args
 	} else if len(args) == 0 {
 		if config.PodcastsDir != "" {
 			removeWorkDirs(config.PodcastsDir)
@@ -86,26 +98,12 @@ func main() {
 			}
 			expandedArgs = mp3Files
 		} else {
-			printUsage()
+			clihelp.PrintGlobalUsage(buildUsageApp())
 			return
 		}
 	} else {
-		for _, arg := range args {
-			info, err := os.Stat(arg)
-			if err == nil && info.IsDir() {
-				removeWorkDirs(arg)
-				mp3Files := findMP3Files(arg)
-				if len(mp3Files) == 0 {
-					if !cli.Quiet {
-						fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
-					}
-				} else {
-					expandedArgs = append(expandedArgs, mp3Files...)
-				}
-			} else {
-				expandedArgs = append(expandedArgs, arg)
-			}
-		}
+		clihelp.PrintGlobalUsage(buildUsageApp())
+		os.Exit(1)
 	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
@@ -433,26 +431,40 @@ func testWhisperServer(whisperURL string) {
 }
 
 func parseFlags() CLIOptions {
-	for _, a := range os.Args[1:] {
-		switch a {
-		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
-			printUsage()
-			os.Exit(0)
-		}
-	}
-
 	cli := CLIOptions{
 		SaveTranscript: true,
 	}
 
 	args := os.Args[1:]
-	if len(args) > 0 && args[0] == "config" {
-		cli.IsConfigCommand = true
-		args = args[1:]
+
+	var detectedCommand string
+	if len(args) > 0 {
+		switch args[0] {
+		case "config":
+			cli.IsConfigCommand = true
+			detectedCommand = "config"
+			args = args[1:]
+		case "dir":
+			cli.IsDirCommand = true
+			detectedCommand = "dir"
+			args = args[1:]
+		case "file":
+			cli.IsFileCommand = true
+			detectedCommand = "file"
+			args = args[1:]
+		}
 	}
-	if len(args) > 0 && args[0] == "dir" {
-		cli.IsDirCommand = true
-		args = args[1:]
+
+	for _, a := range args {
+		switch a {
+		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
+			if detectedCommand != "" {
+				clihelp.PrintCommandUsage(buildUsageApp(), detectedCommand)
+			} else {
+				clihelp.PrintGlobalUsage(buildUsageApp())
+			}
+			os.Exit(0)
+		}
 	}
 
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -483,10 +495,15 @@ func parseFlags() CLIOptions {
 	flag.BoolVar(&cli.CopyOpenCode, "copy_llm_from_opencode", false, "Import LLM settings from OpenCode config")
 	flag.BoolVar(&cli.TestWhisper, "test-whisper", false, "Test whisper server connection and exit")
 
-	flag.Usage = printUsage
+	flag.Usage = func() {
+		if detectedCommand != "" {
+			clihelp.PrintCommandUsage(buildUsageApp(), detectedCommand)
+		} else {
+			clihelp.PrintGlobalUsage(buildUsageApp())
+		}
+	}
 	flag.CommandLine.Parse(args)
 
-	// Handle flags visited
 	flag.Visit(func(f *flag.Flag) {
 		if f.Name == "no-transcript" {
 			cli.SaveTranscript = false
@@ -499,50 +516,82 @@ func parseFlags() CLIOptions {
 	return cli
 }
 
-func printUsage() {
-	fmt.Printf("\n%s\n", repeatStr("=", 75))
-	fmt.Println("  mp3_rm_ads - Automatic Podcast Ad & Sponsor Segment Remover")
-	fmt.Printf("%s\n", repeatStr("=", 75))
-	fmt.Println("\nUSAGE:")
-	fmt.Println("  mp3_rm_ads [command] [options]")
-	fmt.Println("\nCOMMANDS:")
-	fmt.Println("  <file1.mp3> [file2.mp3 ...]    Process individual MP3 files (default)")
-	fmt.Println("  <transcript.json> [options]    Process a transcript JSON file")
-	fmt.Println("  dir <directory> [options]      Recursively process all MP3s in a directory")
-	fmt.Println("  config [options]               Manage configuration")
-	fmt.Println("\nIf no command is given and podcasts_dir is configured,")
-	fmt.Println("it is equivalent to: mp3_rm_ads dir <podcasts_dir>")
-	fmt.Println("\nOPTIONS:")
-	fmt.Println("  -o, --output PATH              Output MP3 path or directory")
-	fmt.Println("  -q, --quiet                    Suppress progress and informational output")
-	fmt.Println("  -v, --verbose                  Verbose output (show detailed info)")
-	fmt.Println("  --srt                          Export/convert transcript JSON to SubRip (.srt)")
-	fmt.Println("  --txt                          Export/convert transcript JSON to text (.txt)")
-	fmt.Println("  --recut                        Recut audio using .cuts.json (no Whisper/LLM)")
-	fmt.Println("  --no-transcript                Disable saving default .transcript.json file")
-	fmt.Println("  --use-chunks                   Split long audio into chunks for reliable transcription")
-	fmt.Println("  --extract-keywords             Extract keywords via LLM to improve Whisper accuracy")
-	fmt.Println("  -t, --transcribe-minutes Nm    Only transcribe first N minutes (e.g. -t 10m)")
-	fmt.Println("  --force-llm                    Force re-running LLM ad detection even if .cuts.json exists")
-	fmt.Println("  --force-transcribe             Force re-transcribing audio even if .transcript.json exists")
-	fmt.Println("  --use-llm ID_OR_NAME           Select active LLM profile by ID or name")
-	fmt.Println("  --list-llms                    List all configured LLM profiles and exit")
-	fmt.Println("  --list-profiles                List all configured LLM profiles and exit")
-	fmt.Println("  --set-default ID               Set default LLM profile ID in config file")
-	fmt.Println("  --podcasts_dir DIR             Set default podcasts/media directory in config file")
-	fmt.Println("  --copy_llm_from_opencode       Import LLM settings from OpenCode config")
-	fmt.Println("  --test-whisper                  Test whisper server connection and exit")
-	fmt.Println("  -h, --help                     Show this detailed usage message")
-	fmt.Println("\nEXAMPLES:")
-	fmt.Println("  mp3_rm_ads episode.mp3")
-	fmt.Println("  mp3_rm_ads episode1.mp3 episode2.mp3 episode3.mp3")
-	fmt.Println("  mp3_rm_ads dir ~/podcasts")
-	fmt.Println("  mp3_rm_ads dir ~/podcasts -q")
-	fmt.Println("  mp3_rm_ads config --podcasts_dir /path/to/podcasts")
-	fmt.Println("  mp3_rm_ads --recut episode.mp3")
-	fmt.Println("  mp3_rm_ads -q --srt episode.mp3")
-	fmt.Println("  mp3_rm_ads episode.transcript.json -srt -txt")
-	fmt.Println("  mp3_rm_ads --use-llm 2 episode.mp3")
-	fmt.Println("  mp3_rm_ads --copy_llm_from_opencode")
-	fmt.Printf("%s\n\n", repeatStr("=", 75))
+func buildUsageApp() *clihelp.App {
+	return &clihelp.App{
+		Name:        "mp3_rm_ads",
+		Description: "Automatic Podcast Ad & Sponsor Segment Remover",
+		GlobalNote:  "If no command is given and podcasts_dir is configured, it is equivalent to: mp3_rm_ads dir <podcasts_dir>",
+		Commands: []clihelp.Command{
+			{
+				Name:        "file",
+				Description: "Process individual MP3 or transcript JSON files",
+				UsageLine:   "mp3_rm_ads file <file1.mp3> [file2.mp3 ...] [options]",
+				Options:     globalOptions(),
+				Examples:    fileExamples(),
+			},
+			{
+				Name:        "dir",
+				Description: "Recursively process all MP3s in a directory",
+				UsageLine:   "mp3_rm_ads dir <directory> [options]",
+				Options:     globalOptions(),
+				Examples: []clihelp.Example{
+					{Line: "mp3_rm_ads dir ~/podcasts"},
+					{Line: "mp3_rm_ads dir ~/podcasts -q"},
+				},
+			},
+			{
+				Name:        "config",
+				Description: "Manage configuration",
+				UsageLine:   "mp3_rm_ads config [options]",
+				Options: []clihelp.Option{
+					{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
+					{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
+					{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
+					{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
+				},
+				Examples: []clihelp.Example{
+					{Line: "mp3_rm_ads config --podcasts_dir /path/to/podcasts"},
+					{Line: "mp3_rm_ads config --list-llms"},
+					{Line: "mp3_rm_ads config --set-default 2"},
+					{Line: "mp3_rm_ads config --copy_llm_from_opencode"},
+				},
+			},
+		},
+	}
+}
+
+func globalOptions() []clihelp.Option {
+	return []clihelp.Option{
+		{Flags: "-o, --output PATH", Description: "Output MP3 path or directory"},
+		{Flags: "-q, --quiet", Description: "Suppress progress and informational output"},
+		{Flags: "-v, --verbose", Description: "Verbose output (show detailed info)"},
+		{Flags: "--srt", Description: "Export/convert transcript JSON to SubRip (.srt)"},
+		{Flags: "--txt", Description: "Export/convert transcript JSON to text (.txt)"},
+		{Flags: "--recut", Description: "Recut audio using .cuts.json (no Whisper/LLM)"},
+		{Flags: "--no-transcript", Description: "Disable saving default .transcript.json file"},
+		{Flags: "--use-chunks", Description: "Split long audio into chunks for reliable transcription"},
+		{Flags: "--extract-keywords", Description: "Extract keywords via LLM to improve Whisper accuracy"},
+		{Flags: "-t, --transcribe-minutes Nm", Description: "Only transcribe first N minutes (e.g. -t 10m)"},
+		{Flags: "--force-llm", Description: "Force re-running LLM ad detection even if .cuts.json exists"},
+		{Flags: "--force-transcribe", Description: "Force re-transcribing audio even if .transcript.json exists"},
+		{Flags: "--use-llm ID_OR_NAME", Description: "Select active LLM profile by ID or name"},
+		{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
+		{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
+		{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
+		{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
+		{Flags: "--test-whisper", Description: "Test whisper server connection and exit"},
+		{Flags: "-h, --help", Description: "Show this detailed usage message"},
+	}
+}
+
+func fileExamples() []clihelp.Example {
+	return []clihelp.Example{
+		{Line: "mp3_rm_ads file episode.mp3"},
+		{Line: "mp3_rm_ads file episode1.mp3 episode2.mp3 episode3.mp3"},
+		{Line: "mp3_rm_ads file --recut episode.mp3"},
+		{Line: "mp3_rm_ads file -q --srt episode.mp3"},
+		{Line: "mp3_rm_ads file episode.transcript.json -srt -txt"},
+		{Line: "mp3_rm_ads file --use-llm 2 episode.mp3"},
+		{Line: "mp3_rm_ads file --copy_llm_from_opencode"},
+	}
 }
