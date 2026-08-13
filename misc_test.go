@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -340,5 +342,28 @@ func TestParseFlagsSilent(t *testing.T) {
 	cli = parseFlags()
 	if !cli.Silent {
 		t.Error("expected Silent=true for --silent")
+	}
+}
+
+func TestScanningDirectoryOutput(t *testing.T) {
+	d := t.TempDir()
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{}
+	if !cli.Quiet {
+		fmt.Printf("Scanning: %s\n", d)
+	}
+
+	w.Close()
+	os.Stdout = oldStdout
+
+	var buf [512]byte
+	n, _ := r.Read(buf[:])
+	out := string(buf[:n])
+	if !strings.Contains(out, "Scanning: "+d) {
+		t.Errorf("expected output to contain 'Scanning: %s', got %q", d, out)
 	}
 }

@@ -132,6 +132,9 @@ func main() {
 			os.Exit(1)
 		}
 		dir := args[0]
+		if !cli.Quiet {
+			fmt.Printf("Scanning: %s\n", dir)
+		}
 		removeWorkDirs(dir)
 		mp3Files := findMP3Files(dir)
 		if len(mp3Files) == 0 {
@@ -149,6 +152,9 @@ func main() {
 		expandedArgs = args
 	} else if len(args) == 0 {
 		if config.PodcastsDir != "" {
+			if !cli.Quiet {
+				fmt.Printf("Scanning: %s\n", config.PodcastsDir)
+			}
 			removeWorkDirs(config.PodcastsDir)
 			mp3Files := findMP3Files(config.PodcastsDir)
 			if len(mp3Files) == 0 {
