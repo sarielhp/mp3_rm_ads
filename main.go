@@ -31,7 +31,8 @@ func main() {
 		origStdout.Sync()
 		origStderr.Sync()
 
-		tmp, err := os.CreateTemp("", "mp3_rm_ads_silent_*.log")
+		tmpDir := userTmpDir()
+		tmp, err := os.CreateTemp(tmpDir, "mp3_rm_ads_silent_*.log")
 		if err == nil {
 			silentLogFile = tmp
 			silentLogPath = tmp.Name()

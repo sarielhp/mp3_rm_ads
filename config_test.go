@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -113,4 +114,29 @@ func TestPrintConfig(t *testing.T) {
 		ActiveProfileID:    1,
 	}
 	printConfig(cfgEmpty)
+}
+
+func TestUserTmpDir(t *testing.T) {
+	dir := userTmpDir()
+	if !strings.Contains(dir, "mp3_rm_ads") {
+		t.Errorf("expected dir to contain 'mp3_rm_ads', got %q", dir)
+	}
+	info, err := os.Stat(dir)
+	if err != nil || !info.IsDir() {
+		t.Errorf("expected directory to exist, got err=%v", err)
+	}
+
+	origUser := os.Getenv("USER")
+	origLogname := os.Getenv("LOGNAME")
+	defer func() {
+		os.Setenv("USER", origUser)
+		os.Setenv("LOGNAME", origLogname)
+	}()
+
+	os.Setenv("USER", "testuser123")
+	dirUser := userTmpDir()
+	if !strings.Contains(dirUser, "testuser123") || !strings.Contains(dirUser, "mp3_rm_ads") {
+		t.Errorf("expected dir to contain 'testuser123' and 'mp3_rm_ads', got %q", dirUser)
+	}
+	os.RemoveAll(dirUser)
 }

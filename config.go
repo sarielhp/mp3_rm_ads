@@ -27,10 +27,23 @@ var defaultConfig = Config{
 	},
 }
 
+func userTmpDir() string {
+	username := os.Getenv("USER")
+	if username == "" {
+		username = os.Getenv("LOGNAME")
+	}
+	if username == "" {
+		username = "user"
+	}
+	dir := filepath.Join(os.TempDir(), username, "mp3_rm_ads")
+	_ = os.MkdirAll(dir, 0755)
+	return dir
+}
+
 func configDir() string {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return filepath.Join(os.TempDir(), configDirName)
+		return userTmpDir()
 	}
 	return filepath.Join(home, configDirName)
 }
