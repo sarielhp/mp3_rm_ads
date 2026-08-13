@@ -150,28 +150,36 @@ func step1Duration(t0 time.Time) time.Duration {
 	return time.Since(t0)
 }
 
-func printTimingSummary(originalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
+func printTimingSummary(verbose bool, originalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println("\nTIMING SUMMARY:")
 	fmt.Printf("   - Original Length:     %s (%.1fs)\n", formatTime(originalDuration), originalDuration)
 	fmt.Printf("   - Time Cut:            %s (%.1fs)\n", formatTime(actualCut), actualCut)
 	fmt.Printf("   - New Episode Length:  %s (%.1fs)\n", formatTime(newDuration), newDuration)
-	fmt.Printf("   - Running Times:\n")
-	fmt.Printf("       - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
-	fmt.Printf("       - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
-	fmt.Printf("       - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
-	fmt.Printf("       - Total File Processing:  %s\n", formatClock(total.Seconds()))
+	if verbose {
+		fmt.Printf("   - Running Times:\n")
+		fmt.Printf("       - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
+		fmt.Printf("       - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
+		fmt.Printf("       - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
+		fmt.Printf("       - Total File Processing:  %s\n", formatClock(total.Seconds()))
+	} else {
+		fmt.Printf("   - Total Running Time:     %s\n", formatClock(total.Seconds()))
+	}
 }
 
-func printFullSummary(totalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
+func printFullSummary(verbose bool, totalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println()
 	fmt.Println("DURATION & TIME SAVED SUMMARY:")
 	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
 	fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs across %d segment(s))\n", formatTime(actualCut), actualCut, numAds)
 	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
 	fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
-	fmt.Printf("  - Running Times:\n")
-	fmt.Printf("      - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
-	fmt.Printf("      - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
-	fmt.Printf("      - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
-	fmt.Printf("      - Total File Processing:  %s\n", formatClock(total.Seconds()))
+	if verbose {
+		fmt.Printf("  - Running Times:\n")
+		fmt.Printf("      - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
+		fmt.Printf("      - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
+		fmt.Printf("      - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
+		fmt.Printf("      - Total File Processing:  %s\n", formatClock(total.Seconds()))
+	} else {
+		fmt.Printf("  - Total Running Time:      %s\n", formatClock(total.Seconds()))
+	}
 }

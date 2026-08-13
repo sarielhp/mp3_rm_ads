@@ -53,7 +53,7 @@ func putUint32(b []byte, v uint32) {
 	b[3] = byte(v >> 24)
 }
 
-func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*TranscriptionData, error) {
+func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*TranscriptionData, error) {
 	uri := whisperURL
 	boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
 
@@ -154,7 +154,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 		}
 		defer resp.Body.Close()
 
-		if !quiet {
+		if !quiet && verbose {
 			elapsed := time.Since(startTime)
 			fmt.Printf("\rTranscription finished in %s!                                  \n", formatClock(elapsed.Seconds()))
 		}
@@ -190,7 +190,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet bool, totalDuration, 
 	return nil, fmt.Errorf("whisper transcription failed after %d attempts", maxRetries)
 }
 
-func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*TranscriptionData, error) {
+func transcribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*TranscriptionData, error) {
 	overlap := 30.0
 	maxChunk := float64(chunkDuration)
 	if maxChunk > 1200.0 {
@@ -229,7 +229,7 @@ func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, s
 		f.Close()
 		os.Remove(wavPath)
 		os.RemoveAll(workDir)
-		return transcribeWhisper(audioPath, whisperURL, quiet, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
+		return transcribeWhisper(audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
 	}
 
 	type chunkInfo struct {
@@ -306,7 +306,7 @@ func transcribeChunks(audioPath, whisperURL string, quiet bool, totalDuration, s
 		}
 
 		chunkData, err := transcribeWhisper(
-			chunkPath, whisperURL, quiet,
+			chunkPath, whisperURL, quiet, verbose,
 			ch.actualEnd-ch.actualStart, speedFactor,
 			dockerContainer, prompt, language, nil,
 		)

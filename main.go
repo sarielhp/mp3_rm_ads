@@ -18,10 +18,58 @@ import (
 func main() {
 	cli := parseFlags()
 
+	var silentLogFile *os.File
+	var silentLogPath string
+	var origStdout *os.File
+	var origStderr *os.File
+	hasError := false
+
+	if cli.Silent {
+		origStdout = os.Stdout
+		origStderr = os.Stderr
+
+		tmp, err := os.CreateTemp("", "mp3_rm_ads_silent_*.log")
+		if err == nil {
+			silentLogFile = tmp
+			silentLogPath = tmp.Name()
+			os.Stdout = silentLogFile
+			os.Stderr = silentLogFile
+		}
+	}
+
+	finishSilent := func(hadError bool) {
+		if silentLogFile == nil {
+			return
+		}
+		os.Stdout = origStdout
+		os.Stderr = origStderr
+		silentLogFile.Sync()
+		silentLogFile.Close()
+
+		if hadError {
+			data, readErr := os.ReadFile(silentLogPath)
+			if readErr == nil {
+				origStderr.Write(data)
+			}
+		}
+		os.Remove(silentLogPath)
+		silentLogFile = nil
+	}
+
+	defer func() {
+		if r := recover(); r != nil {
+			finishSilent(true)
+			panic(r)
+		} else {
+			finishSilent(hasError)
+		}
+	}()
+
 	if cli.TestWhisper || cli.IsTestCommand {
 		ensureConfigExists()
 		config := loadConfig()
 		if !testWhisperServer(config.WhisperURL, cli.Quiet) {
+			hasError = true
 			os.Exit(1)
 		}
 		return
@@ -142,7 +190,7 @@ func main() {
 		shortName := displayName(filepath.Base(inputFile))
 
 		if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM {
-			if !cli.Quiet {
+			if cli.Verbose && !cli.Quiet {
 				fmt.Printf("skipping: %s\n", shortName)
 			}
 			continue
@@ -186,6 +234,7 @@ func main() {
 
 		transcriptionData, err := loadOrTranscribe(sourceAudioFile, jsonFile, config, cli, selectedProfile, totalDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0Step1)
 		if err != nil {
+			hasError = true
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			continue
 		}
@@ -219,6 +268,7 @@ func main() {
 		}
 
 		if !validateTranscriptSanity(transcriptionData, totalDuration, cli.Quiet) {
+			hasError = true
 			continue
 		}
 
@@ -266,7 +316,7 @@ func main() {
 			adSegments = mergeIntervals(adSegments)
 		}
 		step2Duration := time.Since(t0Step2)
-		if !cli.Quiet {
+		if !cli.Quiet && cli.Verbose {
 			fmt.Printf("Step 2/3 (Ad Detection) finished in %s\n", formatClock(step2Duration.Seconds()))
 		}
 
@@ -275,7 +325,7 @@ func main() {
 			fileTotalDuration := time.Since(fileStartTime)
 			if !cli.Quiet {
 				fmt.Println("No ad segments detected by LLM!")
-				printTimingSummary(totalDuration, totalDuration, 0, 0, 0, step1Duration(t0Step1), step2Duration, 0, fileTotalDuration)
+				printTimingSummary(cli.Verbose, totalDuration, totalDuration, 0, 0, 0, step1Duration(t0Step1), step2Duration, 0, fileTotalDuration)
 			}
 			if sourceAudioFile != outputFile {
 				copyFile(sourceAudioFile, outputFile)
@@ -284,7 +334,7 @@ func main() {
 			continue
 		}
 
-		if !cli.Quiet {
+		if cli.Verbose && !cli.Quiet {
 			fmt.Println()
 			fmt.Println("AD SEGMENTS DETECTED TO REMOVE:")
 			for _, ad := range adSegments {
@@ -314,7 +364,7 @@ func main() {
 
 		if cutAudioFFmpeg(sourceAudioFile, keepSegments, tempOutputFile) {
 			step3Duration := time.Since(t0Step3)
-			if !cli.Quiet {
+			if !cli.Quiet && cli.Verbose {
 				fmt.Printf("Step 3/3 (Audio Cutting) finished in %s\n", formatClock(step3Duration.Seconds()))
 			}
 
@@ -335,11 +385,12 @@ func main() {
 			fileTotalDuration := time.Since(fileStartTime)
 
 			if !cli.Quiet {
-				printFullSummary(totalDuration, newDuration, actualCut, pctCut, len(adSegments),
+				printFullSummary(cli.Verbose, totalDuration, newDuration, actualCut, pctCut, len(adSegments),
 					step1Duration(t0Step1), step2Duration, step3Duration, fileTotalDuration)
 				fmt.Printf("\nSuccess! Ad-free episode saved to: '%s'\n", outputFile)
 			}
 		} else {
+			hasError = true
 			os.Remove(tempOutputFile)
 			os.RemoveAll(workDir)
 			fmt.Fprintf(os.Stderr, "Failed to output ad-free audio for '%s'.\n", inputFile)
@@ -543,6 +594,8 @@ func parseFlags() CLIOptions {
 	flag.BoolVar(&cli.Quiet, "quiet", false, "Suppress progress and informational output")
 	flag.BoolVar(&cli.Verbose, "v", false, "Verbose output (show detailed info)")
 	flag.BoolVar(&cli.Verbose, "verbose", false, "Verbose output (show detailed info)")
+	flag.BoolVar(&cli.Silent, "s", false, "Suppress output unless error occurs")
+	flag.BoolVar(&cli.Silent, "silent", false, "Suppress output unless error occurs")
 	flag.BoolVar(&cli.ExportSRT, "srt", false, "Export/convert transcript JSON to SubRip (.srt)")
 	flag.BoolVar(&cli.ExportTXT, "txt", false, "Export/convert transcript JSON to text (.txt)")
 	flag.BoolVar(&cli.Recut, "recut", false, "Recut audio using .cuts.json (no Whisper/LLM)")
@@ -651,6 +704,7 @@ func globalOptions() []clihelp.Option {
 		{Flags: "-o, --output PATH", Description: "Output MP3 path or directory"},
 		{Flags: "-q, --quiet", Description: "Suppress progress and informational output"},
 		{Flags: "-v, --verbose", Description: "Verbose output (show detailed info)"},
+		{Flags: "-s, --silent", Description: "Suppress output unless error occurs"},
 		{Flags: "--srt", Description: "Export/convert transcript JSON to SubRip (.srt)"},
 		{Flags: "--txt", Description: "Export/convert transcript JSON to text (.txt)"},
 		{Flags: "--recut", Description: "Recut audio using .cuts.json (no Whisper/LLM)"},

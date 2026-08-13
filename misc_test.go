@@ -91,11 +91,13 @@ func TestResolveOutputFile(t *testing.T) {
 }
 
 func TestPrintTimingSummary(t *testing.T) {
-	printTimingSummary(100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+	printTimingSummary(true, 100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+	printTimingSummary(false, 100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
 }
 
 func TestPrintFullSummary(t *testing.T) {
-	printFullSummary(100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+	printFullSummary(true, 100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
+	printFullSummary(false, 100, 80, 20, 20, 2, time.Second, time.Second, time.Second, 3*time.Second)
 }
 
 func TestListProfiles(t *testing.T) {
@@ -321,5 +323,22 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 	cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for test-whisper command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
+	}
+}
+
+func TestParseFlagsSilent(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+
+	os.Args = []string{"mp3_rm_ads", "-s", "file.mp3"}
+	cli := parseFlags()
+	if !cli.Silent {
+		t.Error("expected Silent=true for -s")
+	}
+
+	os.Args = []string{"mp3_rm_ads", "--silent", "file.mp3"}
+	cli = parseFlags()
+	if !cli.Silent {
+		t.Error("expected Silent=true for --silent")
 	}
 }

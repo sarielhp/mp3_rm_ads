@@ -20,7 +20,7 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		jsonFile = baseName + ".transcript.json"
 	}
 	if fileExists(jsonFile) && !cli.ForceTranscribe && !cli.ForceLLM {
-		if !cli.Quiet {
+		if cli.Verbose && !cli.Quiet {
 			fmt.Printf("Skipping '%s' (.transcript.json exists). Use --force-transcribe or --force-llm to reprocess.\n", mainMP3File)
 		}
 		return
@@ -62,7 +62,7 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		return
 	}
 
-	if !cli.Quiet {
+	if cli.Verbose && !cli.Quiet {
 		mergedIntervals := cutsData.MergedCutIntervals
 		if len(mergedIntervals) == 0 {
 			fmt.Println("No cut intervals specified in metadata!")
@@ -89,7 +89,7 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 
 	if cutAudioFFmpeg(sourceAudioFile, keepSegments, tempOutputFile) {
 		recutDuration := time.Since(t0Recut)
-		if !cli.Quiet {
+		if !cli.Quiet && cli.Verbose {
 			fmt.Printf("Audio Recutting finished in %s\n", formatClock(recutDuration.Seconds()))
 		}
 
@@ -139,7 +139,7 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 			return nil, fmt.Errorf("failed to parse transcript JSON: %w", err)
 		}
 		step1Duration := time.Since(*t0Step1)
-		if !cli.Quiet {
+		if !cli.Quiet && cli.Verbose {
 			fmt.Println()
 			fmt.Printf("Step 1/3 (Transcript Loaded) finished in %s\n", formatClock(step1Duration.Seconds()))
 		}
@@ -216,13 +216,13 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 				formatTime(totalDuration), numChunks, formatTime(float64(chunkDuration)))
 		}
 		transcriptionData, err = transcribeChunks(
-			sourceAudioFile, config.WhisperURL, cli.Quiet,
+			sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
 			totalDuration, speedFactor, chunkDuration,
 			dockerContainer, whisperPromptArg, whisperLangArg,
 		)
 	} else {
 		transcriptionData, err = transcribeWhisper(
-			sourceAudioFile, config.WhisperURL, cli.Quiet,
+			sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
 			totalDuration, speedFactor, dockerContainer,
 			whisperPromptArg, whisperLangArg, nil,
 		)
@@ -235,7 +235,7 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 				chunkDur = 900
 			}
 			transcriptionData, err = transcribeChunks(
-				sourceAudioFile, config.WhisperURL, cli.Quiet,
+				sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
 				totalDuration, speedFactor, chunkDur,
 				dockerContainer, whisperPromptArg, whisperLangArg,
 			)
@@ -247,7 +247,7 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 	}
 
 	step1Duration := time.Since(*t0Step1)
-	if !cli.Quiet {
+	if !cli.Quiet && cli.Verbose {
 		fmt.Printf("Step 1/3 (Transcription) finished in %s\n", formatClock(step1Duration.Seconds()))
 	}
 	*isNewlyTranscribed = true
