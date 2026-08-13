@@ -106,7 +106,18 @@ func TestListProfiles(t *testing.T) {
 	listProfiles(Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "T", "t", "http://t", "m", ""}}})
 }
 
-func TestPrintUsage(t *testing.T) { clihelp.PrintGlobalUsage(buildUsageApp()) }
+func TestPrintUsage(t *testing.T) {
+	app := buildUsageApp()
+	clihelp.PrintGlobalUsage(app)
+	clihelp.PrintCommandUsage(app, "file")
+	clihelp.PrintSection("TEST SECTION")
+	app.PrintGlobalUsage()
+	app.PrintCommandUsage("file")
+	app.PrintCommandUsage("dir")
+	app.PrintCommandUsage("config")
+	app.PrintUsage()
+	app.PrintUsage("test")
+}
 
 func TestHandleRecutNoCutsFile(t *testing.T) {
 	handleRecut("t.mp3", "t.mp3", "t.precut", "t_af.mp3", "t", 100, LLMProfile{}, CLIOptions{Quiet: true}, time.Now())

@@ -102,7 +102,7 @@ func main() {
 		if cli.SetPodcastsDir || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
 			printConfig(config)
 		} else {
-			clihelp.PrintCommandUsage(buildUsageApp(), "config")
+			buildUsageApp().PrintCommandUsage("config")
 		}
 		return
 	}
@@ -144,7 +144,7 @@ func main() {
 
 	if cli.IsDirCommand {
 		if len(args) == 0 {
-			clihelp.PrintCommandUsage(buildUsageApp(), "dir")
+			buildUsageApp().PrintCommandUsage("dir")
 			os.Exit(1)
 		}
 		dir := args[0]
@@ -160,7 +160,7 @@ func main() {
 		expandedArgs = mp3Files
 	} else if cli.IsFileCommand {
 		if len(args) == 0 {
-			clihelp.PrintCommandUsage(buildUsageApp(), "file")
+			buildUsageApp().PrintCommandUsage("file")
 			os.Exit(1)
 		}
 		expandedArgs = args
@@ -177,11 +177,11 @@ func main() {
 			}
 			expandedArgs = mp3Files
 		} else {
-			clihelp.PrintGlobalUsage(buildUsageApp())
+			buildUsageApp().PrintGlobalUsage()
 			return
 		}
 	} else {
-		clihelp.PrintGlobalUsage(buildUsageApp())
+		buildUsageApp().PrintGlobalUsage()
 		os.Exit(1)
 	}
 
@@ -605,9 +605,9 @@ func parseFlags() CLIOptions {
 		switch a {
 		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
 			if detectedCommand != "" {
-				clihelp.PrintCommandUsage(buildUsageApp(), detectedCommand)
+				buildUsageApp().PrintCommandUsage(detectedCommand)
 			} else {
-				clihelp.PrintGlobalUsage(buildUsageApp())
+				buildUsageApp().PrintGlobalUsage()
 			}
 			os.Exit(0)
 		}
@@ -649,9 +649,9 @@ func parseFlags() CLIOptions {
 
 	flag.Usage = func() {
 		if detectedCommand != "" {
-			clihelp.PrintCommandUsage(buildUsageApp(), detectedCommand)
+			buildUsageApp().PrintCommandUsage(detectedCommand)
 		} else {
-			clihelp.PrintGlobalUsage(buildUsageApp())
+			buildUsageApp().PrintGlobalUsage()
 		}
 	}
 	flag.CommandLine.Parse(args)

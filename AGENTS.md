@@ -161,6 +161,10 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
    across sibling files in the same package when exceeding 600 lines.
 6. **Commit Messages**: Use conventional commits format:
    `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
+7. **Subdirectory Isolation**: Under no circumstances modify files outside this
+   subdirectory. Find operations must be restricted to this subdirectory.
+8. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
+   or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
 
 ## Test Suite
 
