@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
@@ -234,5 +236,90 @@ func TestExtractJSONArrayInvalid(t *testing.T) {
 func TestValidateTranscriptSanityZeroDuration(t *testing.T) {
 	if !validateTranscriptSanity(&TranscriptionData{}, 0, true) {
 		t.Error("should be true")
+	}
+}
+
+func TestTestWhisperServerEmptyURL(t *testing.T) {
+	if testWhisperServerEx("", 1, 1*time.Millisecond, true) {
+		t.Error("expected false for empty URL")
+	}
+}
+
+func TestTestWhisperServerSuccess(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"text":"hello"}`))
+	}))
+	defer ts.Close()
+
+	if !testWhisperServerEx(ts.URL, 1, 1*time.Millisecond, true) {
+		t.Error("expected true for active Whisper server")
+	}
+}
+
+func TestTestWhisperServerRetrySuccess(t *testing.T) {
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			w.Write([]byte("Waking up..."))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		w.Write([]byte(`{"text":"ok"}`))
+	}))
+	defer ts.Close()
+
+	if !testWhisperServerEx(ts.URL, 3, 5*time.Millisecond, true) {
+		t.Error("expected true on retry success")
+	}
+	if attempts != 2 {
+		t.Errorf("expected 2 attempts, got %d", attempts)
+	}
+}
+
+func TestTestWhisperServerFailure(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer ts.Close()
+
+	if testWhisperServerEx(ts.URL, 2, 5*time.Millisecond, true) {
+		t.Error("expected false for failing Whisper server")
+	}
+}
+
+func TestTestWhisperServerClientError(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer ts.Close()
+
+	if testWhisperServerEx(ts.URL, 3, 5*time.Millisecond, true) {
+		t.Error("expected false for 404 client error without retrying")
+	}
+}
+
+func TestParseFlagsTestWhisperCommand(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+
+	os.Args = []string{"mp3_rm_ads", "test", "whisper"}
+	cli := parseFlags()
+	if !cli.IsTestCommand || !cli.TestWhisper {
+		t.Errorf("expected IsTestCommand=true, TestWhisper=true, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
+	}
+
+	os.Args = []string{"mp3_rm_ads", "test"}
+	cli = parseFlags()
+	if !cli.IsTestCommand || !cli.TestWhisper {
+		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default test command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
+	}
+
+	os.Args = []string{"mp3_rm_ads", "test-whisper"}
+	cli = parseFlags()
+	if !cli.IsTestCommand || !cli.TestWhisper {
+		t.Errorf("expected IsTestCommand=true, TestWhisper=true for test-whisper command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 }

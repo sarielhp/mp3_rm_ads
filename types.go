@@ -131,6 +131,7 @@ type CLIOptions struct {
 	IsConfigCommand bool
 	IsDirCommand    bool
 	IsFileCommand   bool
+	IsTestCommand   bool
 	ListLLMs        bool
 	CopyOpenCode    bool
 	Quiet           bool
