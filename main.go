@@ -73,6 +73,9 @@ func main() {
 		} else {
 			finishSilent(hasError)
 		}
+		if !cli.Quiet {
+			fmt.Println()
+		}
 	}()
 
 	if cli.TestWhisper || cli.IsTestCommand {
@@ -127,15 +130,25 @@ func main() {
 
 	var expandedArgs []string
 
+	hasPrintedScanning := false
+	printScanning := func(dir string) {
+		if cli.Quiet {
+			return
+		}
+		if !hasPrintedScanning {
+			fmt.Println()
+			hasPrintedScanning = true
+		}
+		fmt.Printf("Scanning: %s\n", dir)
+	}
+
 	if cli.IsDirCommand {
 		if len(args) == 0 {
 			clihelp.PrintCommandUsage(buildUsageApp(), "dir")
 			os.Exit(1)
 		}
 		dir := args[0]
-		if !cli.Quiet {
-			fmt.Printf("Scanning: %s\n", dir)
-		}
+		printScanning(dir)
 		removeWorkDirs(dir)
 		mp3Files := findMP3Files(dir)
 		if len(mp3Files) == 0 {
@@ -153,9 +166,7 @@ func main() {
 		expandedArgs = args
 	} else if len(args) == 0 {
 		if config.PodcastsDir != "" {
-			if !cli.Quiet {
-				fmt.Printf("Scanning: %s\n", config.PodcastsDir)
-			}
+			printScanning(config.PodcastsDir)
 			removeWorkDirs(config.PodcastsDir)
 			mp3Files := findMP3Files(config.PodcastsDir)
 			if len(mp3Files) == 0 {
