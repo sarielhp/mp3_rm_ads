@@ -28,6 +28,9 @@ func main() {
 		origStdout = os.Stdout
 		origStderr = os.Stderr
 
+		origStdout.Sync()
+		origStderr.Sync()
+
 		tmp, err := os.CreateTemp("", "mp3_rm_ads_silent_*.log")
 		if err == nil {
 			silentLogFile = tmp
@@ -39,17 +42,23 @@ func main() {
 
 	finishSilent := func(hadError bool) {
 		if silentLogFile == nil {
+			os.Stdout.Sync()
+			os.Stderr.Sync()
 			return
 		}
+		os.Stdout.Sync()
+		os.Stderr.Sync()
+		silentLogFile.Sync()
+
 		os.Stdout = origStdout
 		os.Stderr = origStderr
-		silentLogFile.Sync()
 		silentLogFile.Close()
 
 		if hadError {
 			data, readErr := os.ReadFile(silentLogPath)
 			if readErr == nil {
 				origStderr.Write(data)
+				origStderr.Sync()
 			}
 		}
 		os.Remove(silentLogPath)
@@ -405,6 +414,9 @@ func main() {
 		batchDuration := time.Since(batchStartTime)
 		fmt.Printf("\nBatch Completed! Processed %d file(s) in %s.\n", totalFiles, formatClock(batchDuration.Seconds()))
 	}
+
+	os.Stdout.Sync()
+	os.Stderr.Sync()
 }
 
 func removeWorkDirs(dir string) {
