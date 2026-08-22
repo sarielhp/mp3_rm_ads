@@ -407,13 +407,38 @@ const yellowQ = "?"
 func stripHTML(s string) string {
 	var result strings.Builder
 	inTag := false
-	for _, r := range s {
-		if r == '<' {
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if c == '<' {
 			inTag = true
-		} else if r == '>' {
+		} else if c == '>' {
 			inTag = false
 		} else if !inTag {
-			result.WriteRune(r)
+			if c == '&' {
+				entityEnd := strings.IndexByte(s[i:], ';')
+				if entityEnd >= 0 {
+					entity := s[i : i+entityEnd+1]
+					switch entity {
+					case "&amp;":
+						result.WriteByte('&')
+					case "&lt;":
+						result.WriteByte('<')
+					case "&gt;":
+						result.WriteByte('>')
+					case "&quot;":
+						result.WriteByte('"')
+					case "&apos;":
+						result.WriteByte('\'')
+					case "&nbsp;":
+						result.WriteByte(' ')
+					default:
+						result.WriteString(entity)
+					}
+					i += entityEnd
+					continue
+				}
+			}
+			result.WriteByte(c)
 		}
 	}
 	return strings.TrimSpace(result.String())

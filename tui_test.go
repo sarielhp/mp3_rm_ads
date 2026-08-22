@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"os"
 	"strings"
@@ -1174,5 +1175,68 @@ func TestDetectImageFormat(t *testing.T) {
 		if got != c.fmt {
 			t.Errorf("detectImageFormat(%q) = %d, want %d", c.path, got, c.fmt)
 		}
+	}
+}
+
+func TestStripHTMLEntities(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{"Hello &amp; World", "Hello & World"},
+		{"a &lt; b &gt; c", "a < b > c"},
+		{"&quot;quoted&quot;", "\"quoted\""},
+		{"&apos;single&apos;", "'single'"},
+		{"hello&nbsp;world", "hello world"},
+		{"<b>bold</b>", "bold"},
+		{"<p>para</p>", "para"},
+	}
+	for _, c := range cases {
+		got := stripHTML(c.in)
+		if got != c.out {
+			t.Errorf("stripHTML(%q) = %q, want %q", c.in, got, c.out)
+		}
+	}
+}
+
+func TestMergeSegmentsText(t *testing.T) {
+	segs := []TranscriptionSegment{
+		{Start: 0, End: 10, Text: "first part"},
+		{Start: 9, End: 20, Text: "second part"},
+	}
+	merged := mergeSegments(segs)
+	if len(merged) != 1 {
+		t.Fatalf("expected 1 merged segment, got %d", len(merged))
+	}
+	if merged[0].Text != "first part second part" {
+		t.Errorf("merged text should combine both parts, got %q", merged[0].Text)
+	}
+	if merged[0].End != 20 {
+		t.Errorf("merged end should be 20, got %f", merged[0].End)
+	}
+}
+
+func TestMergeSegmentsNoOverlap(t *testing.T) {
+	segs := []TranscriptionSegment{
+		{Start: 0, End: 10, Text: "first"},
+		{Start: 20, End: 30, Text: "second"},
+	}
+	merged := mergeSegments(segs)
+	if len(merged) != 2 {
+		t.Fatalf("expected 2 segments, got %d", len(merged))
+	}
+}
+
+func TestTranscribeRetryBuffer(t *testing.T) {
+	var buf bytes.Buffer
+	buf.WriteString("test data")
+	reader := bytes.NewReader(buf.Bytes())
+	first := make([]byte, 4)
+	n1, _ := reader.Read(first)
+	reader.Seek(0, 0)
+	second := make([]byte, 4)
+	n2, _ := reader.Read(second)
+	if n1 != n2 || string(first) != string(second) {
+		t.Error("bytes.NewReader should allow re-reading")
 	}
 }

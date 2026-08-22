@@ -316,7 +316,16 @@ func (m *tuiModel) handleEnter() (tea.Model, tea.Cmd) {
 		eps := m.filteredEpisodes()
 		if m.podIdx < len(m.podcasts) && m.epIdx < len(eps) {
 			m.screen = screenEpisodeDetail
-			ep := &eps[m.epIdx]
+			selectedEp := eps[m.epIdx]
+			// Map filtered episode index back to actual episode index
+			pod := &m.podcasts[m.podIdx]
+			for i, e := range pod.episodes {
+				if e.path == selectedEp.path {
+					m.epIdx = i
+					break
+				}
+			}
+			ep := &pod.episodes[m.epIdx]
 			if !ep.durationDone {
 				idx := m.epIdx
 				return m, func() tea.Msg {
@@ -916,7 +925,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		if ep.absData.Description != "" {
 			out.WriteByte('\n')
 			out.WriteString(tuiLabelStyle.Render("  Description:\n"))
-			desc := stripHTML(ep.absData.Description)
+			desc := renderHTML(ep.absData.Description)
 			descLines := splitText(desc, max(20, m.width-8))
 			for _, line := range descLines {
 				out.WriteString(fmt.Sprintf("    %s\n", line))
