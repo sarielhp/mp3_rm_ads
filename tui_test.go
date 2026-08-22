@@ -5,6 +5,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -915,5 +916,103 @@ func TestTUIFilteredPodcastsOutOfRange(t *testing.T) {
 	eps := m.filteredEpisodes()
 	if eps != nil {
 		t.Error("filteredEpisodes should return nil for out-of-range podIdx")
+	}
+}
+
+func TestTUIRelativeAge(t *testing.T) {
+	now := time.Now()
+
+	cases := []struct {
+		t   time.Time
+		out string
+	}{
+		{now, "Today"},
+		{now.Add(-25 * time.Hour), "1Day"},
+		{now.Add(-72 * time.Hour), "3Days"},
+		{now.Add(-10 * 24 * time.Hour), "1Weeks"},
+		{now.Add(-60 * 24 * time.Hour), "2Months"},
+		{now.Add(-400 * 24 * time.Hour), "1Year"},
+		{now.Add(24 * time.Hour), "Future"},
+	}
+
+	for _, c := range cases {
+		got := formatRelativeAge(c.t)
+		if got != c.out {
+			t.Errorf("formatRelativeAge(%v) = %q, want %q", c.t, got, c.out)
+		}
+	}
+}
+
+func TestTUIRenderHTML(t *testing.T) {
+	cases := []struct {
+		in  string
+		out string
+	}{
+		{"", ""},
+		{"Hello World", "Hello World"},
+		{"<b>bold</b>", "\x1b[1mbold\x1b[22m"},
+		{"<i>italic</i>", "\x1b[3mitalic\x1b[23m"},
+		{"Line1<br>Line2", "Line1\nLine2"},
+		{"<p>Para1</p><p>Para2</p>", "\nPara1\n\nPara2\n"},
+		{"<li>Item1</li>", "\n  - Item1\n"},
+	}
+
+	for _, c := range cases {
+		got := renderHTML(c.in)
+		if got != c.out {
+			t.Errorf("renderHTML(%q) = %q, want %q", c.in, got, c.out)
+		}
+	}
+}
+
+func TestTUIPopupMessage(t *testing.T) {
+	m := makeTestModel()
+
+	m.showPopup("Test message")
+	if m.popupMsg != "Test message" {
+		t.Errorf("popupMsg should be 'Test message', got %q", m.popupMsg)
+	}
+	if m.popupTimer != 10 {
+		t.Errorf("popupTimer should be 10, got %d", m.popupTimer)
+	}
+
+	// Tick down
+	for i := 0; i < 10; i++ {
+		m.tickPopup()
+	}
+	if m.popupMsg != "" {
+		t.Error("popupMsg should be empty after 10 ticks")
+	}
+}
+
+func TestTUIPopupDraw(t *testing.T) {
+	m := makeTestModel()
+	m.popupMsg = ""
+	popup := m.drawPopup()
+	if popup != "" {
+		t.Errorf("empty popup should return empty string, got %q", popup)
+	}
+
+	m.popupMsg = "Saving..."
+	popup = m.drawPopup()
+	if !strings.Contains(popup, "Saving...") {
+		t.Errorf("popup should contain message, got %q", popup)
+	}
+}
+
+func TestTUIFileSizeGB(t *testing.T) {
+	cases := []struct {
+		in  int64
+		out string
+	}{
+		{1073741824, "1.0 GB"},
+		{1610612736, "1.5 GB"},
+		{2147483648, "2.0 GB"},
+	}
+	for _, c := range cases {
+		got := formatFileSize(c.in)
+		if got != c.out {
+			t.Errorf("formatFileSize(%d) = %q, want %q", c.in, got, c.out)
+		}
 	}
 }

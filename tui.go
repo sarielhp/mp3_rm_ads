@@ -63,6 +63,8 @@ type tuiModel struct {
 	searchMode  bool
 	searchQuery string
 	showHelp    bool
+	popupMsg    string
+	popupTimer  int
 }
 
 type loadedPodcastsMsg struct {
@@ -129,6 +131,7 @@ func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.handleKey(msg)
 
 	default:
+		m.tickPopup()
 		return m, nil
 	}
 	return m, nil
@@ -372,6 +375,26 @@ func (m *tuiModel) filteredEpisodes() []tuiEpisode {
 	return filtered
 }
 
+func (m *tuiModel) showPopup(msg string) {
+	m.popupMsg = msg
+	m.popupTimer = 10
+}
+
+func (m *tuiModel) tickPopup() {
+	if m.popupTimer > 0 {
+		m.popupTimer--
+		if m.popupTimer == 0 {
+			m.popupMsg = ""
+		}
+	}
+}
+
+func (m *tuiModel) drawPopup() string {
+	if m.popupMsg == "" {
+		return ""
+	}
+	return tuiPopupStyle.Render("  " + m.popupMsg)
+}
 func (m *tuiModel) searchBar() string {
 	if !m.searchMode {
 		return ""
@@ -413,6 +436,11 @@ func (m *tuiModel) View() string {
 
 	if m.searchMode {
 		body += "\n" + m.searchBar()
+	}
+
+	popup := m.drawPopup()
+	if popup != "" {
+		body += "\n" + popup
 	}
 
 	return body

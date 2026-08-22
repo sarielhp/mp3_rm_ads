@@ -11,8 +11,10 @@ func formatFileSize(size int64) string {
 		return fmt.Sprintf("%d B", size)
 	} else if size < 1024*1024 {
 		return fmt.Sprintf("%.1f KB", float64(size)/1024)
-	} else {
+	} else if size < 1024*1024*1024 {
 		return fmt.Sprintf("%.1f MB", float64(size)/(1024*1024))
+	} else {
+		return fmt.Sprintf("%.1f GB", float64(size)/(1024*1024*1024))
 	}
 }
 
@@ -121,4 +123,108 @@ func absEpisodeDuration(ep *absEpisode) string {
 		return ""
 	}
 	return formatDurationShort(ep.Duration)
+}
+
+func formatRelativeAge(t time.Time) string {
+	now := time.Now()
+	diff := now.Sub(t)
+
+	if diff < 0 {
+		return "Future"
+	}
+
+	switch {
+	case diff < 24*time.Hour:
+		return "Today"
+	case diff < 48*time.Hour:
+		return "1Day"
+	case diff < 7*24*time.Hour:
+		days := int(diff.Hours() / 24)
+		return fmt.Sprintf("%dDays", days)
+	case diff < 30*24*time.Hour:
+		weeks := int(diff.Hours() / (24 * 7))
+		return fmt.Sprintf("%dWeeks", weeks)
+	case diff < 365*24*time.Hour:
+		months := int(diff.Hours() / (24 * 30))
+		return fmt.Sprintf("%dMonths", months)
+	default:
+		years := int(diff.Hours() / (24 * 365))
+		return fmt.Sprintf("%dYear", years)
+	}
+}
+
+func renderHTML(html string) string {
+	if html == "" {
+		return ""
+	}
+
+	var result strings.Builder
+	inTag := false
+	inBold := false
+	inItalic := false
+	var tagBuf strings.Builder
+	var textBuf strings.Builder
+
+	flushText := func() {
+		if textBuf.Len() == 0 {
+			return
+		}
+		text := textBuf.String()
+		textBuf.Reset()
+		if inBold {
+			result.WriteString("\033[1m")
+			result.WriteString(text)
+			result.WriteString("\033[22m")
+		} else if inItalic {
+			result.WriteString("\033[3m")
+			result.WriteString(text)
+			result.WriteString("\033[23m")
+		} else {
+			result.WriteString(text)
+		}
+	}
+
+	for _, c := range html {
+		if c == '<' {
+			flushText()
+			inTag = true
+			tagBuf.Reset()
+			continue
+		}
+		if c == '>' && inTag {
+			inTag = false
+			tag := strings.ToLower(strings.TrimSpace(tagBuf.String()))
+			switch tag {
+			case "b", "strong":
+				inBold = true
+			case "/b", "/strong":
+				inBold = false
+			case "i", "em":
+				inItalic = true
+			case "/i", "/em":
+				inItalic = false
+			case "br", "br/", "br /":
+				result.WriteByte('\n')
+			case "p":
+				result.WriteByte('\n')
+			case "/p":
+				result.WriteByte('\n')
+			case "li":
+				result.WriteString("\n  - ")
+			case "/li":
+				result.WriteByte('\n')
+			case "/div":
+				result.WriteByte('\n')
+			}
+			continue
+		}
+		if inTag {
+			tagBuf.WriteRune(c)
+			continue
+		}
+		textBuf.WriteRune(c)
+	}
+	flushText()
+
+	return result.String()
 }

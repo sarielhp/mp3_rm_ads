@@ -78,6 +78,12 @@ var (
 			Background(colorYellow).
 			Padding(0, 1)
 
+	tuiPopupStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorDarkBg).
+			Background(colorPurple).
+			Padding(0, 1)
+
 	// Status Badges & Pills
 	tuiBadgeAdFree = lipgloss.NewStyle().
 			Bold(true).
