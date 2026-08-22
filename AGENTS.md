@@ -122,6 +122,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 | `audio.go` | ffmpeg wrappers (cut, convert, truncate, probe) | ~118 |
 | `format.go` | Time formatting, SRT/TXT conversion, interval merging | ~497 |
 | `docker.go` | Docker container detection, log polling, progress | ~338 |
+| `tui.go` | Interactive TUI browser (podcast list → episodes → detail) | ~598 |
 
 ## Test Files
 
@@ -157,14 +158,20 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
    existing structs and interfaces.
 4. **Checkpointing**: Run `make checkpoint` after passing checks to preserve
    working states during long sessions.
-5. **File Length**: Keep source files between 150-300 lines. Split large structs
+5. **Surgical Editing**: Never perform full-file rewrites (`replaceAll`) on existing
+   files. Read the target section, locate the specific function/struct, and apply
+   localized targeted diffs.
+6. **Plan Before Build**: For multi-step refactoring or subtle bug fixes, always
+   use `plan` mode / consult the `planner` subagent to formulate the exact steps
+   before modifying code in `build` mode.
+7. **File Length**: Keep source files between 150-300 lines. Split large structs
    across sibling files in the same package when exceeding 600 lines.
-6. **Commit Messages**: Use conventional commits format:
+8. **Commit Messages**: Use conventional commits format:
    `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
-7. **Subdirectory Isolation**: Under no circumstances modify files outside this
+9. **Subdirectory Isolation**: Under no circumstances modify files outside this
    subdirectory. Find operations must be restricted to this subdirectory.
-8. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
-   or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
+10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
+    or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
 
 ## Test Suite
 

@@ -13,6 +13,8 @@ Automatically detects and removes advertisement, sponsor, and promotional segmen
 - **Chunked Transcription**: Split long audio into overlapping chunks for reliability (`--use-chunks`)
 - **Docker Progress Monitoring**: Auto-detects local whisper Docker container and shows real progress/ETA
 - **Auto-fallback**: Detects whisper decode failures and automatically retries with chunked transcription
+- **Interactive TUI**: Browse podcasts, queue episodes, and track processing status
+- **Audiobookshelf Integration**: Map podcast directories and check ABS server status
 
 ## Workflow
 
@@ -31,11 +33,11 @@ Automatically detects and removes advertisement, sponsor, and promotional segmen
 git clone https://github.com/yourusername/mp3_rm_ads.git
 cd mp3_rm_ads
 
-# Make executable
-chmod +x mp3_rm_ads
+# Build the Go binary
+go build -o mp3_rm_ads .
 
-# Install dependencies (if needed)
-gem install rainbow
+# Or use the Makefile
+make build
 ```
 
 ## Configuration
@@ -50,6 +52,9 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
   "chunk_duration_sec": 0,
   "parallel_chunks": 1,
   "active_profile_id": 1,
+  "podcasts_dir": "",
+  "whisper_language": "",
+  "whisper_prompt": "",
   "profiles": [
     {
       "id": 1,
@@ -59,7 +64,10 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
       "model": "llama3.1:8b",
       "api_key": ""
     }
-  ]
+  ],
+  "audiobookshelf_url": "",
+  "audiobookshelf_user": "",
+  "audiobookshelf_pass": ""
 }
 ```
 
@@ -72,6 +80,12 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 | `whisper_docker_container` | Auto-detected | Docker container name for progress polling |
 | `chunk_duration_sec` | 0 (disabled) | Split audio into chunks of this duration (seconds) |
 | `parallel_chunks` | 1 | Number of chunks to transcribe in parallel |
+| `podcasts_dir` | "" | Default directory for podcast processing |
+| `whisper_language` | "" | Language override for Whisper transcription |
+| `whisper_prompt` | "" | Prompt to prepend to Whisper transcription |
+| `audiobookshelf_url` | "" | Audiobookshelf server URL |
+| `audiobookshelf_user` | "" | Audiobookshelf username |
+| `audiobookshelf_pass` | "" | Audiobookshelf password |
 
 ## Usage
 
@@ -89,6 +103,31 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 
 # Quiet mode
 ./mp3_rm_ads -q episode.mp3
+```
+
+### Subcommands
+
+```bash
+# Process all MP3s in a directory
+./mp3_rm_ads dir /path/to/podcasts/
+
+# Process a single file
+./mp3_rm_ads file episode.mp3
+
+# Interactive TUI browser
+./mp3_rm_ads tui [path/to/podcasts/dir]
+
+# Configuration management
+./mp3_rm_ads config
+
+# Test Whisper server
+./mp3_rm_ads test --test-whisper
+
+# Test Audiobookshelf server
+./mp3_rm_ads test --test-abs
+
+# Map Audiobookshelf podcasts
+./mp3_rm_ads test --abs-map
 ```
 
 ### Chunked Transcription
@@ -151,6 +190,19 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 ./mp3_rm_ads --set-default 2
 ```
 
+### Audiobookshelf Integration
+
+```bash
+# Set Audiobookshelf server details
+./mp3_rm_ads --set-abs --abs-url http://localhost:8080 --abs-user admin --abs-pass password
+
+# Test connection to Audiobookshelf
+./mp3_rm_ads --test-abs
+
+# Map podcast directories
+./mp3_rm_ads --abs-map
+```
+
 ## Output Files
 
 - `episode.mp3` → `episode_adfree.mp3` (original preserved as `episode.mp3.precut`)
@@ -182,7 +234,7 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 
 ## Requirements
 
-- Ruby 3.0+
+- Go 1.26+
 - FFmpeg
 - Whisper GPU server (local or remote)
 - LLM API access (local or remote)

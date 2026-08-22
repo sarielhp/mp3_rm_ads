@@ -13,6 +13,8 @@ import (
 	"time"
 
 	"github.com/sarielhp/clihelp"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 func main() {
@@ -78,12 +80,24 @@ func main() {
 		}
 	}()
 
-	if cli.TestWhisper || cli.IsTestCommand {
+	if cli.TestWhisper || cli.TestABS || cli.TestABSMap || cli.IsTestCommand {
 		ensureConfigExists()
 		config := loadConfig()
-		if !testWhisperServer(config.WhisperURL, cli.Quiet) {
-			hasError = true
-			os.Exit(1)
+		switch {
+		case cli.TestABSMap:
+			absMapPodcasts(config, cli.Quiet)
+		case cli.TestABSDownload:
+			absDownloadAllData(config, cli.Quiet)
+		case cli.TestABS:
+			if !testAudiobookshelfServer(config, cli.Quiet) {
+				hasError = true
+				os.Exit(1)
+			}
+		default:
+			if !testWhisperServer(config.WhisperURL, cli.Quiet) {
+				hasError = true
+				os.Exit(1)
+			}
 		}
 		return
 	}
@@ -98,8 +112,15 @@ func main() {
 		}
 	}
 
+	if cli.SetABS {
+		setAudiobookshelf(&config, cli.ABSURL, cli.ABSUser, cli.ABSPass)
+		if cli.IsConfigCommand || flag.NArg() == 0 {
+			return
+		}
+	}
+
 	if cli.IsConfigCommand {
-		if cli.SetPodcastsDir || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
+		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
 			printConfig(config)
 		} else {
 			buildUsageApp().PrintCommandUsage("config")
@@ -123,6 +144,32 @@ func main() {
 
 	if cli.SetDefault > 0 {
 		setDefaultProfile(&config, cli.SetDefault)
+		return
+	}
+
+	if cli.IsTUICommand {
+		args := flag.Args()
+		dir := config.PodcastsDir
+		if len(args) > 0 {
+			dir = args[0]
+		}
+		if dir == "" {
+			buildUsageApp().PrintCommandUsage("tui")
+			os.Exit(1)
+		}
+		bk := &TuiBackend{
+			LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
+				return loadTUIPodcastsABS(dir, config)
+			},
+			LoadQueues:  loadAllQueues,
+			SaveQueue:   saveQueue,
+			GetDuration: getAudioDuration,
+		}
+		p := tea.NewProgram(newTuiModel(bk, dir), tea.WithAltScreen())
+		if _, err := p.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
+			os.Exit(1)
+		}
 		return
 	}
 
@@ -583,6 +630,10 @@ func parseFlags() CLIOptions {
 			cli.IsFileCommand = true
 			detectedCommand = "file"
 			args = args[1:]
+		case "tui":
+			cli.IsTUICommand = true
+			detectedCommand = "tui"
+			args = args[1:]
 		case "test":
 			cli.IsTestCommand = true
 			detectedCommand = "test"
@@ -590,12 +641,38 @@ func parseFlags() CLIOptions {
 			if len(args) > 0 && (args[0] == "whisper" || args[0] == "whisper-server") {
 				cli.TestWhisper = true
 				args = args[1:]
+			} else if len(args) > 0 && args[0] == "abs" {
+				args = args[1:]
+				if len(args) > 0 && args[0] == "map" {
+					cli.TestABSMap = true
+					args = args[1:]
+				} else if len(args) > 0 && args[0] == "download" {
+					cli.TestABSDownload = true
+					args = args[1:]
+				} else {
+					cli.TestABS = true
+				}
 			} else {
 				cli.TestWhisper = true
 			}
 		case "test-whisper":
 			cli.IsTestCommand = true
 			cli.TestWhisper = true
+			detectedCommand = "test"
+			args = args[1:]
+		case "test-abs":
+			cli.IsTestCommand = true
+			cli.TestABS = true
+			detectedCommand = "test"
+			args = args[1:]
+		case "test-abs-map":
+			cli.IsTestCommand = true
+			cli.TestABSMap = true
+			detectedCommand = "test"
+			args = args[1:]
+		case "test-abs-download":
+			cli.IsTestCommand = true
+			cli.TestABSDownload = true
 			detectedCommand = "test"
 			args = args[1:]
 		}
@@ -614,6 +691,9 @@ func parseFlags() CLIOptions {
 	}
 
 	testWhisperCmd := cli.TestWhisper
+	testABSCmd := cli.TestABS
+	testABSMapCmd := cli.TestABSMap
+	testABSDownloadCmd := cli.TestABSDownload
 	isTestCmd := cli.IsTestCommand
 
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -644,8 +724,13 @@ func parseFlags() CLIOptions {
 	flag.BoolVar(&cli.ListLLMs, "list-llms", false, "List all configured LLM profiles and exit")
 	flag.BoolVar(&cli.ListLLMs, "list-profiles", false, "List all configured LLM profiles and exit")
 	flag.BoolVar(&cli.CopyOpenCode, "copy_llm_from_opencode", false, "Import LLM settings from OpenCode config")
+	flag.StringVar(&cli.ABSURL, "abs-url", "", "Audiobookshelf server URL")
+	flag.StringVar(&cli.ABSUser, "abs-user", "", "Audiobookshelf username")
+	flag.StringVar(&cli.ABSPass, "abs-pass", "", "Audiobookshelf password")
 	var testWhisperFlag bool
 	flag.BoolVar(&testWhisperFlag, "test-whisper", false, "Test whisper server connection and exit")
+	var testABSFlag bool
+	flag.BoolVar(&testABSFlag, "test-abs", false, "Test Audiobookshelf server connection and exit")
 
 	flag.Usage = func() {
 		if detectedCommand != "" {
@@ -656,8 +741,19 @@ func parseFlags() CLIOptions {
 	}
 	flag.CommandLine.Parse(args)
 
-	if testWhisperCmd || testWhisperFlag || isTestCmd {
-		cli.TestWhisper = true
+	if testWhisperCmd || testWhisperFlag || testABSCmd || testABSFlag || testABSMapCmd || testABSDownloadCmd || isTestCmd {
+		if testWhisperCmd || testWhisperFlag || isTestCmd {
+			cli.TestWhisper = true
+		}
+		if testABSCmd || testABSFlag {
+			cli.TestABS = true
+		}
+		if testABSMapCmd {
+			cli.TestABSMap = true
+		}
+		if testABSDownloadCmd {
+			cli.TestABSDownload = true
+		}
 		cli.IsTestCommand = true
 	}
 
@@ -667,6 +763,9 @@ func parseFlags() CLIOptions {
 		}
 		if f.Name == "podcasts_dir" || f.Name == "podcasts-dir" {
 			cli.SetPodcastsDir = true
+		}
+		if f.Name == "abs-url" || f.Name == "abs-user" || f.Name == "abs-pass" {
+			cli.SetABS = true
 		}
 	})
 
@@ -697,17 +796,34 @@ func buildUsageApp() *clihelp.App {
 				},
 			},
 			{
+				Name:        "tui",
+				Description: "Interactive TUI browser for podcasts and episodes",
+				UsageLine:   "mp3_rm_ads tui [directory]",
+				Options: []clihelp.Option{
+					{Flags: "[directory]", Description: "Podcasts directory (default: podcasts_dir from config)"},
+				},
+				Examples: []clihelp.Example{
+					{Line: "mp3_rm_ads tui"},
+					{Line: "mp3_rm_ads tui ~/podcasts"},
+				},
+			},
+			{
 				Name:        "config",
 				Description: "Manage configuration",
 				UsageLine:   "mp3_rm_ads config [options]",
 				Options: []clihelp.Option{
 					{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
+					{Flags: "--abs-url URL", Description: "Set Audiobookshelf server URL"},
+					{Flags: "--abs-user USER", Description: "Set Audiobookshelf username"},
+					{Flags: "--abs-pass PASS", Description: "Set Audiobookshelf password"},
 					{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
 					{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
 					{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
 				},
 				Examples: []clihelp.Example{
 					{Line: "mp3_rm_ads config --podcasts_dir /path/to/podcasts"},
+					{Line: "mp3_rm_ads config --abs-url http://192.168.1.100:80"},
+					{Line: "mp3_rm_ads config --abs-user admin --abs-pass secret"},
 					{Line: "mp3_rm_ads config --list-llms"},
 					{Line: "mp3_rm_ads config --set-default 2"},
 					{Line: "mp3_rm_ads config --copy_llm_from_opencode"},
@@ -715,13 +831,19 @@ func buildUsageApp() *clihelp.App {
 			},
 			{
 				Name:        "test",
-				Description: "Test external services like Whisper server",
-				UsageLine:   "mp3_rm_ads test whisper [options]",
+				Description: "Test external services like Whisper server or Audiobookshelf",
+				UsageLine:   "mp3_rm_ads test <whisper|abs [connect|map]>",
 				Options: []clihelp.Option{
 					{Flags: "--test-whisper", Description: "Test whisper server connection with retries"},
+					{Flags: "--test-abs", Description: "Test Audiobookshelf server connection"},
+					{Flags: "--test-abs-map", Description: "Map local podcast files to Audiobookshelf metadata"},
+					{Flags: "--test-abs-download", Description: "Download all ABS data for all MP3 files"},
 				},
 				Examples: []clihelp.Example{
 					{Line: "mp3_rm_ads test whisper"},
+					{Line: "mp3_rm_ads test abs connect"},
+					{Line: "mp3_rm_ads test abs map"},
+					{Line: "mp3_rm_ads test abs download"},
 					{Line: "mp3_rm_ads test"},
 				},
 			},

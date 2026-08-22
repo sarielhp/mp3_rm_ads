@@ -113,6 +113,9 @@ type Config struct {
 	ChunkDurationSec       int          `json:"chunk_duration_sec"`
 	ActiveProfileID        int          `json:"active_profile_id"`
 	Profiles               []LLMProfile `json:"profiles"`
+	AudiobookshelfURL      string       `json:"audiobookshelf_url,omitempty"`
+	AudiobookshelfUser     string       `json:"audiobookshelf_user,omitempty"`
+	AudiobookshelfPass     string       `json:"audiobookshelf_pass,omitempty"`
 }
 
 type CLIOptions struct {
@@ -131,6 +134,7 @@ type CLIOptions struct {
 	IsConfigCommand bool
 	IsDirCommand    bool
 	IsFileCommand   bool
+	IsTUICommand    bool
 	IsTestCommand   bool
 	ListLLMs        bool
 	CopyOpenCode    bool
@@ -141,6 +145,13 @@ type CLIOptions struct {
 	TranscribeMin   string
 	ExtractKeywords bool
 	TestWhisper     bool
+	TestABS         bool
+	TestABSMap      bool
+	TestABSDownload bool
+	ABSURL          string
+	ABSUser         string
+	ABSPass         string
+	SetABS          bool
 }
 
 type CostInfo struct {

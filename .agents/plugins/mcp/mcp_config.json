@@ -1,0 +1,46 @@
+{
+  "mcpServers": {
+    "gopls": {
+      "command": "gopls",
+      "args": [
+        "mcp"
+      ]
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp"
+      ]
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-docker-server"
+      ]
+    },
+    "fetch": {
+      "command": "uvx",
+      "args": [
+        "--with",
+        "mcp<1.2.0",
+        "mcp-server-fetch"
+      ]
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ]
+    },
+    "git": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "mcp-git"
+      ]
+    }
+  }
+}

@@ -6,7 +6,6 @@ import (
 
 	"github.com/fatih/color"
 	"golang.org/x/term"
-	"golang.org/x/text/unicode/bidi"
 )
 
 var (
@@ -32,14 +31,7 @@ func printSeparator() {
 }
 
 func displayName(name string) string {
-	p := bidi.Paragraph{}
-	p.SetString(name)
-	order, err := p.Order()
-	if err != nil {
-		return name
-	}
-	if order.Direction() == bidi.RightToLeft {
-		return "\u200E" + name
-	}
+	// Return the name as-is to avoid potential RTL text issues
+	// The terminal/bubbletea framework should handle text direction properly
 	return name
 }

@@ -152,6 +152,28 @@ func copyFile(src, dst string) {
 }
 
 func findMP3Files(dir string) []string {
+	queueFile := filepath.Join(dir, "queue.json")
+	if _, err := os.Stat(queueFile); err == nil {
+		data, err := os.ReadFile(queueFile)
+		if err != nil {
+			return nil
+		}
+		var queue []string
+		if err := json.Unmarshal(data, &queue); err != nil {
+			return nil
+		}
+		if len(queue) == 0 {
+			return nil
+		}
+		var files []string
+		for _, name := range queue {
+			if strings.HasSuffix(strings.ToLower(name), ".mp3") {
+				files = append(files, filepath.Join(dir, name))
+			}
+		}
+		return files
+	}
+
 	var files []string
 	entries, err := os.ReadDir(dir)
 	if err != nil {

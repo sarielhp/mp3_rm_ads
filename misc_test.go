@@ -106,6 +106,69 @@ func TestListProfiles(t *testing.T) {
 	listProfiles(Config{ActiveProfileID: 1, Profiles: []LLMProfile{{1, "T", "t", "http://t", "m", ""}}})
 }
 
+func TestABSNoURL(t *testing.T) {
+	if testAudiobookshelfServer(Config{}, true) {
+		t.Error("should fail with no URL")
+	}
+}
+
+func TestABSLoginSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/login" && r.Method == "POST" {
+			w.WriteHeader(200)
+			w.Write([]byte(`{"user":{"token":"abc"}}`))
+			return
+		}
+		w.WriteHeader(404)
+	}))
+	defer srv.Close()
+
+	if !testAudiobookshelfServer(Config{AudiobookshelfURL: srv.URL, AudiobookshelfUser: "u", AudiobookshelfPass: "p"}, true) {
+		t.Error("should succeed with valid login")
+	}
+}
+
+func TestABSLoginFailure(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(401)
+		w.Write([]byte("Unauthorized"))
+	}))
+	defer srv.Close()
+
+	if testAudiobookshelfServer(Config{AudiobookshelfURL: srv.URL, AudiobookshelfUser: "u", AudiobookshelfPass: "p"}, true) {
+		t.Error("should fail with bad credentials")
+	}
+}
+
+func TestABSNoAuthSuccess(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(200)
+		w.Write([]byte("OK"))
+	}))
+	defer srv.Close()
+
+	if !testAudiobookshelfServer(Config{AudiobookshelfURL: srv.URL}, true) {
+		t.Error("should succeed without auth")
+	}
+}
+
+func TestABSConnectionFailure(t *testing.T) {
+	if testAudiobookshelfServer(Config{AudiobookshelfURL: "http://127.0.0.1:1"}, true) {
+		t.Error("should fail with bad URL")
+	}
+}
+
+func TestABSNoAuthServerError(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(500)
+	}))
+	defer srv.Close()
+
+	if testAudiobookshelfServer(Config{AudiobookshelfURL: srv.URL, AudiobookshelfUser: "u", AudiobookshelfPass: "p"}, true) {
+		t.Error("should fail with 500")
+	}
+}
+
 func TestPrintUsage(t *testing.T) {
 	app := buildUsageApp()
 	clihelp.PrintGlobalUsage(app)

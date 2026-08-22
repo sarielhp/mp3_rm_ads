@@ -145,6 +145,25 @@ func printConfig(cfg Config) {
 		fmt.Printf("  whisper_language:         %s\n", cfg.WhisperLanguage)
 	}
 	fmt.Printf("  active_profile_id:        %d\n", cfg.ActiveProfileID)
+	if cfg.AudiobookshelfURL != "" {
+		fmt.Printf("  audiobookshelf_url:       %s\n", cfg.AudiobookshelfURL)
+	}
+	if cfg.AudiobookshelfUser != "" {
+		fmt.Printf("  audiobookshelf_user:      %s\n", cfg.AudiobookshelfUser)
+	}
+}
+
+func setAudiobookshelf(cfg *Config, url, user, pass string) {
+	if url != "" {
+		cfg.AudiobookshelfURL = url
+	}
+	if user != "" {
+		cfg.AudiobookshelfUser = user
+	}
+	if pass != "" {
+		cfg.AudiobookshelfPass = pass
+	}
+	saveConfig(*cfg)
 }
 
 func getProfileCost(profile LLMProfile) CostInfo {
