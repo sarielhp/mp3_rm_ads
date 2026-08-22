@@ -1148,6 +1148,12 @@ func TestTUINewModelWithConfig(t *testing.T) {
 
 func TestTUISetTerminalTitle(t *testing.T) {
 	m := makeTestModel()
-	// Just test it doesn't panic
 	m.setTerminalTitle("test title")
+}
+
+func TestKittyFunctionsExist(t *testing.T) {
+	_ = isKittySupported()
+	_ = findCoverImage("/tmp")
+	_ = encodeKittyGraphics([]byte("test"), 0, 0)
+	_ = kittyClearGraphics()
 }

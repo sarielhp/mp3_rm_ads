@@ -166,6 +166,7 @@ type CLIOptions struct {
 	TestABS         bool
 	TestABSMap      bool
 	TestABSDownload bool
+	TestKitty       bool
 	ABSURL          string
 	ABSUser         string
 	ABSPass         string

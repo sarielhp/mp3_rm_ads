@@ -106,3 +106,37 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 func kittyClearGraphics() string {
 	return "\x1b_Ga=d,d=a\x1b\\"
 }
+
+func testKittyImage(args []string) {
+	if !isKittySupported() {
+		fmt.Println("Kitty protocol is not supported in this terminal.")
+		fmt.Println("Run this in the Kitty terminal emulator.")
+		os.Exit(1)
+	}
+
+	if len(args) == 0 {
+		fmt.Println("Usage: mp3_rm_ads test kitty <image-file>")
+		fmt.Println()
+		fmt.Println("Displays an image using the Kitty graphics protocol.")
+		fmt.Println("Supported formats: PNG, JPEG, WebP")
+		os.Exit(1)
+	}
+
+	path := args[0]
+	if _, err := os.Stat(path); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: file not found: %s\n", path)
+		os.Exit(1)
+	}
+
+	esc, err := encodeKittyGraphicsFile(path, 0, 0)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error encoding image: %v\n", err)
+		os.Exit(1)
+	}
+
+	fmt.Print(esc)
+	fmt.Println()
+	fmt.Println("Image displayed. Press Enter to clear and exit.")
+	fmt.Scanln()
+	fmt.Print(kittyClearGraphics())
+}

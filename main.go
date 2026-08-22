@@ -80,7 +80,7 @@ func main() {
 		}
 	}()
 
-	if cli.TestWhisper || cli.TestABS || cli.TestABSMap || cli.IsTestCommand {
+	if cli.TestWhisper || cli.TestABS || cli.TestABSMap || cli.TestKitty || cli.IsTestCommand {
 		ensureConfigExists()
 		config := loadConfig()
 		switch {
@@ -88,6 +88,8 @@ func main() {
 			absMapPodcasts(config, cli.Quiet)
 		case cli.TestABSDownload:
 			absDownloadAllData(config, cli.Quiet)
+		case cli.TestKitty:
+			testKittyImage(flag.Args())
 		case cli.TestABS:
 			if !testAudiobookshelfServer(config, cli.Quiet) {
 				hasError = true
@@ -652,6 +654,9 @@ func parseFlags() CLIOptions {
 				} else {
 					cli.TestABS = true
 				}
+			} else if len(args) > 0 && args[0] == "kitty" {
+				cli.TestKitty = true
+				args = args[1:]
 			} else {
 				cli.TestWhisper = true
 			}
@@ -675,6 +680,11 @@ func parseFlags() CLIOptions {
 			cli.TestABSDownload = true
 			detectedCommand = "test"
 			args = args[1:]
+		case "test-kitty":
+			cli.IsTestCommand = true
+			cli.TestKitty = true
+			detectedCommand = "test"
+			args = args[1:]
 		}
 	}
 
@@ -694,6 +704,7 @@ func parseFlags() CLIOptions {
 	testABSCmd := cli.TestABS
 	testABSMapCmd := cli.TestABSMap
 	testABSDownloadCmd := cli.TestABSDownload
+	testKittyCmd := cli.TestKitty
 	isTestCmd := cli.IsTestCommand
 
 	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
@@ -741,7 +752,7 @@ func parseFlags() CLIOptions {
 	}
 	flag.CommandLine.Parse(args)
 
-	if testWhisperCmd || testWhisperFlag || testABSCmd || testABSFlag || testABSMapCmd || testABSDownloadCmd || isTestCmd {
+	if testWhisperCmd || testWhisperFlag || testABSCmd || testABSFlag || testABSMapCmd || testABSDownloadCmd || testKittyCmd || isTestCmd {
 		if testWhisperCmd || testWhisperFlag || isTestCmd {
 			cli.TestWhisper = true
 		}
@@ -753,6 +764,9 @@ func parseFlags() CLIOptions {
 		}
 		if testABSDownloadCmd {
 			cli.TestABSDownload = true
+		}
+		if testKittyCmd {
+			cli.TestKitty = true
 		}
 		cli.IsTestCommand = true
 	}
@@ -832,18 +846,20 @@ func buildUsageApp() *clihelp.App {
 			{
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",
-				UsageLine:   "mp3_rm_ads test <whisper|abs [connect|map]>",
+				UsageLine:   "mp3_rm_ads test <whisper|abs [connect|map|download]|kitty <image>>",
 				Options: []clihelp.Option{
 					{Flags: "--test-whisper", Description: "Test whisper server connection with retries"},
 					{Flags: "--test-abs", Description: "Test Audiobookshelf server connection"},
 					{Flags: "--test-abs-map", Description: "Map local podcast files to Audiobookshelf metadata"},
 					{Flags: "--test-abs-download", Description: "Download all ABS data for all MP3 files"},
+					{Flags: "--test-kitty", Description: "Test Kitty image protocol with an image file"},
 				},
 				Examples: []clihelp.Example{
 					{Line: "mp3_rm_ads test whisper"},
 					{Line: "mp3_rm_ads test abs connect"},
 					{Line: "mp3_rm_ads test abs map"},
 					{Line: "mp3_rm_ads test abs download"},
+					{Line: "mp3_rm_ads test kitty cover.jpg"},
 					{Line: "mp3_rm_ads test"},
 				},
 			},
