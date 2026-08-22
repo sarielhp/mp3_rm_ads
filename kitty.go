@@ -53,7 +53,7 @@ func findCoverImage(podcastDir string) string {
 	return ""
 }
 
-func encodeKittyGraphics(imgData []byte, cols, rows int) string {
+func encodeKittyGraphics(imgData []byte, cols, rows int, format int) string {
 	if len(imgData) == 0 {
 		return ""
 	}
@@ -72,7 +72,7 @@ func encodeKittyGraphics(imgData []byte, cols, rows int) string {
 		chunk := b64[i:end]
 
 		if i == 0 {
-			ctrl := fmt.Sprintf("a=T,f=100,t=d,m=%d", m)
+			ctrl := fmt.Sprintf("a=p,f=%d,t=d,m=%d", format, m)
 			if cols > 0 {
 				ctrl += fmt.Sprintf(",c=%d", cols)
 			}
@@ -88,6 +88,20 @@ func encodeKittyGraphics(imgData []byte, cols, rows int) string {
 	return b.String()
 }
 
+func detectImageFormat(path string) int {
+	ext := strings.ToLower(filepath.Ext(path))
+	switch ext {
+	case ".png":
+		return 100
+	case ".jpg", ".jpeg":
+		return 101
+	case ".webp":
+		return 100
+	default:
+		return 100
+	}
+}
+
 func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	f, err := os.Open(filePath)
 	if err != nil {
@@ -100,7 +114,8 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 		return "", err
 	}
 
-	return encodeKittyGraphics(data, cols, rows), nil
+	format := detectImageFormat(filePath)
+	return encodeKittyGraphics(data, cols, rows, format), nil
 }
 
 func kittyClearGraphics() string {

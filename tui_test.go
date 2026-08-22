@@ -1154,6 +1154,25 @@ func TestTUISetTerminalTitle(t *testing.T) {
 func TestKittyFunctionsExist(t *testing.T) {
 	_ = isKittySupported()
 	_ = findCoverImage("/tmp")
-	_ = encodeKittyGraphics([]byte("test"), 0, 0)
+	_ = encodeKittyGraphics([]byte("test"), 0, 0, 100)
 	_ = kittyClearGraphics()
+}
+
+func TestDetectImageFormat(t *testing.T) {
+	cases := []struct {
+		path string
+		fmt  int
+	}{
+		{"/path/image.png", 100},
+		{"/path/image.jpg", 101},
+		{"/path/image.jpeg", 101},
+		{"/path/image.webp", 100},
+		{"/path/image.unknown", 100},
+	}
+	for _, c := range cases {
+		got := detectImageFormat(c.path)
+		if got != c.fmt {
+			t.Errorf("detectImageFormat(%q) = %d, want %d", c.path, got, c.fmt)
+		}
+	}
 }
