@@ -1,0 +1,82 @@
+// Bubblewrap Sandbox Launcher Configuration File
+{
+  "system": {
+    "share_net": true,
+    "clearenv": true,
+    "unshare_uts": true,
+    "hostname": "bubble"
+  },
+  "sandbox_path": "/home/sariel/.sandbox/pi_generic",
+  "models_json_path": "~/info/llm/models.json",
+  "tmux_session_name": "bwrap-dev",
+  "max_file_count": 1000,
+  "cdtoday": "info/misc",
+  "features": {
+    "enable_ssh": true,
+    "ssh_keys": [],
+    "auto_repo_deploy_key": true,
+    "enable_x11": true,
+    "enable_wsl": true,
+    "enable_etc_auto_bind": true,
+    "enable_oh_my_posh": true
+  },
+  "oh_my_posh": {
+    "theme_path": "~/.config/bw/theme.omp.json"
+  },
+  "env": {
+    "HOME": "/home/sariel",
+    "TERM": "xterm-256color",
+    "LANG": "C.UTF-8",
+    "LC_ALL": "C.UTF-8",
+    "USER": "sariel",
+    "LOGNAME": "sariel",
+    "SHELL": "/bin/bash",
+    "EDITOR": "emacs -nw",
+    "VISUAL": "emacs -nw",
+    "OPENROUTER_API_KEY": ""
+  },
+  "path": [
+    "/home/sariel/bin",
+    "/home/sariel/.local/bin",
+    "/home/sariel/.cargo/bin",
+    "/usr/local/sbin",
+    "/usr/local/bin",
+    "/usr/sbin",
+    "/usr/bin",
+    "/sbin",
+    "/bin"
+  ],
+  "binds_rw": [
+    ["/home/sariel/.sandbox/pi_generic", "/home/sariel"],
+    ["~/.opencode", "/home/sariel/.opencode"],
+    ["~/.cargo", "/home/sariel/.cargo"],
+    ["~/.gitconfig", "/home/sariel/.gitconfig"],
+    ["~/.git-credentials", "/home/sariel/.git-credentials"],
+    ["~/.config/git", "/home/sariel/.config/git"],
+    ["~/.ssh/known_hosts", "/home/sariel/.ssh/known_hosts"],
+    ["~/.ssh/config", "/home/sariel/.ssh/config"],
+    ["~/.terminfo", "/home/sariel/.terminfo"],
+    ["~/.local/share/terminfo", "/home/sariel/.local/share/terminfo"],
+    // Local binary directories (for uv, uvx, and other user tools):
+    ["~/.local/bin", "/home/sariel/.local/bin"],
+    // TeX Live writable directories (for format generation, font cache):
+    ["~/.texlive2026/texmf-var", "/home/sariel/.texlive2026/texmf-var"],
+    ["~/.texlive2026/texmf-config", "/home/sariel/.texlive2026/texmf-config"],
+    ["~/.local/share/fonts", "/home/sariel/.local/share/fonts"],
+    ["~/.cache/fontconfig", "/home/sariel/.cache/fontconfig"],"/media/podcasts/clean/","/home/sariel/.config/abs/"
+  ],
+  "binds_ro": [
+    ["/bin", "/bin"],
+    ["/usr", "/usr"],
+    ["/lib", "/lib"],
+    ["/lib64", "/lib64"],
+    ["/lib32", "/lib32"],
+    ["/libx32", "/libx32"],
+    ["/sbin", "/sbin"],
+    ["/run/systemd/journal", "/run/systemd/journal"],
+    ["~/.rustup", "/home/sariel/.rustup"],
+    // System TeX Live installation (packages, fonts, formats):
+    ["/var/lib/texmf", "/var/lib/texmf"],
+    ["/var/cache/fontconfig", "/var/cache/fontconfig"]
+  ]
+}

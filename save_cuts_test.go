@@ -105,7 +105,7 @@ func TestSaveCutsJSONGenerator(t *testing.T) {
 	data, _ := readFile(r.CutsFile)
 	var cd CutsData
 	json.Unmarshal(data, &cd)
-	if cd.Generator != "mp3_rm_ads" {
+	if cd.Generator != "abs" {
 		t.Error("generator wrong")
 	}
 }

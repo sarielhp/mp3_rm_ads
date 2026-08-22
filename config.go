@@ -9,12 +9,13 @@ import (
 	"strings"
 )
 
-const configDirName = ".config/mp3_rm_ads"
+const configDirName = ".config/abs"
+const legacyConfigDirName = ".config/mp3_rm_ads"
 const configFileName = "config.json"
 const opencodeConfigFile = ".config/opencode/opencode.json"
 
 var defaultConfig = Config{
-	Instructions:       "Configuration file for mp3_rm_ads. Select profiles by ID or set active_profile_id.",
+	Instructions:       "Configuration file for abs. Select profiles by ID or set active_profile_id.",
 	WhisperURL:         "http://192.168.1.230:8088/inference",
 	WhisperSpeedFactor: 7.0,
 	ChunkDurationSec:   0,
@@ -35,7 +36,7 @@ func userTmpDir() string {
 	if username == "" {
 		username = "user"
 	}
-	dir := filepath.Join(os.TempDir(), username, "mp3_rm_ads")
+	dir := filepath.Join(os.TempDir(), username, "abs")
 	_ = os.MkdirAll(dir, 0755)
 	return dir
 }
@@ -50,6 +51,14 @@ func configDir() string {
 
 func configPath() string {
 	return filepath.Join(configDir(), configFileName)
+}
+
+func legacyConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, legacyConfigDirName, configFileName)
 }
 
 func opencodeConfigPath() string {
@@ -82,6 +91,15 @@ func ensureConfigExists() {
 		return
 	}
 	if _, err := os.Stat(configPath()); os.IsNotExist(err) {
+		legacy := legacyConfigPath()
+		if legacy != "" {
+			if legacyData, err := os.ReadFile(legacy); err == nil && len(legacyData) > 0 {
+				_ = os.WriteFile(configPath(), legacyData, 0644)
+				fmt.Printf("Migrated legacy configuration from '%s' to '%s'\n", legacy, configPath())
+				return
+			}
+		}
+
 		cfg := defaultConfig
 		ip := localIP()
 		cfg.WhisperURL = fmt.Sprintf("http://%s:8088/inference", ip)
@@ -98,15 +116,50 @@ func replaceIP(url, ip string) string {
 	return strings.Replace(url, "192.168.1.230", ip, 1)
 }
 
+func applyEnvOverrides(cfg *Config) {
+	if v := os.Getenv("WHISPER_URL"); v != "" {
+		cfg.WhisperURL = v
+	}
+	if v := os.Getenv("ABS_URL"); v != "" {
+		cfg.AudiobookshelfURL = v
+	} else if v := os.Getenv("AUDIOBOOKSHELF_URL"); v != "" {
+		cfg.AudiobookshelfURL = v
+	}
+	if v := os.Getenv("ABS_USER"); v != "" {
+		cfg.AudiobookshelfUser = v
+	} else if v := os.Getenv("AUDIOBOOKSHELF_USER"); v != "" {
+		cfg.AudiobookshelfUser = v
+	}
+	if v := os.Getenv("ABS_PASS"); v != "" {
+		cfg.AudiobookshelfPass = v
+	} else if v := os.Getenv("AUDIOBOOKSHELF_PASS"); v != "" {
+		cfg.AudiobookshelfPass = v
+	}
+	if v := os.Getenv("PODCASTS_DIR"); v != "" {
+		cfg.PodcastsDir = v
+	}
+	if v := os.Getenv("WHISPER_LANGUAGE"); v != "" {
+		cfg.WhisperLanguage = v
+	}
+	if v := os.Getenv("WHISPER_DOCKER_CONTAINER"); v != "" {
+		cfg.WhisperDockerContainer = v
+	}
+}
+
 func loadConfig() Config {
 	data, err := os.ReadFile(configPath())
 	if err != nil {
-		return defaultConfig
+		cfg := defaultConfig
+		applyEnvOverrides(&cfg)
+		return cfg
 	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		return defaultConfig
+		cfg = defaultConfig
+		applyEnvOverrides(&cfg)
+		return cfg
 	}
+	applyEnvOverrides(&cfg)
 	return cfg
 }
 

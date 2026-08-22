@@ -3,23 +3,27 @@
 ## Build & Quality
 
 - **Go 1.26+** — single `main` package with files organized by concern
-- Build: `go build -o mp3_rm_ads .`
+- Build: `go build -o abs .`
 - Test: `go test -timeout 30s ./...` (all tests use `t.TempDir()` for isolation)
 - Lint: `go vet ./...` then `staticcheck ./...`
 - Format: `gofmt -s -w .` before committing
 
-## Automation Scripts (`scripts/`)
+## Automation Tools (`tools/`)
 
 | Script | Purpose |
 |--------|---------|
-| `scripts/check.sh` | Full quality gate: format → tidy → vet → staticcheck → test → build |
-| `scripts/format.sh` | Run `gofmt -s -w .` only |
-| `scripts/lint.sh` | Static analysis: `go vet` + `staticcheck` |
-| `scripts/map.sh` | Print package structure, key types, and exported functions |
-| `scripts/version.sh` | Print current version from `VERSION` file |
-| `scripts/bump-version.sh` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
-| `scripts/commit.sh <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
-| `scripts/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
+| `tools/check.sh` | Full quality gate: format → tidy → vet → staticcheck → test → build |
+| `tools/format.sh` | Run `gofmt -s -w .` only |
+| `tools/lint.sh` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
+| `tools/audit_lines.rb` | Audit Go source file lengths against 150-300 target (600 limit) |
+| `tools/outline_symbols.rb` | Index all Go types, structs, interfaces, and functions |
+| `tools/show_symbol.rb <sym>` | Display single symbol code block with line numbers |
+| `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
+| `tools/map.sh` | Print package structure, key types, and exported functions |
+| `tools/version.sh` | Print current version from `VERSION` file |
+| `tools/bump-version.sh` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
+| `tools/commit.sh <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
+| `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
 
 ## Makefile
 
@@ -28,7 +32,10 @@ A `Makefile` at the project root delegates to all scripts:
 | Target | Action |
 |--------|--------|
 | `make check` | Full quality gate |
-| `make lint` | Static analysis (vet + staticcheck) |
+| `make lint` | Static analysis (vet + staticcheck + line audit) |
+| `make audit` | Audit Go source file line lengths (`tools/audit_lines.rb`) |
+| `make symbols` | Outline symbols (`tools/outline_symbols.rb ARGS="..."`) |
+| `make template` | Regenerate config template (`tools/generate_config_template.rb`) |
 | `make test` | Run tests |
 | `make build` | Build binary |
 | `make format` | Format code |
@@ -141,13 +148,22 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 - `whisper.cpp` server — HTTP API for transcription
 - `libmp3lame` — MP3 encoding (via ffmpeg)
 
-## Key Architecture
-
-- Transcription: HTTP POST to whisper server with `verbose_json` response format
-- Progress: Docker log polling via `docker logs --tail N`
-- Ad detection: LLM API (Ollama, OpenRouter, etc.)
-- Audio cutting: ffmpeg filter_complex with concat
-- Config: `~/.config/mp3_rm_ads/config.json`
+## Key Architecture & Configuration
+ 
+ - Transcription: HTTP POST to whisper server with `verbose_json` response format
+ - Progress: Docker log polling via `docker logs --tail N`
+ - Ad detection: LLM API (Ollama, OpenRouter, etc.)
+ - Audio cutting: ffmpeg filter_complex with concat
+ - Config: `~/.config/abs/config.json`
+ - Legacy Auto-Migration: If `~/.config/abs/config.json` does not exist, `abs` auto-migrates from `~/.config/mp3_rm_ads/config.json` on first run.
+ - Environment Overrides: Supported env vars override config values:
+   - `WHISPER_URL`
+   - `ABS_URL` / `AUDIOBOOKSHELF_URL`
+   - `ABS_USER` / `AUDIOBOOKSHELF_USER`
+   - `ABS_PASS` / `AUDIOBOOKSHELF_PASS`
+   - `PODCASTS_DIR`
+   - `WHISPER_LANGUAGE`
+   - `WHISPER_DOCKER_CONTAINER`
 
 ## Agent Development Rules
 

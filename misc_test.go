@@ -46,7 +46,7 @@ func TestParseFlags(t *testing.T) {
 func TestParseFlagsConfigPodcastsDir(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"mp3_rm_ads", "config", "--podcasts_dir", "/path/to/podcasts"}
+	os.Args = []string{"abs", "config", "--podcasts_dir", "/path/to/podcasts"}
 	cli := parseFlags()
 	if !cli.IsConfigCommand || cli.PodcastsDir != "/path/to/podcasts" {
 		t.Errorf("expected IsConfigCommand=true, PodcastsDir='/path/to/podcasts', got %v, %q", cli.IsConfigCommand, cli.PodcastsDir)
@@ -383,19 +383,19 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"mp3_rm_ads", "test", "whisper"}
+	os.Args = []string{"abs", "test", "whisper"}
 	cli := parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
-	os.Args = []string{"mp3_rm_ads", "test"}
+	os.Args = []string{"abs", "test"}
 	cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default test command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
-	os.Args = []string{"mp3_rm_ads", "test-whisper"}
+	os.Args = []string{"abs", "test-whisper"}
 	cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for test-whisper command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
@@ -406,13 +406,13 @@ func TestParseFlagsSilent(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"mp3_rm_ads", "-s", "file.mp3"}
+	os.Args = []string{"abs", "-s", "file.mp3"}
 	cli := parseFlags()
 	if !cli.Silent {
 		t.Error("expected Silent=true for -s")
 	}
 
-	os.Args = []string{"mp3_rm_ads", "--silent", "file.mp3"}
+	os.Args = []string{"abs", "--silent", "file.mp3"}
 	cli = parseFlags()
 	if !cli.Silent {
 		t.Error("expected Silent=true for --silent")

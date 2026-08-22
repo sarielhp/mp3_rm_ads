@@ -34,7 +34,7 @@ func main() {
 		origStderr.Sync()
 
 		tmpDir := userTmpDir()
-		tmp, err := os.CreateTemp(tmpDir, "mp3_rm_ads_silent_*.log")
+		tmp, err := os.CreateTemp(tmpDir, "abs_silent_*.log")
 		if err == nil {
 			silentLogFile = tmp
 			silentLogPath = tmp.Name()
@@ -788,43 +788,43 @@ func parseFlags() CLIOptions {
 
 func buildUsageApp() *clihelp.App {
 	return &clihelp.App{
-		Name:        "mp3_rm_ads",
+		Name:        "abs",
 		Description: "Automatic Podcast Ad & Sponsor Segment Remover",
-		GlobalNote:  "If no command is given and podcasts_dir is configured, it is equivalent to: mp3_rm_ads dir <podcasts_dir>",
+		GlobalNote:  "If no command is given and podcasts_dir is configured, it is equivalent to: abs dir <podcasts_dir>",
 		Commands: []clihelp.Command{
 			{
 				Name:        "file",
 				Description: "Process individual MP3 or transcript JSON files",
-				UsageLine:   "mp3_rm_ads file <file1.mp3> [file2.mp3 ...] [options]",
+				UsageLine:   "abs file <file1.mp3> [file2.mp3 ...] [options]",
 				Options:     globalOptions(),
 				Examples:    fileExamples(),
 			},
 			{
 				Name:        "dir",
 				Description: "Recursively process all MP3s in a directory",
-				UsageLine:   "mp3_rm_ads dir <directory> [options]",
+				UsageLine:   "abs dir <directory> [options]",
 				Options:     globalOptions(),
 				Examples: []clihelp.Example{
-					{Line: "mp3_rm_ads dir ~/podcasts"},
-					{Line: "mp3_rm_ads dir ~/podcasts -q"},
+					{Line: "abs dir ~/podcasts"},
+					{Line: "abs dir ~/podcasts -q"},
 				},
 			},
 			{
 				Name:        "tui",
 				Description: "Interactive TUI browser for podcasts and episodes",
-				UsageLine:   "mp3_rm_ads tui [directory]",
+				UsageLine:   "abs tui [directory]",
 				Options: []clihelp.Option{
 					{Flags: "[directory]", Description: "Podcasts directory (default: podcasts_dir from config)"},
 				},
 				Examples: []clihelp.Example{
-					{Line: "mp3_rm_ads tui"},
-					{Line: "mp3_rm_ads tui ~/podcasts"},
+					{Line: "abs tui"},
+					{Line: "abs tui ~/podcasts"},
 				},
 			},
 			{
 				Name:        "config",
 				Description: "Manage configuration",
-				UsageLine:   "mp3_rm_ads config [options]",
+				UsageLine:   "abs config [options]",
 				Options: []clihelp.Option{
 					{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
 					{Flags: "--abs-url URL", Description: "Set Audiobookshelf server URL"},
@@ -835,18 +835,18 @@ func buildUsageApp() *clihelp.App {
 					{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
 				},
 				Examples: []clihelp.Example{
-					{Line: "mp3_rm_ads config --podcasts_dir /path/to/podcasts"},
-					{Line: "mp3_rm_ads config --abs-url http://192.168.1.100:80"},
-					{Line: "mp3_rm_ads config --abs-user admin --abs-pass secret"},
-					{Line: "mp3_rm_ads config --list-llms"},
-					{Line: "mp3_rm_ads config --set-default 2"},
-					{Line: "mp3_rm_ads config --copy_llm_from_opencode"},
+					{Line: "abs config --podcasts_dir /path/to/podcasts"},
+					{Line: "abs config --abs-url http://192.168.1.100:80"},
+					{Line: "abs config --abs-user admin --abs-pass secret"},
+					{Line: "abs config --list-llms"},
+					{Line: "abs config --set-default 2"},
+					{Line: "abs config --copy_llm_from_opencode"},
 				},
 			},
 			{
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",
-				UsageLine:   "mp3_rm_ads test <whisper|abs [connect|map|download]|kitty <image>>",
+				UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
 				Options: []clihelp.Option{
 					{Flags: "--test-whisper", Description: "Test whisper server connection with retries"},
 					{Flags: "--test-abs", Description: "Test Audiobookshelf server connection"},
@@ -855,12 +855,12 @@ func buildUsageApp() *clihelp.App {
 					{Flags: "--test-kitty", Description: "Test Kitty image protocol with an image file"},
 				},
 				Examples: []clihelp.Example{
-					{Line: "mp3_rm_ads test whisper"},
-					{Line: "mp3_rm_ads test abs connect"},
-					{Line: "mp3_rm_ads test abs map"},
-					{Line: "mp3_rm_ads test abs download"},
-					{Line: "mp3_rm_ads test kitty cover.jpg"},
-					{Line: "mp3_rm_ads test"},
+					{Line: "abs test whisper"},
+					{Line: "abs test abs connect"},
+					{Line: "abs test abs map"},
+					{Line: "abs test abs download"},
+					{Line: "abs test kitty cover.jpg"},
+					{Line: "abs test"},
 				},
 			},
 		},
@@ -894,12 +894,12 @@ func globalOptions() []clihelp.Option {
 
 func fileExamples() []clihelp.Example {
 	return []clihelp.Example{
-		{Line: "mp3_rm_ads file episode.mp3"},
-		{Line: "mp3_rm_ads file episode1.mp3 episode2.mp3 episode3.mp3"},
-		{Line: "mp3_rm_ads file --recut episode.mp3"},
-		{Line: "mp3_rm_ads file -q --srt episode.mp3"},
-		{Line: "mp3_rm_ads file episode.transcript.json -srt -txt"},
-		{Line: "mp3_rm_ads file --use-llm 2 episode.mp3"},
-		{Line: "mp3_rm_ads file --copy_llm_from_opencode"},
+		{Line: "abs file episode.mp3"},
+		{Line: "abs file episode1.mp3 episode2.mp3 episode3.mp3"},
+		{Line: "abs file --recut episode.mp3"},
+		{Line: "abs file -q --srt episode.mp3"},
+		{Line: "abs file episode.transcript.json -srt -txt"},
+		{Line: "abs file --use-llm 2 episode.mp3"},
+		{Line: "abs file --copy_llm_from_opencode"},
 	}
 }

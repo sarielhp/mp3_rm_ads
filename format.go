@@ -360,7 +360,7 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 		llmInfo = fmt.Sprintf("%s (%s)", profile.Name, profile.Model)
 	}
 
-	generatorName := "mp3_rm_ads"
+	generatorName := "abs"
 
 	cutsData := CutsData{
 		Version:             1,

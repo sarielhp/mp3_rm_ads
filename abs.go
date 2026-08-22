@@ -149,7 +149,7 @@ func absGet(baseURL, token, endpoint string, v interface{}) error {
 
 func testAudiobookshelfServer(cfg Config, quiet bool) bool {
 	if cfg.AudiobookshelfURL == "" {
-		fmt.Println("ERROR: audiobookshelf_url is not configured. Set it with: mp3_rm_ads config --abs-url <url>")
+		fmt.Println("ERROR: audiobookshelf_url is not configured. Set it with: abs config --abs-url <url>")
 		return false
 	}
 

@@ -1,4 +1,4 @@
-module github.com/sariel/mp3_rm_ads
+module github.com/sariel/abs
 
 go 1.26.5
 

@@ -118,8 +118,8 @@ func TestPrintConfig(t *testing.T) {
 
 func TestUserTmpDir(t *testing.T) {
 	dir := userTmpDir()
-	if !strings.Contains(dir, "mp3_rm_ads") {
-		t.Errorf("expected dir to contain 'mp3_rm_ads', got %q", dir)
+	if !strings.Contains(dir, "abs") {
+		t.Errorf("expected dir to contain 'abs', got %q", dir)
 	}
 	info, err := os.Stat(dir)
 	if err != nil || !info.IsDir() {
@@ -135,8 +135,64 @@ func TestUserTmpDir(t *testing.T) {
 
 	os.Setenv("USER", "testuser123")
 	dirUser := userTmpDir()
-	if !strings.Contains(dirUser, "testuser123") || !strings.Contains(dirUser, "mp3_rm_ads") {
-		t.Errorf("expected dir to contain 'testuser123' and 'mp3_rm_ads', got %q", dirUser)
+	if !strings.Contains(dirUser, "testuser123") || !strings.Contains(dirUser, "abs") {
+		t.Errorf("expected dir to contain 'testuser123' and 'abs', got %q", dirUser)
 	}
 	os.RemoveAll(dirUser)
+}
+
+func TestApplyEnvOverrides(t *testing.T) {
+	origWhisper := os.Getenv("WHISPER_URL")
+	origABS := os.Getenv("ABS_URL")
+	origUser := os.Getenv("ABS_USER")
+	origPass := os.Getenv("ABS_PASS")
+	origDir := os.Getenv("PODCASTS_DIR")
+	origLang := os.Getenv("WHISPER_LANGUAGE")
+	origDocker := os.Getenv("WHISPER_DOCKER_CONTAINER")
+	defer func() {
+		os.Setenv("WHISPER_URL", origWhisper)
+		os.Setenv("ABS_URL", origABS)
+		os.Setenv("ABS_USER", origUser)
+		os.Setenv("ABS_PASS", origPass)
+		os.Setenv("PODCASTS_DIR", origDir)
+		os.Setenv("WHISPER_LANGUAGE", origLang)
+		os.Setenv("WHISPER_DOCKER_CONTAINER", origDocker)
+	}()
+
+	os.Setenv("WHISPER_URL", "http://custom-whisper:9000/inference")
+	os.Setenv("ABS_URL", "http://custom-abs:8080")
+	os.Setenv("ABS_USER", "customuser")
+	os.Setenv("ABS_PASS", "custompass")
+	os.Setenv("PODCASTS_DIR", "/custom/podcasts")
+	os.Setenv("WHISPER_LANGUAGE", "es")
+	os.Setenv("WHISPER_DOCKER_CONTAINER", "custom-docker")
+
+	cfg := Config{}
+	applyEnvOverrides(&cfg)
+
+	if cfg.WhisperURL != "http://custom-whisper:9000/inference" {
+		t.Errorf("expected custom whisper URL, got %q", cfg.WhisperURL)
+	}
+	if cfg.AudiobookshelfURL != "http://custom-abs:8080" {
+		t.Errorf("expected custom ABS URL, got %q", cfg.AudiobookshelfURL)
+	}
+	if cfg.AudiobookshelfUser != "customuser" || cfg.AudiobookshelfPass != "custompass" {
+		t.Errorf("expected custom user/pass, got %q / %q", cfg.AudiobookshelfUser, cfg.AudiobookshelfPass)
+	}
+	if cfg.PodcastsDir != "/custom/podcasts" {
+		t.Errorf("expected custom podcasts dir, got %q", cfg.PodcastsDir)
+	}
+	if cfg.WhisperLanguage != "es" {
+		t.Errorf("expected custom language, got %q", cfg.WhisperLanguage)
+	}
+	if cfg.WhisperDockerContainer != "custom-docker" {
+		t.Errorf("expected custom docker container, got %q", cfg.WhisperDockerContainer)
+	}
+}
+
+func TestLegacyConfigPath(t *testing.T) {
+	p := legacyConfigPath()
+	if p != "" && !strings.Contains(p, "mp3_rm_ads") {
+		t.Errorf("expected legacy config path to contain mp3_rm_ads, got %q", p)
+	}
 }

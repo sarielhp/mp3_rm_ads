@@ -1,4 +1,4 @@
-# mp3_rm_ads
+# abs
 
 Automatically detects and removes advertisement, sponsor, and promotional segments from podcast MP3 files using local Whisper transcription and configurable LLM detection.
 
@@ -30,11 +30,11 @@ Automatically detects and removes advertisement, sponsor, and promotional segmen
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/mp3_rm_ads.git
-cd mp3_rm_ads
+git clone https://github.com/yourusername/abs.git
+cd abs
 
 # Build the Go binary
-go build -o mp3_rm_ads .
+go build -o abs .
 
 # Or use the Makefile
 make build
@@ -42,7 +42,7 @@ make build
 
 ## Configuration
 
-The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first run, using the local machine's IP address automatically.
+The program creates a config file at `~/.config/abs/config.json` on first run, using the local machine's IP address automatically.
 
 ```json
 {
@@ -93,41 +93,41 @@ The program creates a config file at `~/.config/mp3_rm_ads/config.json` on first
 
 ```bash
 # Process a single episode
-./mp3_rm_ads episode.mp3
+./abs episode.mp3
 
 # Process all MP3s in a directory
-./mp3_rm_ads /path/to/podcasts/
+./abs /path/to/podcasts/
 
 # Process multiple episodes
-./mp3_rm_ads episode1.mp3 episode2.mp3 episode3.mp3
+./abs episode1.mp3 episode2.mp3 episode3.mp3
 
 # Quiet mode
-./mp3_rm_ads -q episode.mp3
+./abs -q episode.mp3
 ```
 
 ### Subcommands
 
 ```bash
 # Process all MP3s in a directory
-./mp3_rm_ads dir /path/to/podcasts/
+./abs dir /path/to/podcasts/
 
 # Process a single file
-./mp3_rm_ads file episode.mp3
+./abs file episode.mp3
 
 # Interactive TUI browser
-./mp3_rm_ads tui [path/to/podcasts/dir]
+./abs tui [path/to/podcasts/dir]
 
 # Configuration management
-./mp3_rm_ads config
+./abs config
 
 # Test Whisper server
-./mp3_rm_ads test --test-whisper
+./abs test --test-whisper
 
 # Test Audiobookshelf server
-./mp3_rm_ads test --test-abs
+./abs test --test-abs
 
 # Map Audiobookshelf podcasts
-./mp3_rm_ads test --abs-map
+./abs test --abs-map
 ```
 
 ### Chunked Transcription
@@ -136,7 +136,7 @@ For long files that whisper fails to decode, use chunked transcription:
 
 ```bash
 # Enable chunking (10-minute chunks with 30s overlap)
-./mp3_rm_ads --use-chunks episode.mp3
+./abs --use-chunks episode.mp3
 
 # Or enable permanently in config:
 # "chunk_duration_sec": 600
@@ -148,59 +148,59 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 
 ```bash
 # Export to SRT format
-./mp3_rm_ads --srt episode.mp3
+./abs --srt episode.mp3
 
 # Export to TXT format
-./mp3_rm_ads --txt episode.mp3
+./abs --txt episode.mp3
 
 # Export both
-./mp3_rm_ads --srt --txt episode.mp3
+./abs --srt --txt episode.mp3
 ```
 
 ### Recut Mode
 
 ```bash
 # Re-cut using existing .cuts.json
-./mp3_rm_ads --recut episode.mp3
+./abs --recut episode.mp3
 ```
 
 ### Force Options
 
 ```bash
 # Force re-transcribe
-./mp3_rm_ads --force-transcribe episode.mp3
+./abs --force-transcribe episode.mp3
 
 # Force re-run LLM detection
-./mp3_rm_ads --force-llm episode.mp3
+./abs --force-llm episode.mp3
 
 # Force both
-./mp3_rm_ads --force-transcribe --force-llm episode.mp3
+./abs --force-transcribe --force-llm episode.mp3
 ```
 
 ### LLM Profiles
 
 ```bash
 # List available profiles
-./mp3_rm_ads --list-llms
+./abs --list-llms
 
 # Use specific profile
-./mp3_rm_ads --use-llm 2 episode.mp3
+./abs --use-llm 2 episode.mp3
 
 # Set default profile
-./mp3_rm_ads --set-default 2
+./abs --set-default 2
 ```
 
 ### Audiobookshelf Integration
 
 ```bash
 # Set Audiobookshelf server details
-./mp3_rm_ads --set-abs --abs-url http://localhost:8080 --abs-user admin --abs-pass password
+./abs --set-abs --abs-url http://localhost:8080 --abs-user admin --abs-pass password
 
 # Test connection to Audiobookshelf
-./mp3_rm_ads --test-abs
+./abs --test-abs
 
 # Map podcast directories
-./mp3_rm_ads --abs-map
+./abs --abs-map
 ```
 
 ## Output Files

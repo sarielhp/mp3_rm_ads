@@ -1,12 +1,12 @@
 # Changelog
 
-All notable changes to mp3_rm_ads will be documented in this file.
+All notable changes to abs will be documented in this file.
 
 ## [0.1.7] - 2026-08-13
 
 ### Added
 - Display `Scanning: <Directory>` status output when starting folder scan in default mode and `dir` mode
-- Dedicated user temporary directory `/tmp/$USER/mp3_rm_ads/` created on demand for temporary log files and fallbacks
+- Dedicated user temporary directory `/tmp/$USER/abs/` created on demand for temporary log files and fallbacks
 
 ## [Unreleased]
 

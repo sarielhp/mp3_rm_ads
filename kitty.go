@@ -66,7 +66,7 @@ func kittyClearGraphics() string {
 
 func testKittyImage(args []string) {
 	if len(args) == 0 {
-		fmt.Println("Usage: mp3_rm_ads test kitty <image-file>")
+		fmt.Println("Usage: abs test kitty <image-file>")
 		fmt.Println()
 		fmt.Println("Displays an image using ANSI true-color half-block rendering.")
 		fmt.Println("Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")

@@ -1,21 +1,30 @@
-.PHONY: all check lint test build format tidy vet staticcheck map version bump commit push ci checkpoint clean
+.PHONY: all check lint test build format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template
 
 all: check
 
 check:
-	@./scripts/check.sh
+	@./tools/check.sh
 
 lint:
-	@./scripts/lint.sh
+	@./tools/lint.sh
+
+audit:
+	@ruby ./tools/audit_lines.rb
+
+symbols:
+	@ruby ./tools/outline_symbols.rb $(ARGS)
+
+template:
+	@ruby ./tools/generate_config_template.rb
 
 test:
 	@go test -timeout 30s ./...
 
 build:
-	@go build -o mp3_rm_ads .
+	@go build -o abs .
 
 format:
-	@./scripts/format.sh
+	@./tools/format.sh
 
 tidy:
 	@go mod tidy
@@ -27,24 +36,24 @@ staticcheck:
 	@staticcheck -checks '-SA2001' ./...
 
 map:
-	@./scripts/map.sh
+	@./tools/map.sh
 
 version:
-	@./scripts/version.sh
+	@./tools/version.sh
 
 bump:
-	@./scripts/bump-version.sh
+	@./tools/bump-version.sh
 
 commit:
-	@./scripts/commit.sh $(ARGS)
+	@./tools/commit.sh $(ARGS)
 
 push: bump
 
 ci: check
 
 checkpoint:
-	@./scripts/checkpoint.sh
+	@./tools/checkpoint.sh
 
 clean:
-	@rm -f mp3_rm_ads
+	@rm -f abs
 	@echo "Cleaned."

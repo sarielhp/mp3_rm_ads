@@ -520,11 +520,11 @@ func (m *tuiModel) View() string {
 
 	// Set terminal title
 	if m.screen == screenPodcastDetail && m.podIdx < len(m.podcasts) {
-		m.setTerminalTitle("mp3_rm_ads - " + m.podcasts[m.podIdx].name)
+		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].name)
 	} else if m.screen == screenEpisodeDetail && m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
-		m.setTerminalTitle("mp3_rm_ads - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
+		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
 	} else {
-		m.setTerminalTitle("mp3_rm_ads")
+		m.setTerminalTitle("abs")
 	}
 
 	var body string
