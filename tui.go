@@ -489,14 +489,6 @@ func (m *tuiModel) drawErrorScreen() string {
 	out.WriteByte('\n')
 	return out.String()
 }
-
-func disableTerminalScroll() {
-	fmt.Print("\x1b[?1049h")
-}
-
-func enableTerminalScroll() {
-	fmt.Print("\x1b[?1049l")
-}
 func (m *tuiModel) searchBar() string {
 	if !m.searchMode {
 		return ""
@@ -823,6 +815,18 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
 	out.WriteByte('\n')
 
+	// Cover art at the top
+	if isKittySupported() && m.showCover {
+		coverPath := findCoverImage(pod.dir)
+		if coverPath != "" {
+			imgEsc, err := encodeKittyGraphicsFile(coverPath, 30, 0)
+			if err == nil && imgEsc != "" {
+				out.WriteString(imgEsc)
+				out.WriteByte('\n')
+			}
+		}
+	}
+
 	// Status Badges Row
 	var badges []string
 	if ep.hasAdsRemoved {
@@ -934,18 +938,6 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	} else {
 		out.WriteByte('\n')
 		out.WriteString(tuiDimStyle.Render("  No ABS data available\n"))
-	}
-
-	// 3. Kitty Graphics Protocol Image Display (Cover Art) - Left side
-	if isKittySupported() && m.showCover {
-		coverPath := findCoverImage(pod.dir)
-		if coverPath != "" {
-			imgEsc, err := encodeKittyGraphicsFile(coverPath, 30, 0)
-			if err == nil && imgEsc != "" {
-				out.WriteString(tuiLabelStyle.Render("  Cover Art:\n"))
-				out.WriteString(imgEsc + "\n\n")
-			}
-		}
 	}
 
 	out.WriteByte('\n')

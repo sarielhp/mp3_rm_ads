@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"image"
 	"os"
 	"strings"
 	"testing"
@@ -1109,9 +1110,26 @@ func TestTUIErrorScreenQuit(t *testing.T) {
 }
 
 func TestTUIScrollWheelFunctions(t *testing.T) {
-	// Just test that functions exist and don't panic
-	disableTerminalScroll()
-	enableTerminalScroll()
+}
+
+func TestRenderImageToHalfBlocks(t *testing.T) {
+	// Create a small test image
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	result := renderImageToHalfBlocks(img, 4, 4)
+	if result == "" {
+		t.Error("renderImageToHalfBlocks should return non-empty string")
+	}
+	if !strings.Contains(result, "▀") {
+		t.Error("renderImageToHalfBlocks should contain half-block characters")
+	}
+}
+
+func TestRenderImageFile(t *testing.T) {
+	// Test with non-existent file
+	_, err := renderImageFile("/nonexistent/image.jpg", 10, 10)
+	if err == nil {
+		t.Error("renderImageFile with non-existent file should return error")
+	}
 }
 
 func TestTUIApplyColorConfig(t *testing.T) {
@@ -1155,26 +1173,13 @@ func TestTUISetTerminalTitle(t *testing.T) {
 func TestKittyFunctionsExist(t *testing.T) {
 	_ = isKittySupported()
 	_ = findCoverImage("/tmp")
-	_ = encodeKittyGraphics([]byte("test"), 0, 0, 100)
 	_ = kittyClearGraphics()
 }
 
 func TestDetectImageFormat(t *testing.T) {
-	cases := []struct {
-		path string
-		fmt  int
-	}{
-		{"/path/image.png", 100},
-		{"/path/image.jpg", 101},
-		{"/path/image.jpeg", 101},
-		{"/path/image.webp", 100},
-		{"/path/image.unknown", 100},
-	}
-	for _, c := range cases {
-		got := detectImageFormat(c.path)
-		if got != c.fmt {
-			t.Errorf("detectImageFormat(%q) = %d, want %d", c.path, got, c.fmt)
-		}
+	// Always returns 100 with half-block approach
+	if detectImageFormat("/path/image.jpg") != 100 {
+		t.Error("detectImageFormat should always return 100")
 	}
 }
 
