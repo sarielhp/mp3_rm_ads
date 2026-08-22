@@ -65,6 +65,9 @@ type tuiModel struct {
 	showHelp    bool
 	popupMsg    string
 	popupTimer  int
+	marqueeTick int
+	marqueePos  int
+	marqueeDir  int
 }
 
 type loadedPodcastsMsg struct {
@@ -78,7 +81,10 @@ type episodeDurationMsg struct {
 	duration float64
 }
 
-func newTuiModel(bk *TuiBackend, podcastsDir string) *tuiModel {
+func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *Config) *tuiModel {
+	if cfg != nil {
+		applyTUIColorConfig(cfg.TUIColor)
+	}
 	return &tuiModel{
 		screen:      screenPodcasts,
 		loading:     true,
@@ -143,6 +149,20 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	s := msg.String()
+
+	// Handle error screen keys
+	if m.loadErr != "" {
+		switch s {
+		case "r", "R":
+			m.loadErr = ""
+			m.loading = true
+			return m, m.Init()
+		case "q", "Q", "ctrl+c", "ctrl+d":
+			m.done = true
+			return m, tea.Quit
+		}
+		return m, nil
+	}
 
 	switch s {
 	case "ctrl+c", "ctrl+d":
@@ -395,6 +415,55 @@ func (m *tuiModel) drawPopup() string {
 	}
 	return tuiPopupStyle.Render("  " + m.popupMsg)
 }
+
+func (m *tuiModel) marqueeText(text string, maxWidth int) string {
+	if len(text) <= maxWidth {
+		return text
+	}
+	m.marqueeTick++
+	if m.marqueeTick%3 == 0 {
+		m.marqueePos += m.marqueeDir
+		if m.marqueePos >= len(text)-maxWidth {
+			m.marqueeDir = -1
+		}
+		if m.marqueePos <= 0 {
+			m.marqueeDir = 1
+		}
+	}
+	start := m.marqueePos
+	if start < 0 {
+		start = 0
+	}
+	if start+maxWidth > len(text) {
+		start = len(text) - maxWidth
+	}
+	return text[start : start+maxWidth]
+}
+
+func (m *tuiModel) setTerminalTitle(title string) {
+	fmt.Printf("\033]0;%s\007", title)
+}
+
+func (m *tuiModel) drawErrorScreen() string {
+	out := &strings.Builder{}
+	out.WriteString(tuiTitleStyle.Render("  Connection Error"))
+	out.WriteByte('\n')
+	out.WriteByte('\n')
+	out.WriteString(tuiDimStyle.Render("  " + m.loadErr))
+	out.WriteByte('\n')
+	out.WriteByte('\n')
+	out.WriteString(tuiHelpStyle.Render("  R - Retry  Q - Quit"))
+	out.WriteByte('\n')
+	return out.String()
+}
+
+func disableTerminalScroll() {
+	fmt.Print("\x1b[?1049h")
+}
+
+func enableTerminalScroll() {
+	fmt.Print("\x1b[?1049l")
+}
 func (m *tuiModel) searchBar() string {
 	if !m.searchMode {
 		return ""
@@ -418,10 +487,19 @@ func (m *tuiModel) View() string {
 		return "Loading podcasts..."
 	}
 	if m.loadErr != "" {
-		return fmt.Sprintf("Error: %s", m.loadErr)
+		return m.drawErrorScreen()
 	}
 	if !m.ready {
 		return "Initializing..."
+	}
+
+	// Set terminal title
+	if m.screen == screenPodcastDetail && m.podIdx < len(m.podcasts) {
+		m.setTerminalTitle("mp3_rm_ads - " + m.podcasts[m.podIdx].name)
+	} else if m.screen == screenEpisodeDetail && m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
+		m.setTerminalTitle("mp3_rm_ads - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
+	} else {
+		m.setTerminalTitle("mp3_rm_ads")
 	}
 
 	var body string

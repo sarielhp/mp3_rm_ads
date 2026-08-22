@@ -103,19 +103,37 @@ type LLMProfile struct {
 }
 
 type Config struct {
-	Instructions           string       `json:"_instructions"`
-	PodcastsDir            string       `json:"podcasts_dir"`
-	WhisperURL             string       `json:"whisper_url"`
-	WhisperSpeedFactor     float64      `json:"whisper_speed_factor"`
-	WhisperDockerContainer string       `json:"whisper_docker_container"`
-	WhisperLanguage        string       `json:"whisper_language"`
-	WhisperPrompt          string       `json:"whisper_prompt"`
-	ChunkDurationSec       int          `json:"chunk_duration_sec"`
-	ActiveProfileID        int          `json:"active_profile_id"`
-	Profiles               []LLMProfile `json:"profiles"`
-	AudiobookshelfURL      string       `json:"audiobookshelf_url,omitempty"`
-	AudiobookshelfUser     string       `json:"audiobookshelf_user,omitempty"`
-	AudiobookshelfPass     string       `json:"audiobookshelf_pass,omitempty"`
+	Instructions           string          `json:"_instructions"`
+	PodcastsDir            string          `json:"podcasts_dir"`
+	WhisperURL             string          `json:"whisper_url"`
+	WhisperSpeedFactor     float64         `json:"whisper_speed_factor"`
+	WhisperDockerContainer string          `json:"whisper_docker_container"`
+	WhisperLanguage        string          `json:"whisper_language"`
+	WhisperPrompt          string          `json:"whisper_prompt"`
+	ChunkDurationSec       int             `json:"chunk_duration_sec"`
+	ActiveProfileID        int             `json:"active_profile_id"`
+	Profiles               []LLMProfile    `json:"profiles"`
+	AudiobookshelfURL      string          `json:"audiobookshelf_url,omitempty"`
+	AudiobookshelfUser     string          `json:"audiobookshelf_user,omitempty"`
+	AudiobookshelfPass     string          `json:"audiobookshelf_pass,omitempty"`
+	TUIColor               *TUIColorConfig `json:"tui_color,omitempty"`
+}
+
+type TUIColorConfig struct {
+	Cyan     string `json:"cyan,omitempty"`
+	Purple   string `json:"purple,omitempty"`
+	Magenta  string `json:"magenta,omitempty"`
+	Pink     string `json:"pink,omitempty"`
+	Yellow   string `json:"yellow,omitempty"`
+	Green    string `json:"green,omitempty"`
+	Red      string `json:"red,omitempty"`
+	Blue     string `json:"blue,omitempty"`
+	Lavender string `json:"lavender,omitempty"`
+	DarkBg   string `json:"dark_bg,omitempty"`
+	CardBg   string `json:"card_bg,omitempty"`
+	Border   string `json:"border,omitempty"`
+	Subtext  string `json:"subtext,omitempty"`
+	Dim      string `json:"dim,omitempty"`
 }
 
 type CLIOptions struct {

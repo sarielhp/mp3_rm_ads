@@ -1,23 +1,25 @@
 package main
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+)
 
 var (
 	// Base Palette (Cyberpunk / Nord / Catppuccin inspired vibrant tones)
-	colorCyan     = lipgloss.Color("#00f5d4") // Neon Cyan / Mint
-	colorPurple   = lipgloss.Color("#7b2cbf") // Deep Violet
-	colorMagenta  = lipgloss.Color("#f72585") // Neon Magenta / Pink
-	colorPink     = lipgloss.Color("#ff70a6") // Soft Pink / Coral
-	colorYellow   = lipgloss.Color("#ffd166") // Amber Gold
-	colorGreen    = lipgloss.Color("#06d6a0") // Emerald Green
-	colorRed      = lipgloss.Color("#ef476f") // Bright Coral Red
-	colorBlue     = lipgloss.Color("#4cc9f0") // Electric Sky Blue
-	colorLavender = lipgloss.Color("#c77dff") // Light Lavender
-	colorDarkBg   = lipgloss.Color("#1a1b26") // Deep Background
-	colorCardBg   = lipgloss.Color("#24283b") // Surface / Card
-	colorBorder   = lipgloss.Color("#414868") // Subtle Border
-	colorSubtext  = lipgloss.Color("#a9b1d6") // Crisp Subtext
-	colorDim      = lipgloss.Color("#565f89") // Muted Dim
+	colorCyan     = lipgloss.Color("#00f5d4")
+	colorPurple   = lipgloss.Color("#7b2cbf")
+	colorMagenta  = lipgloss.Color("#f72585")
+	colorPink     = lipgloss.Color("#ff70a6")
+	colorYellow   = lipgloss.Color("#ffd166")
+	colorGreen    = lipgloss.Color("#06d6a0")
+	colorRed      = lipgloss.Color("#ef476f")
+	colorBlue     = lipgloss.Color("#4cc9f0")
+	colorLavender = lipgloss.Color("#c77dff")
+	colorDarkBg   = lipgloss.Color("#1a1b26")
+	colorCardBg   = lipgloss.Color("#24283b")
+	colorBorder   = lipgloss.Color("#414868")
+	colorSubtext  = lipgloss.Color("#a9b1d6")
+	colorDim      = lipgloss.Color("#565f89")
 
 	// Text & Header Styles
 	tuiTitleStyle = lipgloss.NewStyle().
@@ -131,3 +133,51 @@ var (
 	tuiDividerStyle = lipgloss.NewStyle().
 			Foreground(colorBorder)
 )
+
+func applyTUIColorConfig(cfg *TUIColorConfig) {
+	if cfg == nil {
+		return
+	}
+	if cfg.Cyan != "" {
+		colorCyan = lipgloss.Color(cfg.Cyan)
+	}
+	if cfg.Purple != "" {
+		colorPurple = lipgloss.Color(cfg.Purple)
+	}
+	if cfg.Magenta != "" {
+		colorMagenta = lipgloss.Color(cfg.Magenta)
+	}
+	if cfg.Pink != "" {
+		colorPink = lipgloss.Color(cfg.Pink)
+	}
+	if cfg.Yellow != "" {
+		colorYellow = lipgloss.Color(cfg.Yellow)
+	}
+	if cfg.Green != "" {
+		colorGreen = lipgloss.Color(cfg.Green)
+	}
+	if cfg.Red != "" {
+		colorRed = lipgloss.Color(cfg.Red)
+	}
+	if cfg.Blue != "" {
+		colorBlue = lipgloss.Color(cfg.Blue)
+	}
+	if cfg.Lavender != "" {
+		colorLavender = lipgloss.Color(cfg.Lavender)
+	}
+	if cfg.DarkBg != "" {
+		colorDarkBg = lipgloss.Color(cfg.DarkBg)
+	}
+	if cfg.CardBg != "" {
+		colorCardBg = lipgloss.Color(cfg.CardBg)
+	}
+	if cfg.Border != "" {
+		colorBorder = lipgloss.Color(cfg.Border)
+	}
+	if cfg.Subtext != "" {
+		colorSubtext = lipgloss.Color(cfg.Subtext)
+	}
+	if cfg.Dim != "" {
+		colorDim = lipgloss.Color(cfg.Dim)
+	}
+}

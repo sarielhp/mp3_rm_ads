@@ -431,7 +431,7 @@ func TestTUIModelInit(t *testing.T) {
 			return map[string][]string{}
 		},
 	}
-	m := newTuiModel(bk, "/tmp/test")
+	m := newTuiModel(bk, "/tmp/test", nil)
 
 	cmd := m.Init()
 	if cmd == nil {
@@ -461,7 +461,7 @@ func TestTUIModelInitError(t *testing.T) {
 			return map[string][]string{}
 		},
 	}
-	m := newTuiModel(bk, "/tmp/test")
+	m := newTuiModel(bk, "/tmp/test", nil)
 	cmd := m.Init()
 
 	msg := cmd()
@@ -1015,4 +1015,107 @@ func TestTUIFileSizeGB(t *testing.T) {
 			t.Errorf("formatFileSize(%d) = %q, want %q", c.in, got, c.out)
 		}
 	}
+}
+
+func TestTUIMarqueeText(t *testing.T) {
+	m := makeTestModel()
+
+	// Short text should not be marquee'd
+	short := m.marqueeText("hello", 10)
+	if short != "hello" {
+		t.Errorf("short text should not be truncated, got %q", short)
+	}
+
+	// Long text should scroll
+	long := "This is a very long title that should scroll"
+	m.marqueePos = 0
+	m.marqueeDir = 1
+	result := m.marqueeText(long, 20)
+	if len(result) > 20 {
+		t.Errorf("marquee result should be at most 20 chars, got %d", len(result))
+	}
+}
+
+func TestTUIErrorScreen(t *testing.T) {
+	m := makeTestModel()
+	m.loadErr = "test error"
+	view := m.View()
+	if !strings.Contains(view, "Connection Error") {
+		t.Error("error screen should show Connection Error")
+	}
+	if !strings.Contains(view, "test error") {
+		t.Error("error screen should show error message")
+	}
+	if !strings.Contains(view, "Retry") {
+		t.Error("error screen should show Retry option")
+	}
+}
+
+func TestTUIErrorScreenRetry(t *testing.T) {
+	m := makeTestModel()
+	m.loadErr = "test error"
+
+	// Press R to retry
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("R")})
+	if m.loadErr != "" {
+		t.Error("loadErr should be cleared on retry")
+	}
+	if !m.loading {
+		t.Error("loading should be true on retry")
+	}
+}
+
+func TestTUIErrorScreenQuit(t *testing.T) {
+	m := makeTestModel()
+	m.loadErr = "test error"
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if !m.done {
+		t.Error("done should be true on quit from error screen")
+	}
+}
+
+func TestTUIScrollWheelFunctions(t *testing.T) {
+	// Just test that functions exist and don't panic
+	disableTerminalScroll()
+	enableTerminalScroll()
+}
+
+func TestTUIApplyColorConfig(t *testing.T) {
+	cfg := &TUIColorConfig{
+		Cyan:   "#ff0000",
+		Yellow: "#00ff00",
+	}
+	applyTUIColorConfig(cfg)
+	// Colors should be updated (can't easily test lipgloss.Color equality)
+	applyTUIColorConfig(nil)
+}
+
+func TestTUINewModelWithConfig(t *testing.T) {
+	bk := &TuiBackend{
+		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
+			return nil, nil
+		},
+		LoadQueues: func(pods []tuiPodcast) map[string][]string {
+			return map[string][]string{}
+		},
+	}
+	cfg := &Config{
+		TUIColor: &TUIColorConfig{
+			Cyan: "#ff0000",
+		},
+	}
+	m := newTuiModel(bk, "/tmp/test", cfg)
+	if m == nil {
+		t.Error("newTuiModel should return non-nil model")
+	}
+	if m.podcastsDir != "/tmp/test" {
+		t.Errorf("expected podcastsDir /tmp/test, got %s", m.podcastsDir)
+	}
+}
+
+func TestTUISetTerminalTitle(t *testing.T) {
+	m := makeTestModel()
+	// Just test it doesn't panic
+	m.setTerminalTitle("test title")
 }

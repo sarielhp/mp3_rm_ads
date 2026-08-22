@@ -165,7 +165,7 @@ func main() {
 			SaveQueue:   saveQueue,
 			GetDuration: getAudioDuration,
 		}
-		p := tea.NewProgram(newTuiModel(bk, dir), tea.WithAltScreen())
+		p := tea.NewProgram(newTuiModel(bk, dir, &config), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 			os.Exit(1)
