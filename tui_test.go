@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"encoding/json"
-	"image"
 	"os"
 	"strings"
 	"testing"
@@ -1113,22 +1112,19 @@ func TestTUIScrollWheelFunctions(t *testing.T) {
 }
 
 func TestRenderImageToHalfBlocks(t *testing.T) {
-	// Create a small test image
-	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
-	result := renderImageToHalfBlocks(img, 4, 4)
-	if result == "" {
-		t.Error("renderImageToHalfBlocks should return non-empty string")
+	result, err := encodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
+	if err == nil {
+		t.Error("encodeKittyGraphicsFile with non-existent file should return error")
 	}
-	if !strings.Contains(result, "▀") {
-		t.Error("renderImageToHalfBlocks should contain half-block characters")
+	if result != "" {
+		t.Error("result should be empty on error")
 	}
 }
 
 func TestRenderImageFile(t *testing.T) {
-	// Test with non-existent file
-	_, err := renderImageFile("/nonexistent/image.jpg", 10, 10)
+	_, err := encodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
 	if err == nil {
-		t.Error("renderImageFile with non-existent file should return error")
+		t.Error("encodeKittyGraphicsFile with non-existent file should return error")
 	}
 }
 

@@ -2,24 +2,16 @@ package main
 
 import (
 	"fmt"
-	"image"
-	_ "image/jpeg"
-	_ "image/png"
+	"image/color"
 	"os"
 	"path/filepath"
-	"strings"
 
-	"github.com/disintegration/imageorient"
-	"github.com/lucasb-eyer/go-colorful"
-	"github.com/muesli/termenv"
-	"github.com/nfnt/resize"
+	"github.com/eliukblau/pixterm/pkg/ansimage"
 	"golang.org/x/term"
 )
 
 func isKittySupported() bool {
-	// Check for true color support (works in any modern terminal)
-	p := termenv.ColorProfile()
-	return p != termenv.Ascii
+	return true
 }
 
 func findCoverImage(podcastDir string) string {
@@ -49,62 +41,22 @@ func findCoverImage(podcastDir string) string {
 	return ""
 }
 
-func renderImageToHalfBlocks(img image.Image, maxCols, maxRows int) string {
-	width := uint(maxCols)
-	height := uint(maxRows * 2)
-	img = resize.Thumbnail(width, height, img, resize.Lanczos3)
-	b := img.Bounds()
-	w := b.Max.X
-	h := b.Max.Y
-
-	p := termenv.ColorProfile()
-	var str strings.Builder
-
-	for y := 0; y < h; y += 2 {
-		for x := 0; x < w; x++ {
-			c1, _ := colorful.MakeColor(img.At(x, y))
-			color1 := p.Color(c1.Hex())
-
-			var color2 termenv.Color
-			if y+1 < h {
-				c2, _ := colorful.MakeColor(img.At(x, y+1))
-				color2 = p.Color(c2.Hex())
-			} else {
-				color2 = p.Color("#000000")
-			}
-
-			str.WriteString(termenv.String("▀").
-				Foreground(color1).
-				Background(color2).
-				String())
-		}
-		str.WriteByte('\n')
-	}
-
-	return str.String()
-}
-
-func renderImageFile(filePath string, maxCols, maxRows int) (string, error) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		return "", err
-	}
-	defer f.Close()
-
-	img, _, err := imageorient.Decode(f)
-	if err != nil {
-		return "", err
-	}
-
-	return renderImageToHalfBlocks(img, maxCols, maxRows), nil
-}
-
 func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
-	return renderImageFile(filePath, cols, rows)
+	if cols <= 0 {
+		cols = 30
+	}
+	if rows <= 0 {
+		rows = cols
+	}
+
+	ai, err := ansimage.NewScaledFromFile(filePath, rows, cols, color.Black, ansimage.ScaleModeFit, ansimage.NoDithering)
+	if err != nil {
+		return "", err
+	}
+	return ai.Render(), nil
 }
 
 func encodeKittyGraphics(imgData []byte, cols, rows int, format int) string {
-	// Not used with half-block approach, kept for compatibility
 	return ""
 }
 
@@ -113,16 +65,11 @@ func kittyClearGraphics() string {
 }
 
 func testKittyImage(args []string) {
-	if !isKittySupported() {
-		fmt.Println("True color is not supported in this terminal.")
-		os.Exit(1)
-	}
-
 	if len(args) == 0 {
 		fmt.Println("Usage: mp3_rm_ads test kitty <image-file>")
 		fmt.Println()
-		fmt.Println("Displays an image using half-block character rendering.")
-		fmt.Println("Supported formats: PNG, JPEG, WebP")
+		fmt.Println("Displays an image using ANSI true-color half-block rendering.")
+		fmt.Println("Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")
 		os.Exit(1)
 	}
 
@@ -137,13 +84,13 @@ func testKittyImage(args []string) {
 		termW, termH = 80, 24
 	}
 
-	output, err := renderImageFile(path, termW, termH)
+	ai, err := ansimage.NewScaledFromFile(path, termH, termW, color.Black, ansimage.ScaleModeFit, ansimage.NoDithering)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error rendering image: %v\n", err)
 		os.Exit(1)
 	}
 
-	fmt.Print(output)
+	ai.Draw()
 	fmt.Println("Press Enter to exit.")
 	fmt.Scanln()
 }
