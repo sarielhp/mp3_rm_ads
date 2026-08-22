@@ -720,7 +720,7 @@ func parseFlags() CLIOptions {
 	flag.BoolVar(&cli.ExportSRT, "srt", false, "Export/convert transcript JSON to SubRip (.srt)")
 	flag.BoolVar(&cli.ExportTXT, "txt", false, "Export/convert transcript JSON to text (.txt)")
 	flag.BoolVar(&cli.Recut, "recut", false, "Recut audio using .cuts.json (no Whisper/LLM)")
-	flag.BoolVar(&cli.SaveTranscript, "no-transcript", true, "Disable saving default .transcript.json file")
+	flag.BoolVar(&cli.SaveTranscript, "no-transcript", false, "Disable saving default .transcript.json file")
 	flag.BoolVar(&cli.UseChunks, "use-chunks", false, "Split long audio into chunks for reliable transcription")
 	flag.BoolVar(&cli.ExtractKeywords, "extract-keywords", false, "Extract keywords via LLM to improve Whisper accuracy")
 	flag.StringVar(&cli.TranscribeMin, "t", "", "Only transcribe first N minutes (e.g. -t 10m)")

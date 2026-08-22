@@ -254,7 +254,8 @@ func (m *tuiModel) handleSortToggle() {
 func (m *tuiModel) handleUp() {
 	switch m.screen {
 	case screenPodcasts:
-		if m.podIdx > 0 {
+		pods := m.filteredPodcasts()
+		if m.podIdx > 0 && m.podIdx < len(pods) {
 			m.podIdx--
 			if m.podIdx < m.podScroll {
 				m.podScroll = m.podIdx
@@ -297,7 +298,15 @@ func (m *tuiModel) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenPodcasts:
 		pods := m.filteredPodcasts()
-		if len(pods) > 0 {
+		if len(pods) > 0 && m.podIdx < len(pods) {
+			// Map filtered index back to actual podcast index
+			selectedPod := pods[m.podIdx]
+			for i, p := range m.podcasts {
+				if p.dir == selectedPod.dir {
+					m.podIdx = i
+					break
+				}
+			}
 			m.epIdx = 0
 			m.epScroll = 0
 			m.screen = screenPodcastDetail

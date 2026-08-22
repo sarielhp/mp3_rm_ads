@@ -293,9 +293,6 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 				for _, c := range existing.CutIntervals {
 					st := c.StartSec
 					en := c.EndSec
-					if st == 0 && c.StartSec == 0 {
-						st = c.StartSec
-					}
 					existingRaw = append(existingRaw, AdSegment{Start: st, End: en, Reason: c.Reason})
 				}
 			}

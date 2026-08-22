@@ -118,7 +118,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 			Timeout: time.Duration(readTimeout) * time.Second,
 		}
 
-		req, err := http.NewRequest("POST", uri, &buf)
+		req, err := http.NewRequest("POST", uri, bytes.NewReader(buf.Bytes()))
 		if err != nil {
 			return nil, fmt.Errorf("failed to create request: %w", err)
 		}
@@ -152,7 +152,6 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 			close(progressDone)
 			return nil, fmt.Errorf("failed to connect to Whisper GPU server at '%s' after %d attempts: %w", whisperURL, maxRetries, err)
 		}
-		defer resp.Body.Close()
 
 		if !quiet && verbose {
 			elapsed := time.Since(startTime)
@@ -161,6 +160,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 
 		if resp.StatusCode == http.StatusOK {
 			body, err := io.ReadAll(resp.Body)
+			resp.Body.Close()
 			if err != nil {
 				close(progressDone)
 				return nil, fmt.Errorf("failed to read response body: %w", err)
@@ -175,6 +175,7 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 		}
 
 		body, _ := io.ReadAll(resp.Body)
+		resp.Body.Close()
 		if !quiet {
 			fmt.Printf("\nWhisper server returned status %d: %s\n", resp.StatusCode, string(body))
 		}
@@ -259,6 +260,12 @@ func transcribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDu
 		}
 		startByte := int64(extractStart * float64(wavBytesPerSec))
 		dataSize := int((extractEnd - extractStart) * float64(wavBytesPerSec))
+		if startByte+int64(dataSize) > pcmSize {
+			dataSize = int(pcmSize - startByte)
+		}
+		if dataSize < 0 {
+			dataSize = 0
+		}
 
 		chunks[i] = chunkInfo{
 			index:        i,
@@ -354,8 +361,7 @@ func transcribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDu
 					seg.End = segEnd
 				}
 			} else {
-				mid := cutEnd
-				if segStart >= mid {
+				if segStart >= cutEnd {
 					continue
 				}
 				if segStart < cutStart {
@@ -363,8 +369,8 @@ func transcribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDu
 				} else {
 					seg.Start = segStart
 				}
-				if segEnd > mid {
-					seg.End = mid
+				if segEnd > cutEnd {
+					seg.End = cutEnd
 				} else {
 					seg.End = segEnd
 				}
@@ -433,7 +439,7 @@ func mergeSegments(segs []TranscriptionSegment) []TranscriptionSegment {
 		if seg.Start <= last.End+0.5 {
 			if seg.End > last.End {
 				last.End = seg.End
-				last.Text = seg.Text
+				last.Text = last.Text + " " + seg.Text
 			}
 		} else {
 			merged = append(merged, seg)
