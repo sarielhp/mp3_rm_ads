@@ -60,6 +60,9 @@ type tuiModel struct {
 	podcastsDir string
 	vp          viewport.Model
 	showCover   bool
+	searchMode  bool
+	searchQuery string
+	showHelp    bool
 }
 
 type loadedPodcastsMsg struct {
@@ -132,6 +135,10 @@ func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	if m.searchMode {
+		return m.handleSearchKey(msg)
+	}
+
 	s := msg.String()
 
 	switch s {
@@ -164,9 +171,60 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "i", "I":
 		m.showCover = !m.showCover
+
+	case "b", "B":
+		m.showHelp = !m.showHelp
+
+	case "d", "D":
+		m.handleSortToggle()
+
+	case "/":
+		m.searchMode = true
+		m.searchQuery = ""
 	}
 
 	return m, nil
+}
+
+func (m *tuiModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.KeyEnter:
+		m.searchMode = false
+		m.podIdx = 0
+		m.podScroll = 0
+		m.epIdx = 0
+		m.epScroll = 0
+	case tea.KeyEscape:
+		m.searchMode = false
+		m.searchQuery = ""
+	case tea.KeyBackspace:
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+		}
+	case tea.KeyRunes:
+		m.searchQuery += string(msg.Runes)
+		m.podIdx = 0
+		m.podScroll = 0
+		m.epIdx = 0
+		m.epScroll = 0
+	}
+	return m, nil
+}
+
+func (m *tuiModel) handleSortToggle() {
+	if m.screen != screenPodcastDetail {
+		return
+	}
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := &m.podcasts[m.podIdx]
+	// Reverse episode order
+	for i, j := 0, len(pod.episodes)-1; i < j; i, j = i+1, j-1 {
+		pod.episodes[i], pod.episodes[j] = pod.episodes[j], pod.episodes[i]
+	}
+	m.epIdx = 0
+	m.epScroll = 0
 }
 
 func (m *tuiModel) handleUp() {
@@ -283,6 +341,45 @@ func (m *tuiModel) visibleLines(headerLines int) int {
 	return n
 }
 
+func (m *tuiModel) filteredPodcasts() []tuiPodcast {
+	if m.searchQuery == "" {
+		return m.podcasts
+	}
+	q := strings.ToLower(m.searchQuery)
+	var filtered []tuiPodcast
+	for _, p := range m.podcasts {
+		if strings.Contains(strings.ToLower(p.name), q) {
+			filtered = append(filtered, p)
+		}
+	}
+	return filtered
+}
+
+func (m *tuiModel) filteredEpisodes() []tuiEpisode {
+	if m.podIdx >= len(m.podcasts) {
+		return nil
+	}
+	if m.searchQuery == "" {
+		return m.podcasts[m.podIdx].episodes
+	}
+	q := strings.ToLower(m.searchQuery)
+	var filtered []tuiEpisode
+	for _, e := range m.podcasts[m.podIdx].episodes {
+		if strings.Contains(strings.ToLower(e.filename), q) {
+			filtered = append(filtered, e)
+		}
+	}
+	return filtered
+}
+
+func (m *tuiModel) searchBar() string {
+	if !m.searchMode {
+		return ""
+	}
+	prompt := fmt.Sprintf("  Search: %s█", m.searchQuery)
+	return tuiSearchStyle.Render(prompt)
+}
+
 func truncate(s string, max int) string {
 	if len(s) <= max {
 		return s
@@ -304,15 +401,21 @@ func (m *tuiModel) View() string {
 		return "Initializing..."
 	}
 
+	var body string
 	switch m.screen {
 	case screenPodcasts:
-		return m.drawPodcastsList()
+		body = m.drawPodcastsList()
 	case screenPodcastDetail:
-		return m.drawPodcastDetail()
+		body = m.drawPodcastDetail()
 	case screenEpisodeDetail:
-		return m.drawEpisodeDetail()
+		body = m.drawEpisodeDetail()
 	}
-	return ""
+
+	if m.searchMode {
+		body += "\n" + m.searchBar()
+	}
+
+	return body
 }
 
 func (m *tuiModel) drawPodcastsList() string {
@@ -321,9 +424,11 @@ func (m *tuiModel) drawPodcastsList() string {
 	titleBanner := tuiHeaderBanner.Render(" PODCASTS ")
 	out.WriteString(fmt.Sprintf("  %s\n", titleBanner))
 
+	pods := m.filteredPodcasts()
+
 	totalEps := 0
 	totalDone := 0
-	for _, p := range m.podcasts {
+	for _, p := range pods {
 		totalEps += len(p.episodes)
 		for _, e := range p.episodes {
 			if e.hasAdsRemoved {
@@ -332,7 +437,7 @@ func (m *tuiModel) drawPodcastsList() string {
 		}
 	}
 
-	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d podcasts, %d episodes, %d ad-free", len(m.podcasts), totalEps, totalDone))
+	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d podcasts, %d episodes, %d ad-free", len(pods), totalEps, totalDone))
 	out.WriteString(statPill)
 	out.WriteByte('\n')
 
@@ -343,12 +448,12 @@ func (m *tuiModel) drawPodcastsList() string {
 	maxVis := m.visibleLines(4)
 	start := m.podScroll
 	end := start + maxVis
-	if end > len(m.podcasts) {
-		end = len(m.podcasts)
+	if end > len(pods) {
+		end = len(pods)
 	}
 
 	for i := start; i < end; i++ {
-		p := m.podcasts[i]
+		p := pods[i]
 		epCount := len(p.episodes)
 		doneCount := 0
 		for _, e := range p.episodes {
@@ -377,13 +482,20 @@ func (m *tuiModel) drawPodcastsList() string {
 	}
 
 	out.WriteByte('\n')
-	helpText := "↑↓ navigate  Enter select  q quit"
-	if len(m.podcasts) > maxVis {
-		pct := float64(m.podIdx+1) / float64(len(m.podcasts)) * 100
+	helpText := "↑↓ navigate  Enter select  / search  q quit"
+	if m.showHelp {
+		helpText += "  B hide help"
+	} else {
+		helpText = ""
+	}
+	if len(pods) > maxVis {
+		pct := float64(m.podIdx+1) / float64(len(pods)) * 100
 		helpText += fmt.Sprintf("  [%d%%]", int(pct))
 	}
-	out.WriteString(tuiHelpStyle.Render("  " + helpText))
-	out.WriteByte('\n')
+	if helpText != "" {
+		out.WriteString(tuiHelpStyle.Render("  " + helpText))
+		out.WriteByte('\n')
+	}
 
 	return out.String()
 }
@@ -402,9 +514,11 @@ func (m *tuiModel) drawPodcastDetail() string {
 	out.WriteString(title)
 	out.WriteByte('\n')
 
-	total := len(pod.episodes)
+	eps := m.filteredEpisodes()
+
+	total := len(eps)
 	done := 0
-	for _, e := range pod.episodes {
+	for _, e := range eps {
 		if e.hasAdsRemoved {
 			done++
 		}
@@ -436,8 +550,8 @@ func (m *tuiModel) drawPodcastDetail() string {
 	maxVis := m.visibleLines(5)
 	start := m.epScroll
 	end := start + maxVis
-	if end > len(pod.episodes) {
-		end = len(pod.episodes)
+	if end > len(eps) {
+		end = len(eps)
 	}
 
 	queueEntries := m.queue[pod.dir]
@@ -454,7 +568,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		// Build episode list as a block
 		epBlock := &strings.Builder{}
 		for i := start; i < end; i++ {
-			ep := pod.episodes[i]
+			ep := eps[i]
 			prefix := "    "
 			if ep.hasAdsRemoved {
 				prefix = "  " + tuiGreenStyle.Render("\u2713") + " "
@@ -502,7 +616,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		}
 	} else {
 		for i := start; i < end; i++ {
-			ep := pod.episodes[i]
+			ep := eps[i]
 			prefix := "    "
 			if ep.hasAdsRemoved {
 				prefix = "  " + tuiGreenStyle.Render("\u2713") + " "
@@ -532,16 +646,23 @@ func (m *tuiModel) drawPodcastDetail() string {
 	}
 
 	out.WriteByte('\n')
-	helpText := "↑↓ navigate  Enter info  R queue  Esc back"
+	helpText := "↑↓ navigate  Enter info  R queue  / search  D sort  Esc back"
 	if isKittySupported() {
-		helpText += "  I toggle cover"
+		helpText += "  I cover"
 	}
-	if len(pod.episodes) > maxVis {
-		pct := float64(m.epIdx+1) / float64(len(pod.episodes)) * 100
+	if m.showHelp {
+		helpText += "  B hide"
+	} else {
+		helpText = ""
+	}
+	if len(eps) > maxVis {
+		pct := float64(m.epIdx+1) / float64(len(eps)) * 100
 		helpText += fmt.Sprintf("  [%d%%]", int(pct))
 	}
-	out.WriteString(tuiHelpStyle.Render("  " + helpText))
-	out.WriteByte('\n')
+	if helpText != "" {
+		out.WriteString(tuiHelpStyle.Render("  " + helpText))
+		out.WriteByte('\n')
+	}
 
 	return out.String()
 }
@@ -714,8 +835,15 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	if isKittySupported() {
 		helpText += "  I - Toggle cover"
 	}
-	out.WriteString(tuiHelpStyle.Render("  " + helpText))
-	out.WriteByte('\n')
+	if m.showHelp {
+		helpText += "  B hide"
+	} else {
+		helpText = ""
+	}
+	if helpText != "" {
+		out.WriteString(tuiHelpStyle.Render("  " + helpText))
+		out.WriteByte('\n')
+	}
 
 	return out.String()
 }

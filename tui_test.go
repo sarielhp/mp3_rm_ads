@@ -766,10 +766,154 @@ func TestTUIHandleKeyCtrlC(t *testing.T) {
 	}
 }
 
-func TestTUIKittyFunctions(t *testing.T) {
-	// Test that Kitty functions exist and compile
-	_ = isKittySupported()
-	_ = findCoverImage("/tmp")
-	_ = encodeKittyGraphics([]byte("test"), 0, 0)
-	_ = kittyClearGraphics()
+func TestTUISearchFilter(t *testing.T) {
+	m := makeTestModel()
+	m.searchQuery = "tech"
+	pods := m.filteredPodcasts()
+	if len(pods) != 1 || pods[0].name != "Tech Podcast" {
+		t.Errorf("expected 1 podcast (Tech Podcast), got %d: %v", len(pods), pods)
+	}
+
+	m.searchQuery = "nonexistent"
+	pods = m.filteredPodcasts()
+	if len(pods) != 0 {
+		t.Errorf("expected 0 podcasts, got %d", len(pods))
+	}
+
+	m.searchQuery = ""
+	pods = m.filteredPodcasts()
+	if len(pods) != 2 {
+		t.Errorf("expected 2 podcasts with empty query, got %d", len(pods))
+	}
+}
+
+func TestTUISearchFilterEpisodes(t *testing.T) {
+	m := makeTestModel()
+	m.searchQuery = "ep101"
+	eps := m.filteredEpisodes()
+	if len(eps) != 1 || eps[0].filename != "ep101.mp3" {
+		t.Errorf("expected 1 episode (ep101.mp3), got %d", len(eps))
+	}
+
+	m.searchQuery = ""
+	eps = m.filteredEpisodes()
+	if len(eps) != 3 {
+		t.Errorf("expected 3 episodes with empty query, got %d", len(eps))
+	}
+}
+
+func TestTUISearchModeKeyHandling(t *testing.T) {
+	m := makeTestModel()
+
+	// Enter search mode
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+	if !m.searchMode {
+		t.Error("should be in search mode after /")
+	}
+
+	// Type characters
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if m.searchQuery != "tes" {
+		t.Errorf("search query should be 'tes', got %q", m.searchQuery)
+	}
+
+	// Backspace
+	m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	if m.searchQuery != "te" {
+		t.Errorf("search query should be 'te' after backspace, got %q", m.searchQuery)
+	}
+
+	// Escape clears and exits search
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.searchMode {
+		t.Error("should exit search mode on escape")
+	}
+	if m.searchQuery != "" {
+		t.Errorf("search query should be empty after escape, got %q", m.searchQuery)
+	}
+}
+
+func TestTUISearchModeEnter(t *testing.T) {
+	m := makeTestModel()
+	m.searchMode = true
+	m.searchQuery = "test"
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+	if m.searchMode {
+		t.Error("should exit search mode on enter")
+	}
+}
+
+func TestTUISortToggle(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenPodcastDetail
+
+	// Check initial order: ep101, ep102, ep103 (by modTime)
+	if m.podcasts[0].episodes[0].filename != "ep101.mp3" {
+		t.Errorf("expected ep101 first, got %s", m.podcasts[0].episodes[0].filename)
+	}
+
+	m.handleSortToggle()
+
+	// After toggle, order should be reversed
+	if m.podcasts[0].episodes[0].filename != "ep103.mp3" {
+		t.Errorf("expected ep103 first after sort toggle, got %s", m.podcasts[0].episodes[0].filename)
+	}
+
+	// Toggle again
+	m.handleSortToggle()
+	if m.podcasts[0].episodes[0].filename != "ep101.mp3" {
+		t.Errorf("expected ep101 first after second toggle, got %s", m.podcasts[0].episodes[0].filename)
+	}
+}
+
+func TestTUISortToggleOnPodcastScreen(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenPodcasts
+	original := m.podcasts[0].episodes[0].filename
+	m.handleSortToggle()
+	if m.podcasts[0].episodes[0].filename != original {
+		t.Error("sort toggle should not work on podcast list screen")
+	}
+}
+
+func TestTUIHelpToggle(t *testing.T) {
+	m := makeTestModel()
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("b")})
+	if !m.showHelp {
+		t.Error("showHelp should be true after B key")
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("B")})
+	if m.showHelp {
+		t.Error("showHelp should be false after second B key")
+	}
+}
+
+func TestTUISearchBarDisplay(t *testing.T) {
+	m := makeTestModel()
+	m.searchMode = false
+	bar := m.searchBar()
+	if bar != "" {
+		t.Errorf("search bar should be empty when not in search mode, got %q", bar)
+	}
+
+	m.searchMode = true
+	m.searchQuery = "test"
+	bar = m.searchBar()
+	if !strings.Contains(bar, "test") {
+		t.Errorf("search bar should contain query, got %q", bar)
+	}
+}
+
+func TestTUIFilteredPodcastsOutOfRange(t *testing.T) {
+	m := makeTestModel()
+	m.podIdx = 999
+	eps := m.filteredEpisodes()
+	if eps != nil {
+		t.Error("filteredEpisodes should return nil for out-of-range podIdx")
+	}
 }

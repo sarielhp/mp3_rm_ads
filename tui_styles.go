@@ -72,6 +72,12 @@ var (
 	tuiHelpStyle = lipgloss.NewStyle().
 			Foreground(colorDim)
 
+	tuiSearchStyle = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorDarkBg).
+			Background(colorYellow).
+			Padding(0, 1)
+
 	// Status Badges & Pills
 	tuiBadgeAdFree = lipgloss.NewStyle().
 			Bold(true).
