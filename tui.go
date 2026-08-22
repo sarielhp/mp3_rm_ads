@@ -43,31 +43,32 @@ type TuiBackend struct {
 }
 
 type tuiModel struct {
-	width       int
-	height      int
-	ready       bool
-	screen      tuiScreen
-	podcasts    []tuiPodcast
-	podIdx      int
-	podScroll   int
-	epIdx       int
-	epScroll    int
-	queue       map[string][]string
-	loading     bool
-	loadErr     string
-	done        bool
-	bk          *TuiBackend
-	podcastsDir string
-	vp          viewport.Model
-	showCover   bool
-	searchMode  bool
-	searchQuery string
-	showHelp    bool
-	popupMsg    string
-	popupTimer  int
-	marqueeTick int
-	marqueePos  int
-	marqueeDir  int
+	width                int
+	height               int
+	ready                bool
+	screen               tuiScreen
+	podcasts             []tuiPodcast
+	podIdx               int
+	podScroll            int
+	epIdx                int
+	epScroll             int
+	queue                map[string][]string
+	loading              bool
+	loadErr              string
+	done                 bool
+	bk                   *TuiBackend
+	podcastsDir          string
+	vp                   viewport.Model
+	showCover            bool
+	searchMode           bool
+	searchQuery          string
+	showHelp             bool
+	popupMsg             string
+	popupTimer           int
+	marqueeTick          int
+	marqueePos           int
+	marqueeDir           int
+	lastMarqueeSelection string
 }
 
 type loadedPodcastsMsg struct {
@@ -272,7 +273,8 @@ func (m *tuiModel) handleUp() {
 func (m *tuiModel) handleDown() {
 	switch m.screen {
 	case screenPodcasts:
-		if m.podIdx < len(m.podcasts)-1 {
+		pods := m.filteredPodcasts()
+		if m.podIdx < len(pods)-1 {
 			m.podIdx++
 			maxVis := m.visibleLines(4)
 			if m.podIdx-m.podScroll >= maxVis {
@@ -280,14 +282,12 @@ func (m *tuiModel) handleDown() {
 			}
 		}
 	case screenPodcastDetail:
-		if m.podIdx < len(m.podcasts) {
-			eps := m.podcasts[m.podIdx].episodes
-			if m.epIdx < len(eps)-1 {
-				m.epIdx++
-				maxVis := m.visibleLines(5)
-				if m.epIdx-m.epScroll >= maxVis {
-					m.epScroll = m.epIdx - maxVis + 1
-				}
+		eps := m.filteredEpisodes()
+		if m.epIdx < len(eps)-1 {
+			m.epIdx++
+			maxVis := m.visibleLines(5)
+			if m.epIdx-m.epScroll >= maxVis {
+				m.epScroll = m.epIdx - maxVis + 1
 			}
 		}
 	}
@@ -296,16 +296,18 @@ func (m *tuiModel) handleDown() {
 func (m *tuiModel) handleEnter() (tea.Model, tea.Cmd) {
 	switch m.screen {
 	case screenPodcasts:
-		if len(m.podcasts) > 0 {
+		pods := m.filteredPodcasts()
+		if len(pods) > 0 {
 			m.epIdx = 0
 			m.epScroll = 0
 			m.screen = screenPodcastDetail
 		}
 
 	case screenPodcastDetail:
-		if m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
+		eps := m.filteredEpisodes()
+		if m.podIdx < len(m.podcasts) && m.epIdx < len(eps) {
 			m.screen = screenEpisodeDetail
-			ep := &m.podcasts[m.podIdx].episodes[m.epIdx]
+			ep := &eps[m.epIdx]
 			if !ep.durationDone {
 				idx := m.epIdx
 				return m, func() tea.Msg {
@@ -335,11 +337,15 @@ func (m *tuiModel) handleQueueToggle() {
 		return
 	}
 	pod := &m.podcasts[m.podIdx]
-	if m.epIdx >= len(pod.episodes) {
+	eps := m.filteredEpisodes()
+	if m.epIdx >= len(eps) {
 		return
 	}
-	ep := pod.episodes[m.epIdx]
+	ep := eps[m.epIdx]
 	entries := m.queue[pod.dir]
+	if entries == nil {
+		entries = []string{}
+	}
 	found := false
 	for i, e := range entries {
 		if e == ep.filename {
@@ -354,6 +360,7 @@ func (m *tuiModel) handleQueueToggle() {
 	if m.bk.SaveQueue != nil {
 		m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
 	}
+	m.showPopup("Queue updated")
 }
 
 func (m *tuiModel) visibleLines(headerLines int) int {
@@ -419,6 +426,14 @@ func (m *tuiModel) drawPopup() string {
 func (m *tuiModel) marqueeText(text string, maxWidth int) string {
 	if len(text) <= maxWidth {
 		return text
+	}
+	// Reset marquee when selection changes
+	selKey := fmt.Sprintf("%d-%d", m.podIdx, m.epIdx)
+	if selKey != m.lastMarqueeSelection {
+		m.lastMarqueeSelection = selKey
+		m.marqueePos = 0
+		m.marqueeDir = 1
+		m.marqueeTick = 0
 	}
 	m.marqueeTick++
 	if m.marqueeTick%3 == 0 {
@@ -640,7 +655,6 @@ func (m *tuiModel) drawPodcastDetail() string {
 	out.WriteByte('\n')
 
 	// Cover art on the left side
-	coverWidth := 0
 	var coverEsc string
 	if isKittySupported() && m.showCover {
 		coverPath := findCoverImage(pod.dir)
@@ -648,7 +662,6 @@ func (m *tuiModel) drawPodcastDetail() string {
 			imgEsc, err := encodeKittyGraphicsFile(coverPath, 30, 0)
 			if err == nil && imgEsc != "" {
 				coverEsc = imgEsc
-				coverWidth = 30
 			}
 		}
 	}
@@ -671,8 +684,10 @@ func (m *tuiModel) drawPodcastDetail() string {
 	}
 
 	if coverEsc != "" {
-		// Build episode list as a block
-		epBlock := &strings.Builder{}
+		// Display cover art above the episode list
+		out.WriteString(coverEsc)
+		out.WriteByte('\n')
+
 		for i := start; i < end; i++ {
 			ep := eps[i]
 			prefix := "    "
@@ -692,33 +707,14 @@ func (m *tuiModel) drawPodcastDetail() string {
 			}
 
 			line := prefix + displayName(displayNameStr) + suffix
-			epWidth := max(1, m.width-coverWidth-6)
-			line = truncate(line, epWidth)
+			line = truncate(line, max(1, m.width-1))
 
 			if i == m.epIdx {
-				epBlock.WriteString(tuiSelectedStyle.Render(line))
+				out.WriteString(tuiSelectedStyle.Render(line))
 			} else {
-				epBlock.WriteString(line)
+				out.WriteString(line)
 			}
-			epBlock.WriteByte('\n')
-		}
-
-		// Render side by side: cover art | episode list
-		coverLines := strings.Split(coverEsc, "\n")
-		epLines := strings.Split(strings.TrimRight(epBlock.String(), "\n"), "\n")
-		maxLines := max(len(coverLines), len(epLines))
-		for lineIdx := 0; lineIdx < maxLines; lineIdx++ {
-			leftPart := ""
-			if lineIdx < len(coverLines) {
-				leftPart = coverLines[lineIdx]
-			} else {
-				leftPart = strings.Repeat(" ", coverWidth)
-			}
-			rightPart := ""
-			if lineIdx < len(epLines) {
-				rightPart = epLines[lineIdx]
-			}
-			out.WriteString(fmt.Sprintf("  %s  %s\n", leftPart, rightPart))
+			out.WriteByte('\n')
 		}
 	} else {
 		for i := start; i < end; i++ {
@@ -847,9 +843,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Size:"), formatFileSize(ep.fileSize)))
 
 	dur := ep.duration
-	if dur <= 0 && ep.durationDone {
-		dur = ep.duration
-	} else if dur <= 0 && m.bk != nil && m.bk.GetDuration != nil {
+	if dur <= 0 && m.bk != nil && m.bk.GetDuration != nil {
 		dur = m.bk.GetDuration(ep.path)
 		ep.duration = dur
 		ep.durationDone = true

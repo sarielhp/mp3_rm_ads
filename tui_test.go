@@ -929,7 +929,7 @@ func TestTUIRelativeAge(t *testing.T) {
 		{now, "Today"},
 		{now.Add(-25 * time.Hour), "1Day"},
 		{now.Add(-72 * time.Hour), "3Days"},
-		{now.Add(-10 * 24 * time.Hour), "1Weeks"},
+		{now.Add(-10 * 24 * time.Hour), "1Week"},
 		{now.Add(-60 * 24 * time.Hour), "2Months"},
 		{now.Add(-400 * 24 * time.Hour), "1Year"},
 		{now.Add(24 * time.Hour), "Future"},
@@ -955,6 +955,10 @@ func TestTUIRenderHTML(t *testing.T) {
 		{"Line1<br>Line2", "Line1\nLine2"},
 		{"<p>Para1</p><p>Para2</p>", "\nPara1\n\nPara2\n"},
 		{"<li>Item1</li>", "\n  - Item1\n"},
+		{"Hello &amp; World", "Hello & World"},
+		{"a &lt; b &gt; c", "a < b > c"},
+		{"&quot;quoted&quot;", "\"quoted\""},
+		{"&nbsp;space", " space"},
 	}
 
 	for _, c := range cases {
@@ -1033,6 +1037,34 @@ func TestTUIMarqueeText(t *testing.T) {
 	result := m.marqueeText(long, 20)
 	if len(result) > 20 {
 		t.Errorf("marquee result should be at most 20 chars, got %d", len(result))
+	}
+}
+
+func TestTUIMarqueeResetOnSelectionChange(t *testing.T) {
+	m := makeTestModel()
+	long := "This is a very long title that should scroll"
+
+	// Set initial marquee state to simulate scrolling
+	m.marqueePos = 5
+	m.marqueeDir = -1
+	m.marqueeTick = 10
+	m.podIdx = 0
+	m.epIdx = 0
+	m.lastMarqueeSelection = "0-0"
+
+	// Advance marquee a bit
+	m.marqueeText(long, 20)
+	posBefore := m.marqueePos
+
+	// Change selection
+	m.epIdx = 1
+	m.marqueeText(long, 20)
+
+	if m.marqueePos == posBefore {
+		t.Error("marqueePos should reset when selection changes")
+	}
+	if m.marqueePos != 0 {
+		t.Errorf("marqueePos should reset to 0, got %d", m.marqueePos)
 	}
 }
 

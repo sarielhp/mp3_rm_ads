@@ -140,16 +140,28 @@ func formatRelativeAge(t time.Time) string {
 		return "1Day"
 	case diff < 7*24*time.Hour:
 		days := int(diff.Hours() / 24)
+		if days == 1 {
+			return "1Day"
+		}
 		return fmt.Sprintf("%dDays", days)
 	case diff < 30*24*time.Hour:
 		weeks := int(diff.Hours() / (24 * 7))
+		if weeks == 1 {
+			return "1Week"
+		}
 		return fmt.Sprintf("%dWeeks", weeks)
 	case diff < 365*24*time.Hour:
 		months := int(diff.Hours() / (24 * 30))
+		if months == 1 {
+			return "1Month"
+		}
 		return fmt.Sprintf("%dMonths", months)
 	default:
 		years := int(diff.Hours() / (24 * 365))
-		return fmt.Sprintf("%dYear", years)
+		if years == 1 {
+			return "1Year"
+		}
+		return fmt.Sprintf("%dYears", years)
 	}
 }
 
@@ -184,7 +196,26 @@ func renderHTML(html string) string {
 		}
 	}
 
-	for _, c := range html {
+	decodeEntity := func(entity string) string {
+		switch entity {
+		case "&amp;":
+			return "&"
+		case "&lt;":
+			return "<"
+		case "&gt;":
+			return ">"
+		case "&quot;":
+			return "\""
+		case "&apos;":
+			return "'"
+		case "&nbsp;":
+			return " "
+		}
+		return entity
+	}
+
+	for i := 0; i < len(html); i++ {
+		c := html[i]
 		if c == '<' {
 			flushText()
 			inTag = true
@@ -219,10 +250,20 @@ func renderHTML(html string) string {
 			continue
 		}
 		if inTag {
-			tagBuf.WriteRune(c)
+			tagBuf.WriteByte(c)
 			continue
 		}
-		textBuf.WriteRune(c)
+		if c == '&' {
+			entityEnd := strings.IndexByte(html[i:], ';')
+			if entityEnd >= 0 {
+				entity := html[i : i+entityEnd+1]
+				decoded := decodeEntity(entity)
+				textBuf.WriteString(decoded)
+				i += entityEnd
+				continue
+			}
+		}
+		textBuf.WriteByte(c)
 	}
 	flushText()
 
