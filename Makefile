@@ -1,4 +1,4 @@
-.PHONY: all check lint test build format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template
+.PHONY: all check lint test build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split
 
 all: check
 
@@ -13,6 +13,9 @@ audit:
 
 symbols:
 	@ruby ./tools/outline_symbols.rb $(ARGS)
+
+suggest-split:
+	@ruby ./tools/suggest_split.rb $(ARGS)
 
 template:
 	@ruby ./tools/generate_config_template.rb
@@ -48,6 +51,10 @@ commit:
 	@./tools/commit.sh $(ARGS)
 
 push: bump
+
+install: build
+	@go install .
+	@if [ -d "$$HOME/bin" ]; then cp abs "$$HOME/bin/abs"; echo "Installed to $$HOME/bin/abs and $$(go env GOPATH)/bin/abs"; else echo "Installed to $$(go env GOPATH)/bin/abs"; fi
 
 ci: check
 

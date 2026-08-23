@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/.."
+bash tools/check.sh > /dev/null 2>&1
 
 current=$(cat VERSION)
 IFS='.' read -r major minor patch <<< "$current"

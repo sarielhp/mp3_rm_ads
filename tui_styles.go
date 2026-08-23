@@ -26,6 +26,9 @@ var (
 			Bold(true).
 			Foreground(colorCyan)
 
+	tuiCyanStyle = lipgloss.NewStyle().
+			Foreground(colorCyan)
+
 	tuiHeaderBanner = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorDarkBg).
@@ -119,6 +122,23 @@ var (
 			Foreground(colorMagenta).
 			Background(lipgloss.Color("#361f36")).
 			Padding(0, 1)
+
+	tuiPlayerPlaying = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colorDarkBg).
+				Background(colorGreen).
+				Padding(0, 1)
+
+	tuiPlayerPaused = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorDarkBg).
+			Background(colorYellow).
+			Padding(0, 1)
+
+	tuiPlayerStopped = lipgloss.NewStyle().
+				Foreground(colorDim).
+				Background(lipgloss.Color("#1f2335")).
+				Padding(0, 1)
 
 	// Section Boxes / Cards
 	tuiSectionTitle = lipgloss.NewStyle().

@@ -3,17 +3,14 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-echo "=== Formatting ==="
-gofmt -s -w .
+echo "=== Formatting & Config Template ==="
+./tools/format.sh
 
 echo "=== Tidy ==="
 go mod tidy
 
-echo "=== Vet ==="
-go vet ./...
-
-echo "=== Staticcheck ==="
-staticcheck -checks '-SA2001' ./...
+echo "=== Lint & Line Audit ==="
+./tools/lint.sh
 
 echo "=== Test ==="
 go test -timeout 30s ./...

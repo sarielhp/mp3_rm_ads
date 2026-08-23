@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -439,5 +440,32 @@ func TestScanningDirectoryOutput(t *testing.T) {
 	out := string(buf[:n])
 	if !strings.Contains(out, "Scanning: "+d) {
 		t.Errorf("expected output to contain 'Scanning: %s', got %q", d, out)
+	}
+}
+
+func TestBuildUsageApp(t *testing.T) {
+	app := buildUsageApp()
+	if app.Name != "abs" {
+		t.Errorf("expected app name 'abs', got %q", app.Name)
+	}
+	if len(app.Commands) < 5 {
+		t.Errorf("expected at least 5 commands, got %d", len(app.Commands))
+	}
+}
+
+func TestNativeKittyGraphics(t *testing.T) {
+	tempDir := t.TempDir()
+	imgPath := filepath.Join(tempDir, "test.png")
+	os.WriteFile(imgPath, []byte("\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDRtestdata"), 0644)
+
+	esc, err := encodeNativeKittyGraphics(imgPath, 20, 10)
+	if err != nil {
+		t.Fatalf("encodeNativeKittyGraphics failed: %v", err)
+	}
+	if !strings.HasPrefix(esc, "\x1b_Ga=T,f=100") {
+		t.Errorf("expected escape prefix '\\x1b_Ga=T,f=100', got %q", esc)
+	}
+	if !strings.HasSuffix(esc, "\x1b\\") {
+		t.Errorf("expected escape suffix '\\x1b\\\\', got %q", esc)
 	}
 }

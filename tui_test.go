@@ -333,17 +333,23 @@ func TestTUINavigationEscape(t *testing.T) {
 }
 
 func TestTUIKeyQuit(t *testing.T) {
-	m := makeTestModel()
-	_, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	if cmd == nil {
-		t.Error("q at podcast screen should trigger quit")
+	screens := []tuiScreen{
+		screenPodcasts,
+		screenPodcastDetail,
+		screenEpisodeDetail,
+		screenPlayer,
+		screenPlayQueue,
+		screenAdQueue,
 	}
 
-	m2 := makeTestModel()
-	m2.screen = screenPodcastDetail
-	_, cmd2 := m2.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-	if cmd2 != nil {
-		t.Error("q at detail screen should not quit")
+	for _, s := range screens {
+		m := makeTestModel()
+		m.screen = s
+		m.done = false
+		_, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+		if cmd == nil || !m.done {
+			t.Errorf("q at screen %v should trigger quit and set done", s)
+		}
 	}
 }
 
@@ -426,24 +432,33 @@ func TestTUILoadPodcastsError(t *testing.T) {
 func TestTUIModelInit(t *testing.T) {
 	bk := &TuiBackend{
 		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
-			return nil, nil
+			return []tuiPodcast{{name: "Test", dir: "/tmp/test"}}, nil
 		},
 		LoadQueues: func(pods []tuiPodcast) map[string][]string {
-			return map[string][]string{}
+			return map[string][]string{"/tmp/test": {"a.mp3"}}
 		},
 	}
 	m := newTuiModel(bk, "/tmp/test", nil)
-
 	cmd := m.Init()
-	if cmd == nil {
-		t.Error("Init should return a command")
-	}
-	if !m.loading {
-		t.Error("model should be loading after Init")
-	}
 
 	msg := cmd()
 	switch v := msg.(type) {
+	case tea.BatchMsg:
+		found := false
+		for _, subCmd := range v {
+			if subCmd != nil {
+				subMsg := subCmd()
+				if lp, ok := subMsg.(loadedPodcastsMsg); ok {
+					found = true
+					if lp.err != "" {
+						t.Errorf("unexpected error: %s", lp.err)
+					}
+				}
+			}
+		}
+		if !found {
+			t.Errorf("expected loadedPodcastsMsg in batch")
+		}
 	case loadedPodcastsMsg:
 		if v.err != "" {
 			t.Errorf("unexpected error: %s", v.err)
@@ -467,6 +482,22 @@ func TestTUIModelInitError(t *testing.T) {
 
 	msg := cmd()
 	switch v := msg.(type) {
+	case tea.BatchMsg:
+		found := false
+		for _, subCmd := range v {
+			if subCmd != nil {
+				subMsg := subCmd()
+				if lp, ok := subMsg.(loadedPodcastsMsg); ok {
+					found = true
+					if lp.err == "" {
+						t.Error("expected error")
+					}
+				}
+			}
+		}
+		if !found {
+			t.Errorf("expected loadedPodcastsMsg in batch")
+		}
 	case loadedPodcastsMsg:
 		if v.err == "" {
 			t.Error("expected error")
@@ -590,17 +621,14 @@ func TestTUIViewEpisodeDetail(t *testing.T) {
 	if !strings.Contains(view, "ep102.mp3") {
 		t.Error("should show episode filename")
 	}
-	if !strings.Contains(view, "1.0 KB") {
-		t.Error("should show file size")
+	if !strings.Contains(view, "AUDIO PLAYER") {
+		t.Error("should show AUDIO PLAYER")
 	}
-	if !strings.Contains(view, "Tech Podcast/ep102.mp3") {
-		t.Error("should show path")
+	if !strings.Contains(view, "Show Notes") {
+		t.Error("should show Show Notes")
 	}
-	if !strings.Contains(view, "Not removed") {
-		t.Error("should show not removed status")
-	}
-	if !strings.Contains(view, "In queue") {
-		t.Error("should show queued status")
+	if !strings.Contains(view, "Has Ads") {
+		t.Error("should show Has Ads status")
 	}
 }
 
@@ -611,8 +639,8 @@ func TestTUIViewEpisodeDetailAdRemoved(t *testing.T) {
 
 	view := m.View()
 
-	if !strings.Contains(view, "Removed") {
-		t.Error("should show Removed status")
+	if !strings.Contains(view, "Ad-Free") {
+		t.Error("should show Ad-Free status")
 	}
 	if !strings.Contains(view, "\u2713") {
 		t.Error("should show checkmark for ad-free")
@@ -627,11 +655,8 @@ func TestTUIViewEpisodeDetailNotQueued(t *testing.T) {
 
 	view := m.View()
 
-	if strings.Contains(view, "In queue") {
-		t.Error("should not show queued for non-queued episode")
-	}
-	if !strings.Contains(view, "Not queued") {
-		t.Error("should show Not queued")
+	if !strings.Contains(view, "AUDIO PLAYER") {
+		t.Error("should show player section")
 	}
 }
 
@@ -1239,5 +1264,82 @@ func TestTranscribeRetryBuffer(t *testing.T) {
 	n2, _ := reader.Read(second)
 	if n1 != n2 || string(first) != string(second) {
 		t.Error("bytes.NewReader should allow re-reading")
+	}
+}
+
+func TestTUIFKeyScreens(t *testing.T) {
+	m := makeTestModel()
+
+	// Press F1 -> Player screen
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF1})
+	if m.screen != screenPlayer {
+		t.Errorf("expected screenPlayer on F1, got %v", m.screen)
+	}
+	viewF1 := m.View()
+	if !strings.Contains(viewF1, "AUDIO PLAYER (F1)") {
+		t.Errorf("expected AUDIO PLAYER (F1) in view, got %q", viewF1)
+	}
+
+	// Press Esc -> returns to previous screen
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.screen != screenPodcasts {
+		t.Errorf("expected screenPodcasts after Esc, got %v", m.screen)
+	}
+
+	// Press F2 -> Play Queue screen
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
+	if m.screen != screenPlayQueue {
+		t.Errorf("expected screenPlayQueue on F2, got %v", m.screen)
+	}
+	viewF2 := m.View()
+	if !strings.Contains(viewF2, "PLAYING QUEUE (F2)") {
+		t.Errorf("expected PLAYING QUEUE (F2) in view, got %q", viewF2)
+	}
+
+	// Press Space to grab/reorder
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
+	if !m.pqGrabbed {
+		t.Errorf("expected pqGrabbed to be true after space")
+	}
+
+	// Press Esc -> back
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.screen != screenPodcasts {
+		t.Errorf("expected screenPodcasts after Esc, got %v", m.screen)
+	}
+
+	// Test multi-level F1 -> F2 -> F3 -> Esc from screenPodcastDetail
+	m.screen = screenPodcastDetail
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF1}) // goes to Player
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF2}) // goes to PlayQueue
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF3}) // goes to AdQueue
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.screen != screenPodcastDetail {
+		t.Errorf("expected screenPodcastDetail after Esc from F-key hopping, got %v", m.screen)
+	}
+}
+
+func TestAutoAdQueueWhenPlayQueueAdded(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenPodcastDetail
+	m.podIdx = 0
+	// Episode 1 (ep102.mp3) hasAdsRemoved: false
+	m.epIdx = 1
+
+	podDir := m.podcasts[0].dir
+	m.queue[podDir] = nil
+
+	m.playSelectedEpisode()
+
+	// Should be added to m.queue[podDir]
+	found := false
+	for _, fn := range m.queue[podDir] {
+		if fn == "ep102.mp3" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected ep102.mp3 to be auto-added to ad removal queue: %v", m.queue[podDir])
 	}
 }

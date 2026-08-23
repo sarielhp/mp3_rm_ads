@@ -171,6 +171,8 @@ type CLIOptions struct {
 	ABSUser         string
 	ABSPass         string
 	SetABS          bool
+	IsCacheCommand  bool
+	ResetCache      bool
 }
 
 type CostInfo struct {

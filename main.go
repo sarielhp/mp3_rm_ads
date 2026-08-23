@@ -18,6 +18,19 @@ import (
 )
 
 func main() {
+	defer func() {
+		globalPlayer.Stop()
+		if r := recover(); r != nil {
+			globalPlayer.Stop()
+			panic(r)
+		}
+	}()
+
+	if len(os.Args) <= 1 {
+		buildUsageApp().PrintGlobalUsage()
+		return
+	}
+
 	cli := parseFlags()
 
 	var silentLogFile *os.File
@@ -121,6 +134,17 @@ func main() {
 		}
 	}
 
+	if cli.IsCacheCommand || cli.ResetCache {
+		if err := resetCache(); err != nil {
+			fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
+			os.Exit(1)
+		}
+		if !cli.Quiet {
+			fmt.Println("Cache reset successfully.")
+		}
+		return
+	}
+
 	if cli.IsConfigCommand {
 		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
 			printConfig(config)
@@ -214,21 +238,8 @@ func main() {
 		}
 		expandedArgs = args
 	} else if len(args) == 0 {
-		if config.PodcastsDir != "" {
-			printScanning(config.PodcastsDir)
-			removeWorkDirs(config.PodcastsDir)
-			mp3Files := findMP3Files(config.PodcastsDir)
-			if len(mp3Files) == 0 {
-				if !cli.Quiet {
-					fmt.Printf("No MP3 files found in directory '%s'.\n", config.PodcastsDir)
-				}
-				return
-			}
-			expandedArgs = mp3Files
-		} else {
-			buildUsageApp().PrintGlobalUsage()
-			return
-		}
+		buildUsageApp().PrintGlobalUsage()
+		return
 	} else {
 		buildUsageApp().PrintGlobalUsage()
 		os.Exit(1)
@@ -636,6 +647,16 @@ func parseFlags() CLIOptions {
 			cli.IsTUICommand = true
 			detectedCommand = "tui"
 			args = args[1:]
+		case "cache":
+			cli.IsCacheCommand = true
+			detectedCommand = "cache"
+			args = args[1:]
+			if len(args) > 0 && (args[0] == "reset" || args[0] == "clear" || args[0] == "clean") {
+				cli.ResetCache = true
+				args = args[1:]
+			} else {
+				cli.ResetCache = true
+			}
 		case "test":
 			cli.IsTestCommand = true
 			detectedCommand = "test"
@@ -738,6 +759,7 @@ func parseFlags() CLIOptions {
 	flag.StringVar(&cli.ABSURL, "abs-url", "", "Audiobookshelf server URL")
 	flag.StringVar(&cli.ABSUser, "abs-user", "", "Audiobookshelf username")
 	flag.StringVar(&cli.ABSPass, "abs-pass", "", "Audiobookshelf password")
+	flag.BoolVar(&cli.ResetCache, "reset-cache", false, "Reset and purge all cached podcast metadata and cover images")
 	var testWhisperFlag bool
 	flag.BoolVar(&testWhisperFlag, "test-whisper", false, "Test whisper server connection and exit")
 	var testABSFlag bool
@@ -790,7 +812,6 @@ func buildUsageApp() *clihelp.App {
 	return &clihelp.App{
 		Name:        "abs",
 		Description: "Automatic Podcast Ad & Sponsor Segment Remover",
-		GlobalNote:  "If no command is given and podcasts_dir is configured, it is equivalent to: abs dir <podcasts_dir>",
 		Commands: []clihelp.Command{
 			{
 				Name:        "file",
@@ -861,6 +882,18 @@ func buildUsageApp() *clihelp.App {
 					{Line: "abs test abs download"},
 					{Line: "abs test kitty cover.jpg"},
 					{Line: "abs test"},
+				},
+			},
+			{
+				Name:        "cache",
+				Description: "Manage and reset local podcast metadata and cover image cache",
+				UsageLine:   "abs cache [reset|clear]",
+				Options: []clihelp.Option{
+					{Flags: "reset", Description: "Completely purge all cached podcast metadata and cover images"},
+				},
+				Examples: []clihelp.Example{
+					{Line: "abs cache reset"},
+					{Line: "abs cache clear"},
 				},
 			},
 		},

@@ -3,6 +3,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -22,9 +24,28 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 			continue
 		}
 		podDir := filepath.Join(podcastsDir, entry.Name())
+		_ = ensureABSIgnore(podDir)
 		pod := tuiPodcast{
 			name: entry.Name(),
 			dir:  podDir,
+		}
+
+		cachedIdx, _ := loadPodcastCache(podDir)
+		cachedByPath := make(map[string]CachedEpisodeSummary)
+		cachedByName := make(map[string]CachedEpisodeSummary)
+		if cachedIdx != nil {
+			pod.author = cachedIdx.Author
+			pod.description = cachedIdx.Description
+			pod.feedURL = cachedIdx.FeedURL
+			pod.coverPath = cachedIdx.CoverPath
+			for _, ce := range cachedIdx.Episodes {
+				if ce.Path != "" {
+					cachedByPath[ce.Path] = ce
+				}
+				if ce.Filename != "" {
+					cachedByName[ce.Filename] = ce
+				}
+			}
 		}
 
 		mp3Files, err := filepath.Glob(filepath.Join(podDir, "*.mp3"))
@@ -34,6 +55,7 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 
 		var episodes []tuiEpisode
 		for _, mp3 := range mp3Files {
+			absPath, _ := filepath.Abs(mp3)
 			base := strings.TrimSuffix(mp3, ".mp3")
 			hasCut := false
 			if _, err := os.Stat(base + ".cuts.json"); err == nil {
@@ -45,17 +67,32 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 				fSize = fi.Size()
 				modTime = fi.ModTime()
 			}
-			episodes = append(episodes, tuiEpisode{
-				filename:      filepath.Base(mp3),
-				path:          mp3,
+			fn := filepath.Base(mp3)
+			ep := tuiEpisode{
+				filename:      fn,
+				path:          absPath,
 				hasAdsRemoved: hasCut,
 				fileSize:      fSize,
 				modTime:       modTime,
-			})
+			}
+			if ce, ok := cachedByPath[absPath]; ok {
+				ep.title = ce.Title
+				ep.publishedAt = ce.PublishedAt
+				ep.duration = ce.Duration
+				ep.season = ce.Season
+				ep.episode = ce.Episode
+			} else if ce, ok := cachedByName[fn]; ok {
+				ep.title = ce.Title
+				ep.publishedAt = ce.PublishedAt
+				ep.duration = ce.Duration
+				ep.season = ce.Season
+				ep.episode = ce.Episode
+			}
+			episodes = append(episodes, ep)
 		}
 
 		sort.Slice(episodes, func(i, j int) bool {
-			return episodes[i].modTime.After(episodes[j].modTime)
+			return episodes[i].displayDate().After(episodes[j].displayDate())
 		})
 
 		pod.episodes = episodes
@@ -69,6 +106,122 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 	})
 
 	return podcasts, nil
+}
+
+func savePodcastToCache(pod *tuiPodcast) {
+	if pod == nil {
+		return
+	}
+	absPodDir, _ := filepath.Abs(pod.dir)
+	var summaries []CachedEpisodeSummary
+	for _, ep := range pod.episodes {
+		absPath, _ := filepath.Abs(ep.path)
+		title := ep.displayTitle()
+		pubAt := ep.publishedAt
+		dur := ep.duration
+		season := ep.season
+		episode := ep.episode
+		if ep.absData != nil {
+			if ep.absData.Title != "" {
+				title = ep.absData.Title
+			}
+			if pub := parseABSEpisodePublishedAt(ep.absData); pub > 0 {
+				pubAt = pub
+			}
+			if ep.absData.Duration > 0 {
+				dur = ep.absData.Duration
+			}
+			if ep.absData.Season != "" {
+				season = ep.absData.Season
+			}
+			if ep.absData.Episode != "" {
+				episode = ep.absData.Episode
+			}
+
+			det := CachedEpisodeDetails{
+				Path:        absPath,
+				Filename:    ep.filename,
+				Title:       title,
+				Description: ep.absData.Description,
+				Subtitle:    ep.absData.Subtitle,
+				EpisodeType: ep.absData.EpisodeType,
+				RawABS:      ep.absData,
+			}
+			if pod.absData != nil {
+				det.Author = pod.absData.Media.Metadata.Author
+				det.FeedURL = pod.absData.Media.Metadata.FeedURL
+			}
+			_ = saveEpisodeDetails(pod.dir, ep.filename, &det)
+		}
+
+		summaries = append(summaries, CachedEpisodeSummary{
+			Path:          absPath,
+			Filename:      ep.filename,
+			Title:         title,
+			PublishedAt:   pubAt,
+			Duration:      dur,
+			FileSize:      ep.fileSize,
+			Season:        season,
+			Episode:       episode,
+			HasAdsRemoved: ep.hasAdsRemoved,
+		})
+	}
+
+	absItemID := ""
+	author := pod.author
+	description := pod.description
+	feedURL := pod.feedURL
+	coverPath := pod.coverPath
+	if pod.absData != nil {
+		absItemID = pod.absData.ID
+		if pod.absData.Media.Metadata.Author != "" {
+			author = pod.absData.Media.Metadata.Author
+		}
+		if pod.absData.Media.Metadata.Description != "" {
+			description = pod.absData.Media.Metadata.Description
+		}
+		if pod.absData.Media.Metadata.FeedURL != "" {
+			feedURL = pod.absData.Media.Metadata.FeedURL
+		}
+	}
+	index := CachedPodcastIndex{
+		PodcastName: pod.name,
+		PodcastDir:  absPodDir,
+		ABSItemID:   absItemID,
+		Author:      author,
+		Description: description,
+		FeedURL:     feedURL,
+		CoverPath:   coverPath,
+		UpdatedAt:   time.Now(),
+		Episodes:    summaries,
+	}
+	_ = savePodcastCache(pod.dir, &index)
+}
+
+func absDownloadCover(baseURL, token, itemID, destPath string) error {
+	if _, err := os.Stat(destPath); err == nil {
+		return nil
+	}
+	url := fmt.Sprintf("%s/api/items/%s/cover", baseURL, itemID)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Authorization", "Bearer "+token)
+	client := &http.Client{Timeout: 5 * time.Second}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("cover status: %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(destPath, data, 0644)
 }
 
 func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
@@ -130,6 +283,26 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 			continue
 		}
 		pod.absData = &fullItem
+		if fullItem.Media.Metadata.Author != "" {
+			pod.author = fullItem.Media.Metadata.Author
+		}
+		if fullItem.Media.Metadata.Description != "" {
+			pod.description = fullItem.Media.Metadata.Description
+		}
+		if fullItem.Media.Metadata.FeedURL != "" {
+			pod.feedURL = fullItem.Media.Metadata.FeedURL
+		}
+
+		// Cache cover image locally
+		cDir := cacheDirForPodcast(pod.dir)
+		coverDest := filepath.Join(cDir, "cover.jpg")
+		_ = absDownloadCover(baseURL, token, fullItem.ID, coverDest)
+
+		// Quarantine any abandoned duplicates (e.g. Title.mp3 when Title (guid).mp3 exists)
+		quarantined := quarantineAbandonedDuplicates(pod.dir, fullItem.Media.Episodes)
+		if len(quarantined) > 0 {
+			printQuarantinedSummary(quarantined, pod.name)
+		}
 
 		episodeMap := make(map[string]*absEpisode)
 		for epIdx := range fullItem.Media.Episodes {
@@ -137,25 +310,56 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 			if ep.AudioFile != nil {
 				if ep.AudioFile.Metadata.Filename != "" {
 					episodeMap[ep.AudioFile.Metadata.Filename] = ep
+					episodeMap[normalizeEpisodeTitle(ep.AudioFile.Metadata.Filename)] = ep
 				}
 				if ep.AudioFile.Metadata.RelPath != "" {
-					episodeMap[filepath.Base(ep.AudioFile.Metadata.RelPath)] = ep
+					cleanRel := filepath.Base(ep.AudioFile.Metadata.RelPath)
+					episodeMap[cleanRel] = ep
+					episodeMap[normalizeEpisodeTitle(cleanRel)] = ep
 				}
 			}
 			if ep.Title != "" {
 				episodeMap[ep.Title] = ep
 				episodeMap[ep.Title+".mp3"] = ep
+				episodeMap[normalizeEpisodeTitle(ep.Title)] = ep
 			}
 		}
 
 		for j := range pod.episodes {
 			ep := &pod.episodes[j]
+			var matchedEp *absEpisode
 			if absEp, exists := episodeMap[ep.filename]; exists {
-				ep.absData = absEp
+				matchedEp = absEp
 			} else if absEp, exists := episodeMap[strings.TrimSuffix(ep.filename, ".mp3")]; exists {
-				ep.absData = absEp
+				matchedEp = absEp
+			} else if absEp, exists := episodeMap[normalizeEpisodeTitle(ep.filename)]; exists {
+				matchedEp = absEp
+			}
+			if matchedEp != nil {
+				ep.absData = matchedEp
+				if matchedEp.Title != "" {
+					ep.title = matchedEp.Title
+				}
+				if pub := parseABSEpisodePublishedAt(matchedEp); pub > 0 {
+					ep.publishedAt = pub
+				}
+				if matchedEp.Duration > 0 {
+					ep.duration = matchedEp.Duration
+				}
+				if matchedEp.Season != "" {
+					ep.season = matchedEp.Season
+				}
+				if matchedEp.Episode != "" {
+					ep.episode = matchedEp.Episode
+				}
 			}
 		}
+
+		sort.Slice(pod.episodes, func(x, y int) bool {
+			return pod.episodes[x].displayDate().After(pod.episodes[y].displayDate())
+		})
+
+		savePodcastToCache(pod)
 	}
 
 	return podcasts, nil

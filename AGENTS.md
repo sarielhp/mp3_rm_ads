@@ -18,6 +18,7 @@
 | `tools/audit_lines.rb` | Audit Go source file lengths against 150-300 target (600 limit) |
 | `tools/outline_symbols.rb` | Index all Go types, structs, interfaces, and functions |
 | `tools/show_symbol.rb <sym>` | Display single symbol code block with line numbers |
+| `tools/suggest_split.rb` | Suggest logical file split boundaries for oversized files |
 | `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
@@ -35,6 +36,7 @@ A `Makefile` at the project root delegates to all scripts:
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
 | `make audit` | Audit Go source file line lengths (`tools/audit_lines.rb`) |
 | `make symbols` | Outline symbols (`tools/outline_symbols.rb ARGS="..."`) |
+| `make suggest-split` | Suggest file splits (`tools/suggest_split.rb ARGS="..."`) |
 | `make template` | Regenerate config template (`tools/generate_config_template.rb`) |
 | `make test` | Run tests |
 | `make build` | Build binary |

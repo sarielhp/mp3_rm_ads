@@ -39,18 +39,18 @@ go_files.each do |file|
   File.readlines(file).each_with_index do |line, idx|
     lineno = idx + 1
     case line
-    when /^type\s+([A-Z]\w+)\s+(struct|interface)/
+    when /^type\s+([A-Za-z]\w*)\s+(struct|interface)/
       sym = { name: Regexp.last_match(1), kind: Regexp.last_match(2), line: lineno }
       symbols << sym if symbol_rx.nil? || sym[:name] =~ symbol_rx
-    when /^type\s+([A-Z]\w+)\s+(\w+)/
+    when /^type\s+([A-Za-z]\w*)\s+(\w+)/
       sym = { name: Regexp.last_match(1), kind: "type (#{Regexp.last_match(2)})", line: lineno }
       symbols << sym if symbol_rx.nil? || sym[:name] =~ symbol_rx
-    when /^func\s+\((\w+\s+\*?([A-Z]\w+))\)\s+([A-Za-z]\w+)\s*\(/
+    when /^func\s+\((\w+\s+\*?([A-Za-z]\w*))\)\s+([A-Za-z]\w*)\s*\(/
       recv = Regexp.last_match(2)
       fn = Regexp.last_match(3)
       sym = { name: "(#{recv}).#{fn}", kind: 'method', line: lineno }
       symbols << sym if symbol_rx.nil? || sym[:name] =~ symbol_rx || fn =~ symbol_rx
-    when /^func\s+([A-Za-z]\w+)\s*\(/
+    when /^func\s+([A-Za-z]\w*)\s*\(/
       fn = Regexp.last_match(1)
       sym = { name: fn, kind: 'func', line: lineno }
       symbols << sym if symbol_rx.nil? || sym[:name] =~ symbol_rx

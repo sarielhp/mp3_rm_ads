@@ -15,24 +15,71 @@ const (
 	screenPodcasts tuiScreen = iota
 	screenPodcastDetail
 	screenEpisodeDetail
+	screenPlayer
+	screenPlayQueue
+	screenAdQueue
 )
 
 type tuiPodcast struct {
-	name     string
-	dir      string
-	episodes []tuiEpisode
-	absData  *absItem
+	name        string
+	dir         string
+	author      string
+	description string
+	feedURL     string
+	coverPath   string
+	episodes    []tuiEpisode
+	absData     *absItem
+}
+
+func (p tuiPodcast) displayAuthor() string {
+	if p.absData != nil && p.absData.Media.Metadata.Author != "" {
+		return p.absData.Media.Metadata.Author
+	}
+	return p.author
+}
+
+func (p tuiPodcast) displayDescription() string {
+	if p.absData != nil && p.absData.Media.Metadata.Description != "" {
+		return p.absData.Media.Metadata.Description
+	}
+	return p.description
 }
 
 type tuiEpisode struct {
 	filename      string
 	path          string
+	title         string
 	hasAdsRemoved bool
 	fileSize      int64
 	modTime       time.Time
+	publishedAt   int64
 	duration      float64
 	durationDone  bool
+	season        string
+	episode       string
 	absData       *absEpisode
+}
+
+func (e tuiEpisode) displayDate() time.Time {
+	if e.publishedAt > 0 {
+		return time.UnixMilli(e.publishedAt)
+	}
+	if e.absData != nil {
+		if pub := parseABSEpisodePublishedAt(e.absData); pub > 0 {
+			return time.UnixMilli(pub)
+		}
+	}
+	return e.modTime
+}
+
+func (e tuiEpisode) displayTitle() string {
+	if e.title != "" {
+		return e.title
+	}
+	if e.absData != nil && e.absData.Title != "" {
+		return e.absData.Title
+	}
+	return e.filename
 }
 
 type TuiBackend struct {
@@ -69,6 +116,22 @@ type tuiModel struct {
 	marqueePos           int
 	marqueeDir           int
 	lastMarqueeSelection string
+	descScroll           int
+	prevScreen           tuiScreen
+	pqIdx                int
+	pqScroll             int
+	pqGrabbed            bool
+	adqIdx               int
+	adqScroll            int
+	adqGrabbed           bool
+}
+
+type playerTickMsg time.Time
+
+func playerTickCmd() tea.Cmd {
+	return tea.Tick(500*time.Millisecond, func(t time.Time) tea.Msg {
+		return playerTickMsg(t)
+	})
 }
 
 type loadedPodcastsMsg struct {
@@ -97,7 +160,7 @@ func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *Config) *tuiModel {
 }
 
 func (m *tuiModel) Init() tea.Cmd {
-	return func() tea.Msg {
+	loadCmd := func() tea.Msg {
 		pods, err := m.bk.LoadPodcasts(m.podcastsDir)
 		if err != nil {
 			return loadedPodcastsMsg{err: err.Error()}
@@ -105,6 +168,7 @@ func (m *tuiModel) Init() tea.Cmd {
 		queue := m.bk.LoadQueues(pods)
 		return loadedPodcastsMsg{podcasts: pods, queue: queue}
 	}
+	return tea.Batch(loadCmd, playerTickCmd())
 }
 
 func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -133,6 +197,10 @@ func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				ep.durationDone = true
 			}
 		}
+
+	case playerTickMsg:
+		globalPlayer.UpdatePosition()
+		return m, playerTickCmd()
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -166,23 +234,216 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch s {
-	case "ctrl+c", "ctrl+d":
+	case "q", "Q", "ctrl+c", "ctrl+d":
+		globalPlayer.Stop()
 		m.done = true
 		return m, tea.Quit
 
-	case "q":
-		if m.screen == screenPodcasts {
-			m.done = true
-			return m, tea.Quit
+	case "f1", "F1":
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+			m.prevScreen = m.screen
 		}
-		m.handleEscape()
+		m.screen = screenPlayer
 		return m, nil
 
+	case "f2", "F2":
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+			m.prevScreen = m.screen
+		}
+		m.screen = screenPlayQueue
+		m.pqGrabbed = false
+		return m, nil
+
+	case "f3", "F3":
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+			m.prevScreen = m.screen
+		}
+		m.screen = screenAdQueue
+		m.adqGrabbed = false
+		return m, nil
+	}
+
+	if m.screen == screenPlayer {
+		switch s {
+		case "esc":
+			m.handleEscape()
+			return m, nil
+		}
+	}
+
+	if m.screen == screenPlayQueue {
+		unified := globalPlayer.GetUnifiedQueue()
+		total := len(unified)
+
+		switch s {
+		case "up", "k":
+			if m.pqGrabbed && m.pqIdx > 0 {
+				globalPlayer.MoveUnifiedItem(m.pqIdx, m.pqIdx-1)
+				m.pqIdx--
+			} else if m.pqIdx > 0 {
+				m.pqIdx--
+			}
+		case "down", "j":
+			if m.pqGrabbed && m.pqIdx < total-1 {
+				globalPlayer.MoveUnifiedItem(m.pqIdx, m.pqIdx+1)
+				m.pqIdx++
+			} else if m.pqIdx < total-1 {
+				m.pqIdx++
+			}
+		case " ":
+			m.pqGrabbed = !m.pqGrabbed
+			if m.pqGrabbed {
+				m.showPopup("Grabbed (↑/↓ to move)")
+			} else {
+				m.showPopup("Placed item")
+			}
+		case "enter":
+			if m.pqGrabbed {
+				m.pqGrabbed = false
+				m.showPopup("Placed item")
+			} else if m.pqIdx < total {
+				item := unified[m.pqIdx]
+				if item.IsCurrent {
+					globalPlayer.TogglePause()
+					if globalPlayer.IsPaused {
+						m.showPopup("Paused")
+					} else {
+						m.showPopup("Resumed")
+					}
+				} else {
+					globalPlayer.RemoveUnifiedItem(m.pqIdx)
+					globalPlayer.PlayTrack(item.Track)
+					m.showPopup("Playing: " + truncate(item.Track.Title, 25))
+				}
+			}
+		case "d", "x", "delete", "backspace":
+			if m.pqIdx < total {
+				item := unified[m.pqIdx]
+				globalPlayer.RemoveUnifiedItem(m.pqIdx)
+				m.showPopup("Removed: " + truncate(item.Track.Title, 25))
+				if m.pqIdx >= total-1 && m.pqIdx > 0 {
+					m.pqIdx--
+				}
+			}
+		case "c", "C":
+			globalPlayer.ClearQueue()
+			m.showPopup("Play queue cleared")
+		case "esc":
+			m.handleEscape()
+		}
+		return m, nil
+	}
+
+	if m.screen == screenAdQueue {
+		items := getAllAdQueueItems(m.podcasts, m.queue)
+		switch s {
+		case "up", "k":
+			if m.adqGrabbed && m.adqIdx > 0 {
+				moveAdQueueItem(items, m.adqIdx, m.adqIdx-1, m.queue, m.bk.SaveQueue)
+				m.adqIdx--
+			} else if m.adqIdx > 0 {
+				m.adqIdx--
+			}
+		case "down", "j":
+			if m.adqGrabbed && m.adqIdx < len(items)-1 {
+				moveAdQueueItem(items, m.adqIdx, m.adqIdx+1, m.queue, m.bk.SaveQueue)
+				m.adqIdx++
+			} else if m.adqIdx < len(items)-1 {
+				m.adqIdx++
+			}
+		case " ":
+			m.adqGrabbed = !m.adqGrabbed
+			if m.adqGrabbed {
+				m.showPopup("Grabbed (↑/↓ to move)")
+			} else {
+				m.showPopup("Placed item")
+			}
+		case "enter":
+			m.adqGrabbed = false
+		case "d", "x", "delete", "backspace", "r", "R":
+			if m.adqIdx < len(items) {
+				removeAdQueueItem(items[m.adqIdx], m.queue, m.bk.SaveQueue)
+				m.showPopup("Removed from ad queue")
+				if m.adqIdx >= len(items)-1 && m.adqIdx > 0 {
+					m.adqIdx--
+				}
+			}
+		case "esc":
+			m.handleEscape()
+		}
+		return m, nil
+	}
+
+	switch s {
+
+	case "p", "P":
+		if m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
+			m.playSelectedEpisode()
+		}
+
+	case " ":
+		globalPlayer.TogglePause()
+		if globalPlayer.IsPaused {
+			m.showPopup("Paused")
+		} else if globalPlayer.IsPlaying {
+			m.showPopup("Resumed")
+		}
+
+	case "right", "l", ">":
+		if globalPlayer.IsPlaying {
+			globalPlayer.Seek(30)
+			m.showPopup("+30s (" + formatPlayerTime(globalPlayer.Position) + ")")
+		}
+
+	case "left", "h", "<":
+		if globalPlayer.IsPlaying {
+			globalPlayer.Seek(-30)
+			m.showPopup("-30s (" + formatPlayerTime(globalPlayer.Position) + ")")
+		}
+
+	case "+", "=", "]":
+		globalPlayer.VolumeUp()
+		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.Volume))
+
+	case "-", "_", "[":
+		globalPlayer.VolumeDown()
+		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.Volume))
+
+	case "m", "M":
+		globalPlayer.ToggleMute()
+		if globalPlayer.Muted {
+			m.showPopup("Muted")
+		} else {
+			m.showPopup("Unmuted")
+		}
+
+	case "s", "S":
+		globalPlayer.CycleSpeaker()
+		m.showPopup("Speaker: " + globalPlayer.CurrentSpeaker)
+
+	case "n", "N":
+		globalPlayer.Next()
+		m.showPopup("Next track")
+
+	case "c", "C":
+		globalPlayer.ClearQueue()
+		m.showPopup("Queue cleared")
+
 	case "up", "k":
-		m.handleUp()
+		if m.screen == screenEpisodeDetail {
+			if m.descScroll > 0 {
+				m.descScroll--
+			}
+		} else {
+			m.handleUp()
+		}
 
 	case "down", "j":
-		m.handleDown()
+		if m.screen == screenEpisodeDetail {
+			m.descScroll++
+		} else {
+			m.handleDown()
+		}
 
 	case "enter":
 		return m.handleEnter()
@@ -208,6 +469,58 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	return m, nil
+}
+
+func (m *tuiModel) playSelectedEpisode() {
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := m.podcasts[m.podIdx]
+	eps := m.filteredEpisodes()
+	if m.epIdx >= len(eps) {
+		return
+	}
+	ep := eps[m.epIdx]
+	track := PlayerTrack{
+		Title:    ep.displayTitle(),
+		Podcast:  pod.name,
+		Path:     ep.path,
+		Duration: ep.duration,
+	}
+	addedToPlayer := globalPlayer.EnqueueAndPlay(track)
+
+	addedToAdQueue := false
+	if !ep.hasAdsRemoved {
+		entries := m.queue[pod.dir]
+		found := false
+		for _, q := range entries {
+			if q == ep.filename {
+				found = true
+				break
+			}
+		}
+		if !found {
+			m.queue[pod.dir] = append(entries, ep.filename)
+			if m.bk.SaveQueue != nil {
+				m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
+			}
+			addedToAdQueue = true
+		}
+	}
+
+	if addedToPlayer {
+		if addedToAdQueue {
+			m.showPopup("Queued (play & ad removal): " + truncate(ep.displayTitle(), 25))
+		} else {
+			m.showPopup("Queued for playback: " + truncate(ep.displayTitle(), 25))
+		}
+	} else {
+		if addedToAdQueue {
+			m.showPopup("Queued for ad removal: " + truncate(ep.displayTitle(), 25))
+		} else {
+			m.showPopup("Already playing or queued")
+		}
+	}
 }
 
 func (m *tuiModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -344,6 +657,10 @@ func (m *tuiModel) handleEscape() {
 		m.screen = screenPodcasts
 	case screenEpisodeDetail:
 		m.screen = screenPodcastDetail
+	case screenPlayer, screenPlayQueue, screenAdQueue:
+		m.screen = m.prevScreen
+		m.pqGrabbed = false
+		m.adqGrabbed = false
 	}
 }
 
@@ -535,6 +852,12 @@ func (m *tuiModel) View() string {
 		body = m.drawPodcastDetail()
 	case screenEpisodeDetail:
 		body = m.drawEpisodeDetail()
+	case screenPlayer:
+		body = m.drawPlayerScreen()
+	case screenPlayQueue:
+		body = m.drawPlayQueueScreen()
+	case screenAdQueue:
+		body = m.drawAdQueueScreen()
 	}
 
 	if m.searchMode {
@@ -583,37 +906,168 @@ func (m *tuiModel) drawPodcastsList() string {
 		end = len(pods)
 	}
 
-	for i := start; i < end; i++ {
-		p := pods[i]
-		epCount := len(p.episodes)
-		doneCount := 0
-		for _, e := range p.episodes {
-			if e.hasAdsRemoved {
-				doneCount++
+	if m.width >= 65 && len(pods) > 0 {
+		leftW := max(28, m.width*45/100)
+		rightW := max(25, m.width-leftW-5)
+
+		var leftLines []string
+		for i := start; i < end; i++ {
+			p := pods[i]
+			epCount := len(p.episodes)
+			doneCount := 0
+			for _, e := range p.episodes {
+				if e.hasAdsRemoved {
+					doneCount++
+				}
+			}
+
+			nameStr := displayName(p.name)
+			statsStr := fmt.Sprintf("(%d/%d)", epCount, doneCount)
+
+			line := fmt.Sprintf("  %s %s", nameStr, statsStr)
+			truncLine := truncate(line, leftW-2)
+			pad := strings.Repeat(" ", max(0, leftW-len([]rune(truncLine))))
+			fullLine := truncLine + pad
+
+			if i == m.podIdx {
+				leftLines = append(leftLines, tuiSelectedStyle.Render(fullLine))
+			} else {
+				leftLines = append(leftLines, fullLine)
 			}
 		}
 
-		nameStr := displayName(p.name)
-		statsStr := fmt.Sprintf("(%d/%d)", epCount, doneCount)
+		// Build right pane for selected podcast
+		var rightLines []string
+		if m.podIdx < len(pods) {
+			selPod := pods[m.podIdx]
 
-		authorStr := ""
-		if p.absData != nil && p.absData.Media.Metadata.Author != "" {
-			authorStr = fmt.Sprintf(" [%s]", p.absData.Media.Metadata.Author)
+			// 1. Cover Art (if available and enabled)
+			if isKittySupported() && m.showCover {
+				coverPath := findCoverImage(selPod.dir)
+				if coverPath != "" {
+					imgW := min(rightW-4, 26)
+					imgH := min(8, maxVis/2)
+					if imgH < 4 {
+						imgH = 4
+					}
+					if imgEsc, err := encodeKittyGraphicsFile(coverPath, imgW, imgH); err == nil && imgEsc != "" {
+						if isKittyTerminal() {
+							rightLines = append(rightLines, imgEsc)
+							for h := 1; h < imgH; h++ {
+								rightLines = append(rightLines, strings.Repeat(" ", max(0, imgW)))
+							}
+						} else {
+							for _, imgLine := range strings.Split(imgEsc, "\n") {
+								if imgLine != "" {
+									rightLines = append(rightLines, imgLine)
+								}
+							}
+						}
+					}
+				}
+			}
+
+			// 2. Podcast Title
+			title := displayName(selPod.name)
+			rightLines = append(rightLines, tuiTitleStyle.Render(truncate(title, rightW-2)))
+
+			// 3. Author
+			if author := selPod.displayAuthor(); author != "" {
+				rightLines = append(rightLines, tuiSubtitleStyle.Render(truncate("by "+displayName(author), rightW-2)))
+			}
+
+			// 4. Counts
+			selDone := 0
+			for _, e := range selPod.episodes {
+				if e.hasAdsRemoved {
+					selDone++
+				}
+			}
+			queued := len(m.queue[selPod.dir])
+			statStr := fmt.Sprintf("%d eps • %d ad-free", len(selPod.episodes), selDone)
+			if queued > 0 {
+				statStr += fmt.Sprintf(" • %d queued", queued)
+			}
+			rightLines = append(rightLines, tuiStatStyle.Render(truncate(statStr, rightW-2)))
+
+			// 5. Latest Episode
+			if len(selPod.episodes) > 0 {
+				latest := selPod.episodes[0]
+				d := latest.displayDate()
+				dateStr := ""
+				if !d.IsZero() {
+					dateStr = d.Format("2006-01-02")
+				}
+				latestStr := fmt.Sprintf("Latest: %s", latest.displayTitle())
+				if dateStr != "" {
+					latestStr += fmt.Sprintf(" (%s)", dateStr)
+				}
+				rightLines = append(rightLines, tuiSubtextStyle.Render(truncate(latestStr, rightW-2)))
+			}
+
+			// 6. Description (clean text)
+			if desc := selPod.displayDescription(); desc != "" {
+				clean := strings.TrimSpace(renderHTML(desc))
+				clean = strings.ReplaceAll(clean, "\n", " ")
+				if len(clean) > 0 {
+					rightLines = append(rightLines, tuiDimStyle.Render(truncate(clean, rightW-2)))
+				}
+			}
 		}
 
-		line := fmt.Sprintf("  %s  %s%s", nameStr, statsStr, authorStr)
-		line = truncate(line, max(1, m.width-1))
+		// Join columns
+		totalLines := max(len(leftLines), len(rightLines))
+		for k := 0; k < totalLines; k++ {
+			leftPart := ""
+			if k < len(leftLines) {
+				leftPart = leftLines[k]
+			} else {
+				leftPart = strings.Repeat(" ", leftW)
+			}
 
-		if i == m.podIdx {
-			out.WriteString(tuiSelectedStyle.Render(line))
-		} else {
-			out.WriteString(line)
+			rightPart := ""
+			if k < len(rightLines) {
+				rightPart = rightLines[k]
+			}
+
+			out.WriteString(leftPart + tuiDividerStyle.Render(" │ ") + rightPart + "\n")
 		}
-		out.WriteByte('\n')
+	} else {
+		for i := start; i < end; i++ {
+			p := pods[i]
+			epCount := len(p.episodes)
+			doneCount := 0
+			for _, e := range p.episodes {
+				if e.hasAdsRemoved {
+					doneCount++
+				}
+			}
+
+			nameStr := displayName(p.name)
+			statsStr := fmt.Sprintf("(%d/%d)", epCount, doneCount)
+
+			authorStr := ""
+			if author := p.displayAuthor(); author != "" {
+				authorStr = fmt.Sprintf(" [%s]", displayName(author))
+			}
+
+			line := fmt.Sprintf("  %s  %s%s", nameStr, statsStr, authorStr)
+			line = truncate(line, max(1, m.width-1))
+
+			if i == m.podIdx {
+				out.WriteString(tuiSelectedStyle.Render(line))
+			} else {
+				out.WriteString(line)
+			}
+			out.WriteByte('\n')
+		}
 	}
 
 	out.WriteByte('\n')
 	helpText := "↑↓ navigate  Enter select  / search  q quit"
+	if isKittySupported() {
+		helpText += "  I cover"
+	}
 	if m.showHelp {
 		helpText += "  B hide help"
 	} else {
@@ -664,19 +1118,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
 	out.WriteByte('\n')
 
-	// Cover art on the left side
-	var coverEsc string
-	if isKittySupported() && m.showCover {
-		coverPath := findCoverImage(pod.dir)
-		if coverPath != "" {
-			imgEsc, err := encodeKittyGraphicsFile(coverPath, 30, 0)
-			if err == nil && imgEsc != "" {
-				coverEsc = imgEsc
-			}
-		}
-	}
-
-	maxVis := m.visibleLines(5)
+	maxVis := m.visibleLines(3)
 	start := m.epScroll
 	end := start + maxVis
 	if end > len(eps) {
@@ -693,72 +1135,97 @@ func (m *tuiModel) drawPodcastDetail() string {
 		return false
 	}
 
-	if coverEsc != "" {
-		// Display cover art above the episode list
-		out.WriteString(coverEsc)
+	renderEpRow := func(i int) {
+		ep := eps[i]
+		displayNameStr := ep.displayTitle()
+		d := ep.displayDate()
+		dateStr := strings.Repeat(" ", 10)
+		if !d.IsZero() {
+			dateStr = d.Format("2006-01-02")
+		}
+
+		availWidth := m.width - 2
+		isSelected := (i == m.epIdx)
+
+		if availWidth >= 40 {
+			qBadgeWidth := 0
+			if isQueued(ep.filename) {
+				qBadgeWidth = 4
+			}
+			titleWidth := availWidth - 16 - qBadgeWidth
+			if titleWidth < 10 {
+				titleWidth = 10
+			}
+			truncTitle := truncate(displayName(displayNameStr), titleWidth)
+			padLen := max(0, titleWidth-len([]rune(truncTitle)))
+			padding := strings.Repeat(" ", padLen)
+
+			if isSelected {
+				chk := "  "
+				if ep.hasAdsRemoved {
+					chk = "✓ "
+				}
+				qBadge := ""
+				if isQueued(ep.filename) {
+					qBadge = " [Q]"
+				}
+				plainLine := "  " + dateStr + "  " + chk + truncTitle + padding + qBadge
+				fullPad := max(0, availWidth-len([]rune(plainLine)))
+				fullRow := plainLine + strings.Repeat(" ", fullPad)
+				out.WriteString(tuiSelectedStyle.Render(fullRow))
+			} else {
+				chk := "  "
+				if ep.hasAdsRemoved {
+					chk = tuiGreenStyle.Render("✓") + " "
+				}
+				qBadge := ""
+				if isQueued(ep.filename) {
+					qBadge = " " + tuiBadgeQueued.Render("[Q]")
+				}
+				line := "  " + tuiSubtextStyle.Render(dateStr) + "  " + chk + truncTitle + padding + qBadge
+				out.WriteString(line)
+			}
+		} else {
+			if isSelected {
+				chk := " "
+				if ep.hasAdsRemoved {
+					chk = "✓"
+				}
+				qBadge := ""
+				if isQueued(ep.filename) {
+					qBadge = " [Q]"
+				}
+				line := dateStr + " " + chk + " " + displayName(displayNameStr) + qBadge
+				truncLine := truncate(line, max(1, m.width-1))
+				fullPad := max(0, (m.width-1)-len([]rune(truncLine)))
+				out.WriteString(tuiSelectedStyle.Render(truncLine + strings.Repeat(" ", fullPad)))
+			} else {
+				chk := " "
+				if ep.hasAdsRemoved {
+					chk = tuiGreenStyle.Render("✓")
+				}
+				qBadge := ""
+				if isQueued(ep.filename) {
+					qBadge = " " + tuiBadgeQueued.Render("[Q]")
+				}
+				line := tuiSubtextStyle.Render(dateStr) + " " + chk + " " + displayName(displayNameStr) + qBadge
+				out.WriteString(truncate(line, max(1, m.width-1)))
+			}
+		}
 		out.WriteByte('\n')
+	}
 
-		for i := start; i < end; i++ {
-			ep := eps[i]
-			prefix := "    "
-			if ep.hasAdsRemoved {
-				prefix = "  " + tuiGreenStyle.Render("\u2713") + " "
-			}
+	// Clear graphics when viewing podcast episodes
+	if isKittyTerminal() {
+		out.WriteString(kittyClearGraphics())
+	}
 
-			suffix := ""
-			if isQueued(ep.filename) {
-				suffix = " " + tuiBadgeQueued.Render("[Q]")
-			}
-
-			absTitle := absEpisodeTitle(ep.absData)
-			displayNameStr := ep.filename
-			if absTitle != "" {
-				displayNameStr = absTitle
-			}
-
-			line := prefix + displayName(displayNameStr) + suffix
-			line = truncate(line, max(1, m.width-1))
-
-			if i == m.epIdx {
-				out.WriteString(tuiSelectedStyle.Render(line))
-			} else {
-				out.WriteString(line)
-			}
-			out.WriteByte('\n')
-		}
-	} else {
-		for i := start; i < end; i++ {
-			ep := eps[i]
-			prefix := "    "
-			if ep.hasAdsRemoved {
-				prefix = "  " + tuiGreenStyle.Render("\u2713") + " "
-			}
-
-			suffix := ""
-			if isQueued(ep.filename) {
-				suffix = " " + tuiBadgeQueued.Render("[Q]")
-			}
-
-			absTitle := absEpisodeTitle(ep.absData)
-			displayNameStr := ep.filename
-			if absTitle != "" {
-				displayNameStr = absTitle
-			}
-
-			line := prefix + displayName(displayNameStr) + suffix
-			line = truncate(line, max(1, m.width-1))
-
-			if i == m.epIdx {
-				out.WriteString(tuiSelectedStyle.Render(line))
-			} else {
-				out.WriteString(line)
-			}
-			out.WriteByte('\n')
-		}
+	for i := start; i < end; i++ {
+		renderEpRow(i)
 	}
 
 	out.WriteByte('\n')
-	helpText := "↑↓ navigate  Enter info  R queue  / search  D sort  Esc back"
+	helpText := "↑↓ navigate  Enter/p play/info  Space pause  ←/→ seek  +/- vol  Esc back  q quit"
 	if isKittySupported() {
 		helpText += "  I cover"
 	}
@@ -768,190 +1235,10 @@ func (m *tuiModel) drawPodcastDetail() string {
 		helpText = ""
 	}
 	if len(eps) > maxVis {
-		pct := float64(m.epIdx+1) / float64(len(eps)) * 100
-		helpText += fmt.Sprintf("  [%d%%]", int(pct))
+		helpText += fmt.Sprintf("  [%d/%d]", m.epIdx+1, len(eps))
 	}
 	if helpText != "" {
-		out.WriteString(tuiHelpStyle.Render("  " + helpText))
-		out.WriteByte('\n')
-	}
-
-	return out.String()
-}
-
-func (m *tuiModel) drawEpisodeDetail() string {
-	out := &strings.Builder{}
-
-	if m.podIdx >= len(m.podcasts) {
-		m.screen = screenPodcasts
-		return m.drawPodcastsList()
-	}
-
-	pod := m.podcasts[m.podIdx]
-	if m.epIdx >= len(pod.episodes) {
-		m.screen = screenPodcastDetail
-		return m.drawPodcastDetail()
-	}
-
-	ep := pod.episodes[m.epIdx]
-	queueEntries := m.queue[pod.dir]
-	inQueue := false
-	for _, q := range queueEntries {
-		if q == ep.filename {
-			inQueue = true
-			break
-		}
-	}
-
-	displayHeader := ep.filename
-	if ep.absData != nil && ep.absData.Title != "" {
-		displayHeader = ep.absData.Title
-	}
-
-	out.WriteString(tuiTitleStyle.Render("  " + displayName(displayHeader)))
-	out.WriteByte('\n')
-
-	dividerWidth := max(0, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
-	out.WriteByte('\n')
-
-	// Cover art at the top
-	if isKittySupported() && m.showCover {
-		coverPath := findCoverImage(pod.dir)
-		if coverPath != "" {
-			imgEsc, err := encodeKittyGraphicsFile(coverPath, 30, 0)
-			if err == nil && imgEsc != "" {
-				out.WriteString(imgEsc)
-				out.WriteByte('\n')
-			}
-		}
-	}
-
-	// Status Badges Row
-	var badges []string
-	if ep.hasAdsRemoved {
-		badges = append(badges, tuiBadgeAdFree.Render("✓ Removed"))
-	} else {
-		badges = append(badges, tuiBadgeHasAds.Render("✗ Not removed"))
-	}
-
-	if inQueue {
-		badges = append(badges, tuiBadgeQueued.Render("In queue"))
-	} else {
-		badges = append(badges, tuiDimStyle.Render("Not queued"))
-	}
-
-	if ep.absData != nil {
-		if ep.absData.EpisodeType != "" {
-			badges = append(badges, tuiBadgeType.Render(strings.ToUpper(ep.absData.EpisodeType)))
-		}
-		if ep.absData.Season != "" && ep.absData.Episode != "" {
-			badges = append(badges, tuiBadgeCount.Render(fmt.Sprintf("S%sE%s", ep.absData.Season, ep.absData.Episode)))
-		} else if ep.absData.Episode != "" {
-			badges = append(badges, tuiBadgeCount.Render(fmt.Sprintf("Ep %s", ep.absData.Episode)))
-		}
-	}
-
-	out.WriteString("  Status: " + strings.Join(badges, "  ") + "\n\n")
-
-	// 1. Audio & File Details Card
-	out.WriteString(tuiSectionTitle.Render("  Audio & File Information"))
-	out.WriteByte('\n')
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
-	out.WriteByte('\n')
-
-	out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("File:"), displayName(ep.filename)))
-	out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Path:"), displayName(pod.name+"/"+ep.filename)))
-	out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Size:"), formatFileSize(ep.fileSize)))
-
-	dur := ep.duration
-	if dur <= 0 && m.bk != nil && m.bk.GetDuration != nil {
-		dur = m.bk.GetDuration(ep.path)
-		ep.duration = dur
-		ep.durationDone = true
-	}
-	if dur > 0 {
-		out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Duration:"), formatDurationShort(dur)))
-	}
-
-	if ep.absData != nil && ep.absData.AudioFile != nil {
-		af := ep.absData.AudioFile
-		if af.Codec != "" {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Codec:"), af.Codec))
-		}
-		if af.BitRate > 0 {
-			out.WriteString(fmt.Sprintf("  %s %d kbps\n", tuiLabelStyle.Render("Bitrate:"), af.BitRate/1000))
-		}
-		if af.ChannelLayout != "" {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Channels:"), af.ChannelLayout))
-		}
-	}
-
-	// 2. ABS Rich Metadata Section
-	if ep.absData != nil {
-		out.WriteByte('\n')
-		out.WriteString(tuiSectionTitle.Render("  ABS Information"))
-		out.WriteByte('\n')
-		out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
-		out.WriteByte('\n')
-
-		if ep.absData.Title != "" {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Title:"), ep.absData.Title))
-		}
-		if ep.absData.Subtitle != "" {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Subtitle:"), ep.absData.Subtitle))
-		}
-		if ep.absData.PubDate != "" {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Published:"), formatABSDate(ep.absData.PubDate)))
-		} else if ep.absData.PublishedAt > 0 {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Published:"), formatTimestamp(ep.absData.PublishedAt)))
-		}
-		if ep.absData.Duration > 0 {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("ABS Duration:"), formatDurationShort(ep.absData.Duration)))
-		}
-		if ep.absData.Size > 0 {
-			out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("ABS Size:"), formatFileSize(ep.absData.Size)))
-		}
-
-		if pod.absData != nil {
-			meta := pod.absData.Media.Metadata
-			if meta.Author != "" {
-				out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Author:"), meta.Author))
-			}
-			if len(meta.Genres) > 0 {
-				out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Genres:"), strings.Join(meta.Genres, ", ")))
-			}
-			if meta.FeedURL != "" {
-				out.WriteString(fmt.Sprintf("  %s %s\n", tuiLabelStyle.Render("Feed URL:"), meta.FeedURL))
-			}
-		}
-
-		if ep.absData.Description != "" {
-			out.WriteByte('\n')
-			out.WriteString(tuiLabelStyle.Render("  Description:\n"))
-			desc := renderHTML(ep.absData.Description)
-			descLines := splitText(desc, max(20, m.width-8))
-			for _, line := range descLines {
-				out.WriteString(fmt.Sprintf("    %s\n", line))
-			}
-		}
-	} else {
-		out.WriteByte('\n')
-		out.WriteString(tuiDimStyle.Render("  No ABS data available\n"))
-	}
-
-	out.WriteByte('\n')
-	helpText := "R - Toggle queue  Esc - Back"
-	if isKittySupported() {
-		helpText += "  I - Toggle cover"
-	}
-	if m.showHelp {
-		helpText += "  B hide"
-	} else {
-		helpText = ""
-	}
-	if helpText != "" {
-		out.WriteString(tuiHelpStyle.Render("  " + helpText))
+		out.WriteString(tuiDimStyle.Render("  " + helpText))
 		out.WriteByte('\n')
 	}
 
