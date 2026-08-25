@@ -85,21 +85,23 @@ func TestAdQueueHelpers(t *testing.T) {
 			episodes: []tuiEpisode{
 				{filename: "ep1.mp3", title: "Episode One", hasAdsRemoved: true},
 				{filename: "ep2.mp3", title: "Episode Two", hasAdsRemoved: false},
+				{filename: "ep3.mp3", title: "Episode Three", hasAdsRemoved: false},
 			},
 		},
 	}
 	q := map[string][]string{
-		"/podcasts/tech": {"ep1.mp3", "ep2.mp3"},
+		"/podcasts/tech": {"ep1.mp3", "ep2.mp3", "ep3.mp3"},
 	}
 
+	// ep1 has ads removed, so it should be excluded from getAllAdQueueItems
 	items := getAllAdQueueItems(pods, q)
 	if len(items) != 2 {
-		t.Fatalf("expected 2 ad queue items, got %d", len(items))
+		t.Fatalf("expected 2 ad queue items (ep1 excluded), got %d", len(items))
 	}
-	if items[0].Title != "Episode One" || !items[0].HasAdsRemoved {
+	if items[0].Title != "Episode Two" || items[0].HasAdsRemoved {
 		t.Errorf("unexpected first item: %+v", items[0])
 	}
-	if items[1].Title != "Episode Two" || items[1].HasAdsRemoved {
+	if items[1].Title != "Episode Three" || items[1].HasAdsRemoved {
 		t.Errorf("unexpected second item: %+v", items[1])
 	}
 
@@ -110,9 +112,9 @@ func TestAdQueueHelpers(t *testing.T) {
 		savedEntries = entries
 	}
 
-	// Remove ep1
+	// Remove ep2
 	removeAdQueueItem(items[0], q, saveFn)
-	if savedDir != "/podcasts/tech" || len(savedEntries) != 1 || savedEntries[0] != "ep2.mp3" {
+	if savedDir != "/podcasts/tech" || len(savedEntries) != 2 || savedEntries[0] != "ep1.mp3" || savedEntries[1] != "ep3.mp3" {
 		t.Errorf("unexpected saved after remove: %v, %v", savedDir, savedEntries)
 	}
 }

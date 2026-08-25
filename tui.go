@@ -690,12 +690,18 @@ func (m *tuiModel) handleQueueToggle() {
 		}
 	}
 	if !found {
+		if ep.hasAdsRemoved {
+			m.showPopup("Episode already has ads removed")
+			return
+		}
 		m.queue[pod.dir] = append(entries, ep.filename)
+		m.showPopup("Added to ad removal queue")
+	} else {
+		m.showPopup("Removed from ad removal queue")
 	}
 	if m.bk.SaveQueue != nil {
 		m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
 	}
-	m.showPopup("Queue updated")
 }
 
 func (m *tuiModel) visibleLines(headerLines int) int {
@@ -907,8 +913,8 @@ func (m *tuiModel) drawPodcastsList() string {
 	}
 
 	if m.width >= 65 && len(pods) > 0 {
-		leftW := max(28, m.width*45/100)
-		rightW := max(25, m.width-leftW-5)
+		leftW := min(36, max(26, m.width*32/100))
+		rightW := max(30, m.width-leftW-5)
 
 		var leftLines []string
 		for i := start; i < end; i++ {
@@ -936,7 +942,7 @@ func (m *tuiModel) drawPodcastsList() string {
 			}
 		}
 
-		// Build right pane for selected podcast
+		// Build right pane for selected podcast with rich details
 		var rightLines []string
 		if m.podIdx < len(pods) {
 			selPod := pods[m.podIdx]
@@ -945,11 +951,8 @@ func (m *tuiModel) drawPodcastsList() string {
 			if isKittySupported() && m.showCover {
 				coverPath := findCoverImage(selPod.dir)
 				if coverPath != "" {
-					imgW := min(rightW-4, 26)
-					imgH := min(8, maxVis/2)
-					if imgH < 4 {
-						imgH = 4
-					}
+					imgW := min(rightW-4, 24)
+					imgH := min(7, max(4, maxVis/3))
 					if imgEsc, err := encodeKittyGraphicsFile(coverPath, imgW, imgH); err == nil && imgEsc != "" {
 						if isKittyTerminal() {
 							rightLines = append(rightLines, imgEsc)
@@ -976,41 +979,102 @@ func (m *tuiModel) drawPodcastsList() string {
 				rightLines = append(rightLines, tuiSubtitleStyle.Render(truncate("by "+displayName(author), rightW-2)))
 			}
 
-			// 4. Counts
+			// 4. Detailed Stats & Timeline
 			selDone := 0
+			var totalDurSec float64
+			var newestDate, oldestDate time.Time
 			for _, e := range selPod.episodes {
 				if e.hasAdsRemoved {
 					selDone++
 				}
-			}
-			queued := len(m.queue[selPod.dir])
-			statStr := fmt.Sprintf("%d eps • %d ad-free", len(selPod.episodes), selDone)
-			if queued > 0 {
-				statStr += fmt.Sprintf(" • %d queued", queued)
-			}
-			rightLines = append(rightLines, tuiStatStyle.Render(truncate(statStr, rightW-2)))
-
-			// 5. Latest Episode
-			if len(selPod.episodes) > 0 {
-				latest := selPod.episodes[0]
-				d := latest.displayDate()
-				dateStr := ""
+				totalDurSec += e.duration
+				d := e.displayDate()
 				if !d.IsZero() {
-					dateStr = d.Format("2006-01-02")
+					if newestDate.IsZero() || d.After(newestDate) {
+						newestDate = d
+					}
+					if oldestDate.IsZero() || d.Before(oldestDate) {
+						oldestDate = d
+					}
 				}
-				latestStr := fmt.Sprintf("Latest: %s", latest.displayTitle())
-				if dateStr != "" {
-					latestStr += fmt.Sprintf(" (%s)", dateStr)
-				}
-				rightLines = append(rightLines, tuiSubtextStyle.Render(truncate(latestStr, rightW-2)))
 			}
 
-			// 6. Description (clean text)
+			statParts := []string{
+				fmt.Sprintf("%d episodes", len(selPod.episodes)),
+				fmt.Sprintf("%d ad-free", selDone),
+			}
+			if queued := len(m.queue[selPod.dir]); queued > 0 {
+				statParts = append(statParts, fmt.Sprintf("%d queued", queued))
+			}
+			if totalDurSec > 0 {
+				hrs := int(totalDurSec) / 3600
+				mins := (int(totalDurSec) % 3600) / 60
+				if hrs > 0 {
+					statParts = append(statParts, fmt.Sprintf("~%dh %dm audio", hrs, mins))
+				} else {
+					statParts = append(statParts, fmt.Sprintf("~%dm audio", mins))
+				}
+			}
+			rightLines = append(rightLines, tuiStatStyle.Render(truncate(strings.Join(statParts, " • "), rightW-2)))
+
+			if !newestDate.IsZero() {
+				dateInfo := fmt.Sprintf("Timeline: %s", newestDate.Format("2006-01-02"))
+				if !oldestDate.IsZero() && !oldestDate.Equal(newestDate) {
+					dateInfo += fmt.Sprintf(" (oldest: %s)", oldestDate.Format("2006-01-02"))
+				}
+				rightLines = append(rightLines, tuiSubtextStyle.Render(truncate(dateInfo, rightW-2)))
+			}
+
+			// 5. Description (rich multi-line wrapped text)
 			if desc := selPod.displayDescription(); desc != "" {
 				clean := strings.TrimSpace(renderHTML(desc))
-				clean = strings.ReplaceAll(clean, "\n", " ")
 				if len(clean) > 0 {
-					rightLines = append(rightLines, tuiDimStyle.Render(truncate(clean, rightW-2)))
+					rightLines = append(rightLines, "")
+					prefix := "About: "
+					lines := wrapText(prefix+clean, rightW-2)
+					if len(lines) > 0 {
+						firstLine := lines[0]
+						if strings.HasPrefix(firstLine, prefix) {
+							rest := strings.TrimPrefix(firstLine, prefix)
+							rightLines = append(rightLines, tuiSectionTitle.Render(prefix)+tuiDimStyle.Render(rest))
+						} else {
+							rightLines = append(rightLines, tuiDimStyle.Render(firstLine))
+						}
+						for _, l := range lines[1:] {
+							if len(rightLines) >= maxVis-5 && len(selPod.episodes) > 0 {
+								break
+							}
+							if len(rightLines) >= maxVis {
+								break
+							}
+							rightLines = append(rightLines, tuiDimStyle.Render(l))
+						}
+					}
+				}
+			}
+
+			// 6. Recent Episodes preview
+			if len(selPod.episodes) > 0 && len(rightLines) < maxVis-2 {
+				rightLines = append(rightLines, "")
+				rightLines = append(rightLines, tuiSectionTitle.Render("Recent Episodes:"))
+				for epIdx, ep := range selPod.episodes {
+					if len(rightLines) >= maxVis {
+						break
+					}
+					if epIdx >= 5 {
+						break
+					}
+					d := ep.displayDate()
+					dStr := ""
+					if !d.IsZero() {
+						dStr = d.Format("2006-01-02") + " "
+					}
+					chk := " "
+					if ep.hasAdsRemoved {
+						chk = "✓ "
+					}
+					epLine := fmt.Sprintf("  %s%s%s", chk, dStr, ep.displayTitle())
+					rightLines = append(rightLines, tuiDimStyle.Render(truncate(epLine, rightW-2)))
 				}
 			}
 		}

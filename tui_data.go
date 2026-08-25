@@ -378,13 +378,31 @@ func loadAllQueues(pods []tuiPodcast) map[string][]string {
 			q[pod.dir] = nil
 			continue
 		}
-		var filtered []string
-		for _, e := range entries {
-			if strings.HasSuffix(strings.ToLower(e), ".mp3") {
-				filtered = append(filtered, e)
+
+		adFreeMap := make(map[string]bool)
+		for _, ep := range pod.episodes {
+			if ep.hasAdsRemoved {
+				adFreeMap[ep.filename] = true
 			}
 		}
+
+		var filtered []string
+		needsResave := false
+		for _, e := range entries {
+			if !strings.HasSuffix(strings.ToLower(e), ".mp3") {
+				needsResave = true
+				continue
+			}
+			if adFreeMap[e] {
+				needsResave = true
+				continue
+			}
+			filtered = append(filtered, e)
+		}
 		q[pod.dir] = filtered
+		if needsResave {
+			saveQueue(pod.dir, filtered)
+		}
 	}
 	return q
 }

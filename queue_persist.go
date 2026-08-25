@@ -188,16 +188,20 @@ func getAllAdQueueItems(pods []tuiPodcast, q map[string][]string) []AdQueueItem 
 				Filename:    fn,
 				Title:       fn,
 			}
+			hasAdsRemoved := false
 			for _, ep := range pod.episodes {
 				if ep.filename == fn {
 					item.Title = ep.displayTitle()
 					item.HasAdsRemoved = ep.hasAdsRemoved
 					item.PublishedAt = ep.publishedAt
 					item.Duration = ep.duration
+					hasAdsRemoved = ep.hasAdsRemoved
 					break
 				}
 			}
-			list = append(list, item)
+			if !hasAdsRemoved {
+				list = append(list, item)
+			}
 		}
 	}
 	return list

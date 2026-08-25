@@ -145,11 +145,18 @@ func TestTUILoadAllQueues(t *testing.T) {
 	os.MkdirAll(d+"/pod3", 0755)
 
 	os.WriteFile(d+"/pod1/queue.json", []byte(`["ep1.mp3", "ep2.mp3"]`), 0644)
-	os.WriteFile(d+"/pod2/queue.json", []byte(`["ep3.mp3", "note.txt"]`), 0644)
+	os.WriteFile(d+"/pod2/queue.json", []byte(`["ep3.mp3", "note.txt", "ad_free_ep.mp3"]`), 0644)
 
 	pods := []tuiPodcast{
 		{name: "pod1", dir: d + "/pod1"},
-		{name: "pod2", dir: d + "/pod2"},
+		{
+			name: "pod2",
+			dir:  d + "/pod2",
+			episodes: []tuiEpisode{
+				{filename: "ep3.mp3", hasAdsRemoved: false},
+				{filename: "ad_free_ep.mp3", hasAdsRemoved: true},
+			},
+		},
 		{name: "pod3", dir: d + "/pod3"},
 	}
 
@@ -159,7 +166,7 @@ func TestTUILoadAllQueues(t *testing.T) {
 		t.Errorf("pod1 expected 2 queue entries, got %d", len(q[pods[0].dir]))
 	}
 	if len(q[pods[1].dir]) != 1 {
-		t.Errorf("pod2 expected 1 queue entry (note.txt filtered), got %d", len(q[pods[1].dir]))
+		t.Errorf("pod2 expected 1 queue entry (note.txt and ad_free_ep.mp3 filtered), got %d", len(q[pods[1].dir]))
 	}
 	if q[pods[2].dir] != nil {
 		t.Errorf("pod3 expected nil queue (no queue.json), got %v", q[pods[2].dir])
@@ -167,6 +174,15 @@ func TestTUILoadAllQueues(t *testing.T) {
 
 	if q[pods[0].dir][0] != "ep1.mp3" || q[pods[0].dir][1] != "ep2.mp3" {
 		t.Errorf("pod1 queue contents wrong: %v", q[pods[0].dir])
+	}
+	if q[pods[1].dir][0] != "ep3.mp3" {
+		t.Errorf("pod2 queue contents wrong: %v", q[pods[1].dir])
+	}
+
+	// Verify pod2 queue.json on disk was cleaned
+	cleanBytes, err := os.ReadFile(d + "/pod2/queue.json")
+	if err != nil || strings.Contains(string(cleanBytes), "ad_free_ep.mp3") || strings.Contains(string(cleanBytes), "note.txt") {
+		t.Errorf("expected pod2 queue.json to be cleaned on disk, got: %s", string(cleanBytes))
 	}
 }
 
@@ -1341,5 +1357,26 @@ func TestAutoAdQueueWhenPlayQueueAdded(t *testing.T) {
 	}
 	if !found {
 		t.Errorf("expected ep102.mp3 to be auto-added to ad removal queue: %v", m.queue[podDir])
+	}
+}
+
+func TestQueueToggleAdFreeEpisode(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenPodcastDetail
+	m.podIdx = 0
+	// Episode 0 (ep101.mp3) has hasAdsRemoved: true in makeTestModel
+	m.epIdx = 0
+
+	podDir := m.podcasts[0].dir
+	m.queue[podDir] = nil
+
+	m.handleQueueToggle()
+
+	// Should NOT be added to m.queue[podDir]
+	if len(m.queue[podDir]) != 0 {
+		t.Errorf("expected ad-free episode not to be added to queue, got: %v", m.queue[podDir])
+	}
+	if m.popupMsg != "Episode already has ads removed" {
+		t.Errorf("expected popup 'Episode already has ads removed', got %q", m.popupMsg)
 	}
 }
