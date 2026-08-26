@@ -126,14 +126,15 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 
 		if !quiet {
 			go func(done chan struct{}) {
+				ticker := time.NewTicker(2 * time.Second)
+				defer ticker.Stop()
 				for {
 					select {
 					case <-done:
 						return
-					default:
+					case <-ticker.C:
 						elapsed := time.Since(startTime)
 						fmt.Printf("\rTranscribing audio... Elapsed: %s   ", formatClock(elapsed.Seconds()))
-						time.Sleep(2 * time.Second)
 					}
 				}
 			}(progressDone)

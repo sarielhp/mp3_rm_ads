@@ -243,6 +243,39 @@ func (p *AudioPlayer) ClearQueue() {
 	p.saveQueueLocked()
 }
 
+func (p *AudioPlayer) MoveTrack(from, to int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if from < 0 || from >= len(p.Queue) || to < 0 || to >= len(p.Queue) || from == to {
+		return
+	}
+	track := p.Queue[from]
+	p.Queue = append(p.Queue[:from], p.Queue[from+1:]...)
+	p.Queue = append(p.Queue[:to], append([]PlayerTrack{track}, p.Queue[to:]...)...)
+	p.saveQueueLocked()
+}
+
+func (p *AudioPlayer) RemoveTrack(idx int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if idx < 0 || idx >= len(p.Queue) {
+		return
+	}
+	p.Queue = append(p.Queue[:idx], p.Queue[idx+1:]...)
+	p.saveQueueLocked()
+}
+
+func (p *AudioPlayer) PlayQueueIndex(idx int) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if idx < 0 || idx >= len(p.Queue) {
+		return
+	}
+	track := p.Queue[idx]
+	p.Queue = append(p.Queue[:idx], p.Queue[idx+1:]...)
+	p.playTrackLocked(track)
+}
+
 func (p *AudioPlayer) UpdatePosition() {
 	p.mu.Lock()
 	defer p.mu.Unlock()

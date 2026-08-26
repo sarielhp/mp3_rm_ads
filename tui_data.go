@@ -26,8 +26,9 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 		podDir := filepath.Join(podcastsDir, entry.Name())
 		_ = ensureABSIgnore(podDir)
 		pod := tuiPodcast{
-			name: entry.Name(),
-			dir:  podDir,
+			name:   entry.Name(),
+			dir:    podDir,
+			config: loadPodcastConfig(podDir),
 		}
 
 		cachedIdx, _ := loadPodcastCache(podDir)
@@ -61,6 +62,12 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 			if _, err := os.Stat(base + ".cuts.json"); err == nil {
 				hasCut = true
 			}
+			hasTx := false
+			if _, err := os.Stat(base + ".transcript.json"); err == nil {
+				hasTx = true
+			} else if _, err := os.Stat(base + ".transcript.txt"); err == nil {
+				hasTx = true
+			}
 			var fSize int64
 			var modTime time.Time
 			if fi, err := os.Stat(mp3); err == nil {
@@ -72,6 +79,7 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 				filename:      fn,
 				path:          absPath,
 				hasAdsRemoved: hasCut,
+				hasTranscript: hasTx,
 				fileSize:      fSize,
 				modTime:       modTime,
 			}
@@ -81,12 +89,18 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 				ep.duration = ce.Duration
 				ep.season = ce.Season
 				ep.episode = ce.Episode
+				if ce.HasTranscript {
+					ep.hasTranscript = true
+				}
 			} else if ce, ok := cachedByName[fn]; ok {
 				ep.title = ce.Title
 				ep.publishedAt = ce.PublishedAt
 				ep.duration = ce.Duration
 				ep.season = ce.Season
 				ep.episode = ce.Episode
+				if ce.HasTranscript {
+					ep.hasTranscript = true
+				}
 			}
 			episodes = append(episodes, ep)
 		}
@@ -164,6 +178,7 @@ func savePodcastToCache(pod *tuiPodcast) {
 			Season:        season,
 			Episode:       episode,
 			HasAdsRemoved: ep.hasAdsRemoved,
+			HasTranscript: ep.hasTranscript,
 		})
 	}
 

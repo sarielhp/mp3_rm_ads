@@ -83,7 +83,10 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 	}
 
 	workDir := workDirFor(outputFile)
-	os.MkdirAll(workDir, 0755)
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		fmt.Fprintf(os.Stderr, "Error creating work directory '%s': %v\n", workDir, err)
+		return
+	}
 	tempOutputFile := filepath.Join(workDir, filepath.Base(outputFile)+".tmp"+filepath.Ext(outputFile))
 	verifyTempFile(tempOutputFile)
 
@@ -106,7 +109,10 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 
 		newDuration := getAudioDuration(outputFile)
 		actualCut := totalDuration - newDuration
-		pctCut := actualCut / totalDuration * 100
+		pctCut := 0.0
+		if totalDuration > 0 {
+			pctCut = actualCut / totalDuration * 100
+		}
 		fileTotalDuration := time.Since(fileStartTime)
 
 		if !cli.Quiet {

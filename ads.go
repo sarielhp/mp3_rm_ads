@@ -51,27 +51,26 @@ type llmChoice struct {
 	Message llmMessage `json:"message"`
 }
 
-func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
+func callLLMChat(profile LLMProfile, sysPrompt, userPrompt string, maxTokens int, timeout time.Duration, quiet bool) (string, error) {
 	payload := llmRequest{
 		Model: profile.Model,
 		Messages: []llmMessage{
-			{Role: "system", Content: systemPrompt},
-			{Role: "user", Content: fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)},
+			{Role: "system", Content: sysPrompt},
+			{Role: "user", Content: userPrompt},
 		},
 		Temperature: 0.1,
+		MaxTokens:   maxTokens,
 	}
 
 	body, err := json.Marshal(payload)
 	if err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
-		return nil
+		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	client := &http.Client{Timeout: 300 * time.Second}
+	client := &http.Client{Timeout: timeout}
 	req, err := http.NewRequest("POST", profile.URL, bytes.NewReader(body))
 	if err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
-		return nil
+		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 
@@ -85,37 +84,40 @@ func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
 
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
-		return nil
+		return "", err
 	}
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(resp.Body)
-		fmt.Printf("Server returned status code %d: %s\n", resp.StatusCode, string(respBody))
-		return nil
+		return "", fmt.Errorf("server returned status code %d: %s", resp.StatusCode, string(respBody))
 	}
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
-		return nil
+		return "", fmt.Errorf("failed to read response: %w", err)
 	}
 
 	var llmResp llmResponse
 	if err := json.Unmarshal(respBody, &llmResp); err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
-		return nil
+		return "", fmt.Errorf("failed to unmarshal response: %w", err)
 	}
 
 	if len(llmResp.Choices) == 0 {
-		return nil
+		return "", fmt.Errorf("no choices in response")
 	}
 
-	content := llmResp.Choices[0].Message.Content
+	return llmResp.Choices[0].Message.Content, nil
+}
 
-	ads := extractJSONArray(content)
-	return ads
+func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
+	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
+	content, err := callLLMChat(profile, systemPrompt, userPrompt, 0, 300*time.Second, false)
+	if err != nil {
+		fmt.Printf("Warning during LLM ad detection: %v\n", err)
+		return nil
+	}
+	return extractJSONArray(content)
 }
 
 func extractJSONArray(content string) []AdSegment {
@@ -132,8 +134,25 @@ func extractJSONArray(content string) []AdSegment {
 
 	end := -1
 	depth := 0
+	inString := false
+	escaped := false
+
 	for i := start; i < len(content); i++ {
-		switch content[i] {
+		c := content[i]
+		if inString {
+			if escaped {
+				escaped = false
+			} else if c == '\\' {
+				escaped = true
+			} else if c == '"' {
+				inString = false
+			}
+			continue
+		}
+
+		switch c {
+		case '"':
+			inString = true
 		case '[':
 			depth++
 		case ']':
@@ -156,80 +175,14 @@ func extractJSONArray(content string) []AdSegment {
 }
 
 func extractKeywordsLLM(transcriptText string, profile LLMProfile, quiet bool) string {
-	payload := llmRequest{
-		Model: profile.Model,
-		Messages: []llmMessage{
-			{Role: "system", Content: keywordExtractionPrompt},
-			{Role: "user", Content: fmt.Sprintf("Extract keywords from this podcast transcript segment:\n\n%s", transcriptText)},
-		},
-		Temperature: 0.1,
-		MaxTokens:   200,
-	}
-
-	body, err := json.Marshal(payload)
+	userPrompt := fmt.Sprintf("Extract keywords from this podcast transcript segment:\n\n%s", transcriptText)
+	content, err := callLLMChat(profile, keywordExtractionPrompt, userPrompt, 200, 60*time.Second, quiet)
 	if err != nil {
 		if !quiet {
 			fmt.Printf("Warning during keyword extraction: %v\n", err)
 		}
 		return ""
 	}
-
-	client := &http.Client{Timeout: 60 * time.Second}
-	req, err := http.NewRequest("POST", profile.URL, bytes.NewReader(body))
-	if err != nil {
-		if !quiet {
-			fmt.Printf("Warning during keyword extraction: %v\n", err)
-		}
-		return ""
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	apiKey := profile.APIKey
-	if apiKey == "" {
-		apiKey = envOr("OPENROUTER_API_KEY", "")
-	}
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
-	}
-
-	resp, err := client.Do(req)
-	if err != nil {
-		if !quiet {
-			fmt.Printf("Warning during keyword extraction: %v\n", err)
-		}
-		return ""
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		if !quiet {
-			fmt.Printf("Keyword extraction LLM returned status %d: %s\n", resp.StatusCode, string(respBody))
-		}
-		return ""
-	}
-
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		if !quiet {
-			fmt.Printf("Warning during keyword extraction: %v\n", err)
-		}
-		return ""
-	}
-
-	var llmResp llmResponse
-	if err := json.Unmarshal(respBody, &llmResp); err != nil {
-		if !quiet {
-			fmt.Printf("Warning during keyword extraction: %v\n", err)
-		}
-		return ""
-	}
-
-	if len(llmResp.Choices) == 0 {
-		return ""
-	}
-
-	content := llmResp.Choices[0].Message.Content
 
 	var keywords []string
 	current := ""

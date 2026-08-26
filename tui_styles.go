@@ -112,6 +112,18 @@ var (
 			Background(lipgloss.Color("#2e2a4a")).
 			Padding(0, 1)
 
+	tuiBadgeTranscript = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(colorDarkBg).
+				Background(colorCyan).
+				Padding(0, 1)
+
+	tuiBadgePolicy = lipgloss.NewStyle().
+			Bold(true).
+			Foreground(colorDarkBg).
+			Background(colorPurple).
+			Padding(0, 1)
+
 	tuiBadgeDuration = lipgloss.NewStyle().
 				Foreground(colorBlue).
 				Background(lipgloss.Color("#1f2d3d")).

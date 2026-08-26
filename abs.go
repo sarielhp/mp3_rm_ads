@@ -105,6 +105,7 @@ func absLogin(cfg Config) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("connection failed: %w", err)
 	}
+	defer resp.Body.Close()
 	data, err := io.ReadAll(io.LimitReader(resp.Body, 10*1024*1024))
 	if err != nil {
 		return "", fmt.Errorf("failed to read login response: %w", err)

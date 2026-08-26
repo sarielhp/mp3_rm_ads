@@ -1,18 +1,12 @@
 package main
 
 import (
-	"bytes"
 	"flag"
 	"fmt"
-	"io"
-	"mime/multipart"
-	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/sarielhp/clihelp"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -27,7 +21,9 @@ func main() {
 	}()
 
 	if len(os.Args) <= 1 {
-		buildUsageApp().PrintGlobalUsage()
+		// Let clihelp handle the help display automatically
+		app := buildUsageApp()
+		app.Execute(os.Args[1:])
 		return
 	}
 
@@ -149,7 +145,9 @@ func main() {
 		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
 			printConfig(config)
 		} else {
-			buildUsageApp().PrintCommandUsage("config")
+			// Let clihelp handle the help display automatically
+			app := buildUsageApp()
+			app.Execute([]string{"config"})
 		}
 		return
 	}
@@ -180,7 +178,9 @@ func main() {
 			dir = args[0]
 		}
 		if dir == "" {
-			buildUsageApp().PrintCommandUsage("tui")
+			// Let clihelp handle the help display automatically
+			app := buildUsageApp()
+			app.Execute([]string{"tui"})
 			os.Exit(1)
 		}
 		bk := &TuiBackend{
@@ -215,33 +215,103 @@ func main() {
 		fmt.Printf("Scanning: %s\n", dir)
 	}
 
+	if cli.IsTimelineCommand {
+		targetDir := "."
+		if len(args) > 0 {
+			targetDir = args[0]
+		} else if config.PodcastsDir != "" {
+			targetDir = config.PodcastsDir
+		}
+		podcasts, err := loadTUIPodcasts(targetDir)
+		if err != nil || len(podcasts) == 0 {
+			podDir, _ := filepath.Abs(targetDir)
+			podName := filepath.Base(podDir)
+			pod := tuiPodcast{name: podName, dir: podDir}
+			mp3Files, _ := filepath.Glob(filepath.Join(podDir, "*.mp3"))
+			for _, mp3 := range mp3Files {
+				base := strings.TrimSuffix(mp3, ".mp3")
+				hasCut := false
+				if _, err := os.Stat(base + ".cuts.json"); err == nil {
+					hasCut = true
+				}
+				hasTx := false
+				if _, err := os.Stat(base + ".transcript.json"); err == nil {
+					hasTx = true
+				} else if _, err := os.Stat(base + ".transcript.txt"); err == nil {
+					hasTx = true
+				}
+				var fSize int64
+				var modTime time.Time
+				if fi, err := os.Stat(mp3); err == nil {
+					fSize = fi.Size()
+					modTime = fi.ModTime()
+				}
+				pod.episodes = append(pod.episodes, tuiEpisode{
+					filename:      filepath.Base(mp3),
+					path:          mp3,
+					hasAdsRemoved: hasCut,
+					hasTranscript: hasTx,
+					fileSize:      fSize,
+					modTime:       modTime,
+				})
+			}
+			if len(pod.episodes) > 0 {
+				podcasts = []tuiPodcast{pod}
+			}
+		}
+		if len(podcasts) == 0 {
+			if !cli.Quiet {
+				fmt.Printf("No podcast episodes found in '%s'.\n", targetDir)
+			}
+			return
+		}
+		for _, pod := range podcasts {
+			releases := getPodcastLastEpisodesOnlineTimeline(pod, 20)
+			fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
+		}
+		return
+	}
+
 	if cli.IsDirCommand {
 		if len(args) == 0 {
-			buildUsageApp().PrintCommandUsage("dir")
+			// Let clihelp handle the help display automatically
+			app := buildUsageApp()
+			app.Execute([]string{"dir"})
 			os.Exit(1)
 		}
 		dir := args[0]
 		printScanning(dir)
 		removeWorkDirs(dir)
-		mp3Files := findMP3Files(dir)
-		if len(mp3Files) == 0 {
+		rawMp3Files := findMP3Files(dir)
+		podCfg := loadPodcastConfig(dir)
+		mp3Files := filterMP3FilesByPodcastConfig(rawMp3Files, dir, podCfg)
+		if len(rawMp3Files) == 0 {
 			if !cli.Quiet {
 				fmt.Printf("No MP3 files found in directory '%s'.\n", dir)
+			}
+			return
+		}
+		if len(mp3Files) == 0 && podCfg.AdRemoval == AdRemovalNone {
+			if !cli.Quiet {
+				fmt.Printf("Podcast config set to 'none' (No ad removal). Skipping ad removal for '%s'.\n", dir)
 			}
 			return
 		}
 		expandedArgs = mp3Files
 	} else if cli.IsFileCommand {
 		if len(args) == 0 {
-			buildUsageApp().PrintCommandUsage("file")
+			app := buildUsageApp()
+			app.Execute([]string{"file"})
 			os.Exit(1)
 		}
 		expandedArgs = args
 	} else if len(args) == 0 {
-		buildUsageApp().PrintGlobalUsage()
+		app := buildUsageApp()
+		app.Execute([]string{})
 		return
 	} else {
-		buildUsageApp().PrintGlobalUsage()
+		app := buildUsageApp()
+		app.Execute([]string{})
 		os.Exit(1)
 	}
 
@@ -468,7 +538,10 @@ func main() {
 
 			newDuration := getAudioDuration(outputFile)
 			actualCut := totalDuration - newDuration
-			pctCut := actualCut / totalDuration * 100
+			pctCut := 0.0
+			if totalDuration > 0 {
+				pctCut = actualCut / totalDuration * 100
+			}
 			fileTotalDuration := time.Since(fileStartTime)
 
 			if !cli.Quiet {
@@ -511,428 +584,5 @@ func removeWorkDirs(dir string) {
 				removeWorkDirs(path)
 			}
 		}
-	}
-}
-
-func wakeWhisperServer(whisperURL string, quiet bool) {
-	if whisperURL == "" {
-		return
-	}
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", whisperURL, nil)
-	if err != nil {
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	resp.Body.Close()
-}
-
-func testWhisperServer(whisperURL string, quiet bool) bool {
-	return testWhisperServerEx(whisperURL, 5, 3*time.Second, quiet)
-}
-
-func testWhisperServerEx(whisperURL string, maxRetries int, retryDelay time.Duration, quiet bool) bool {
-	if whisperURL == "" {
-		fmt.Println("ERROR: whisper_url is not configured in config file.")
-		return false
-	}
-
-	if !quiet {
-		fmt.Printf("Testing whisper server at: %s\n", whisperURL)
-	}
-
-	pcmData := make([]byte, 3200)
-	header := buildWavHeader(len(pcmData))
-	audioContent := append(header, pcmData...)
-
-	var lastErr error
-	var lastStatus int
-	var lastResponseBody string
-
-	client := &http.Client{Timeout: 10 * time.Second}
-
-	for attempt := 1; attempt <= maxRetries; attempt++ {
-		wakeWhisperServer(whisperURL, true)
-
-		boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
-		var buf bytes.Buffer
-		w := multipart.NewWriter(&buf)
-		w.SetBoundary(boundary)
-		fw, _ := w.CreateFormFile("file", "test.wav")
-		fw.Write(audioContent)
-		w.WriteField("response_format", "verbose_json")
-		w.WriteField("temperature", "0.0")
-		w.Close()
-
-		req, err := http.NewRequest("POST", whisperURL, &buf)
-		if err != nil {
-			if !quiet {
-				fmt.Printf("ERROR: Failed to create request: %v\n", err)
-			}
-			return false
-		}
-		req.Header.Set("Content-Type", w.FormDataContentType())
-
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < maxRetries {
-				if !quiet {
-					fmt.Printf("Attempt %d/%d: Connection error: %v (server may be sleeping, retrying in %v...)\n",
-						attempt, maxRetries, err, retryDelay)
-				}
-				time.Sleep(retryDelay)
-				continue
-			}
-			break
-		}
-
-		body, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
-		lastStatus = resp.StatusCode
-		lastResponseBody = string(body)
-
-		if resp.StatusCode == http.StatusOK {
-			fmt.Println("SUCCESS: Whisper server responded OK (200)")
-			return true
-		}
-
-		if resp.StatusCode >= 500 && attempt < maxRetries {
-			if !quiet {
-				fmt.Printf("Attempt %d/%d: Server returned status %d: %s (server may be waking up, retrying in %v...)\n",
-					attempt, maxRetries, resp.StatusCode, lastResponseBody, retryDelay)
-			}
-			time.Sleep(retryDelay)
-			continue
-		}
-
-		fmt.Printf("FAIL: Server returned status %d: %s\n", resp.StatusCode, lastResponseBody)
-		return false
-	}
-
-	if lastErr != nil {
-		fmt.Printf("FAIL: Could not connect to Whisper server at '%s' after %d attempt(s): %v\n", whisperURL, maxRetries, lastErr)
-	} else {
-		fmt.Printf("FAIL: Server at '%s' returned status %d after %d attempt(s): %s\n", whisperURL, lastStatus, maxRetries, lastResponseBody)
-	}
-	return false
-}
-
-func parseFlags() CLIOptions {
-	cli := CLIOptions{
-		SaveTranscript: true,
-	}
-
-	args := os.Args[1:]
-
-	var detectedCommand string
-	if len(args) > 0 {
-		switch args[0] {
-		case "config":
-			cli.IsConfigCommand = true
-			detectedCommand = "config"
-			args = args[1:]
-		case "dir":
-			cli.IsDirCommand = true
-			detectedCommand = "dir"
-			args = args[1:]
-		case "file":
-			cli.IsFileCommand = true
-			detectedCommand = "file"
-			args = args[1:]
-		case "tui":
-			cli.IsTUICommand = true
-			detectedCommand = "tui"
-			args = args[1:]
-		case "cache":
-			cli.IsCacheCommand = true
-			detectedCommand = "cache"
-			args = args[1:]
-			if len(args) > 0 && (args[0] == "reset" || args[0] == "clear" || args[0] == "clean") {
-				cli.ResetCache = true
-				args = args[1:]
-			} else {
-				cli.ResetCache = true
-			}
-		case "test":
-			cli.IsTestCommand = true
-			detectedCommand = "test"
-			args = args[1:]
-			if len(args) > 0 && (args[0] == "whisper" || args[0] == "whisper-server") {
-				cli.TestWhisper = true
-				args = args[1:]
-			} else if len(args) > 0 && args[0] == "abs" {
-				args = args[1:]
-				if len(args) > 0 && args[0] == "map" {
-					cli.TestABSMap = true
-					args = args[1:]
-				} else if len(args) > 0 && args[0] == "download" {
-					cli.TestABSDownload = true
-					args = args[1:]
-				} else {
-					cli.TestABS = true
-				}
-			} else if len(args) > 0 && args[0] == "kitty" {
-				cli.TestKitty = true
-				args = args[1:]
-			} else {
-				cli.TestWhisper = true
-			}
-		case "test-whisper":
-			cli.IsTestCommand = true
-			cli.TestWhisper = true
-			detectedCommand = "test"
-			args = args[1:]
-		case "test-abs":
-			cli.IsTestCommand = true
-			cli.TestABS = true
-			detectedCommand = "test"
-			args = args[1:]
-		case "test-abs-map":
-			cli.IsTestCommand = true
-			cli.TestABSMap = true
-			detectedCommand = "test"
-			args = args[1:]
-		case "test-abs-download":
-			cli.IsTestCommand = true
-			cli.TestABSDownload = true
-			detectedCommand = "test"
-			args = args[1:]
-		case "test-kitty":
-			cli.IsTestCommand = true
-			cli.TestKitty = true
-			detectedCommand = "test"
-			args = args[1:]
-		}
-	}
-
-	for _, a := range args {
-		switch a {
-		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
-			if detectedCommand != "" {
-				buildUsageApp().PrintCommandUsage(detectedCommand)
-			} else {
-				buildUsageApp().PrintGlobalUsage()
-			}
-			os.Exit(0)
-		}
-	}
-
-	testWhisperCmd := cli.TestWhisper
-	testABSCmd := cli.TestABS
-	testABSMapCmd := cli.TestABSMap
-	testABSDownloadCmd := cli.TestABSDownload
-	testKittyCmd := cli.TestKitty
-	isTestCmd := cli.IsTestCommand
-
-	flag.CommandLine = flag.NewFlagSet(os.Args[0], flag.ExitOnError)
-
-	flag.StringVar(&cli.Output, "o", "", "Output MP3 path or directory")
-	flag.StringVar(&cli.Output, "output", "", "Output MP3 path or directory")
-	flag.BoolVar(&cli.Quiet, "q", false, "Suppress progress and informational output")
-	flag.BoolVar(&cli.Quiet, "quiet", false, "Suppress progress and informational output")
-	flag.BoolVar(&cli.Verbose, "v", false, "Verbose output (show detailed info)")
-	flag.BoolVar(&cli.Verbose, "verbose", false, "Verbose output (show detailed info)")
-	flag.BoolVar(&cli.Silent, "s", false, "Suppress output unless error occurs")
-	flag.BoolVar(&cli.Silent, "silent", false, "Suppress output unless error occurs")
-	flag.BoolVar(&cli.ExportSRT, "srt", false, "Export/convert transcript JSON to SubRip (.srt)")
-	flag.BoolVar(&cli.ExportTXT, "txt", false, "Export/convert transcript JSON to text (.txt)")
-	flag.BoolVar(&cli.Recut, "recut", false, "Recut audio using .cuts.json (no Whisper/LLM)")
-	flag.BoolVar(&cli.SaveTranscript, "no-transcript", false, "Disable saving default .transcript.json file")
-	flag.BoolVar(&cli.UseChunks, "use-chunks", false, "Split long audio into chunks for reliable transcription")
-	flag.BoolVar(&cli.ExtractKeywords, "extract-keywords", false, "Extract keywords via LLM to improve Whisper accuracy")
-	flag.StringVar(&cli.TranscribeMin, "t", "", "Only transcribe first N minutes (e.g. -t 10m)")
-	flag.StringVar(&cli.TranscribeMin, "transcribe-minutes", "", "Only transcribe first N minutes (e.g. -t 10m)")
-	flag.BoolVar(&cli.ForceLLM, "force-llm", false, "Force re-running LLM ad detection even if .cuts.json exists")
-	flag.BoolVar(&cli.ForceTranscribe, "force-transcribe", false, "Force re-transcribing audio even if .transcript.json exists")
-	flag.StringVar(&cli.UseLLM, "use-llm", "", "Select active LLM profile by ID or name")
-	flag.StringVar(&cli.UseLLM, "profile", "", "Select active LLM profile by ID or name")
-	flag.IntVar(&cli.SetDefault, "set-default", 0, "Set default LLM profile ID in config file")
-	flag.StringVar(&cli.PodcastsDir, "podcasts_dir", "", "Set default podcasts/media directory in config file")
-	flag.StringVar(&cli.PodcastsDir, "podcasts-dir", "", "Set default podcasts/media directory in config file")
-	flag.BoolVar(&cli.ListLLMs, "list-llms", false, "List all configured LLM profiles and exit")
-	flag.BoolVar(&cli.ListLLMs, "list-profiles", false, "List all configured LLM profiles and exit")
-	flag.BoolVar(&cli.CopyOpenCode, "copy_llm_from_opencode", false, "Import LLM settings from OpenCode config")
-	flag.StringVar(&cli.ABSURL, "abs-url", "", "Audiobookshelf server URL")
-	flag.StringVar(&cli.ABSUser, "abs-user", "", "Audiobookshelf username")
-	flag.StringVar(&cli.ABSPass, "abs-pass", "", "Audiobookshelf password")
-	flag.BoolVar(&cli.ResetCache, "reset-cache", false, "Reset and purge all cached podcast metadata and cover images")
-	var testWhisperFlag bool
-	flag.BoolVar(&testWhisperFlag, "test-whisper", false, "Test whisper server connection and exit")
-	var testABSFlag bool
-	flag.BoolVar(&testABSFlag, "test-abs", false, "Test Audiobookshelf server connection and exit")
-
-	flag.Usage = func() {
-		if detectedCommand != "" {
-			buildUsageApp().PrintCommandUsage(detectedCommand)
-		} else {
-			buildUsageApp().PrintGlobalUsage()
-		}
-	}
-	flag.CommandLine.Parse(args)
-
-	if testWhisperCmd || testWhisperFlag || testABSCmd || testABSFlag || testABSMapCmd || testABSDownloadCmd || testKittyCmd || isTestCmd {
-		if testWhisperCmd || testWhisperFlag || isTestCmd {
-			cli.TestWhisper = true
-		}
-		if testABSCmd || testABSFlag {
-			cli.TestABS = true
-		}
-		if testABSMapCmd {
-			cli.TestABSMap = true
-		}
-		if testABSDownloadCmd {
-			cli.TestABSDownload = true
-		}
-		if testKittyCmd {
-			cli.TestKitty = true
-		}
-		cli.IsTestCommand = true
-	}
-
-	flag.Visit(func(f *flag.Flag) {
-		if f.Name == "no-transcript" {
-			cli.SaveTranscript = false
-		}
-		if f.Name == "podcasts_dir" || f.Name == "podcasts-dir" {
-			cli.SetPodcastsDir = true
-		}
-		if f.Name == "abs-url" || f.Name == "abs-user" || f.Name == "abs-pass" {
-			cli.SetABS = true
-		}
-	})
-
-	return cli
-}
-
-func buildUsageApp() *clihelp.App {
-	return &clihelp.App{
-		Name:        "abs",
-		Description: "Automatic Podcast Ad & Sponsor Segment Remover",
-		Commands: []clihelp.Command{
-			{
-				Name:        "file",
-				Description: "Process individual MP3 or transcript JSON files",
-				UsageLine:   "abs file <file1.mp3> [file2.mp3 ...] [options]",
-				Options:     globalOptions(),
-				Examples:    fileExamples(),
-			},
-			{
-				Name:        "dir",
-				Description: "Recursively process all MP3s in a directory",
-				UsageLine:   "abs dir <directory> [options]",
-				Options:     globalOptions(),
-				Examples: []clihelp.Example{
-					{Line: "abs dir ~/podcasts"},
-					{Line: "abs dir ~/podcasts -q"},
-				},
-			},
-			{
-				Name:        "tui",
-				Description: "Interactive TUI browser for podcasts and episodes",
-				UsageLine:   "abs tui [directory]",
-				Options: []clihelp.Option{
-					{Flags: "[directory]", Description: "Podcasts directory (default: podcasts_dir from config)"},
-				},
-				Examples: []clihelp.Example{
-					{Line: "abs tui"},
-					{Line: "abs tui ~/podcasts"},
-				},
-			},
-			{
-				Name:        "config",
-				Description: "Manage configuration",
-				UsageLine:   "abs config [options]",
-				Options: []clihelp.Option{
-					{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
-					{Flags: "--abs-url URL", Description: "Set Audiobookshelf server URL"},
-					{Flags: "--abs-user USER", Description: "Set Audiobookshelf username"},
-					{Flags: "--abs-pass PASS", Description: "Set Audiobookshelf password"},
-					{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
-					{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
-					{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
-				},
-				Examples: []clihelp.Example{
-					{Line: "abs config --podcasts_dir /path/to/podcasts"},
-					{Line: "abs config --abs-url http://192.168.1.100:80"},
-					{Line: "abs config --abs-user admin --abs-pass secret"},
-					{Line: "abs config --list-llms"},
-					{Line: "abs config --set-default 2"},
-					{Line: "abs config --copy_llm_from_opencode"},
-				},
-			},
-			{
-				Name:        "test",
-				Description: "Test external services like Whisper server or Audiobookshelf",
-				UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
-				Options: []clihelp.Option{
-					{Flags: "--test-whisper", Description: "Test whisper server connection with retries"},
-					{Flags: "--test-abs", Description: "Test Audiobookshelf server connection"},
-					{Flags: "--test-abs-map", Description: "Map local podcast files to Audiobookshelf metadata"},
-					{Flags: "--test-abs-download", Description: "Download all ABS data for all MP3 files"},
-					{Flags: "--test-kitty", Description: "Test Kitty image protocol with an image file"},
-				},
-				Examples: []clihelp.Example{
-					{Line: "abs test whisper"},
-					{Line: "abs test abs connect"},
-					{Line: "abs test abs map"},
-					{Line: "abs test abs download"},
-					{Line: "abs test kitty cover.jpg"},
-					{Line: "abs test"},
-				},
-			},
-			{
-				Name:        "cache",
-				Description: "Manage and reset local podcast metadata and cover image cache",
-				UsageLine:   "abs cache [reset|clear]",
-				Options: []clihelp.Option{
-					{Flags: "reset", Description: "Completely purge all cached podcast metadata and cover images"},
-				},
-				Examples: []clihelp.Example{
-					{Line: "abs cache reset"},
-					{Line: "abs cache clear"},
-				},
-			},
-		},
-	}
-}
-
-func globalOptions() []clihelp.Option {
-	return []clihelp.Option{
-		{Flags: "-o, --output PATH", Description: "Output MP3 path or directory"},
-		{Flags: "-q, --quiet", Description: "Suppress progress and informational output"},
-		{Flags: "-v, --verbose", Description: "Verbose output (show detailed info)"},
-		{Flags: "-s, --silent", Description: "Suppress output unless error occurs"},
-		{Flags: "--srt", Description: "Export/convert transcript JSON to SubRip (.srt)"},
-		{Flags: "--txt", Description: "Export/convert transcript JSON to text (.txt)"},
-		{Flags: "--recut", Description: "Recut audio using .cuts.json (no Whisper/LLM)"},
-		{Flags: "--no-transcript", Description: "Disable saving default .transcript.json file"},
-		{Flags: "--use-chunks", Description: "Split long audio into chunks for reliable transcription"},
-		{Flags: "--extract-keywords", Description: "Extract keywords via LLM to improve Whisper accuracy"},
-		{Flags: "-t, --transcribe-minutes Nm", Description: "Only transcribe first N minutes (e.g. -t 10m)"},
-		{Flags: "--force-llm", Description: "Force re-running LLM ad detection even if .cuts.json exists"},
-		{Flags: "--force-transcribe", Description: "Force re-transcribing audio even if .transcript.json exists"},
-		{Flags: "--use-llm ID_OR_NAME", Description: "Select active LLM profile by ID or name"},
-		{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
-		{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
-		{Flags: "--podcasts_dir DIR", Description: "Set default podcasts/media directory in config file"},
-		{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
-		{Flags: "--test-whisper", Description: "Test whisper server connection and exit"},
-		{Flags: "-h, --help", Description: "Show this detailed usage message"},
-	}
-}
-
-func fileExamples() []clihelp.Example {
-	return []clihelp.Example{
-		{Line: "abs file episode.mp3"},
-		{Line: "abs file episode1.mp3 episode2.mp3 episode3.mp3"},
-		{Line: "abs file --recut episode.mp3"},
-		{Line: "abs file -q --srt episode.mp3"},
-		{Line: "abs file episode.transcript.json -srt -txt"},
-		{Line: "abs file --use-llm 2 episode.mp3"},
-		{Line: "abs file --copy_llm_from_opencode"},
 	}
 }

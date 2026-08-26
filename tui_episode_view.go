@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -76,6 +78,9 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		} else {
 			badgeRow += tuiBadgeHasAds.Render("Has Ads") + " "
 		}
+		if ep.hasTranscript {
+			badgeRow += tuiBadgeTranscript.Render("TX Transcribed") + " "
+		}
 		badgeRow += tuiBadgeDuration.Render(totalDurStr) + " "
 		if dateStr != "" {
 			badgeRow += tuiStatStyle.Render(dateStr)
@@ -144,6 +149,21 @@ func (m *tuiModel) drawEpisodeDetail() string {
 
 		rightLines = append(rightLines, "")
 
+		// Ad-Cut Map (if cuts metadata exists)
+		basePath := strings.TrimSuffix(ep.path, ".mp3")
+		cutsFile := basePath + ".cuts.json"
+		if data, err := os.ReadFile(cutsFile); err == nil {
+			var cd CutsData
+			if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
+				dur := ep.duration
+				if dur <= 0 {
+					dur = cd.OriginalDurationSec
+				}
+				rightLines = append(rightLines, renderVisualAdCutTimeline(dur, cd.CutIntervals, rightW-4))
+				rightLines = append(rightLines, "")
+			}
+		}
+
 		// 2. Output Device & Volume
 		rightLines = append(rightLines, tuiLabelStyle.Render("Audio Output & Volume:"))
 		speaker := globalPlayer.CurrentSpeaker
@@ -176,7 +196,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		rightLines = append(rightLines, tuiDividerStyle.Render(strings.Repeat("─", rightW-2)))
 
 		// 4. Key Controls Legend
-		rightLines = append(rightLines, tuiDimStyle.Render("Space Play/Pause │ p Play Episode │ Esc Back │ q Quit"))
+		rightLines = append(rightLines, tuiDimStyle.Render("Space Play/Pause │ p Play │ t Transcript │ Esc Back │ q Quit"))
 		rightLines = append(rightLines, tuiDimStyle.Render("←/→   -30s / +30s │ +/- Volume     │ s Speaker"))
 		rightLines = append(rightLines, tuiDimStyle.Render("↑/↓   Scroll Notes│ n Next in Queue│ m Mute"))
 

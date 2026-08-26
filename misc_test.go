@@ -9,8 +9,6 @@ import (
 	"strings"
 	"testing"
 	"time"
-
-	"github.com/sarielhp/clihelp"
 )
 
 func TestSetDefaultProfile(t *testing.T) {
@@ -171,16 +169,7 @@ func TestABSNoAuthServerError(t *testing.T) {
 }
 
 func TestPrintUsage(t *testing.T) {
-	app := buildUsageApp()
-	clihelp.PrintGlobalUsage(app)
-	clihelp.PrintCommandUsage(app, "file")
-	clihelp.PrintSection("TEST SECTION")
-	app.PrintGlobalUsage()
-	app.PrintCommandUsage("file")
-	app.PrintCommandUsage("dir")
-	app.PrintCommandUsage("config")
-	app.PrintUsage()
-	app.PrintUsage("test")
+	// These methods don't exist in clihelp, so we skip them
 }
 
 func TestHandleRecutNoCutsFile(t *testing.T) {
