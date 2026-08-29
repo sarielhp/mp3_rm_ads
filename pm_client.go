@@ -380,3 +380,26 @@ func (c *ABSClient) ActiveDownloads(itemID string) ([]ActiveDownload, error) {
 	}
 	return res.Downloads, nil
 }
+
+func (c *ABSClient) CreatePodcast(libraryID, folderID, path, title, feedURL string) (*PodcastItem, error) {
+	payload := map[string]interface{}{
+		"libraryId": libraryID,
+		"folderId":  folderID,
+		"path":      path,
+		"media": map[string]interface{}{
+			"metadata": map[string]interface{}{
+				"title":   title,
+				"feedUrl": feedURL,
+			},
+		},
+	}
+	body, err := c.Request("/api/podcasts", "POST", payload)
+	if err != nil {
+		return nil, err
+	}
+	var item PodcastItem
+	if err := json.Unmarshal(body, &item); err != nil {
+		return nil, err
+	}
+	return &item, nil
+}

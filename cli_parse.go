@@ -205,22 +205,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							return nil
 						},
 					},
-					{
-						Name:        "opml",
-						Description: "Generate an OPML file containing RSS feeds of all podcasts on Audiobookshelf",
-						UsageLine:   "abs export opml [options]",
-						Options: []clihelp.Option{
-							clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
-							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
-						},
-						Run: func(ctx *clihelp.Context) error {
-							*action = "server"
-							opts.ServerSubcmd = "opml"
-							opts.Args = ctx.Args
-							return nil
-						},
-					},
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "export"
@@ -234,10 +218,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							opts.ExportFormat = "txt"
 							opts.ExportTXT = true
 							opts.Args = ctx.Args[1:]
-						case "opml":
-							*action = "server"
-							opts.ServerSubcmd = "opml"
-							opts.Args = ctx.Args[1:]
 						default:
 							opts.ExportFormat = "srt"
 							opts.ExportSRT = true
@@ -249,17 +229,71 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			},
 			{
 				Name:        "opml",
-				Description: "Generate an OPML file containing RSS feeds of all podcasts on Audiobookshelf",
-				UsageLine:   "abs opml [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
+				Description: "Import or export podcast subscriptions using OPML files",
+				UsageLine:   "abs opml <command> [args]",
+				Subcommands: []clihelp.Command{
+					{
+						Name:        "import",
+						Description: "Import podcast subscriptions from an OPML file into Audiobookshelf",
+						UsageLine:   "abs opml import <file> [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<file>", Description: "Path to the OPML file to import"},
+						},
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "opml"
+							opts.OPMLSubcmd = "import"
+							if len(ctx.Args) > 0 {
+								opts.OPMLFile = ctx.Args[0]
+							}
+							return nil
+						},
+					},
+					{
+						Name:        "export",
+						Description: "Export all Audiobookshelf podcast RSS feeds into an OPML file",
+						UsageLine:   "abs opml export <file> [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<file>", Description: "Path to write the exported OPML file"},
+						},
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "opml"
+							opts.OPMLSubcmd = "export"
+							if len(ctx.Args) > 0 {
+								opts.OPMLFile = ctx.Args[0]
+							}
+							return nil
+						},
+					},
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
 					opts.ServerSubcmd = "opml"
-					opts.Args = ctx.Args
+					if len(ctx.Args) > 0 {
+						switch strings.ToLower(ctx.Args[0]) {
+						case "import":
+							opts.OPMLSubcmd = "import"
+							if len(ctx.Args) > 1 {
+								opts.OPMLFile = ctx.Args[1]
+							}
+						case "export":
+							opts.OPMLSubcmd = "export"
+							if len(ctx.Args) > 1 {
+								opts.OPMLFile = ctx.Args[1]
+							}
+						default:
+							opts.OPMLFile = ctx.Args[0]
+						}
+					}
 					return nil
 				},
 			},

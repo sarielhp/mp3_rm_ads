@@ -220,6 +220,8 @@ type CLIOptions struct {
 	ABSToken            string
 	Args                []string
 	ServerSubcmd        string
+	OPMLSubcmd          string
+	OPMLFile            string
 	PodcastsOnly        bool
 	EpisodesOnly        bool
 	RemoteFFmpegHost    string

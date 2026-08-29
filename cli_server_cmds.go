@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -164,17 +165,71 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 			},
 			{
 				Name:        "opml",
-				Description: "Generate an OPML file containing RSS feeds of all podcasts on Audiobookshelf",
-				UsageLine:   "abs server opml [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
+				Description: "Import or export podcast subscriptions using OPML files",
+				UsageLine:   "abs server opml <command> [args]",
+				Subcommands: []clihelp.Command{
+					{
+						Name:        "import",
+						Description: "Import podcast subscriptions from an OPML file into Audiobookshelf",
+						UsageLine:   "abs server opml import <file> [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<file>", Description: "Path to the OPML file to import"},
+						},
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "opml"
+							opts.OPMLSubcmd = "import"
+							if len(ctx.Args) > 0 {
+								opts.OPMLFile = ctx.Args[0]
+							}
+							return nil
+						},
+					},
+					{
+						Name:        "export",
+						Description: "Export all Audiobookshelf podcast RSS feeds into an OPML file",
+						UsageLine:   "abs server opml export <file> [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<file>", Description: "Path to write the exported OPML file"},
+						},
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "opml"
+							opts.OPMLSubcmd = "export"
+							if len(ctx.Args) > 0 {
+								opts.OPMLFile = ctx.Args[0]
+							}
+							return nil
+						},
+					},
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
 					opts.ServerSubcmd = "opml"
-					opts.Args = ctx.Args
+					if len(ctx.Args) > 0 {
+						switch strings.ToLower(ctx.Args[0]) {
+						case "import":
+							opts.OPMLSubcmd = "import"
+							if len(ctx.Args) > 1 {
+								opts.OPMLFile = ctx.Args[1]
+							}
+						case "export":
+							opts.OPMLSubcmd = "export"
+							if len(ctx.Args) > 1 {
+								opts.OPMLFile = ctx.Args[1]
+							}
+						default:
+							opts.OPMLFile = ctx.Args[0]
+						}
+					}
 					return nil
 				},
 			},

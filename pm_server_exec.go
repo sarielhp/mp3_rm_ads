@@ -13,7 +13,34 @@ import (
 func handleServerCommand(config Config, cli CLIOptions) {
 	switch cli.ServerSubcmd {
 	case "opml":
-		exportOPML(config, cli)
+		targetFile := cli.OPMLFile
+		if targetFile == "" && cli.Output != "" {
+			targetFile = cli.Output
+		}
+		if targetFile == "" && len(cli.Args) > 0 {
+			targetFile = cli.Args[0]
+		}
+
+		switch cli.OPMLSubcmd {
+		case "import":
+			if targetFile == "" {
+				showOPMLImportUsage()
+				printError("Error: missing required <file> argument for 'abs opml import <file>'.")
+				os.Exit(1)
+			}
+			importOPML(config, targetFile, cli.Quiet, cli.Verbose)
+		case "export":
+			if targetFile == "" {
+				showOPMLExportUsage()
+				printError("Error: missing required <file> argument for 'abs opml export <file>'.")
+				os.Exit(1)
+			}
+			exportOPML(config, targetFile, cli.Quiet, cli.Verbose)
+		default:
+			showOPMLUsage()
+			printError("Error: must specify 'import <file>' or 'export <file>'.")
+			os.Exit(1)
+		}
 		return
 
 	case "scan":

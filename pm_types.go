@@ -6,10 +6,17 @@ import (
 	"strconv"
 )
 
-type Library struct {
+type LibraryFolder struct {
 	ID        string `json:"id"`
-	Name      string `json:"name"`
-	MediaType string `json:"mediaType"`
+	FullPath  string `json:"fullPath"`
+	LibraryID string `json:"libraryId"`
+}
+
+type Library struct {
+	ID        string          `json:"id"`
+	Name      string          `json:"name"`
+	MediaType string          `json:"mediaType"`
+	Folders   []LibraryFolder `json:"folders"`
 }
 
 type AudioFileMetadata struct {
