@@ -101,7 +101,8 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 					var newEpisodes []FeedEpisode
 					if maxIdx+1 < len(sortedCatalog) {
 						for _, ep := range sortedCatalog[maxIdx+1:] {
-							if !isDownloaded(ep) {
+							hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
+							if hasEnc && !isDownloaded(ep) {
 								newEpisodes = append(newEpisodes, ep)
 							}
 						}
@@ -113,7 +114,8 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				} else {
 					var undownloaded []FeedEpisode
 					for _, ep := range sortedCatalog {
-						if !isDownloaded(ep) {
+						hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
+						if hasEnc && !isDownloaded(ep) {
 							undownloaded = append(undownloaded, ep)
 						}
 					}

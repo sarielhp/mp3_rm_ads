@@ -168,6 +168,10 @@ func parseRSSXML(data []byte) ([]FeedEpisode, error) {
 
 	var episodes []FeedEpisode
 	for _, it := range rss.Channel.Items {
+		if it.Enclosure == nil || strings.TrimSpace(it.Enclosure.URL) == "" {
+			continue
+		}
+
 		guid := strings.TrimSpace(it.GUID.Value)
 		if guid == "" {
 			guid = strings.TrimSpace(it.ID)
@@ -189,6 +193,9 @@ func parseRSSXML(data []byte) ([]FeedEpisode, error) {
 		}
 		if it.Enclosure != nil && it.Enclosure.URL != "" {
 			encURL := strings.TrimSpace(it.Enclosure.URL)
+			if strings.HasPrefix(encURL, "http://") {
+				encURL = "https://" + strings.TrimPrefix(encURL, "http://")
+			}
 			ep.EnclosureURL = encURL
 			ep.Enclosure = &FeedEnclosure{
 				URL:  encURL,

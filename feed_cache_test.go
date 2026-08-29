@@ -124,7 +124,7 @@ func TestFetchFeedDirect(t *testing.T) {
 		w.Header().Set("ETag", "\"etag-abc\"")
 		w.Header().Set("Last-Modified", "Mon, 02 Jan 2006 15:04:05 GMT")
 		w.WriteHeader(http.StatusOK)
-		fmt.Fprintln(w, `<rss version="2.0"><channel><title>T</title><item><title>E1</title><guid>g1</guid></item></channel></rss>`)
+		fmt.Fprintln(w, `<rss version="2.0"><channel><title>T</title><item><title>E1</title><guid>g1</guid><enclosure url="https://example.com/e1.mp3" type="audio/mpeg"/></item></channel></rss>`)
 	}))
 	defer ts.Close()
 
