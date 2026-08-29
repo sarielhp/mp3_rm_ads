@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -102,6 +103,19 @@ func normalizeCLIArgs(args []string) []string {
 	return args
 }
 
+func getVersion() string {
+	if data, err := os.ReadFile("VERSION"); err == nil {
+		return strings.TrimSpace(string(data))
+	}
+	if execPath, err := os.Executable(); err == nil {
+		execDir := filepath.Dir(execPath)
+		if data, err := os.ReadFile(filepath.Join(execDir, "VERSION")); err == nil {
+			return strings.TrimSpace(string(data))
+		}
+	}
+	return "0.1.26"
+}
+
 func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	keepVal := -1
 	countVal := -1
@@ -109,6 +123,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	app := &clihelp.App{
 		Name:           "abs",
 		Description:    "Automatic Ad Segment Remover & Podcast Manager",
+		Version:        getVersion(),
 		GlobalNote:     "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
 		AbbrevCommands: true,
 		Pager:          true,
@@ -521,12 +536,23 @@ func parseFlags() (string, CLIOptions) {
 
 	for _, a := range normArgs {
 		switch a {
-		case "tree", "--tree":
+		case "--tree":
 			app := buildCLIApp(&action, &opts)
 			app.RenderTree(clihelp.Options{})
 			os.Exit(0)
 		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
 			app := buildCLIApp(&action, &opts)
+			hasTree := false
+			for _, arg := range normArgs {
+				if arg == "tree" || arg == "--tree" {
+					hasTree = true
+					break
+				}
+			}
+			if hasTree {
+				app.RenderTree(clihelp.Options{})
+				os.Exit(0)
+			}
 			var path []string
 			for _, arg := range normArgs {
 				if arg != "help" && arg != "usage" && !strings.HasPrefix(arg, "-") && arg != "tree" && arg != "--tree" {
