@@ -10,10 +10,10 @@ import (
 func TestPodcastConfigDefaults(t *testing.T) {
 	d := t.TempDir()
 	cfg := loadPodcastConfig(d)
-	if cfg.AdRemoval != AdRemovalNone {
-		t.Errorf("expected default AdRemoval to be %q, got %q", AdRemovalNone, cfg.AdRemoval)
+	if cfg.AdRemoval != AdRemovalAll {
+		t.Errorf("expected default AdRemoval to be %q, got %q", AdRemovalAll, cfg.AdRemoval)
 	}
-	if adRemovalModeLabel(cfg.AdRemoval) != "No ad removal" {
+	if adRemovalModeLabel(cfg.AdRemoval) != "Remove from all episodes" {
 		t.Errorf("unexpected label: %s", adRemovalModeLabel(cfg.AdRemoval))
 	}
 }

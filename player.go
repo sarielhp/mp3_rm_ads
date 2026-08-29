@@ -160,7 +160,6 @@ func (p *AudioPlayer) killProcessLocked() {
 		} else {
 			_ = p.cmd.Process.Kill()
 		}
-		_ = p.cmd.Wait()
 		p.cmd = nil
 	}
 }

@@ -190,6 +190,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
    subdirectory. Find operations must be restricted to this subdirectory.
 10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
     or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
+11. **No CLI Aliases**: Avoid defining command or subcommand aliases in CLI apps (`clihelp`). Each command and subcommand must have a single canonical name to maintain clarity, prevent command-space collisions, and keep documentation consistent.
 
 ## Test Suite
 

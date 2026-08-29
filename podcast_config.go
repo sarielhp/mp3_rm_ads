@@ -24,7 +24,7 @@ type PodcastConfig struct {
 
 func defaultPodcastConfig() PodcastConfig {
 	return PodcastConfig{
-		AdRemoval: AdRemovalNone,
+		AdRemoval: AdRemovalAll,
 	}
 }
 

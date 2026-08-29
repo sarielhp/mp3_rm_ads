@@ -1,0 +1,176 @@
+#!/usr/bin/env ruby
+require 'net/http'
+require 'uri'
+require 'json'
+require 'optparse'
+
+# Parse command line options
+options = {}
+parser = OptionParser.new do |opts|
+  opts.banner = "Usage: ruby abs_to_opml.rb [options]"
+
+  opts.separator ""
+  opts.separator "Detailed Description:"
+  opts.separator "  This script automates the generation of an OPML (Outline Processor Markup Language) file"
+  opts.separator "  containing the RSS feeds of all podcasts hosted on your self-hosted Audiobookshelf (ABS) server."
+  opts.separator "  This file can then be imported directly into podcast players (such as AntennaPod, Pocket Casts,"
+  opts.separator "  or Overcast) to subscribe to all of your self-hosted shows in bulk."
+  opts.separator ""
+  opts.separator "How it works under the hood:"
+  opts.separator "  1. Connects to the Audiobookshelf REST API using the provided API token."
+  opts.separator "  2. Queries all libraries and filters specifically for libraries of type 'podcast'."
+  opts.separator "  3. Iterates through all the podcast shows in those libraries."
+  opts.separator "  4. Checks if the RSS feed is already enabled/open for each podcast."
+  opts.separator "  5. If the feed is closed, the script automatically sends a POST request to"
+  opts.separator "     '/api/feeds/item/<item_id>/open' to open/enable it dynamically on your server."
+  opts.separator "  6. Compiles the feed URLs (using the server URL and the feed's slug/ID)."
+  opts.separator "  7. Outputs a standard XML OPML file containing these subscription entries."
+  opts.separator ""
+  opts.separator "Options:"
+
+  opts.on("-s", "--server URL", "Audiobookshelf server URL (e.g. http://tred:8087)") do |s|
+    options[:server] = s.chomp('/')
+  end
+  opts.on("-t", "--token TOKEN", "Audiobookshelf API Token / Key") do |t|
+    options[:token] = t
+  end
+  opts.on("-o", "--output FILE", "Output OPML file (default: stdout)") do |o|
+    options[:output] = o
+  end
+  
+  opts.on_tail("-h", "--help", "Show this message") do
+    puts opts
+    exit
+  end
+end
+
+parser.parse!
+
+if !options[:server] || !options[:token]
+  puts "Error: Server URL and Token are required.\n\n"
+  puts parser
+  exit 1
+end
+
+server_url = options[:server]
+token = options[:token]
+
+# Helper for GET requests
+def get_json(url, token)
+  uri = URI.parse(url)
+  request = Net::HTTP::Get.new(uri)
+  request["Authorization"] = "Bearer #{token}"
+  request["Content-Type"] = "application/json"
+
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
+    http.request(request)
+  end
+
+  unless response.code == '200'
+    puts "Error: API request to #{url} failed with status #{response.code}."
+    puts response.body
+    exit 1
+  end
+
+  JSON.parse(response.body)
+end
+
+# Helper for POST requests (to open RSS feeds)
+def post_json(url, token, body = {})
+  uri = URI.parse(url)
+  request = Net::HTTP::Post.new(uri)
+  request["Authorization"] = "Bearer #{token}"
+  request["Content-Type"] = "application/json"
+  request.body = body.to_json
+
+  response = Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https') do |http|
+    http.request(request)
+  end
+
+  unless ['200', '201'].include?(response.code)
+    STDERR.puts "Warning: Failed to POST to #{url} (status #{response.code})."
+    return nil
+  end
+
+  JSON.parse(response.body) rescue {}
+end
+
+# 1. Fetch all libraries
+libraries_url = "#{server_url}/api/libraries"
+libraries = get_json(libraries_url, token)
+
+# Filter for podcast libraries
+podcast_libraries = libraries.select { |lib| lib['mediaType'] == 'podcast' }
+
+if podcast_libraries.empty?
+  puts "No podcast libraries found on the server."
+  exit 0
+end
+
+podcasts = []
+
+# 2. Fetch items for each podcast library
+podcast_libraries.each do |lib|
+  lib_id = lib['id']
+  items_url = "#{server_url}/api/libraries/#{lib_id}/items"
+  
+  # Fetch list of items in the library
+  library_data = get_json(items_url, token)
+  items = library_data['results'] || library_data
+
+  items.each do |item|
+    # Get detailed item info to check for RSS feed status
+    item_detail_url = "#{server_url}/api/items/#{item['id']}?include=rssfeed"
+    detail = get_json(item_detail_url, token)
+    
+    title = detail['media']['metadata']['title'] rescue item['media']['metadata']['title']
+    feed_slug = detail['rssFeed']['slug'] rescue nil
+    
+    if detail['rssFeed'].nil?
+      # RSS feed is not open, let's open it automatically via API
+      STDERR.puts "Opening RSS feed for podcast: '#{title}'..."
+      open_feed_url = "#{server_url}/api/feeds/item/#{item['id']}/open"
+      result = post_json(open_feed_url, token)
+      
+      if result && result['slug']
+        feed_slug = result['slug']
+      else
+        # Fallback to item ID if slug isn't returned
+        feed_slug = item['id']
+      end
+    end
+    
+    feed_url = "#{server_url}/feed/#{feed_slug}"
+    podcasts << { title: title, url: feed_url }
+  end
+end
+
+# 3. Generate OPML file structure
+opml_content = []
+opml_content << '<?xml version="1.0" encoding="UTF-8"?>'
+opml_content << '<opml version="2.0">'
+opml_content << '  <head>'
+opml_content << '    <title>Audiobookshelf Podcast Feeds</title>'
+opml_content << '  </head>'
+opml_content << '  <body>'
+opml_content << '    <outline text="Audiobookshelf Podcasts">'
+
+podcasts.each do |podcast|
+  escaped_title = podcast[:title].encode(xml: :attr)
+  escaped_url = podcast[:url].encode(xml: :attr)
+  opml_content << "      <outline type=\"rss\" text=#{escaped_title} xmlUrl=#{escaped_url} />"
+end
+
+opml_content << '    </outline>'
+opml_content << '  </body>'
+opml_content << '</opml>'
+
+output_data = opml_content.join("\n")
+
+if options[:output]
+  File.write(options[:output], output_data)
+  puts "Successfully generated OPML file at: #{options[:output]}"
+  puts "Found and processed #{podcasts.size} podcast feeds."
+else
+  puts output_data
+end

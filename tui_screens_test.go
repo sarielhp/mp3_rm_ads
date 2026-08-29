@@ -236,7 +236,7 @@ func TestTUICyclePodcastConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	m := makeTestModel()
 	m.podcasts[0].dir = tempDir
-	m.podcasts[0].config = defaultPodcastConfig()
+	m.podcasts[0].config = PodcastConfig{AdRemoval: AdRemovalNone}
 	m.screen = screenPodcasts
 	m.podIdx = 0
 

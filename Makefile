@@ -1,9 +1,12 @@
-.PHONY: all check lint test build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split
+.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split
 
 all: check
 
 check:
 	@ruby ./tools/check.rb
+
+ci:
+	@ruby ./tools/check.rb --full
 
 lint:
 	@ruby ./tools/lint.rb
@@ -22,6 +25,12 @@ template:
 
 test:
 	@go test -timeout 30s ./...
+
+race:
+	@go test -race -timeout 30s ./...
+
+vuln:
+	@$$HOME/.go/bin/govulncheck ./...
 
 build:
 	@go build -o abs .

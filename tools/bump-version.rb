@@ -6,10 +6,10 @@ require 'open3'
 root_dir = File.expand_path('..', __dir__)
 Dir.chdir(root_dir)
 
-# Run quality gate silently
-_, _, status = Open3.capture3("ruby tools/check.rb")
+# Run full quality gate (including race detector and vulnerability scan)
+_, _, status = Open3.capture3("ruby tools/check.rb --full")
 unless status.success?
-  puts "✗ Quality Gate failed! Run 'make check' to see details."
+  puts "✗ Full Quality Gate failed! Run 'make ci' or 'make check' to see details."
   exit 1
 end
 
