@@ -1,1 +1,4 @@
 abs
+scratch/
+*.xml
+.work/

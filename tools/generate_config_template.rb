@@ -35,7 +35,7 @@ template = {
       "docker_container" => "",
       "language" => "",
       "prompt" => "",
-      "wake_command" => "/home/sariel/info/misc/26/08/28/gc/cloud8 wake"
+      "wake_command" => "cloud8 wake"
     }
   ],
   "podcasts_dir" => "/path/to/podcasts",

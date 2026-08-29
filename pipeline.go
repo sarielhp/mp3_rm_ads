@@ -8,21 +8,10 @@ import (
 	"time"
 )
 
-func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile LLMProfile, cli CLIOptions, fileStartTime time.Time) {
+func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile LLMProfile, config Config, cli CLIOptions, fileStartTime time.Time) {
 	cutsFile := baseName + ".cuts.json"
 	if !fileExists(cutsFile) {
 		fmt.Fprintf(os.Stderr, "Error: Cut metadata JSON file '%s' not found for recutting.\n", cutsFile)
-		return
-	}
-
-	jsonFile := cli.TranscriptPath
-	if jsonFile == "" {
-		jsonFile = baseName + ".transcript.json"
-	}
-	if fileExists(jsonFile) && !cli.ForceTranscribe && !cli.ForceLLM {
-		if cli.Verbose && !cli.Quiet {
-			fmt.Printf("Skipping '%s' (.transcript.json exists). Use --force-transcribe or --force-llm to reprocess.\n", mainMP3File)
-		}
 		return
 	}
 
@@ -90,7 +79,11 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 	tempOutputFile := filepath.Join(workDir, filepath.Base(outputFile)+".tmp"+filepath.Ext(outputFile))
 	verifyTempFile(tempOutputFile)
 
-	if cutAudioFFmpeg(sourceAudioFile, keepSegments, tempOutputFile) {
+	remoteHost := config.RemoteFFmpegHost
+	if cli.RemoteFFmpegHost != "" {
+		remoteHost = cli.RemoteFFmpegHost
+	}
+	if cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
 		recutDuration := time.Since(t0Recut)
 		if !cli.Quiet && cli.Verbose {
 			fmt.Printf("Audio Recutting finished in %s\n", formatClock(recutDuration.Seconds()))
@@ -132,7 +125,7 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 }
 
 func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOptions, selectedProfile LLMProfile, totalDuration, speedFactor float64, whisperLanguage, whisperPrompt string, id3TagsOut map[string]string, isNewlyTranscribed *bool, t0Step1 *time.Time) (*TranscriptionData, error) {
-	if fileExists(jsonFile) {
+	if fileExists(jsonFile) && !cli.ForceTranscribe {
 		if !cli.Quiet {
 			fmt.Printf("Found existing transcript JSON file: '%s'. Reusing transcript...\n", jsonFile)
 		}

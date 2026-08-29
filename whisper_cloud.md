@@ -39,7 +39,7 @@ Since Tailscale SSH is configured, you can log directly into the VM from any mac
 ```bash
 ssh cloud8
 ```
-*(As a backup, you can also connect via the Google Cloud SDK: `gcloud compute ssh cloud8 --zone=us-central1-a --project=vm-on-cloud-sariel`)*
+*(As a backup, you can also connect via the Google Cloud SDK: `gcloud compute ssh cloud8 --zone=us-central1-a --project=<your-gcp-project>`)*
 
 ### Managing the Docker Container
 Once connected to the `cloud8` VM, use standard Docker commands to manage the container named `whisper`:
@@ -99,4 +99,4 @@ curl -s -X POST "http://cloud8:8000/v1/audio/translations" \
 
 ## 5. Local Orchestration Script
 
-For automated usage (waking the VM, running transcription, saving files, and putting the VM to sleep), utilize the local control script [`cloud8`](file:///home/sariel/info/misc/26/08/28/gc/cloud8) and refer to [`plan.md`](file:///home/sariel/info/misc/26/08/28/gc/plan.md) for architecture specifics.
+For automated usage (waking the VM, running transcription, saving files, and putting the VM to sleep), utilize your cloud management script (e.g. `cloud8 wake` / `cloud8 sleep`) configured in your `config.json`.

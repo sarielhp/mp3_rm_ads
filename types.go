@@ -133,6 +133,7 @@ type Config struct {
 	AudiobookshelfToken    string           `json:"audiobookshelf_token,omitempty"`
 	AudiobookshelfDBPath   string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
 	PostProcessors         []string         `json:"post_processors,omitempty"`
+	RemoteFFmpegHost       string           `json:"remote_ffmpeg_host,omitempty"`
 	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 
@@ -159,10 +160,15 @@ type CLIOptions struct {
 	SaveTranscript    bool
 	ExportSRT         bool
 	ExportTXT         bool
+	ExportFormat      string
 	Recut             bool
+	Force             string
 	ForceLLM          bool
 	ForceTranscribe   bool
 	UseLLM            string
+	ConfigCmd         string
+	ConfigKey         string
+	ConfigVal         string
 	SetDefault        int
 	PodcastsDir       string
 	SetPodcastsDir    bool
@@ -199,24 +205,26 @@ type CLIOptions struct {
 	ListWhispers      bool
 
 	// Merged Library Management Options
-	Count          int
-	CountGiven     bool
-	Podcast        string
-	Fill           bool
-	KeepCount      *int
-	CheckNew       bool
-	Oldest         bool
-	NoWait         bool
-	SqliteDBPath   string
-	ProcessorCmd   string
-	ProcessorValue string
-	DryRun         bool
-	ConfigInfo     bool
-	ABSToken       string
-	Args           []string
-	ServerSubcmd   string
-	PodcastsOnly   bool
-	EpisodesOnly   bool
+	Count               int
+	CountGiven          bool
+	Podcast             string
+	Fill                bool
+	KeepCount           *int
+	CheckNew            bool
+	Oldest              bool
+	NoWait              bool
+	SqliteDBPath        string
+	ProcessorCmd        string
+	ProcessorValue      string
+	DryRun              bool
+	ConfigInfo          bool
+	ABSToken            string
+	Args                []string
+	ServerSubcmd        string
+	PodcastsOnly        bool
+	EpisodesOnly        bool
+	RemoteFFmpegHost    string
+	SetRemoteFFmpegHost bool
 }
 
 type CostInfo struct {

@@ -10,22 +10,6 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func resolveUniquePrefix(word string, candidates []string) string {
-	var matches []string
-	for _, c := range candidates {
-		if c == word {
-			return c
-		}
-		if strings.HasPrefix(c, word) {
-			matches = append(matches, c)
-		}
-	}
-	if len(matches) == 1 {
-		return matches[0]
-	}
-	return ""
-}
-
 func isCommandPathOrPrefix(app *clihelp.App, args []string) bool {
 	if len(args) == 0 {
 		return false
@@ -79,46 +63,7 @@ func normalizeCLIArgs(args []string) []string {
 		return args
 	}
 
-	if args[0] == "test-whisper" {
-		return append([]string{"test", "whisper"}, args[1:]...)
-	}
-	if args[0] == "test-abs" {
-		return append([]string{"test", "abs"}, args[1:]...)
-	}
-	if args[0] == "test-abs-map" {
-		return append([]string{"test", "abs", "map"}, args[1:]...)
-	}
-	if args[0] == "test-kitty" {
-		return append([]string{"test", "kitty"}, args[1:]...)
-	}
-
-	legacyMapping := map[string]string{
-		"scan":         "server scan",
-		"new":          "server scan",
-		"check-new":    "server scan",
-		"new-episodes": "server scan",
-		"rescan":       "server rescan",
-		"list":         "server list",
-		"ls":           "server list",
-		"download":     "server download",
-		"dl":           "server download",
-		"keep":         "server keep",
-		"clean":        "server keep",
-		"purge":        "server keep",
-	}
-
-	var legacyKeys []string
-	for k := range legacyMapping {
-		legacyKeys = append(legacyKeys, k)
-	}
-
 	firstArg := strings.ToLower(args[0])
-
-	if legacyMatched := resolveUniquePrefix(firstArg, legacyKeys); legacyMatched != "" {
-		target := legacyMapping[legacyMatched]
-		parts := strings.Split(target, " ")
-		return append(parts, args[1:]...)
-	}
 
 	var dummyAct string
 	var dummyOpts CLIOptions
@@ -156,11 +101,8 @@ func normalizeCLIArgs(args []string) []string {
 		}
 	}
 
-	if hasMp3 {
-		return append([]string{"file"}, args...)
-	}
-	if hasDir {
-		return append([]string{"dir"}, args...)
+	if hasMp3 || hasDir {
+		return append([]string{"proc"}, args...)
 	}
 	if lastArgNum {
 		return append([]string{"server", "download"}, args...)
@@ -187,40 +129,114 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	countVal := -1
 
 	app := &clihelp.App{
-		Name:           "abs",
-		Description:    "Automatic Ad Segment Remover & Podcast Manager",
-		Version:        getVersion(),
-		GlobalNote:     "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
-		AbbrevCommands: true,
-		Pager:          true,
+		Name:                "abs",
+		Description:         "Automatic Ad Segment Remover & Podcast Manager",
+		Version:             getVersion(),
+		GlobalNote:          "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
+		AbbrevCommands:      true,
+		Pager:               true,
+		InteractiveFallback: true,
 		Commands: []clihelp.Command{
 			{
-				Name:        "file",
-				Description: "Process individual MP3 or transcript JSON files",
-				UsageLine:   "abs file <file1.mp3> [file2.mp3 ...] [options]",
+				Name:        "proc",
+				Description: "Process audio files or directories (recursive) for ad removal",
+				UsageLine:   "abs proc [<path1> ...] [options]",
 				Parameters: []clihelp.Param{
-					{Name: "<file1.mp3> [file2.mp3 ...]", Description: "One or more audio files (.mp3) or existing transcript JSON files (.json) to process"},
+					{Name: "[<path1> ...]", Description: "Optional audio files (.mp3), transcript JSONs (.json), or directories (defaults to configured podcasts_dir)"},
 				},
-				Args:    clihelp.MinimumNArgs(1),
 				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
-					*action = "file"
+					*action = "proc"
 					opts.Args = ctx.Args
 					return nil
 				},
 			},
 			{
-				Name:        "dir",
-				Description: "Recursively process all MP3s in a directory",
-				UsageLine:   "abs dir <directory> [options]",
+				Name:        "recut",
+				Description: "Recut audio files or directories using existing .cuts.json metadata",
+				UsageLine:   "abs recut [<path1> ...] [options]",
 				Parameters: []clihelp.Param{
-					{Name: "<directory>", Description: "The target directory containing MP3 files to recursively process"},
+					{Name: "[<path1> ...]", Description: "Optional audio files (.mp3) or directories with existing .cuts.json metadata (defaults to configured podcasts_dir)"},
 				},
-				Args:    clihelp.ExactArgs(1),
-				Options: getTranscriptionOptions(opts),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs unless an error occurs"),
+					clihelp.String(&opts.RemoteFFmpegHost, "--remote-ffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host"),
+					clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of episodes to recut"),
+				},
 				Run: func(ctx *clihelp.Context) error {
-					*action = "dir"
+					*action = "recut"
+					opts.Recut = true
 					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "export",
+				Description: "Export transcript JSON to SRT subtitles or plain text",
+				UsageLine:   "abs export <srt|txt> <path1> [path2 ...] [options]",
+				Subcommands: []clihelp.Command{
+					{
+						Name:        "srt",
+						Description: "Export transcript JSON to SubRip subtitle (.srt) format",
+						UsageLine:   "abs export srt <path1> [path2 ...] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
+						},
+						Args: clihelp.MinimumNArgs(1),
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Output, "-o, --output <path>", "", "Custom output .srt file path or directory"),
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "export"
+							opts.ExportFormat = "srt"
+							opts.ExportSRT = true
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
+					{
+						Name:        "txt",
+						Description: "Export transcript JSON to plain text (.txt) format",
+						UsageLine:   "abs export txt <path1> [path2 ...] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
+						},
+						Args: clihelp.MinimumNArgs(1),
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Output, "-o, --output <path>", "", "Custom output .txt file path or directory"),
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "export"
+							opts.ExportFormat = "txt"
+							opts.ExportTXT = true
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "export"
+					if len(ctx.Args) > 0 {
+						switch strings.ToLower(ctx.Args[0]) {
+						case "srt":
+							opts.ExportFormat = "srt"
+							opts.ExportSRT = true
+							opts.Args = ctx.Args[1:]
+						case "txt":
+							opts.ExportFormat = "txt"
+							opts.ExportTXT = true
+							opts.Args = ctx.Args[1:]
+						default:
+							opts.ExportFormat = "srt"
+							opts.ExportSRT = true
+							opts.Args = ctx.Args
+						}
+					}
 					return nil
 				},
 			},
@@ -233,25 +249,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
-					clihelp.String(&opts.PodcastsDir, "--podcasts-dir, --podcasts_dir <dir>", "", "Podcasts directory"),
+					clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "tui"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "timeline",
-				Aliases:     []string{"table"},
-				Description: "Display exact online availability timestamps table for recent podcast episodes",
-				UsageLine:   "abs timeline [directory]",
-				Parameters: []clihelp.Param{
-					{Name: "[directory]", Description: "Optional path to podcasts directory"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "timeline"
 					opts.Args = ctx.Args
 					return nil
 				},
@@ -270,25 +271,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					return nil
 				},
 			},
-			{
-				Name:        "cache",
-				Description: "Manage and reset local podcast metadata and cover image cache",
-				UsageLine:   "abs cache [reset|clear]",
-				Parameters: []clihelp.Param{
-					{Name: "[reset|clear]", Description: "Action to perform (reset or clear cache)"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "cache"
-					opts.Args = ctx.Args
-					if len(ctx.Args) > 0 && (ctx.Args[0] == "reset" || ctx.Args[0] == "clear" || ctx.Args[0] == "clean") {
-						opts.ResetCache = true
-					} else {
-						opts.ResetCache = true
-					}
-					return nil
-				},
-			},
+
 			{
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",
@@ -341,15 +324,15 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Subcommands: []clihelp.Command{
 					{
 						Name:        "scan",
-						Aliases:     []string{"new", "check-new", "new-episodes"},
 						Description: "Scan Audiobookshelf for new podcasts (create directories, cache covers) and check for new episodes",
 						UsageLine:   "abs server scan [podcasts_dir] [options]",
 						Parameters: []clihelp.Param{
 							{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
 						},
-						Args: clihelp.MaximumNArgs(1),
+						Args:             clihelp.MaximumNArgs(1),
+						OptionsValidator: clihelp.MutuallyExclusive("--podcasts-only", "--episodes-only"),
 						Options: []clihelp.Option{
-							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+							clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 							clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
 							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -366,7 +349,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					},
 					{
 						Name:        "list",
-						Aliases:     []string{"ls"},
 						Description: "List all available podcasts in Audiobookshelf with episode counts",
 						UsageLine:   "abs server list [options]",
 						Args:        clihelp.NoArgs,
@@ -383,7 +365,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					},
 					{
 						Name:        "download",
-						Aliases:     []string{"dl"},
 						Description: "Download undownloaded episodes for podcasts",
 						UsageLine:   "abs server download [<number>] [options]",
 						Parameters: []clihelp.Param{
@@ -391,7 +372,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						},
 						Args: clihelp.MaximumNArgs(1),
 						Options: []clihelp.Option{
-							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+							clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
 							clihelp.Int(&countVal, "-k, --count <number>", -1, "Number of undownloaded episodes to download"),
 							clihelp.Bool(&opts.Fill, "-f, --fill", false, "Fill gaps in downloaded episodes"),
 							clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Enforce keep count policies"),
@@ -426,7 +407,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					},
 					{
 						Name:        "keep",
-						Aliases:     []string{"clean", "purge"},
 						Description: "Delete older episodes keeping only the latest <number> episodes per podcast",
 						UsageLine:   "abs server keep <number> [options]",
 						Parameters: []clihelp.Param{
@@ -434,8 +414,8 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						},
 						Args: clihelp.ExactArgs(1),
 						Options: []clihelp.Option{
-							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast"),
-							clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Keep policy count"),
+							clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast"),
+							clihelp.Int(&keepVal, "-k, --keep <number>", -1, "Keep policy count"),
 							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
 							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Dry run"),
 							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
@@ -464,11 +444,11 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						UsageLine:   "abs server rescan [options]",
 						Args:        clihelp.NoArgs,
 						Options: []clihelp.Option{
-							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by index or title"),
+							clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by index or title"),
 							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview actions without updating DB"),
 							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed trace outputs"),
 							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress standard output"),
-							clihelp.String(&opts.SqliteDBPath, "--db-path, --sqlite-db-path <path>", "", "Path to absdatabase.sqlite"),
+							clihelp.String(&opts.SqliteDBPath, "--db-path <path>", "", "Path to absdatabase.sqlite"),
 						},
 						Run: func(ctx *clihelp.Context) error {
 							*action = "server"
@@ -477,37 +457,206 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							return nil
 						},
 					},
+					{
+						Name:        "timeline",
+						Description: "Display exact online availability timestamps table for recent podcast episodes",
+						UsageLine:   "abs server timeline [directory]",
+						Parameters: []clihelp.Param{
+							{Name: "[directory]", Description: "Optional path to podcasts directory"},
+						},
+						Args: clihelp.MaximumNArgs(1),
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "timeline"
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
 				},
 			},
 			{
 				Name:        "config",
-				Description: "Manage configuration",
-				UsageLine:   "abs config [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.PodcastsDir, "--podcasts-dir, --podcasts_dir <dir>", "", "Set podcasts directory"),
-					clihelp.String(&opts.ABSURL, "--abs-url, --host <url>", "", "Set Audiobookshelf server URL"),
-					clihelp.String(&opts.ABSUser, "--abs-user <user>", "", "Set Audiobookshelf username"),
-					clihelp.String(&opts.ABSPass, "--abs-pass <pass>", "", "Set Audiobookshelf password"),
-					clihelp.String(&opts.ABSToken, "--abs-token, --token <token>", "", "Set Audiobookshelf API Bearer Token"),
-					clihelp.String(&opts.SqliteDBPath, "--db-path, --sqlite-db-path <path>", "", "Set Audiobookshelf SQLite DB path"),
-					clihelp.Bool(&opts.ListLLMs, "--list-llms, --list-profiles", false, "List LLM profiles"),
-					clihelp.Int(&opts.SetDefault, "--set-default <id>", 0, "Set default LLM profile ID"),
-					clihelp.Bool(&opts.ListWhispers, "--list-whispers, --list-whisper", false, "List Whisper profiles"),
-					clihelp.Int(&opts.SetDefaultWhisper, "--set-default-whisper <id>", 0, "Set default Whisper profile ID"),
-					clihelp.String(&opts.AddWhisper, "--add-whisper <spec>", "", "Add Whisper profile"),
-					clihelp.Int(&opts.RemoveWhisper, "--remove-whisper <id>", 0, "Remove Whisper profile"),
-					clihelp.Bool(&opts.CopyOpenCode, "--copy_llm_from_opencode", false, "Import LLM settings from OpenCode"),
-					clihelp.Bool(&opts.ConfigInfo, "-i, --info", false, "Show detailed config summary info"),
-				},
+				Description: "View and manage application configuration",
+				UsageLine:   "abs config [<subcommand>] [options]",
 				Subcommands: []clihelp.Command{
 					{
+						Name:        "get",
+						Description: "Get the value of a configuration key",
+						UsageLine:   "abs config get <key>",
+						Parameters: []clihelp.Param{
+							{Name: "<key>", Description: "Configuration key name (e.g., 'podcasts-dir', 'remote-ffmpeg', 'abs-url')"},
+						},
+						Args: clihelp.ExactArgs(1),
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "get"
+							opts.ConfigKey = ctx.Args[0]
+							return nil
+						},
+					},
+					{
+						Name:        "set",
+						Description: "Set the value of a configuration key",
+						UsageLine:   "abs config set <key> <value>",
+						Parameters: []clihelp.Param{
+							{Name: "<key>", Description: "Configuration key name"},
+							{Name: "<value>", Description: "New configuration value"},
+						},
+						Args: clihelp.ExactArgs(2),
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "set"
+							opts.ConfigKey = ctx.Args[0]
+							opts.ConfigVal = ctx.Args[1]
+							return nil
+						},
+					},
+					{
+						Name:        "show",
+						Description: "Display current configuration summary table",
+						UsageLine:   "abs config show",
+						Args:        clihelp.NoArgs,
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "show"
+							return nil
+						},
+					},
+					{
+						Name:        "llm",
+						Description: "Manage LLM profiles for ad detection",
+						Subcommands: []clihelp.Command{
+							{
+								Name:        "list",
+								Description: "List all configured LLM profiles",
+								UsageLine:   "abs config llm list",
+								Args:        clihelp.NoArgs,
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "llm-list"
+									return nil
+								},
+							},
+							{
+								Name:        "default",
+								Description: "Set default LLM profile ID",
+								UsageLine:   "abs config llm default <id>",
+								Parameters: []clihelp.Param{
+									{Name: "<id>", Description: "Profile ID to set as default"},
+								},
+								Args: clihelp.ExactArgs(1),
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "llm-default"
+									opts.ConfigVal = ctx.Args[0]
+									return nil
+								},
+							},
+							{
+								Name:        "import",
+								Description: "Import LLM settings from OpenCode",
+								UsageLine:   "abs config llm import",
+								Args:        clihelp.NoArgs,
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "llm-import"
+									return nil
+								},
+							},
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "llm-list"
+							return nil
+						},
+					},
+					{
+						Name:        "whisper",
+						Description: "Manage Whisper transcription profiles",
+						Subcommands: []clihelp.Command{
+							{
+								Name:        "list",
+								Description: "List all configured Whisper profiles",
+								UsageLine:   "abs config whisper list",
+								Args:        clihelp.NoArgs,
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "whisper-list"
+									return nil
+								},
+							},
+							{
+								Name:        "default",
+								Description: "Set default Whisper profile ID",
+								UsageLine:   "abs config whisper default <id>",
+								Parameters: []clihelp.Param{
+									{Name: "<id>", Description: "Whisper profile ID to set as default"},
+								},
+								Args: clihelp.ExactArgs(1),
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "whisper-default"
+									opts.ConfigVal = ctx.Args[0]
+									return nil
+								},
+							},
+							{
+								Name:        "add",
+								Description: "Add a new Whisper profile (name:url:speed[:container[:lang[:prompt]]])",
+								UsageLine:   "abs config whisper add <spec>",
+								Parameters: []clihelp.Param{
+									{Name: "<spec>", Description: "Profile specification formatted string"},
+								},
+								Args: clihelp.ExactArgs(1),
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "whisper-add"
+									opts.ConfigVal = ctx.Args[0]
+									return nil
+								},
+							},
+							{
+								Name:        "del",
+								Description: "Remove a Whisper profile by ID",
+								UsageLine:   "abs config whisper del <id>",
+								Parameters: []clihelp.Param{
+									{Name: "<id>", Description: "Whisper profile ID to delete"},
+								},
+								Args: clihelp.ExactArgs(1),
+								Run: func(ctx *clihelp.Context) error {
+									*action = "config"
+									opts.ConfigCmd = "whisper-del"
+									opts.ConfigVal = ctx.Args[0]
+									return nil
+								},
+							},
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "whisper-list"
+							return nil
+						},
+					},
+					{
+						Name:        "cache",
+						Description: "Manage and reset local podcast metadata and cover image cache",
+						UsageLine:   "abs config cache [reset|clear]",
+						Parameters: []clihelp.Param{
+							{Name: "[reset|clear]", Description: "Action to perform (reset or clear cache)"},
+						},
+						Args: clihelp.MaximumNArgs(1),
+						Run: func(ctx *clihelp.Context) error {
+							*action = "config"
+							opts.ConfigCmd = "cache-reset"
+							return nil
+						},
+					},
+					{
 						Name:        "processor",
-						Aliases:     []string{"processors", "proc"},
 						Description: "Manage post-processing programs",
 						Subcommands: []clihelp.Command{
 							{
 								Name:        "set",
-								Aliases:     []string{"add"},
 								Description: "Add or replace a post-processor program",
 								UsageLine:   "abs config processor set <program>",
 								Parameters: []clihelp.Param{
@@ -523,7 +672,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							},
 							{
 								Name:        "list",
-								Aliases:     []string{"ls"},
 								Description: "List configured post-processor programs",
 								UsageLine:   "abs config processor list",
 								Args:        clihelp.NoArgs,
@@ -535,7 +683,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							},
 							{
 								Name:        "del",
-								Aliases:     []string{"delete", "rm", "remove"},
 								Description: "Remove a post-processor program by number",
 								UsageLine:   "abs config processor del <number>",
 								Parameters: []clihelp.Param{
@@ -559,7 +706,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
-					opts.Args = ctx.Args
+					opts.ConfigCmd = "show"
 					return nil
 				},
 			},
@@ -593,16 +740,14 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs unless an error occurs"),
-		clihelp.Bool(&opts.ExportSRT, "--srt", false, "Export transcript to SubRip (.srt)"),
-		clihelp.Bool(&opts.ExportTXT, "--txt", false, "Export transcript to text (.txt)"),
-		clihelp.Bool(&opts.Recut, "--recut", false, "Recut audio using existing .cuts.json"),
 		clihelp.BoolToggle(&opts.SaveTranscript, "--[no-]transcript", true, "Save default .transcript.json file"),
 		clihelp.Bool(&opts.UseChunks, "--use-chunks", false, "Split long audio into chunks for Whisper"),
 		clihelp.Bool(&opts.ExtractKeywords, "--extract-keywords", false, "Extract keywords to improve transcription"),
 		clihelp.String(&opts.TranscribeMin, "-t, --transcribe-minutes <minutes>", "", "Only transcribe first N minutes (e.g. 10m)"),
-		clihelp.Bool(&opts.ForceLLM, "--force-llm", false, "Force LLM ad detection"),
-		clihelp.Bool(&opts.ForceTranscribe, "--force-transcribe", false, "Force Whisper transcription"),
-		clihelp.String(&opts.UseLLM, "--use-llm, --profile <id_or_name>", "", "Select LLM profile ID or name"),
+		clihelp.String(&opts.Force, "-f, --force <stage>", "", "Force re-running: 'whisper', 'llm', or 'all'"),
+		clihelp.String(&opts.UseLLM, "--profile <id_or_name>", "", "Select LLM profile ID or name"),
+		clihelp.String(&opts.RemoteFFmpegHost, "--remote-ffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host (e.g. cloud8)"),
+		clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of untranscribed episodes to process"),
 	}
 }
 
@@ -636,9 +781,9 @@ func parseFlags() (string, CLIOptions) {
 
 	opts.IsConfigCommand = (action == "config")
 	opts.IsDirCommand = (action == "dir")
-	opts.IsFileCommand = (action == "file")
+	opts.IsFileCommand = (action == "proc" || action == "recut")
 	opts.IsTUICommand = (action == "tui")
-	opts.IsTimelineCommand = (action == "timeline")
+	opts.IsTimelineCommand = (action == "timeline" || (action == "server" && opts.ServerSubcmd == "timeline"))
 	opts.IsTestCommand = (action == "test")
 	opts.IsScanCommand = (action == "scan")
 	opts.IsStatusCommand = (action == "status")

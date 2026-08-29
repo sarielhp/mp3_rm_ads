@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"time"
 )
 
 func execCommand(name string, args ...string) *exec.Cmd {
@@ -73,6 +74,10 @@ func validateWavFile(filePath string) bool {
 }
 
 func cutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile string) bool {
+	return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
+}
+
+func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputFile, remoteHost string) bool {
 	if len(keepSegments) == 0 {
 		return false
 	}
@@ -91,6 +96,39 @@ func cutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile stri
 	}
 
 	filterComplex := filterParts + concatInputs + fmt.Sprintf("concat=n=%d:v=0:a=1[aout]", len(keepSegments))
+
+	if remoteHost != "" {
+		tempID := fmt.Sprintf("abs_%d_%d", time.Now().UnixNano(), os.Getpid())
+		ext := filepath.Ext(absInput)
+		if ext == "" {
+			ext = ".mp3"
+		}
+		remIn := fmt.Sprintf("/tmp/%s_in%s", tempID, ext)
+		remOut := fmt.Sprintf("/tmp/%s_out%s", tempID, filepath.Ext(absOutput))
+
+		scpInCmd := exec.Command("scp", "-B", "-q", absInput, fmt.Sprintf("%s:%s", remoteHost, remIn))
+		if err := scpInCmd.Run(); err != nil {
+			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
+		}
+		defer func() {
+			delCmd := exec.Command("ssh", "-o", "BatchMode=yes", remoteHost, fmt.Sprintf("rm -f %s %s", remIn, remOut))
+			_ = delCmd.Run()
+		}()
+
+		remFFmpegCmd := exec.Command("ssh", "-o", "BatchMode=yes", remoteHost,
+			fmt.Sprintf("ffmpeg -y -loglevel error -i %s -filter_complex %q -map '[aout]' -c:a libmp3lame -b:a 192k %s",
+				remIn, filterComplex, remOut))
+		if err := remFFmpegCmd.Run(); err != nil {
+			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
+		}
+
+		scpOutCmd := exec.Command("scp", "-B", "-q", fmt.Sprintf("%s:%s", remoteHost, remOut), absOutput)
+		if err := scpOutCmd.Run(); err != nil {
+			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
+		}
+
+		return true
+	}
 
 	cmd := exec.Command("ffmpeg", "-y", "-loglevel", "error",
 		"-i", absInput,

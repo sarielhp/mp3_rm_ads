@@ -84,7 +84,9 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 
 	w.WriteField("response_format", "verbose_json")
 	w.WriteField("temperature", "0.0")
-	w.WriteField("language", language)
+	if language != "" && language != "auto" {
+		w.WriteField("language", language)
+	}
 
 	if prompt != "" {
 		w.WriteField("prompt", prompt)

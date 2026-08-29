@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/sarielhp/clihelp"
 )
 
 func TestSetDefaultProfile(t *testing.T) {
@@ -35,9 +37,9 @@ func TestResolveAudioFiles(t *testing.T) {
 func TestParseFlags(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"p", "-q", "--srt", "--txt", "f.mp3"}
+	os.Args = []string{"abs", "proc", "-q", "-f", "whisper", "f.mp3"}
 	_, cli := parseFlags()
-	if !cli.Quiet || !cli.ExportSRT || !cli.ExportTXT {
+	if !cli.Quiet || cli.Force != "whisper" {
 		t.Error("parseFlags failed")
 	}
 }
@@ -45,10 +47,30 @@ func TestParseFlags(t *testing.T) {
 func TestParseFlagsConfigPodcastsDir(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "config", "--podcasts_dir", "/path/to/podcasts"}
+	os.Args = []string{"abs", "config", "set", "podcasts-dir", "/path/to/podcasts"}
 	_, cli := parseFlags()
-	if !cli.IsConfigCommand || cli.PodcastsDir != "/path/to/podcasts" {
-		t.Errorf("expected IsConfigCommand=true, PodcastsDir='/path/to/podcasts', got %v, %q", cli.IsConfigCommand, cli.PodcastsDir)
+	if !cli.IsConfigCommand || cli.ConfigCmd != "set" || cli.ConfigKey != "podcasts-dir" || cli.ConfigVal != "/path/to/podcasts" {
+		t.Errorf("expected IsConfigCommand=true, ConfigCmd='set', ConfigKey='podcasts-dir', ConfigVal='/path/to/podcasts', got %v, %q, %q, %q", cli.IsConfigCommand, cli.ConfigCmd, cli.ConfigKey, cli.ConfigVal)
+	}
+}
+
+func TestParseFlagsExport(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+	os.Args = []string{"abs", "export", "srt", "f.transcript.json"}
+	act, cli := parseFlags()
+	if act != "export" || !cli.ExportSRT || cli.ExportFormat != "srt" {
+		t.Errorf("expected export srt, got %s, %v, %s", act, cli.ExportSRT, cli.ExportFormat)
+	}
+}
+
+func TestParseFlagsRecut(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+	os.Args = []string{"abs", "recut", "f.mp3"}
+	act, cli := parseFlags()
+	if act != "recut" || !cli.Recut {
+		t.Errorf("expected recut, got %s, %v", act, cli.Recut)
 	}
 }
 
@@ -173,7 +195,7 @@ func TestPrintUsage(t *testing.T) {
 }
 
 func TestHandleRecutNoCutsFile(t *testing.T) {
-	handleRecut("t.mp3", "t.mp3", "t.precut", "t_af.mp3", "t", 100, LLMProfile{}, CLIOptions{Quiet: true}, time.Now())
+	handleRecut("t.mp3", "t.mp3", "t.precut", "t_af.mp3", "t", 100, LLMProfile{}, Config{}, CLIOptions{Quiet: true}, time.Now())
 }
 
 func TestHandleTranscribeMinNoTruncate(t *testing.T) {
@@ -243,6 +265,23 @@ func TestTruncateAudioNonexistent(t *testing.T) {
 func TestCutAudioFFmpegEmpty(t *testing.T) {
 	if cutAudioFFmpeg("in", nil, "out") {
 		t.Error("should be false")
+	}
+	if cutAudioFFmpegWithHost("in", nil, "out", "cloud8") {
+		t.Error("should be false")
+	}
+}
+
+func TestSetRemoteFFmpegHost(t *testing.T) {
+	testConfigPath = filepath.Join(t.TempDir(), "config.json")
+	defer func() { testConfigPath = "" }()
+	cfg := defaultConfig
+	setRemoteFFmpegHost(&cfg, "cloud8")
+	if cfg.RemoteFFmpegHost != "cloud8" {
+		t.Errorf("expected cloud8, got %s", cfg.RemoteFFmpegHost)
+	}
+	setRemoteFFmpegHost(&cfg, "")
+	if cfg.RemoteFFmpegHost != "" {
+		t.Errorf("expected empty, got %s", cfg.RemoteFFmpegHost)
 	}
 }
 
@@ -385,11 +424,6 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default test command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
-	os.Args = []string{"abs", "test-whisper"}
-	_, cli = parseFlags()
-	if !cli.IsTestCommand || !cli.TestWhisper {
-		t.Errorf("expected IsTestCommand=true, TestWhisper=true for test-whisper command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
-	}
 }
 
 func TestParseFlagsSilent(t *testing.T) {
@@ -441,6 +475,15 @@ func TestBuildUsageApp(t *testing.T) {
 	}
 	if len(app.Commands) < 5 {
 		t.Errorf("expected at least 5 commands, got %d", len(app.Commands))
+	}
+}
+
+func TestCLIAudit(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+	if err := clihelp.Audit(app); err != nil {
+		t.Fatalf("CLI App audit failed: %v", err)
 	}
 }
 

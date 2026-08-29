@@ -5,11 +5,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/sarielhp/clihelp"
 )
 
 func main() {
@@ -107,57 +107,93 @@ func main() {
 		}
 		return
 
-	case "config":
-		if cli.PodcastsDir != "" {
-			setPodcastsDir(&config, cli.PodcastsDir)
+	case "export":
+		targetArgs := cli.Args
+		if len(targetArgs) == 0 {
+			fmt.Println("No input files or directories specified for export.")
+			return
 		}
-		if cli.ABSURL != "" || cli.ABSUser != "" || cli.ABSPass != "" {
-			setAudiobookshelf(&config, cli.ABSURL, cli.ABSUser, cli.ABSPass)
-		}
-		if cli.ABSToken != "" {
-			config.AudiobookshelfToken = cli.ABSToken
-			saveConfig(config)
-			if !cli.Silent {
-				fmt.Println("Saved Audiobookshelf API token to config.")
+		for _, arg := range targetArgs {
+			fi, err := os.Stat(arg)
+			if err == nil && fi.IsDir() {
+				files, _ := filepath.Glob(filepath.Join(arg, "*.transcript.json"))
+				for _, f := range files {
+					if cli.ExportTXT || cli.ExportFormat == "txt" {
+						convertJSONToTXT(f, nil, 0, cli.Output, cli.Quiet)
+					} else {
+						convertJSONToSRT(f, nil, cli.Output, cli.Quiet)
+					}
+				}
+			} else {
+				jsonPath := arg
+				if !strings.HasSuffix(jsonPath, ".json") {
+					jsonPath = stripExt(arg) + ".transcript.json"
+				}
+				if cli.ExportTXT || cli.ExportFormat == "txt" {
+					convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
+				} else {
+					convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
+				}
 			}
-		}
-		if cli.SqliteDBPath != "" {
-			config.AudiobookshelfDBPath = cli.SqliteDBPath
-			saveConfig(config)
-			if !cli.Silent {
-				fmt.Printf("Saved SQLite DB path to config: %s\n", cli.SqliteDBPath)
-			}
-		}
-		if cli.ProcessorCmd != "" {
-			handleConfigProcessor(&config, cli.ProcessorCmd, cli.ProcessorValue)
-		} else if cli.ConfigInfo {
-			printConfigInfo(config)
-		} else if cli.ListLLMs {
-			listProfiles(config)
-		} else if cli.ListWhispers {
-			listWhispers(config)
-		} else if cli.SetDefault > 0 {
-			setDefaultProfile(&config, cli.SetDefault)
-		} else if cli.SetDefaultWhisper > 0 {
-			setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
-		} else if cli.AddWhisper != "" {
-			addWhisperProfile(&config, cli.AddWhisper)
-		} else if cli.RemoveWhisper > 0 {
-			removeWhisperProfile(&config, cli.RemoveWhisper)
-		} else if cli.CopyOpenCode {
-			copyLLMFromOpenCode(&config)
-		} else {
-			printConfig(config)
 		}
 		return
 
-	case "cache":
-		if err := resetCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
-			os.Exit(1)
-		}
-		if !cli.Quiet {
-			fmt.Println("Cache reset successfully.")
+	case "config":
+		switch cli.ConfigCmd {
+		case "get":
+			handleConfigGet(config, cli.ConfigKey)
+		case "set":
+			if err := handleConfigSet(&config, cli.ConfigKey, cli.ConfigVal); err != nil {
+				fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+				os.Exit(1)
+			}
+		case "show":
+			printConfig(config)
+		case "llm-list":
+			listProfiles(config)
+		case "llm-default":
+			if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+				setDefaultProfile(&config, id)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: Invalid profile ID '%s'\n", cli.ConfigVal)
+				os.Exit(1)
+			}
+		case "llm-import":
+			copyLLMFromOpenCode(&config)
+		case "whisper-list":
+			listWhispers(config)
+		case "whisper-default":
+			if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+				setDefaultWhisperProfile(&config, id)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: Invalid Whisper profile ID '%s'\n", cli.ConfigVal)
+				os.Exit(1)
+			}
+		case "whisper-add":
+			addWhisperProfile(&config, cli.ConfigVal)
+		case "whisper-del":
+			if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+				removeWhisperProfile(&config, id)
+			} else {
+				fmt.Fprintf(os.Stderr, "Error: Invalid Whisper profile ID '%s'\n", cli.ConfigVal)
+				os.Exit(1)
+			}
+		case "cache-reset":
+			if err := resetCache(); err != nil {
+				fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
+				os.Exit(1)
+			}
+			if !cli.Quiet {
+				fmt.Println("Cache reset successfully.")
+			}
+		default:
+			if cli.ProcessorCmd != "" {
+				handleConfigProcessor(&config, cli.ProcessorCmd, cli.ProcessorValue)
+			} else if cli.PodcastsDir != "" {
+				setPodcastsDir(&config, cli.PodcastsDir)
+			} else {
+				printConfig(config)
+			}
 		}
 		return
 
@@ -195,62 +231,6 @@ func main() {
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 			os.Exit(1)
-		}
-		return
-
-	case "timeline":
-		targetDir := "."
-		if len(cli.Args) > 0 {
-			targetDir = cli.Args[0]
-		} else if config.PodcastsDir != "" {
-			targetDir = config.PodcastsDir
-		}
-		podcasts, err := loadTUIPodcasts(targetDir)
-		if err != nil || len(podcasts) == 0 {
-			podDir, _ := filepath.Abs(targetDir)
-			podName := filepath.Base(podDir)
-			pod := tuiPodcast{name: podName, dir: podDir}
-			mp3Files, _ := filepath.Glob(filepath.Join(podDir, "*.mp3"))
-			for _, mp3 := range mp3Files {
-				base := strings.TrimSuffix(mp3, ".mp3")
-				hasCut := false
-				if _, err := os.Stat(base + ".cuts.json"); err == nil {
-					hasCut = true
-				}
-				hasTx := false
-				if _, err := os.Stat(base + ".transcript.json"); err == nil {
-					hasTx = true
-				} else if _, err := os.Stat(base + ".transcript.txt"); err == nil {
-					hasTx = true
-				}
-				var fSize int64
-				var modTime time.Time
-				if fi, err := os.Stat(mp3); err == nil {
-					fSize = fi.Size()
-					modTime = fi.ModTime()
-				}
-				pod.episodes = append(pod.episodes, tuiEpisode{
-					filename:      filepath.Base(mp3),
-					path:          mp3,
-					hasAdsRemoved: hasCut,
-					hasTranscript: hasTx,
-					fileSize:      fSize,
-					modTime:       modTime,
-				})
-			}
-			if len(pod.episodes) > 0 {
-				podcasts = []tuiPodcast{pod}
-			}
-		}
-		if len(podcasts) == 0 {
-			if !cli.Quiet {
-				fmt.Printf("No podcast episodes found in '%s'.\n", targetDir)
-			}
-			return
-		}
-		for _, pod := range podcasts {
-			releases := getPodcastLastEpisodesOnlineTimeline(pod, 20)
-			fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
 		}
 		return
 
@@ -534,15 +514,92 @@ func main() {
 				}
 			}
 			return
+
+		case "timeline":
+			targetDir := "."
+			if len(cli.Args) > 0 {
+				targetDir = cli.Args[0]
+			} else if config.PodcastsDir != "" {
+				targetDir = config.PodcastsDir
+			}
+			podcasts, err := loadTUIPodcasts(targetDir)
+			if err != nil || len(podcasts) == 0 {
+				podDir, _ := filepath.Abs(targetDir)
+				podName := filepath.Base(podDir)
+				pod := tuiPodcast{name: podName, dir: podDir}
+				mp3Files, _ := filepath.Glob(filepath.Join(podDir, "*.mp3"))
+				for _, mp3 := range mp3Files {
+					base := strings.TrimSuffix(mp3, ".mp3")
+					hasCut := false
+					if _, err := os.Stat(base + ".cuts.json"); err == nil {
+						hasCut = true
+					}
+					hasTx := false
+					if _, err := os.Stat(base + ".transcript.json"); err == nil {
+						hasTx = true
+					} else if _, err := os.Stat(base + ".transcript.txt"); err == nil {
+						hasTx = true
+					}
+					var fSize int64
+					var modTime time.Time
+					if fi, err := os.Stat(mp3); err == nil {
+						fSize = fi.Size()
+						modTime = fi.ModTime()
+					}
+					pod.episodes = append(pod.episodes, tuiEpisode{
+						filename:      filepath.Base(mp3),
+						path:          mp3,
+						hasAdsRemoved: hasCut,
+						hasTranscript: hasTx,
+						fileSize:      fSize,
+						modTime:       modTime,
+					})
+				}
+				if len(pod.episodes) > 0 {
+					podcasts = []tuiPodcast{pod}
+				}
+			}
+			if len(podcasts) == 0 {
+				if !cli.Quiet {
+					fmt.Printf("No podcast episodes found in '%s'.\n", targetDir)
+				}
+				return
+			}
+			for _, pod := range podcasts {
+				releases := getPodcastLastEpisodesOnlineTimeline(pod, 20)
+				fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
+			}
+			return
 		}
 
-	case "file", "dir":
+	case "proc", "recut":
+		if action == "recut" {
+			cli.Recut = true
+		}
 		// Fall through
+	}
+
+	if cli.Force != "" {
+		f := strings.ToLower(cli.Force)
+		if f == "all" || strings.Contains(f, "whisper") || strings.Contains(f, "transcribe") {
+			cli.ForceTranscribe = true
+		}
+		if f == "all" || strings.Contains(f, "llm") || strings.Contains(f, "ads") {
+			cli.ForceLLM = true
+		}
 	}
 
 	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 
 	args := cli.Args
+	if len(args) == 0 {
+		if config.PodcastsDir != "" {
+			args = []string{config.PodcastsDir}
+		} else {
+			fmt.Println("ERROR: No files or directories specified, and podcasts_dir is not configured.")
+			return
+		}
+	}
 	var expandedArgs []string
 
 	hasPrintedScanning := false
@@ -557,44 +614,44 @@ func main() {
 		fmt.Printf("Scanning: %s\n", dir)
 	}
 
-	if action == "dir" {
-		if len(args) == 0 {
-			app := buildCLIApp(&action, &cli)
-			app.RenderCommand(clihelp.Options{}, "dir")
-			os.Exit(1)
-		}
-		dir := args[0]
-		printScanning(dir)
-		removeWorkDirs(dir)
-		rawMp3Files := findMP3Files(dir)
-		podCfg := loadPodcastConfig(dir)
-		mp3Files := filterMP3FilesByPodcastConfig(rawMp3Files, dir, podCfg)
-		if len(rawMp3Files) == 0 {
-			if !cli.Quiet {
-				fmt.Printf("No MP3 files found in directory '%s'.\n", dir)
+	for _, arg := range args {
+		fi, err := os.Stat(arg)
+		if err == nil && fi.IsDir() {
+			printScanning(arg)
+			removeWorkDirs(arg)
+			rawMp3Files := findMP3Files(arg)
+			podCfg := loadPodcastConfig(arg)
+			mp3Files := filterMP3FilesByPodcastConfig(rawMp3Files, arg, podCfg)
+			if len(rawMp3Files) == 0 {
+				if !cli.Quiet {
+					fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
+				}
+				continue
 			}
-			return
-		}
-		if len(mp3Files) == 0 && podCfg.AdRemoval == AdRemovalNone {
-			if !cli.Quiet {
-				fmt.Printf("Podcast config set to 'none' (No ad removal). Skipping ad removal for '%s'.\n", dir)
+			if len(mp3Files) == 0 && podCfg.AdRemoval == AdRemovalNone {
+				if !cli.Quiet {
+					fmt.Printf("Podcast config set to 'none' (No ad removal). Skipping ad removal for '%s'.\n", arg)
+				}
+				continue
 			}
-			return
+			expandedArgs = append(expandedArgs, mp3Files...)
+		} else {
+			expandedArgs = append(expandedArgs, arg)
 		}
-		expandedArgs = mp3Files
-	} else {
-		if len(args) == 0 {
-			app := buildCLIApp(&action, &cli)
-			app.RenderCommand(clihelp.Options{}, "file")
-			os.Exit(1)
+	}
+
+	if len(expandedArgs) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No files or directories with audio found to process.")
 		}
-		expandedArgs = args
+		return
 	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
 	batchStartTime := time.Now()
 
 	totalFiles := len(expandedArgs)
+	processedCount := 0
 
 	for idx, inputFile := range expandedArgs {
 		fileStartTime := time.Now()
@@ -622,12 +679,20 @@ func main() {
 
 		shortName := displayName(filepath.Base(inputFile))
 
-		if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM {
+		if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut {
 			if cli.Verbose && !cli.Quiet {
 				fmt.Printf("skipping: %s\n", shortName)
 			}
 			continue
 		}
+
+		if cli.Count > 0 && processedCount >= cli.Count {
+			if !cli.Quiet {
+				fmt.Printf("\nReached maximum episode processing limit (%d). Done.\n", cli.Count)
+			}
+			break
+		}
+		processedCount++
 
 		if !cli.Quiet {
 			if totalFiles > 1 {
@@ -646,7 +711,7 @@ func main() {
 		}
 
 		if cli.Recut {
-			handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, cli, fileStartTime)
+			handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, config, cli, fileStartTime)
 			continue
 		}
 
@@ -795,7 +860,11 @@ func main() {
 		tempOutputFile := filepath.Join(workDir, filepath.Base(outputFile)+".tmp"+filepath.Ext(outputFile))
 		verifyTempFile(tempOutputFile)
 
-		if cutAudioFFmpeg(sourceAudioFile, keepSegments, tempOutputFile) {
+		remoteHost := config.RemoteFFmpegHost
+		if cli.RemoteFFmpegHost != "" {
+			remoteHost = cli.RemoteFFmpegHost
+		}
+		if cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
 			step3Duration := time.Since(t0Step3)
 			if !cli.Quiet && cli.Verbose {
 				fmt.Printf("Step 3/3 (Audio Cutting) finished in %s\n", formatClock(step3Duration.Seconds()))

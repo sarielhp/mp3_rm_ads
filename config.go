@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -26,6 +27,7 @@ var defaultConfig = Config{
 		{ID: 3, Name: "OpenRouter - DeepSeek V4 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "deepseek/deepseek-v4-flash"},
 		{ID: 4, Name: "OpenRouter - Gemini 2.5 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "google/gemini-2.5-flash"},
 	},
+	RemoteFFmpegHost: "cloud8",
 }
 
 func userTmpDir() string {
@@ -155,6 +157,11 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("WHISPER_WAKE_COMMAND"); v != "" {
 		cfg.WhisperWakeCommand = v
 	}
+	if v := os.Getenv("REMOTE_FFMPEG_HOST"); v != "" {
+		cfg.RemoteFFmpegHost = v
+	} else if v := os.Getenv("ABS_REMOTE_FFMPEG"); v != "" {
+		cfg.RemoteFFmpegHost = v
+	}
 }
 
 func resolveActiveWhisperProfile(cfg *Config) {
@@ -246,6 +253,19 @@ func printConfig(cfg Config) {
 	if cfg.AudiobookshelfUser != "" {
 		fmt.Printf("  audiobookshelf_user:      %s\n", cfg.AudiobookshelfUser)
 	}
+	if cfg.RemoteFFmpegHost != "" {
+		fmt.Printf("  remote_ffmpeg_host:       %s\n", cfg.RemoteFFmpegHost)
+	}
+}
+
+func setRemoteFFmpegHost(cfg *Config, host string) {
+	cfg.RemoteFFmpegHost = host
+	saveConfig(*cfg)
+	if host == "" {
+		fmt.Println("Remote FFmpeg host disabled (local cutting enabled).")
+	} else {
+		fmt.Printf("Remote FFmpeg host updated to: '%s'\n", host)
+	}
 }
 
 func setAudiobookshelf(cfg *Config, url, user, pass string) {
@@ -259,6 +279,81 @@ func setAudiobookshelf(cfg *Config, url, user, pass string) {
 		cfg.AudiobookshelfPass = pass
 	}
 	saveConfig(*cfg)
+}
+
+func handleConfigSet(cfg *Config, key, val string) error {
+	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
+	case "podcasts-dir", "podcasts.dir", "dir":
+		cfg.PodcastsDir = val
+	case "abs-url", "abs.url", "audiobookshelf-url", "url":
+		cfg.AudiobookshelfURL = val
+	case "abs-user", "abs.user", "audiobookshelf-user", "user":
+		cfg.AudiobookshelfUser = val
+	case "abs-pass", "abs.pass", "audiobookshelf-pass", "pass":
+		cfg.AudiobookshelfPass = val
+	case "abs-token", "abs.token", "audiobookshelf-token", "token":
+		cfg.AudiobookshelfToken = val
+	case "db-path", "abs.db", "db", "sqlite-db-path":
+		cfg.AudiobookshelfDBPath = val
+	case "remote-ffmpeg", "remote-ffmpeg-host", "ffmpeg-host":
+		cfg.RemoteFFmpegHost = val
+	case "whisper-url", "whisper.url":
+		cfg.WhisperURL = val
+	case "whisper-language", "whisper.language", "language", "lang":
+		cfg.WhisperLanguage = val
+	case "whisper-wake-command", "whisper.wake-command", "wake-command":
+		cfg.WhisperWakeCommand = val
+	case "whisper-speed-factor", "whisper.speed-factor", "speed-factor":
+		if sf, err := strconv.ParseFloat(val, 64); err == nil && sf > 0 {
+			cfg.WhisperSpeedFactor = sf
+		} else {
+			return fmt.Errorf("invalid speed factor: %s", val)
+		}
+	case "active-profile-id", "profile-id", "llm-id":
+		if id, err := strconv.Atoi(val); err == nil && id > 0 {
+			cfg.ActiveProfileID = id
+		} else {
+			return fmt.Errorf("invalid profile id: %s", val)
+		}
+	case "active-whisper-id", "whisper-id":
+		if id, err := strconv.Atoi(val); err == nil && id > 0 {
+			cfg.ActiveWhisperID = id
+		} else {
+			return fmt.Errorf("invalid whisper id: %s", val)
+		}
+	default:
+		return fmt.Errorf("unknown configuration key: '%s'", key)
+	}
+	saveConfig(*cfg)
+	fmt.Printf("Updated '%s' = '%s'\n", key, val)
+	return nil
+}
+
+func handleConfigGet(cfg Config, key string) {
+	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
+	case "podcasts-dir", "podcasts.dir", "dir":
+		fmt.Println(cfg.PodcastsDir)
+	case "abs-url", "abs.url", "audiobookshelf-url", "url":
+		fmt.Println(cfg.AudiobookshelfURL)
+	case "abs-user", "abs.user", "audiobookshelf-user", "user":
+		fmt.Println(cfg.AudiobookshelfUser)
+	case "abs-token", "abs.token", "token":
+		fmt.Println(cfg.AudiobookshelfToken)
+	case "db-path", "abs.db", "db":
+		fmt.Println(cfg.AudiobookshelfDBPath)
+	case "remote-ffmpeg", "remote-ffmpeg-host":
+		fmt.Println(cfg.RemoteFFmpegHost)
+	case "whisper-url", "whisper.url":
+		fmt.Println(cfg.WhisperURL)
+	case "whisper-language", "whisper.language", "lang":
+		fmt.Println(cfg.WhisperLanguage)
+	case "active-profile-id", "llm-id":
+		fmt.Println(cfg.ActiveProfileID)
+	case "active-whisper-id", "whisper-id":
+		fmt.Println(cfg.ActiveWhisperID)
+	default:
+		fmt.Printf("Unknown configuration key: '%s'\n", key)
+	}
 }
 
 func getProfileCost(profile LLMProfile) CostInfo {
