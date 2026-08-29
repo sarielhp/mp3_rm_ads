@@ -26,6 +26,54 @@ func resolveUniquePrefix(word string, candidates []string) string {
 	return ""
 }
 
+func isCommandPathOrPrefix(app *clihelp.App, args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	currentCmds := app.Commands
+	for idx, arg := range args {
+		arg = strings.ToLower(arg)
+		var found *clihelp.Command
+		for i := range currentCmds {
+			if strings.ToLower(currentCmds[i].Name) == arg {
+				found = &currentCmds[i]
+				break
+			}
+			for _, alias := range currentCmds[i].Aliases {
+				if strings.ToLower(alias) == arg {
+					found = &currentCmds[i]
+					break
+				}
+			}
+		}
+		if found != nil {
+			currentCmds = found.Subcommands
+			continue
+		}
+
+		hasPrefixMatch := false
+		for i := range currentCmds {
+			if strings.HasPrefix(strings.ToLower(currentCmds[i].Name), arg) {
+				hasPrefixMatch = true
+				break
+			}
+			for _, alias := range currentCmds[i].Aliases {
+				if strings.HasPrefix(strings.ToLower(alias), arg) {
+					hasPrefixMatch = true
+					break
+				}
+			}
+		}
+		if hasPrefixMatch {
+			if idx == len(args)-1 {
+				return true
+			}
+		}
+		return false
+	}
+	return true
+}
+
 func normalizeCLIArgs(args []string) []string {
 	if len(args) == 0 {
 		return args
@@ -64,10 +112,6 @@ func normalizeCLIArgs(args []string) []string {
 		legacyKeys = append(legacyKeys, k)
 	}
 
-	topLevelCmds := []string{
-		"file", "dir", "tui", "timeline", "table", "status", "cache", "test", "server", "config", "cfg", "help", "usage", "tree",
-	}
-
 	firstArg := strings.ToLower(args[0])
 
 	if legacyMatched := resolveUniquePrefix(firstArg, legacyKeys); legacyMatched != "" {
@@ -76,15 +120,10 @@ func normalizeCLIArgs(args []string) []string {
 		return append(parts, args[1:]...)
 	}
 
-	isTopLevelPrefix := false
-	for _, cmd := range topLevelCmds {
-		if strings.HasPrefix(cmd, firstArg) {
-			isTopLevelPrefix = true
-			break
-		}
-	}
-
-	if isTopLevelPrefix {
+	var dummyAct string
+	var dummyOpts CLIOptions
+	dummyApp := buildCLIApp(&dummyAct, &dummyOpts)
+	if isCommandPathOrPrefix(dummyApp, []string{firstArg}) {
 		return args
 	}
 
