@@ -27,31 +27,33 @@ func normalizeCLIArgs(args []string) []string {
 		return append([]string{"test", "kitty"}, args[1:]...)
 	}
 
+	switch strings.ToLower(args[0]) {
+	case "scan", "new", "check-new", "new-episodes":
+		return append([]string{"server", "scan"}, args[1:]...)
+	case "rescan":
+		return append([]string{"server", "rescan"}, args[1:]...)
+	case "list", "ls":
+		return append([]string{"server", "list"}, args[1:]...)
+	case "download", "dl":
+		return append([]string{"server", "download"}, args[1:]...)
+	case "keep", "clean", "purge":
+		return append([]string{"server", "keep"}, args[1:]...)
+	}
+
 	subcmds := map[string]bool{
-		"file":         true,
-		"dir":          true,
-		"tui":          true,
-		"config":       true,
-		"cfg":          true,
-		"test":         true,
-		"timeline":     true,
-		"table":        true,
-		"cache":        true,
-		"scan":         true,
-		"rescan":       true,
-		"status":       true,
-		"download":     true,
-		"dl":           true,
-		"new":          true,
-		"check-new":    true,
-		"new-episodes": true,
-		"keep":         true,
-		"clean":        true,
-		"purge":        true,
-		"list":         true,
-		"ls":           true,
-		"help":         true,
-		"usage":        true,
+		"file":     true,
+		"dir":      true,
+		"tui":      true,
+		"config":   true,
+		"cfg":      true,
+		"test":     true,
+		"timeline": true,
+		"table":    true,
+		"cache":    true,
+		"status":   true,
+		"server":   true,
+		"help":     true,
+		"usage":    true,
 	}
 
 	if subcmds[strings.ToLower(args[0])] {
@@ -59,7 +61,7 @@ func normalizeCLIArgs(args []string) []string {
 	}
 
 	if _, err := strconv.Atoi(args[0]); err == nil {
-		return append([]string{"download"}, args...)
+		return append([]string{"server", "download"}, args...)
 	}
 
 	hasMp3 := false
@@ -94,7 +96,7 @@ func normalizeCLIArgs(args []string) []string {
 		return append([]string{"dir"}, args...)
 	}
 	if lastArgNum {
-		return append([]string{"download"}, args...)
+		return append([]string{"server", "download"}, args...)
 	}
 
 	return args
@@ -113,7 +115,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "file",
 				Description: "Process individual MP3 or transcript JSON files",
 				UsageLine:   "abs file <file1.mp3> [file2.mp3 ...] [options]",
-				Options:     getTranscriptionOptions(opts),
+				Parameters: []clihelp.Param{
+					{Name: "<file1.mp3> [file2.mp3 ...]", Description: "One or more audio files (.mp3) or existing transcript JSON files (.json) to process"},
+				},
+				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "file"
 					opts.Args = ctx.Args
@@ -124,7 +129,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "dir",
 				Description: "Recursively process all MP3s in a directory",
 				UsageLine:   "abs dir <directory> [options]",
-				Options:     getTranscriptionOptions(opts),
+				Parameters: []clihelp.Param{
+					{Name: "<directory>", Description: "The target directory containing MP3 files to recursively process"},
+				},
+				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "dir"
 					opts.Args = ctx.Args
@@ -135,6 +143,9 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "tui",
 				Description: "Interactive TUI browser for podcasts and episodes",
 				UsageLine:   "abs tui [directory]",
+				Parameters: []clihelp.Param{
+					{Name: "[directory]", Description: "Optional path to podcasts directory (defaults to configured podcasts_dir)"},
+				},
 				Options: []clihelp.Option{
 					clihelp.String(&opts.PodcastsDir, "--podcasts-dir, --podcasts_dir <dir>", "", "Podcasts directory"),
 				},
@@ -149,6 +160,9 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Aliases:     []string{"table"},
 				Description: "Display exact online availability timestamps table for recent podcast episodes",
 				UsageLine:   "abs timeline [directory]",
+				Parameters: []clihelp.Param{
+					{Name: "[directory]", Description: "Optional path to podcasts directory"},
+				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "timeline"
 					opts.Args = ctx.Args
@@ -159,6 +173,9 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "status",
 				Description: "Show a dry-run status report of all podcasts and episodes needing ad removal",
 				UsageLine:   "abs status [podcasts_dir]",
+				Parameters: []clihelp.Param{
+					{Name: "[podcasts_dir]", Description: "Optional path to podcasts directory"},
+				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "status"
 					opts.Args = ctx.Args
@@ -169,6 +186,9 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "cache",
 				Description: "Manage and reset local podcast metadata and cover image cache",
 				UsageLine:   "abs cache [reset|clear]",
+				Parameters: []clihelp.Param{
+					{Name: "[reset|clear]", Description: "Action to perform (reset or clear cache)"},
+				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "cache"
 					opts.Args = ctx.Args
@@ -184,6 +204,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",
 				UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
+				Parameters: []clihelp.Param{
+					{Name: "<whisper|abs|kitty>", Description: "Target service/device to test ('whisper', 'abs', or 'kitty')"},
+					{Name: "[args]", Description: "Optional test arguments (e.g., 'map' or 'download' for abs, or path to an image file for kitty)"},
+				},
 				Options: []clihelp.Option{
 					clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
 					clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
@@ -222,130 +246,142 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 			},
 			{
-				Name:        "scan",
-				Description: "Scan Audiobookshelf for new podcasts, create local directories, and cache covers",
-				UsageLine:   "abs scan [podcasts_dir]",
-				Run: func(ctx *clihelp.Context) error {
-					*action = "scan"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "rescan",
-				Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
-				UsageLine:   "abs rescan [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by index or title"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview actions without updating DB"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed trace outputs"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress standard output"),
-					clihelp.String(&opts.SqliteDBPath, "--db-path, --sqlite-db-path <path>", "", "Path to absdatabase.sqlite"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "rescan"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "list",
-				Aliases:     []string{"ls"},
-				Description: "List all available podcasts in Audiobookshelf with episode counts",
-				UsageLine:   "abs list [options]",
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "list"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "download",
-				Aliases:     []string{"dl"},
-				Description: "Download undownloaded episodes for podcasts",
-				UsageLine:   "abs download [<number>] [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
-					clihelp.Int(&countVal, "-k, --count <number>", -1, "Number of undownloaded episodes to download"),
-					clihelp.Bool(&opts.Fill, "-f, --fill", false, "Fill gaps in downloaded episodes"),
-					clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Enforce keep count policies"),
-					clihelp.BoolToggle(&opts.CheckNew, "--[no-]check-new", true, "Check new episodes published"),
-					clihelp.Bool(&opts.Oldest, "--oldest", false, "Download oldest first"),
-					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed info"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "download"
-					opts.Args = ctx.Args
-					if len(ctx.Args) > 0 {
-						k, err := strconv.Atoi(ctx.Args[0])
-						if err == nil {
-							opts.Count = k
-							opts.CountGiven = true
-						}
-					} else if countVal != -1 {
-						opts.Count = countVal
-						opts.CountGiven = true
-					} else {
-						opts.Count = 1
-					}
-					if keepVal > 0 {
-						opts.KeepCount = &keepVal
-					}
-					return nil
-				},
-			},
-			{
-				Name:        "new",
-				Aliases:     []string{"check-new", "new-episodes"},
-				Description: "Check for new episodes published since last download and queue download",
-				UsageLine:   "abs new [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast"),
-					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for completion"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Dry run"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "new"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "keep",
-				Aliases:     []string{"clean", "purge"},
-				Description: "Delete older episodes keeping only the latest <number> episodes per podcast",
-				UsageLine:   "abs keep <number> [options]",
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast"),
-					clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Keep policy count"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Dry run"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "keep"
-					opts.Args = ctx.Args
-					if len(ctx.Args) > 0 {
-						k, err := strconv.Atoi(ctx.Args[0])
-						if err == nil {
-							opts.KeepCount = &k
-						}
-					} else if keepVal > 0 {
-						opts.KeepCount = &keepVal
-					}
-					if opts.KeepCount == nil {
-						return fmt.Errorf("keep count is required (e.g. abs keep 5)")
-					}
-					return nil
+				Name:        "server",
+				Description: "Manage and interact with the Audiobookshelf server",
+				Subcommands: []clihelp.Command{
+					{
+						Name:        "scan",
+						Aliases:     []string{"new", "check-new", "new-episodes"},
+						Description: "Scan Audiobookshelf for new podcasts (create directories, cache covers) and check for new episodes",
+						UsageLine:   "abs server scan [podcasts_dir] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
+						},
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+							clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
+							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+							clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
+							clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check and download new episodes (skip podcast folder scanning)"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "scan"
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
+					{
+						Name:        "list",
+						Aliases:     []string{"ls"},
+						Description: "List all available podcasts in Audiobookshelf with episode counts",
+						UsageLine:   "abs server list [options]",
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
+							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "list"
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
+					{
+						Name:        "download",
+						Aliases:     []string{"dl"},
+						Description: "Download undownloaded episodes for podcasts",
+						UsageLine:   "abs server download [<number>] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "[<number>]", Description: "Optional number of undownloaded episodes to download (defaults to 1)"},
+						},
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+							clihelp.Int(&countVal, "-k, --count <number>", -1, "Number of undownloaded episodes to download"),
+							clihelp.Bool(&opts.Fill, "-f, --fill", false, "Fill gaps in downloaded episodes"),
+							clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Enforce keep count policies"),
+							clihelp.BoolToggle(&opts.CheckNew, "--[no-]check-new", true, "Check new episodes published"),
+							clihelp.Bool(&opts.Oldest, "--oldest", false, "Download oldest first"),
+							clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
+							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed info"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "download"
+							opts.Args = ctx.Args
+							if len(ctx.Args) > 0 {
+								k, err := strconv.Atoi(ctx.Args[0])
+								if err == nil {
+									opts.Count = k
+									opts.CountGiven = true
+								}
+							} else if countVal != -1 {
+								opts.Count = countVal
+								opts.CountGiven = true
+							} else {
+								opts.Count = 1
+							}
+							if keepVal > 0 {
+								opts.KeepCount = &keepVal
+							}
+							return nil
+						},
+					},
+					{
+						Name:        "keep",
+						Aliases:     []string{"clean", "purge"},
+						Description: "Delete older episodes keeping only the latest <number> episodes per podcast",
+						UsageLine:   "abs server keep <number> [options]",
+						Parameters: []clihelp.Param{
+							{Name: "<number>", Description: "Number of latest episodes to keep per podcast"},
+						},
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast"),
+							clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Keep policy count"),
+							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Dry run"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "keep"
+							opts.Args = ctx.Args
+							if len(ctx.Args) > 0 {
+								k, err := strconv.Atoi(ctx.Args[0])
+								if err == nil {
+									opts.KeepCount = &k
+								}
+							} else if keepVal > 0 {
+								opts.KeepCount = &keepVal
+							}
+							if opts.KeepCount == nil {
+								return fmt.Errorf("keep count is required (e.g. abs server keep 5)")
+							}
+							return nil
+						},
+					},
+					{
+						Name:        "rescan",
+						Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
+						UsageLine:   "abs server rescan [options]",
+						Options: []clihelp.Option{
+							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by index or title"),
+							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview actions without updating DB"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed trace outputs"),
+							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress standard output"),
+							clihelp.String(&opts.SqliteDBPath, "--db-path, --sqlite-db-path <path>", "", "Path to absdatabase.sqlite"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "server"
+							opts.ServerSubcmd = "rescan"
+							opts.Args = ctx.Args
+							return nil
+						},
+					},
 				},
 			},
 			{
@@ -379,7 +415,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 								Aliases:     []string{"add"},
 								Description: "Add or replace a post-processor program",
 								UsageLine:   "abs config processor set <program>",
-								Args:        clihelp.ExactArgs(1),
+								Parameters: []clihelp.Param{
+									{Name: "<program>", Description: "The command line or path of the program to run"},
+								},
+								Args: clihelp.ExactArgs(1),
 								Run: func(ctx *clihelp.Context) error {
 									*action = "config"
 									opts.ProcessorCmd = "set"
@@ -404,7 +443,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 								Aliases:     []string{"delete", "rm", "remove"},
 								Description: "Remove a post-processor program by number",
 								UsageLine:   "abs config processor del <number>",
-								Args:        clihelp.ExactArgs(1),
+								Parameters: []clihelp.Param{
+									{Name: "<number>", Description: "The index or number of the post-processor to delete"},
+								},
+								Args: clihelp.ExactArgs(1),
 								Run: func(ctx *clihelp.Context) error {
 									*action = "config"
 									opts.ProcessorCmd = "del"
@@ -434,7 +476,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					*action = "help"
 					app := buildCLIApp(action, opts)
 					if len(ctx.Args) > 0 {
-						app.RenderCommand(clihelp.Options{}, ctx.Args[0])
+						app.RenderCommand(clihelp.Options{}, ctx.Args...)
 					} else {
 						app.RenderGlobal(clihelp.Options{})
 					}
@@ -479,8 +521,14 @@ func parseFlags() (string, CLIOptions) {
 		switch a {
 		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
 			app := buildCLIApp(&action, &opts)
-			if len(args) > 0 && args[0] != "help" && args[0] != "usage" && !strings.HasPrefix(args[0], "-") {
-				app.RenderCommand(clihelp.Options{}, args[0])
+			var path []string
+			for _, arg := range normArgs {
+				if arg != "help" && arg != "usage" && !strings.HasPrefix(arg, "-") {
+					path = append(path, arg)
+				}
+			}
+			if len(path) > 0 {
+				app.RenderCommand(clihelp.Options{}, path...)
 			} else {
 				app.RenderGlobal(clihelp.Options{})
 			}

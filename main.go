@@ -161,19 +161,6 @@ func main() {
 		}
 		return
 
-	case "scan":
-		targetDir := config.PodcastsDir
-		if len(cli.Args) > 0 {
-			targetDir = cli.Args[0]
-		}
-		if targetDir == "" {
-			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
-			os.Exit(1)
-		}
-		config.PodcastsDir = targetDir
-		absScanPodcasts(config, cli.Quiet)
-		return
-
 	case "status":
 		targetDir := config.PodcastsDir
 		if len(cli.Args) > 0 {
@@ -267,268 +254,287 @@ func main() {
 		}
 		return
 
-	case "list":
-		token := config.AudiobookshelfToken
-		if token == "" {
-			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
-		}
-		if token == "" {
-			token, _ = absLogin(config)
-		}
-		if token == "" {
-			printError("Error: Audiobookshelf API token not configured and could not be retrieved from DB or login.")
-			os.Exit(1)
-		}
-		client := NewABSClient(config.AudiobookshelfURL, token)
-		client.Silent = cli.Silent
-		podcasts, err := client.PodcastItems()
-		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
-		}
-		printPodcastList(client, podcasts, cli.Verbose, cli.Silent)
-		return
-
-	case "download":
-		token := config.AudiobookshelfToken
-		if token == "" {
-			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
-		}
-		if token == "" {
-			token, _ = absLogin(config)
-		}
-		if token == "" {
-			printError("Error: Audiobookshelf API token not configured.")
-			os.Exit(1)
-		}
-		client := NewABSClient(config.AudiobookshelfURL, token)
-		client.Silent = cli.Silent
-		podcasts, err := client.PodcastItems()
-		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
-		}
-
-		totalNewlyDownloaded := 0
-		if cli.Podcast != "" {
-			targetItem := matchPodcast(podcasts, cli.Podcast)
-			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+	case "server":
+		switch cli.ServerSubcmd {
+		case "scan":
+			targetDir := config.PodcastsDir
+			if len(cli.Args) > 0 {
+				targetDir = cli.Args[0]
+			}
+			if targetDir == "" {
+				fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
 				os.Exit(1)
 			}
-			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
-			if !cli.DryRun {
-				totalNewlyDownloaded += dlCount
+			config.PodcastsDir = targetDir
+
+			if !cli.EpisodesOnly {
+				absScanPodcasts(config, cli.Quiet)
 			}
-		} else {
-			for idx, item := range podcasts {
-				title := item.Media.Metadata.Title
-				if title == "" {
-					title = "Untitled"
+
+			if !cli.PodcastsOnly {
+				token := config.AudiobookshelfToken
+				if token == "" {
+					token = getABSTokenFromDB(config.AudiobookshelfDBPath)
 				}
+				if token == "" {
+					token, _ = absLogin(config)
+				}
+				if token == "" {
+					printError("Error: Audiobookshelf API token not configured.")
+					os.Exit(1)
+				}
+				client := NewABSClient(config.AudiobookshelfURL, token)
+				client.Silent = cli.Silent
+				podcasts, err := client.PodcastItems()
+				if err != nil {
+					printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+					os.Exit(1)
+				}
+
+				totalNewlyDownloaded := 0
+				totalPodcastsChecked := 0
+
+				if cli.Podcast != "" {
+					targetItem := matchPodcast(podcasts, cli.Podcast)
+					if targetItem == nil {
+						printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+						os.Exit(1)
+					}
+					dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+					if !cli.DryRun {
+						totalNewlyDownloaded += dlCount
+					}
+					totalPodcastsChecked = 1
+				} else {
+					totalPodcastsChecked = len(podcasts)
+					for idx, item := range podcasts {
+						title := item.Media.Metadata.Title
+						if title == "" {
+							title = "Untitled"
+						}
+						if !cli.Silent {
+							fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+							os.Stdout.Sync()
+						}
+						dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+						if !cli.DryRun {
+							totalNewlyDownloaded += dlCount
+						}
+					}
+					if !cli.Silent {
+						fmt.Print("\r\x1b[K")
+					}
+				}
+
 				if !cli.Silent {
-					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
-					os.Stdout.Sync()
+					fmt.Printf("\nChecked a total of %d podcast(s) for new episodes.\n", totalPodcastsChecked)
+					if totalNewlyDownloaded == 0 {
+						fmt.Println("No new episodes found.")
+					}
 				}
-				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+
+				if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
+					runPostProcessors(config.PostProcessors, cli.Silent)
+				}
+			}
+			return
+
+		case "list":
+			token := config.AudiobookshelfToken
+			if token == "" {
+				token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+			}
+			if token == "" {
+				token, _ = absLogin(config)
+			}
+			if token == "" {
+				printError("Error: Audiobookshelf API token not configured and could not be retrieved from DB or login.")
+				os.Exit(1)
+			}
+			client := NewABSClient(config.AudiobookshelfURL, token)
+			client.Silent = cli.Silent
+			podcasts, err := client.PodcastItems()
+			if err != nil {
+				printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+				os.Exit(1)
+			}
+			printPodcastList(client, podcasts, cli.Verbose, cli.Silent)
+			return
+
+		case "download":
+			token := config.AudiobookshelfToken
+			if token == "" {
+				token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+			}
+			if token == "" {
+				token, _ = absLogin(config)
+			}
+			if token == "" {
+				printError("Error: Audiobookshelf API token not configured.")
+				os.Exit(1)
+			}
+			client := NewABSClient(config.AudiobookshelfURL, token)
+			client.Silent = cli.Silent
+			podcasts, err := client.PodcastItems()
+			if err != nil {
+				printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+				os.Exit(1)
+			}
+
+			totalNewlyDownloaded := 0
+			if cli.Podcast != "" {
+				targetItem := matchPodcast(podcasts, cli.Podcast)
+				if targetItem == nil {
+					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+					os.Exit(1)
+				}
+				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
 				if !cli.DryRun {
 					totalNewlyDownloaded += dlCount
 				}
-			}
-			if !cli.Silent {
-				fmt.Print("\r\x1b[K")
-			}
-		}
-
-		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-			runPostProcessors(config.PostProcessors, cli.Silent)
-		}
-		return
-
-	case "new":
-		token := config.AudiobookshelfToken
-		if token == "" {
-			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
-		}
-		if token == "" {
-			token, _ = absLogin(config)
-		}
-		if token == "" {
-			printError("Error: Audiobookshelf API token not configured.")
-			os.Exit(1)
-		}
-		client := NewABSClient(config.AudiobookshelfURL, token)
-		client.Silent = cli.Silent
-		podcasts, err := client.PodcastItems()
-		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
-		}
-
-		totalNewlyDownloaded := 0
-		totalPodcastsChecked := 0
-
-		if cli.Podcast != "" {
-			targetItem := matchPodcast(podcasts, cli.Podcast)
-			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-				os.Exit(1)
-			}
-			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
-			if !cli.DryRun {
-				totalNewlyDownloaded += dlCount
-			}
-			totalPodcastsChecked = 1
-		} else {
-			totalPodcastsChecked = len(podcasts)
-			for idx, item := range podcasts {
-				title := item.Media.Metadata.Title
-				if title == "" {
-					title = "Untitled"
+			} else {
+				for idx, item := range podcasts {
+					title := item.Media.Metadata.Title
+					if title == "" {
+						title = "Untitled"
+					}
+					if !cli.Silent {
+						fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+						os.Stdout.Sync()
+					}
+					dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+					if !cli.DryRun {
+						totalNewlyDownloaded += dlCount
+					}
 				}
 				if !cli.Silent {
-					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
-					os.Stdout.Sync()
-				}
-				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
-				if !cli.DryRun {
-					totalNewlyDownloaded += dlCount
+					fmt.Print("\r\x1b[K")
 				}
 			}
-			if !cli.Silent {
-				fmt.Print("\r\x1b[K")
+
+			if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
+				runPostProcessors(config.PostProcessors, cli.Silent)
 			}
-		}
+			return
 
-		if !cli.Silent {
-			fmt.Printf("\nChecked a total of %d podcast(s) for new episodes.\n", totalPodcastsChecked)
-			if totalNewlyDownloaded == 0 {
-				fmt.Println("No new episodes found.")
+		case "keep":
+			token := config.AudiobookshelfToken
+			if token == "" {
+				token = getABSTokenFromDB(config.AudiobookshelfDBPath)
 			}
-		}
-
-		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-			runPostProcessors(config.PostProcessors, cli.Silent)
-		}
-		return
-
-	case "keep":
-		token := config.AudiobookshelfToken
-		if token == "" {
-			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
-		}
-		if token == "" {
-			token, _ = absLogin(config)
-		}
-		if token == "" {
-			printError("Error: Audiobookshelf API token not configured.")
-			os.Exit(1)
-		}
-		client := NewABSClient(config.AudiobookshelfURL, token)
-		client.Silent = cli.Silent
-		podcasts, err := client.PodcastItems()
-		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
-		}
-
-		if cli.Podcast != "" {
-			targetItem := matchPodcast(podcasts, cli.Podcast)
-			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+			if token == "" {
+				token, _ = absLogin(config)
+			}
+			if token == "" {
+				printError("Error: Audiobookshelf API token not configured.")
 				os.Exit(1)
 			}
-			title := targetItem.Media.Metadata.Title
-			if title == "" {
-				title = "Untitled"
+			client := NewABSClient(config.AudiobookshelfURL, token)
+			client.Silent = cli.Silent
+			podcasts, err := client.PodcastItems()
+			if err != nil {
+				printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+				os.Exit(1)
 			}
-			applyKeepPolicy(client, targetItem.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
-		} else {
-			for _, item := range podcasts {
-				title := item.Media.Metadata.Title
+
+			if cli.Podcast != "" {
+				targetItem := matchPodcast(podcasts, cli.Podcast)
+				if targetItem == nil {
+					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+					os.Exit(1)
+				}
+				title := targetItem.Media.Metadata.Title
 				if title == "" {
 					title = "Untitled"
 				}
-				applyKeepPolicy(client, item.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+				applyKeepPolicy(client, targetItem.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+			} else {
+				for _, item := range podcasts {
+					title := item.Media.Metadata.Title
+					if title == "" {
+						title = "Untitled"
+					}
+					applyKeepPolicy(client, item.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+				}
 			}
-		}
-		return
+			return
 
-	case "rescan":
-		token := config.AudiobookshelfToken
-		if token == "" {
-			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
-		}
-		if token == "" {
-			token, _ = absLogin(config)
-		}
-		if token == "" {
-			printError("Error: Audiobookshelf API token not configured.")
-			os.Exit(1)
-		}
-		client := NewABSClient(config.AudiobookshelfURL, token)
-		client.Silent = cli.Silent
-		podcasts, err := client.PodcastItems()
-		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
-		}
-
-		totalRescanned := 0
-		totalChecked := 0
-		podcastCount := 0
-
-		dbPath := cli.SqliteDBPath
-		if dbPath == "" {
-			dbPath = config.AudiobookshelfDBPath
-		}
-
-		var db *sql.DB
-		if !cli.DryRun && dbPath != "" && fileExists(dbPath) {
-			var err error
-			db, err = sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
-			if err == nil {
-				defer db.Close()
+		case "rescan":
+			token := config.AudiobookshelfToken
+			if token == "" {
+				token = getABSTokenFromDB(config.AudiobookshelfDBPath)
 			}
-		}
-
-		if cli.Podcast != "" {
-			targetItem := matchPodcast(podcasts, cli.Podcast)
-			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+			if token == "" {
+				token, _ = absLogin(config)
+			}
+			if token == "" {
+				printError("Error: Audiobookshelf API token not configured.")
 				os.Exit(1)
 			}
-			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
-			totalRescanned += rCount
-			totalChecked += cCount
-			podcastCount = 1
-		} else {
-			podcastCount = len(podcasts)
-			for idx, item := range podcasts {
-				title := item.Media.Metadata.Title
-				if title == "" {
-					title = "Untitled"
+			client := NewABSClient(config.AudiobookshelfURL, token)
+			client.Silent = cli.Silent
+			podcasts, err := client.PodcastItems()
+			if err != nil {
+				printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+				os.Exit(1)
+			}
+
+			totalRescanned := 0
+			totalChecked := 0
+			podcastCount := 0
+
+			dbPath := cli.SqliteDBPath
+			if dbPath == "" {
+				dbPath = config.AudiobookshelfDBPath
+			}
+
+			var db *sql.DB
+			if !cli.DryRun && dbPath != "" && fileExists(dbPath) {
+				var err error
+				db, err = sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+				if err == nil {
+					defer db.Close()
 				}
-				if !cli.Silent {
-					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
-					os.Stdout.Sync()
+			}
+
+			if cli.Podcast != "" {
+				targetItem := matchPodcast(podcasts, cli.Podcast)
+				if targetItem == nil {
+					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+					os.Exit(1)
 				}
-				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
+				rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
 				totalRescanned += rCount
 				totalChecked += cCount
+				podcastCount = 1
+			} else {
+				podcastCount = len(podcasts)
+				for idx, item := range podcasts {
+					title := item.Media.Metadata.Title
+					if title == "" {
+						title = "Untitled"
+					}
+					if !cli.Silent {
+						fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+						os.Stdout.Sync()
+					}
+					rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
+					totalRescanned += rCount
+					totalChecked += cCount
+				}
+				if !cli.Silent {
+					fmt.Print("\r\x1b[K")
+				}
 			}
-			if !cli.Silent {
-				fmt.Print("\r\x1b[K")
-			}
-		}
 
-		if !cli.Silent {
-			fmt.Printf("\nChecked a total of %d MP3 file(s) across %d podcast(s).\n", totalChecked, podcastCount)
-			if totalRescanned == 0 {
-				fmt.Println("No episodes required database duration updates.")
+			if !cli.Silent {
+				fmt.Printf("\nChecked a total of %d MP3 file(s) across %d podcast(s).\n", totalChecked, podcastCount)
+				if totalRescanned == 0 {
+					fmt.Println("No episodes required database duration updates.")
+				}
 			}
+			return
 		}
-		return
 
 	case "file", "dir":
 		// Fall through

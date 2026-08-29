@@ -214,6 +214,9 @@ type CLIOptions struct {
 	ConfigInfo     bool
 	ABSToken       string
 	Args           []string
+	ServerSubcmd   string
+	PodcastsOnly   bool
+	EpisodesOnly   bool
 }
 
 type CostInfo struct {
