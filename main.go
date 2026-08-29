@@ -186,8 +186,37 @@ func main() {
 		}
 	}
 
+	configArgs := flag.Args()
+	isWhisperSubcmd := false
+	if cli.IsConfigCommand && len(configArgs) > 0 && configArgs[0] == "whisper" {
+		isWhisperSubcmd = true
+		if len(configArgs) >= 3 && configArgs[1] == "set" {
+			var targetID int
+			if _, err := fmt.Sscanf(configArgs[2], "%d", &targetID); err == nil {
+				setDefaultWhisperProfile(&config, targetID)
+			}
+		} else if len(configArgs) >= 2 && configArgs[1] == "list" {
+			listWhispers(config)
+			return
+		} else if len(configArgs) >= 3 && configArgs[1] == "add" {
+			addWhisperProfile(&config, configArgs[2])
+		} else if len(configArgs) >= 3 && (configArgs[1] == "remove" || configArgs[1] == "delete") {
+			var targetID int
+			if _, err := fmt.Sscanf(configArgs[2], "%d", &targetID); err == nil {
+				removeWhisperProfile(&config, targetID)
+			}
+		} else {
+			fmt.Println("Whisper management commands:")
+			fmt.Println("  abs config whisper list")
+			fmt.Println("  abs config whisper set <id>")
+			fmt.Println("  abs config whisper add \"<spec>\"")
+			fmt.Println("  abs config whisper remove <id>")
+			return
+		}
+	}
+
 	if cli.IsConfigCommand {
-		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs || cli.ListWhispers || cli.SetDefaultWhisper > 0 || cli.AddWhisper != "" || cli.RemoveWhisper > 0 {
+		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs || cli.ListWhispers || cli.SetDefaultWhisper > 0 || cli.AddWhisper != "" || cli.RemoveWhisper > 0 || isWhisperSubcmd {
 			printConfig(config)
 		} else {
 			// Let clihelp handle the help display automatically
