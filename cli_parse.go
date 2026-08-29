@@ -150,7 +150,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-					clihelp.String(&opts.RemoteFFmpegHost, "--remote-ffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host"),
+					clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host"),
 					clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of episodes to recut"),
 				},
 				Run: func(ctx *clihelp.Context) error {
@@ -400,10 +400,10 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.BoolToggle(&opts.SaveTranscript, "--[no-]transcript", true, "Save default .transcript.json file"),
 		clihelp.Bool(&opts.UseChunks, "--use-chunks", false, "Split long audio into chunks for Whisper"),
 		clihelp.Bool(&opts.ExtractKeywords, "--extract-keywords", false, "Extract keywords to improve transcription"),
-		clihelp.String(&opts.TranscribeMin, "-t, --transcribe-minutes <minutes>", "", "Only transcribe first N minutes (e.g. 10m)"),
+		clihelp.String(&opts.TranscribeMin, "-t, --tminutes <minutes>", "", "Only transcribe first N minutes (e.g. 10m)"),
 		clihelp.String(&opts.Force, "-f, --force <stage>", "", "Force re-running: 'whisper', 'llm', or 'all'"),
-		clihelp.String(&opts.UseLLM, "--profile <id_or_name>", "", "Select LLM profile ID or name"),
-		clihelp.String(&opts.RemoteFFmpegHost, "--remote-ffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host (e.g. cloud8)"),
+		clihelp.String(&opts.UseLLM, "--profile <id/name>", "", "Select LLM profile ID or name"),
+		clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host (e.g. cloud8)"),
 		clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of untranscribed episodes to process"),
 	}
 }

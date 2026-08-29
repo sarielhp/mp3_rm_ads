@@ -295,7 +295,7 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		cfg.AudiobookshelfToken = val
 	case "db-path", "abs.db", "db", "sqlite-db-path":
 		cfg.AudiobookshelfDBPath = val
-	case "remote-ffmpeg", "remote-ffmpeg-host", "ffmpeg-host":
+	case "remote-ffmpeg", "remote-ffmpeg-host", "ffmpeg-host", "rffmpeg":
 		cfg.RemoteFFmpegHost = val
 	case "whisper-url", "whisper.url":
 		cfg.WhisperURL = val
@@ -341,7 +341,7 @@ func handleConfigGet(cfg Config, key string) {
 		fmt.Println(cfg.AudiobookshelfToken)
 	case "db-path", "abs.db", "db":
 		fmt.Println(cfg.AudiobookshelfDBPath)
-	case "remote-ffmpeg", "remote-ffmpeg-host":
+	case "remote-ffmpeg", "remote-ffmpeg-host", "rffmpeg":
 		fmt.Println(cfg.RemoteFFmpegHost)
 	case "whisper-url", "whisper.url":
 		fmt.Println(cfg.WhisperURL)

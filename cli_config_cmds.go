@@ -15,7 +15,7 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Description: "Get the value of a configuration key",
 				UsageLine:   "abs config get <key>",
 				Parameters: []clihelp.Param{
-					{Name: "<key>", Description: "Configuration key name (e.g., 'podcasts-dir', 'remote-ffmpeg', 'abs-url')"},
+					{Name: "<key>", Description: "Configuration key name (e.g., 'podcasts-dir', 'rffmpeg', 'abs-url')"},
 				},
 				Args: clihelp.ExactArgs(1),
 				Run: func(ctx *clihelp.Context) error {
