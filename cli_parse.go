@@ -107,9 +107,11 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	countVal := -1
 
 	app := &clihelp.App{
-		Name:        "abs",
-		Description: "Automatic Ad Segment Remover & Podcast Manager",
-		GlobalNote:  "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
+		Name:           "abs",
+		Description:    "Automatic Ad Segment Remover & Podcast Manager",
+		GlobalNote:     "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
+		AbbrevCommands: true,
+		Pager:          true,
 		Commands: []clihelp.Command{
 			{
 				Name:        "file",
@@ -519,11 +521,15 @@ func parseFlags() (string, CLIOptions) {
 
 	for _, a := range normArgs {
 		switch a {
+		case "tree", "--tree":
+			app := buildCLIApp(&action, &opts)
+			app.RenderTree(clihelp.Options{})
+			os.Exit(0)
 		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
 			app := buildCLIApp(&action, &opts)
 			var path []string
 			for _, arg := range normArgs {
-				if arg != "help" && arg != "usage" && !strings.HasPrefix(arg, "-") {
+				if arg != "help" && arg != "usage" && !strings.HasPrefix(arg, "-") && arg != "tree" && arg != "--tree" {
 					path = append(path, arg)
 				}
 			}
