@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"net"
 	"os"
@@ -194,5 +195,59 @@ func TestLegacyConfigPath(t *testing.T) {
 	p := legacyConfigPath()
 	if p != "" && !strings.Contains(p, "mp3_rm_ads") {
 		t.Errorf("expected legacy config path to contain mp3_rm_ads, got %q", p)
+	}
+}
+
+func TestConfigCompletion(t *testing.T) {
+	tempDir := t.TempDir()
+	origXDG := os.Getenv("XDG_DATA_HOME")
+	origConfig := os.Getenv("XDG_CONFIG_HOME")
+	os.Setenv("XDG_DATA_HOME", tempDir+"/data")
+	os.Setenv("XDG_CONFIG_HOME", tempDir+"/config")
+	defer func() {
+		os.Setenv("XDG_DATA_HOME", origXDG)
+		os.Setenv("XDG_CONFIG_HOME", origConfig)
+	}()
+
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	var buf bytes.Buffer
+	app.Stdout = &buf
+	err := app.Execute([]string{"config", "completion", "bash"})
+	if err != nil {
+		t.Fatalf("config completion bash failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "_abs_complete") {
+		t.Errorf("bash completion output unexpected: %s", buf.String())
+	}
+
+	buf.Reset()
+	err = app.Execute([]string{"config", "completion", "zsh"})
+	if err != nil {
+		t.Fatalf("config completion zsh failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "#compdef abs") {
+		t.Errorf("zsh completion output unexpected: %s", buf.String())
+	}
+
+	buf.Reset()
+	err = app.Execute([]string{"config", "completion", "fish"})
+	if err != nil {
+		t.Fatalf("config completion fish failed: %v", err)
+	}
+	if !strings.Contains(buf.String(), "fish completion for abs") {
+		t.Errorf("fish completion output unexpected: %s", buf.String())
+	}
+
+	buf.Reset()
+	err = app.Execute([]string{"config", "completion", "install", "bash"})
+	if err != nil {
+		t.Fatalf("config completion install bash failed: %v", err)
+	}
+	installedBash := tempDir + "/data/bash-completion/completions/abs"
+	if !fileExists(installedBash) {
+		t.Errorf("expected %s to exist", installedBash)
 	}
 }

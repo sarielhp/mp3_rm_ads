@@ -32,4 +32,6 @@ go build -o "$BINARY" .
 mkdir -p "$INSTALL_DIR"
 cp "$BINARY" "$INSTALL_DIR/$BINARY"
 
+"$INSTALL_DIR/$BINARY" config completion install bash >/dev/null 2>&1 || true
+
 echo "Success: installed to $INSTALL_DIR/$BINARY"

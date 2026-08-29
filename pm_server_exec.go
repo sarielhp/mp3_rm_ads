@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -58,18 +59,42 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				totalPodcastsChecked = 1
 			} else {
 				totalPodcastsChecked = len(podcasts)
-				for idx, item := range podcasts {
-					title := item.Media.Metadata.Title
-					if title == "" {
-						title = "Untitled"
-					}
-					if !cli.Silent {
-						fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
-						os.Stdout.Sync()
-					}
-					dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+				type scanResult struct {
+					count int
+				}
+				resChan := make(chan scanResult, len(podcasts))
+				sem := make(chan struct{}, 10)
+				var completedCount int
+				var countMu sync.Mutex
+
+				for _, item := range podcasts {
+					go func(it PodcastItem) {
+						sem <- struct{}{}
+						defer func() { <-sem }()
+
+						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+
+						countMu.Lock()
+						completedCount++
+						done := completedCount
+						countMu.Unlock()
+
+						if !cli.Silent {
+							title := it.Media.Metadata.Title
+							if title == "" {
+								title = "Untitled"
+							}
+							fmt.Printf("\rScanning podcasts (%d/%d): %s\x1b[K", done, len(podcasts), title)
+							os.Stdout.Sync()
+						}
+						resChan <- scanResult{count: dlCount}
+					}(item)
+				}
+
+				for i := 0; i < len(podcasts); i++ {
+					res := <-resChan
 					if !cli.DryRun {
-						totalNewlyDownloaded += dlCount
+						totalNewlyDownloaded += res.count
 					}
 				}
 				if !cli.Silent {

@@ -133,6 +133,19 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			}
 			break
 		}
+
+		fileLock, err := acquireFileLock(mainMP3File)
+		if err != nil {
+			if !cli.Quiet {
+				fmt.Fprintf(os.Stderr, "Warning: failed to acquire lock for %s: %v\n", shortName, err)
+			}
+		} else if fileLock == nil {
+			if !cli.Quiet {
+				fmt.Printf("⏭️  Skipping '%s' (currently being processed by another instance)\n", shortName)
+			}
+			continue
+		}
+
 		processedCount++
 
 		if !cli.Quiet {
@@ -158,6 +171,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 
 		if cli.Recut {
 			handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, config, cli, fileStartTime)
+			fileLock.Release()
 			continue
 		}
 
@@ -180,6 +194,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		if err != nil {
 			hasError = true
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			fileLock.Release()
 			continue
 		}
 
@@ -213,6 +228,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 
 		if !validateTranscriptSanity(transcriptionData, totalDuration, cli.Quiet) {
 			hasError = true
+			fileLock.Release()
 			continue
 		}
 
@@ -233,6 +249,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			if !cli.Quiet {
 				fmt.Printf("Export completed in %s\n", formatClock(fileTotalDuration.Seconds()))
 			}
+			fileLock.Release()
 			continue
 		}
 
@@ -245,6 +262,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
 				os.Remove(sourceAudioFile)
 			}
+			fileLock.Release()
 			continue
 		}
 
@@ -275,6 +293,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 				copyFile(sourceAudioFile, outputFile)
 			}
 			fmt.Printf("Result saved to: '%s'\n", outputFile)
+			fileLock.Release()
 			continue
 		}
 
@@ -350,6 +369,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
 			os.Remove(sourceAudioFile)
 		}
+		fileLock.Release()
 	}
 
 	if (processedCount > 1 || totalFiles > 1) && !cli.Quiet {

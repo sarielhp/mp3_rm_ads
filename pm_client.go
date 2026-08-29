@@ -204,13 +204,38 @@ func (c *ABSClient) PodcastItems() ([]PodcastItem, error) {
 			return nil, err
 		}
 
-		for _, itemSummary := range res.Results {
-			detailed, err := c.GetItem(itemSummary.ID)
-			if err != nil {
-				return nil, err
+		type itemResult struct {
+			idx  int
+			item *PodcastItem
+			err  error
+		}
+		resChan := make(chan itemResult, len(res.Results))
+		sem := make(chan struct{}, 10)
+
+		for i, itemSummary := range res.Results {
+			go func(idx int, id string) {
+				sem <- struct{}{}
+				defer func() { <-sem }()
+				detailed, err := c.GetItem(id)
+				resChan <- itemResult{idx: idx, item: detailed, err: err}
+			}(i, itemSummary.ID)
+		}
+
+		ordered := make([]*PodcastItem, len(res.Results))
+		var firstErr error
+		for i := 0; i < len(res.Results); i++ {
+			r := <-resChan
+			if r.err != nil && firstErr == nil {
+				firstErr = r.err
 			}
-			if detailed != nil {
-				podcasts = append(podcasts, *detailed)
+			ordered[r.idx] = r.item
+		}
+		if firstErr != nil {
+			return nil, firstErr
+		}
+		for _, item := range ordered {
+			if item != nil {
+				podcasts = append(podcasts, *item)
 			}
 		}
 	}
@@ -219,8 +244,41 @@ func (c *ABSClient) PodcastItems() ([]PodcastItem, error) {
 }
 
 func (c *ABSClient) PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, error) {
+	cached := globalFeedCache.Get(feedURL)
+	var cachedETag, cachedLastMod string
+	if cached != nil {
+		cachedETag = cached.ETag
+		cachedLastMod = cached.LastModified
+	}
+
+	directEps, newETag, newLastMod, notModified, err := fetchFeedDirect(feedURL, cachedETag, cachedLastMod)
+	if err == nil {
+		if notModified && cached != nil && len(cached.Episodes) > 0 {
+			return cached.Episodes, nil
+		}
+		if len(directEps) > 0 {
+			var latestGUID string
+			if len(directEps) > 0 {
+				latestGUID = directEps[0].GUID
+			}
+			globalFeedCache.Put(feedURL, &FeedCacheEntry{
+				FeedURL:      feedURL,
+				ETag:         newETag,
+				LastModified: newLastMod,
+				LastChecked:  time.Now(),
+				LatestGUID:   latestGUID,
+				Episodes:     directEps,
+			})
+			_ = globalFeedCache.Save()
+			return directEps, nil
+		}
+	}
+
 	body, err := c.Request("/api/podcasts/feed", "POST", map[string]string{"rssFeed": feedURL})
 	if err != nil {
+		if cached != nil && len(cached.Episodes) > 0 {
+			return cached.Episodes, nil
+		}
 		return nil, err
 	}
 

@@ -234,6 +234,7 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 					return nil
 				},
 			},
+			clihelp.CompletionCommand(),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"

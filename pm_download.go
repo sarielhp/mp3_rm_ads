@@ -42,6 +42,15 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				}
 			}
 
+			activeDls, _ := client.ActiveDownloads(itemID)
+			queuedTitles := make(map[string]bool)
+			for _, ad := range activeDls {
+				t := strings.ToLower(strings.TrimSpace(ad.EpisodeDisplayTitle))
+				if t != "" {
+					queuedTitles[t] = true
+				}
+			}
+
 			isDownloaded := func(ep FeedEpisode) bool {
 				encURL := ""
 				if ep.Enclosure != nil {
@@ -52,7 +61,8 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 
 				return (encURL != "" && downloadedURLs[encURL]) ||
 					(guid != "" && downloadedGUIDs[guid]) ||
-					(title != "" && downloadedTitles[title])
+					(title != "" && downloadedTitles[title]) ||
+					(title != "" && queuedTitles[title])
 			}
 
 			sortedCatalog := make([]FeedEpisode, len(feedEpisodes))
