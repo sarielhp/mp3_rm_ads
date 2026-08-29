@@ -308,7 +308,7 @@ func TestValidateTranscriptSanityZeroDuration(t *testing.T) {
 }
 
 func TestTestWhisperServerEmptyURL(t *testing.T) {
-	if testWhisperServerEx("", 1, 1*time.Millisecond, true) {
+	if testWhisperServerEx("", "", 1, 1*time.Millisecond, true) {
 		t.Error("expected false for empty URL")
 	}
 }
@@ -320,7 +320,7 @@ func TestTestWhisperServerSuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if !testWhisperServerEx(ts.URL, 1, 1*time.Millisecond, true) {
+	if !testWhisperServerEx(ts.URL, "", 1, 1*time.Millisecond, true) {
 		t.Error("expected true for active Whisper server")
 	}
 }
@@ -339,7 +339,7 @@ func TestTestWhisperServerRetrySuccess(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if !testWhisperServerEx(ts.URL, 3, 5*time.Millisecond, true) {
+	if !testWhisperServerEx(ts.URL, "", 3, 5*time.Millisecond, true) {
 		t.Error("expected true on retry success")
 	}
 	if attempts != 2 {
@@ -353,7 +353,7 @@ func TestTestWhisperServerFailure(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if testWhisperServerEx(ts.URL, 2, 5*time.Millisecond, true) {
+	if testWhisperServerEx(ts.URL, "", 2, 5*time.Millisecond, true) {
 		t.Error("expected false for failing Whisper server")
 	}
 }
@@ -364,7 +364,7 @@ func TestTestWhisperServerClientError(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	if testWhisperServerEx(ts.URL, 3, 5*time.Millisecond, true) {
+	if testWhisperServerEx(ts.URL, "", 3, 5*time.Millisecond, true) {
 		t.Error("expected false for 404 client error without retrying")
 	}
 }

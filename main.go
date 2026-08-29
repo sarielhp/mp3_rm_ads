@@ -105,7 +105,7 @@ func main() {
 				os.Exit(1)
 			}
 		default:
-			if !testWhisperServer(config.WhisperURL, cli.Quiet) {
+			if !testWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
 				hasError = true
 				os.Exit(1)
 			}
@@ -159,7 +159,7 @@ func main() {
 		}
 	}
 
-	go wakeWhisperServer(config.WhisperURL, cli.Quiet)
+	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 
 	if cli.ListLLMs {
 		listProfiles(config)

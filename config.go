@@ -144,6 +144,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("WHISPER_DOCKER_CONTAINER"); v != "" {
 		cfg.WhisperDockerContainer = v
 	}
+	if v := os.Getenv("WHISPER_WAKE_COMMAND"); v != "" {
+		cfg.WhisperWakeCommand = v
+	}
 }
 
 func loadConfig() Config {
@@ -193,6 +196,9 @@ func printConfig(cfg Config) {
 	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
 	if cfg.WhisperDockerContainer != "" {
 		fmt.Printf("  whisper_docker_container: %s\n", cfg.WhisperDockerContainer)
+	}
+	if cfg.WhisperWakeCommand != "" {
+		fmt.Printf("  whisper_wake_command:     %s\n", cfg.WhisperWakeCommand)
 	}
 	if cfg.WhisperLanguage != "" {
 		fmt.Printf("  whisper_language:         %s\n", cfg.WhisperLanguage)

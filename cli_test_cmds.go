@@ -6,12 +6,24 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"time"
 )
 
-func wakeWhisperServer(whisperURL string, quiet bool) {
+func wakeWhisperServer(whisperURL string, wakeCmd string, quiet bool) {
 	if whisperURL == "" {
 		return
+	}
+	if wakeCmd != "" {
+		if !quiet {
+			fmt.Printf("Running whisper wake command: %s\n", wakeCmd)
+		}
+		cmd := execCommand("/bin/sh", "-c", wakeCmd)
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil && !quiet {
+			fmt.Printf("Warning: Whisper wake command failed: %v\n", err)
+		}
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
 	req, err := http.NewRequest("GET", whisperURL, nil)
@@ -26,11 +38,11 @@ func wakeWhisperServer(whisperURL string, quiet bool) {
 	resp.Body.Close()
 }
 
-func testWhisperServer(whisperURL string, quiet bool) bool {
-	return testWhisperServerEx(whisperURL, 5, 3*time.Second, quiet)
+func testWhisperServer(whisperURL string, wakeCmd string, quiet bool) bool {
+	return testWhisperServerEx(whisperURL, wakeCmd, 5, 3*time.Second, quiet)
 }
 
-func testWhisperServerEx(whisperURL string, maxRetries int, retryDelay time.Duration, quiet bool) bool {
+func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retryDelay time.Duration, quiet bool) bool {
 	if whisperURL == "" {
 		fmt.Println("ERROR: whisper_url is not configured in config file.")
 		return false
@@ -51,7 +63,7 @@ func testWhisperServerEx(whisperURL string, maxRetries int, retryDelay time.Dura
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		wakeWhisperServer(whisperURL, true)
+		wakeWhisperServer(whisperURL, wakeCmd, true)
 
 		boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
 		var buf bytes.Buffer

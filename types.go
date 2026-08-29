@@ -110,6 +110,7 @@ type Config struct {
 	WhisperDockerContainer string          `json:"whisper_docker_container"`
 	WhisperLanguage        string          `json:"whisper_language"`
 	WhisperPrompt          string          `json:"whisper_prompt"`
+	WhisperWakeCommand     string          `json:"whisper_wake_command,omitempty"`
 	ChunkDurationSec       int             `json:"chunk_duration_sec"`
 	ActiveProfileID        int             `json:"active_profile_id"`
 	Profiles               []LLMProfile    `json:"profiles"`
