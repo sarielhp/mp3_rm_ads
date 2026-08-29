@@ -149,6 +149,27 @@ func applyEnvOverrides(cfg *Config) {
 	}
 }
 
+func resolveActiveWhisperProfile(cfg *Config) {
+	if cfg.ActiveWhisperID <= 0 {
+		return
+	}
+	for _, wp := range cfg.WhisperProfiles {
+		if wp.ID == cfg.ActiveWhisperID {
+			if wp.URL != "" {
+				cfg.WhisperURL = wp.URL
+			}
+			if wp.SpeedFactor > 0 {
+				cfg.WhisperSpeedFactor = wp.SpeedFactor
+			}
+			cfg.WhisperDockerContainer = wp.DockerContainer
+			cfg.WhisperLanguage = wp.Language
+			cfg.WhisperPrompt = wp.Prompt
+			cfg.WhisperWakeCommand = wp.WakeCommand
+			return
+		}
+	}
+}
+
 func loadConfig() Config {
 	data, err := os.ReadFile(configPath())
 	if err != nil {
@@ -162,6 +183,7 @@ func loadConfig() Config {
 		applyEnvOverrides(&cfg)
 		return cfg
 	}
+	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
 }
@@ -204,6 +226,9 @@ func printConfig(cfg Config) {
 		fmt.Printf("  whisper_language:         %s\n", cfg.WhisperLanguage)
 	}
 	fmt.Printf("  active_profile_id:        %d\n", cfg.ActiveProfileID)
+	if cfg.ActiveWhisperID > 0 {
+		fmt.Printf("  active_whisper_id:        %d\n", cfg.ActiveWhisperID)
+	}
 	if cfg.AudiobookshelfURL != "" {
 		fmt.Printf("  audiobookshelf_url:       %s\n", cfg.AudiobookshelfURL)
 	}

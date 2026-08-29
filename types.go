@@ -102,22 +102,35 @@ type LLMProfile struct {
 	APIKey string `json:"api_key"`
 }
 
+type WhisperProfile struct {
+	ID              int     `json:"id"`
+	Name            string  `json:"name"`
+	URL             string  `json:"url"`
+	SpeedFactor     float64 `json:"speed_factor"`
+	DockerContainer string  `json:"docker_container,omitempty"`
+	Language        string  `json:"language,omitempty"`
+	Prompt          string  `json:"prompt,omitempty"`
+	WakeCommand     string  `json:"wake_command,omitempty"`
+}
+
 type Config struct {
-	Instructions           string          `json:"_instructions"`
-	PodcastsDir            string          `json:"podcasts_dir"`
-	WhisperURL             string          `json:"whisper_url"`
-	WhisperSpeedFactor     float64         `json:"whisper_speed_factor"`
-	WhisperDockerContainer string          `json:"whisper_docker_container"`
-	WhisperLanguage        string          `json:"whisper_language"`
-	WhisperPrompt          string          `json:"whisper_prompt"`
-	WhisperWakeCommand     string          `json:"whisper_wake_command,omitempty"`
-	ChunkDurationSec       int             `json:"chunk_duration_sec"`
-	ActiveProfileID        int             `json:"active_profile_id"`
-	Profiles               []LLMProfile    `json:"profiles"`
-	AudiobookshelfURL      string          `json:"audiobookshelf_url,omitempty"`
-	AudiobookshelfUser     string          `json:"audiobookshelf_user,omitempty"`
-	AudiobookshelfPass     string          `json:"audiobookshelf_pass,omitempty"`
-	TUIColor               *TUIColorConfig `json:"tui_color,omitempty"`
+	Instructions           string           `json:"_instructions"`
+	PodcastsDir            string           `json:"podcasts_dir"`
+	WhisperURL             string           `json:"whisper_url"`
+	WhisperSpeedFactor     float64          `json:"whisper_speed_factor"`
+	WhisperDockerContainer string           `json:"whisper_docker_container"`
+	WhisperLanguage        string           `json:"whisper_language"`
+	WhisperPrompt          string           `json:"whisper_prompt"`
+	WhisperWakeCommand     string           `json:"whisper_wake_command,omitempty"`
+	ChunkDurationSec       int              `json:"chunk_duration_sec"`
+	ActiveProfileID        int              `json:"active_profile_id"`
+	Profiles               []LLMProfile     `json:"profiles"`
+	ActiveWhisperID        int              `json:"active_whisper_id,omitempty"`
+	WhisperProfiles        []WhisperProfile `json:"whisper_profiles,omitempty"`
+	AudiobookshelfURL      string           `json:"audiobookshelf_url,omitempty"`
+	AudiobookshelfUser     string           `json:"audiobookshelf_user,omitempty"`
+	AudiobookshelfPass     string           `json:"audiobookshelf_pass,omitempty"`
+	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 
 type TUIColorConfig struct {
@@ -175,6 +188,10 @@ type CLIOptions struct {
 	SetABS            bool
 	IsCacheCommand    bool
 	ResetCache        bool
+	AddWhisper        string
+	RemoveWhisper     int
+	SetDefaultWhisper int
+	ListWhispers      bool
 }
 
 type CostInfo struct {

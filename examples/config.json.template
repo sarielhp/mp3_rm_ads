@@ -5,9 +5,33 @@
   "whisper_docker_container": "",
   "whisper_language": "",
   "whisper_prompt": "",
+  "whisper_wake_command": "",
   "chunk_duration_sec": 0,
   "parallel_chunks": 1,
   "active_profile_id": 1,
+  "active_whisper_id": 1,
+  "whisper_profiles": [
+    {
+      "id": 1,
+      "name": "Local Whisper Server (Default)",
+      "url": "http://127.0.0.1:8088/inference",
+      "speed_factor": 7.0,
+      "docker_container": "",
+      "language": "",
+      "prompt": "",
+      "wake_command": ""
+    },
+    {
+      "id": 2,
+      "name": "Cloud8 VM",
+      "url": "http://cloud8:8000/v1/audio/transcriptions",
+      "speed_factor": 7.0,
+      "docker_container": "",
+      "language": "",
+      "prompt": "",
+      "wake_command": "/home/sariel/info/misc/26/08/28/gc/cloud8 wake"
+    }
+  ],
   "podcasts_dir": "/path/to/podcasts",
   "audiobookshelf_url": "http://127.0.0.1:8080",
   "audiobookshelf_user": "admin",

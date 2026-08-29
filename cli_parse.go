@@ -147,6 +147,11 @@ func parseFlags() CLIOptions {
 	flag.StringVar(&cli.PodcastsDir, "podcasts-dir", "", "Set default podcasts/media directory in config file")
 	flag.BoolVar(&cli.ListLLMs, "list-llms", false, "List all configured LLM profiles and exit")
 	flag.BoolVar(&cli.ListLLMs, "list-profiles", false, "List all configured LLM profiles and exit")
+	flag.BoolVar(&cli.ListWhispers, "list-whisper", false, "List all configured Whisper server profiles and exit")
+	flag.BoolVar(&cli.ListWhispers, "list-whispers", false, "List all configured Whisper server profiles and exit")
+	flag.IntVar(&cli.SetDefaultWhisper, "set-default-whisper", 0, "Set default Whisper server profile ID in config file")
+	flag.StringVar(&cli.AddWhisper, "add-whisper", "", "Add new Whisper server profile (Name|URL|[SpeedFactor]|[DockerContainer]|[Language]|[Prompt]|[WakeCommand])")
+	flag.IntVar(&cli.RemoveWhisper, "remove-whisper", 0, "Remove Whisper server profile by ID")
 	flag.BoolVar(&cli.CopyOpenCode, "copy_llm_from_opencode", false, "Import LLM settings from OpenCode config")
 	flag.StringVar(&cli.ABSURL, "abs-url", "", "Audiobookshelf server URL")
 	flag.StringVar(&cli.ABSUser, "abs-user", "", "Audiobookshelf username")
@@ -247,6 +252,10 @@ func buildUsageApp() *clihelp.App {
 					{Flags: "--abs-pass PASS", Description: "Set Audiobookshelf password"},
 					{Flags: "--list-llms", Description: "List all configured LLM profiles and exit"},
 					{Flags: "--set-default ID", Description: "Set default LLM profile ID in config file"},
+					{Flags: "--list-whispers", Description: "List all configured Whisper server profiles and exit"},
+					{Flags: "--set-default-whisper ID", Description: "Set default Whisper server profile ID in config file"},
+					{Flags: "--add-whisper SPEC", Description: "Add new Whisper server profile (Name|URL|[SpeedFactor]|[DockerContainer]|[Language]|[Prompt]|[WakeCommand])"},
+					{Flags: "--remove-whisper ID", Description: "Remove Whisper server profile by ID"},
 					{Flags: "--copy_llm_from_opencode", Description: "Import LLM settings from OpenCode config"},
 				},
 				Examples: []clihelp.Example{
@@ -255,6 +264,10 @@ func buildUsageApp() *clihelp.App {
 					{Line: "abs config --abs-user admin --abs-pass secret"},
 					{Line: "abs config --list-llms"},
 					{Line: "abs config --set-default 2"},
+					{Line: "abs config --list-whispers"},
+					{Line: "abs config --set-default-whisper 2"},
+					{Line: "abs config --add-whisper \"Cloud8|http://cloud8:8000/v1/audio/transcriptions|7.0||||/home/sariel/info/misc/26/08/28/gc/cloud8 wake\""},
+					{Line: "abs config --remove-whisper 3"},
 					{Line: "abs config --copy_llm_from_opencode"},
 				},
 			},

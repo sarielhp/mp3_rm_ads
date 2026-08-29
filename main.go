@@ -142,7 +142,7 @@ func main() {
 	}
 
 	if cli.IsConfigCommand {
-		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs {
+		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs || cli.ListWhispers || cli.SetDefaultWhisper > 0 || cli.AddWhisper != "" || cli.RemoveWhisper > 0 {
 			printConfig(config)
 		} else {
 			// Let clihelp handle the help display automatically
@@ -168,6 +168,26 @@ func main() {
 
 	if cli.SetDefault > 0 {
 		setDefaultProfile(&config, cli.SetDefault)
+		return
+	}
+
+	if cli.ListWhispers {
+		listWhispers(config)
+		return
+	}
+
+	if cli.SetDefaultWhisper > 0 {
+		setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
+		return
+	}
+
+	if cli.AddWhisper != "" {
+		addWhisperProfile(&config, cli.AddWhisper)
+		return
+	}
+
+	if cli.RemoveWhisper > 0 {
+		removeWhisperProfile(&config, cli.RemoveWhisper)
 		return
 	}
 
