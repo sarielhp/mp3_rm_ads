@@ -10,6 +10,22 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
+func resolveUniquePrefix(word string, candidates []string) string {
+	var matches []string
+	for _, c := range candidates {
+		if c == word {
+			return c
+		}
+		if strings.HasPrefix(c, word) {
+			matches = append(matches, c)
+		}
+	}
+	if len(matches) == 1 {
+		return matches[0]
+	}
+	return ""
+}
+
 func normalizeCLIArgs(args []string) []string {
 	if len(args) == 0 {
 		return args
@@ -28,36 +44,47 @@ func normalizeCLIArgs(args []string) []string {
 		return append([]string{"test", "kitty"}, args[1:]...)
 	}
 
-	switch strings.ToLower(args[0]) {
-	case "scan", "new", "check-new", "new-episodes":
-		return append([]string{"server", "scan"}, args[1:]...)
-	case "rescan":
-		return append([]string{"server", "rescan"}, args[1:]...)
-	case "list", "ls":
-		return append([]string{"server", "list"}, args[1:]...)
-	case "download", "dl":
-		return append([]string{"server", "download"}, args[1:]...)
-	case "keep", "clean", "purge":
-		return append([]string{"server", "keep"}, args[1:]...)
+	legacyMapping := map[string]string{
+		"scan":         "server scan",
+		"new":          "server scan",
+		"check-new":    "server scan",
+		"new-episodes": "server scan",
+		"rescan":       "server rescan",
+		"list":         "server list",
+		"ls":           "server list",
+		"download":     "server download",
+		"dl":           "server download",
+		"keep":         "server keep",
+		"clean":        "server keep",
+		"purge":        "server keep",
 	}
 
-	subcmds := map[string]bool{
-		"file":     true,
-		"dir":      true,
-		"tui":      true,
-		"config":   true,
-		"cfg":      true,
-		"test":     true,
-		"timeline": true,
-		"table":    true,
-		"cache":    true,
-		"status":   true,
-		"server":   true,
-		"help":     true,
-		"usage":    true,
+	var legacyKeys []string
+	for k := range legacyMapping {
+		legacyKeys = append(legacyKeys, k)
 	}
 
-	if subcmds[strings.ToLower(args[0])] {
+	topLevelCmds := []string{
+		"file", "dir", "tui", "timeline", "table", "status", "cache", "test", "server", "config", "cfg", "help", "usage", "tree",
+	}
+
+	firstArg := strings.ToLower(args[0])
+
+	if legacyMatched := resolveUniquePrefix(firstArg, legacyKeys); legacyMatched != "" {
+		target := legacyMapping[legacyMatched]
+		parts := strings.Split(target, " ")
+		return append(parts, args[1:]...)
+	}
+
+	isTopLevelPrefix := false
+	for _, cmd := range topLevelCmds {
+		if strings.HasPrefix(cmd, firstArg) {
+			isTopLevelPrefix = true
+			break
+		}
+	}
+
+	if isTopLevelPrefix {
 		return args
 	}
 
