@@ -345,6 +345,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 }
 
 func waitForActiveDownloads(client *ABSClient, podcasts []PodcastItem, silent bool) {
+	time.Sleep(2 * time.Second)
 	startTime := time.Now()
 	for {
 		hasActive := false

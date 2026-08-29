@@ -69,21 +69,30 @@ type FeedEpisode struct {
 	Episode          string         `json:"episode,omitempty"`
 	DurationSeconds  float64        `json:"durationSeconds,omitempty"`
 	GUID             string         `json:"guid,omitempty"`
+	EnclosureURL     string         `json:"enclosureUrl,omitempty"`
 	Enclosure        *FeedEnclosure `json:"enclosure,omitempty"`
 }
 
 func (f *FeedEpisode) UnmarshalJSON(data []byte) error {
 	type Alias FeedEpisode
 	aux := &struct {
-		PublishedAt interface{} `json:"publishedAt"`
-		Season      interface{} `json:"season"`
-		Episode     interface{} `json:"episode"`
+		PublishedAt  interface{} `json:"publishedAt"`
+		Season       interface{} `json:"season"`
+		Episode      interface{} `json:"episode"`
+		EnclosureURL string      `json:"enclosureUrl"`
 		*Alias
 	}{
 		Alias: (*Alias)(f),
 	}
 	if err := json.Unmarshal(data, &aux); err != nil {
 		return err
+	}
+
+	if aux.EnclosureURL != "" && f.Enclosure == nil {
+		f.Enclosure = &FeedEnclosure{URL: aux.EnclosureURL}
+	}
+	if f.Enclosure != nil && f.Enclosure.URL != "" && f.EnclosureURL == "" {
+		f.EnclosureURL = f.Enclosure.URL
 	}
 
 	if aux.PublishedAt != nil {

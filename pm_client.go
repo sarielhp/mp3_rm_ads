@@ -20,6 +20,7 @@ type ABSClient struct {
 	MaxAttempts int
 	RetryDelay  time.Duration
 	Silent      bool
+	Verbose     bool
 	reqMu       sync.Mutex
 }
 
@@ -70,25 +71,30 @@ func (c *ABSClient) Request(endpoint, method string, data interface{}) ([]byte, 
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		retryDelay := c.getRetryDelay(attempt)
-		var bodyReader io.Reader
-		if jsonData != nil {
-			bodyReader = bytes.NewBuffer(jsonData)
-		}
 
-		req, err := http.NewRequest(strings.ToUpper(method), reqURL, bodyReader)
+		var req *http.Request
+		if jsonData != nil {
+			req, err = http.NewRequest(method, reqURL, bytes.NewBuffer(jsonData))
+			if err == nil {
+				req.Header.Set("Content-Type", "application/json")
+			}
+		} else {
+			req, err = http.NewRequest(method, reqURL, nil)
+		}
 		if err != nil {
 			return nil, err
 		}
 
-		req.Header.Set("Authorization", "Bearer "+c.Token)
-		req.Header.Set("Content-Type", "application/json")
+		if c.Token != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
+		}
 
 		res, err := c.httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			if attempt < maxAttempts {
-				if !c.Silent {
-					fmt.Fprintf(os.Stderr, "[-] Audiobookshelf not responding (attempt %d/%d). Waiting for container to wake up (retrying in %v)...\n", attempt, maxAttempts, retryDelay)
+				if c.Verbose {
+					fmt.Fprintf(os.Stderr, "[-] Failed to connect (attempt %d/%d). Retrying in %v...\n", attempt, maxAttempts, retryDelay)
 				}
 				time.Sleep(retryDelay)
 				continue
@@ -102,7 +108,7 @@ func (c *ABSClient) Request(endpoint, method string, data interface{}) ([]byte, 
 		if err != nil {
 			lastErr = err
 			if attempt < maxAttempts {
-				if !c.Silent {
+				if c.Verbose {
 					fmt.Fprintf(os.Stderr, "[-] Failed reading response body (attempt %d/%d). Retrying in %v...\n", attempt, maxAttempts, retryDelay)
 				}
 				time.Sleep(retryDelay)
@@ -114,7 +120,7 @@ func (c *ABSClient) Request(endpoint, method string, data interface{}) ([]byte, 
 		if res.StatusCode >= 500 || res.StatusCode == 429 || res.StatusCode == 408 {
 			lastStatusCode = res.StatusCode
 			if attempt < maxAttempts {
-				if !c.Silent {
+				if c.Verbose {
 					fmt.Fprintf(os.Stderr, "[-] Audiobookshelf returned HTTP %d (attempt %d/%d). Waiting for container to wake up (retrying in %v)...\n", res.StatusCode, attempt, maxAttempts, retryDelay)
 				}
 				time.Sleep(retryDelay)
@@ -133,7 +139,7 @@ func (c *ABSClient) Request(endpoint, method string, data interface{}) ([]byte, 
 		isHTML := bytes.HasPrefix(trimmed, []byte("<")) || strings.Contains(strings.ToLower(res.Header.Get("Content-Type")), "text/html")
 		if isHTML {
 			if attempt < maxAttempts {
-				if !c.Silent {
+				if c.Verbose {
 					fmt.Fprintf(os.Stderr, "[-] Audiobookshelf returned HTML (Sablier/server waking up, attempt %d/%d). Retrying in %v...\n", attempt, maxAttempts, retryDelay)
 				}
 				time.Sleep(retryDelay)

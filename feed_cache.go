@@ -188,8 +188,10 @@ func parseRSSXML(data []byte) ([]FeedEpisode, error) {
 			Episode:          strings.TrimSpace(it.Episode),
 		}
 		if it.Enclosure != nil && it.Enclosure.URL != "" {
+			encURL := strings.TrimSpace(it.Enclosure.URL)
+			ep.EnclosureURL = encURL
 			ep.Enclosure = &FeedEnclosure{
-				URL:  strings.TrimSpace(it.Enclosure.URL),
+				URL:  encURL,
 				Type: strings.TrimSpace(it.Enclosure.Type),
 			}
 		}
