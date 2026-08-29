@@ -141,6 +141,13 @@ func absScanPodcasts(cfg Config, quiet bool) {
 	}
 
 	existing := make(map[string]bool)
+	if dirEntries, err := os.ReadDir(podcastsDir); err == nil {
+		for _, e := range dirEntries {
+			if e.IsDir() {
+				existing[strings.ToLower(e.Name())] = true
+			}
+		}
+	}
 	for _, lp := range localPodcasts {
 		existing[strings.ToLower(lp.name)] = true
 		existing[strings.ToLower(filepath.Base(lp.dir))] = true

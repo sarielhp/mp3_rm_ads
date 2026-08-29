@@ -119,6 +119,15 @@ func (f *FeedEpisode) UnmarshalJSON(data []byte) error {
 type ActiveDownload struct {
 	ID                  string `json:"id"`
 	EpisodeDisplayTitle string `json:"episodeDisplayTitle"`
+	DisplayTitle        string `json:"displayTitle"`
+	Title               string `json:"title"`
+	EpisodeID           string `json:"episodeId"`
+	URL                 string `json:"url"`
+	Episode             struct {
+		Title        string `json:"title"`
+		GUID         string `json:"guid"`
+		EnclosureURL string `json:"enclosureUrl"`
+	} `json:"episode"`
 }
 
 type SimplecastEpisode struct {

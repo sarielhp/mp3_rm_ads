@@ -44,10 +44,23 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 
 			activeDls, _ := client.ActiveDownloads(itemID)
 			queuedTitles := make(map[string]bool)
+			queuedURLs := make(map[string]bool)
+			queuedGUIDs := make(map[string]bool)
 			for _, ad := range activeDls {
-				t := strings.ToLower(strings.TrimSpace(ad.EpisodeDisplayTitle))
-				if t != "" {
-					queuedTitles[t] = true
+				for _, t := range []string{ad.EpisodeDisplayTitle, ad.DisplayTitle, ad.Title, ad.Episode.Title} {
+					t = strings.ToLower(strings.TrimSpace(t))
+					if t != "" {
+						queuedTitles[t] = true
+					}
+				}
+				if ad.URL != "" {
+					queuedURLs[ad.URL] = true
+				}
+				if ad.Episode.EnclosureURL != "" {
+					queuedURLs[ad.Episode.EnclosureURL] = true
+				}
+				if ad.Episode.GUID != "" {
+					queuedGUIDs[ad.Episode.GUID] = true
 				}
 			}
 
@@ -59,10 +72,9 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				guid := ep.GUID
 				title := strings.ToLower(strings.TrimSpace(ep.Title))
 
-				return (encURL != "" && downloadedURLs[encURL]) ||
-					(guid != "" && downloadedGUIDs[guid]) ||
-					(title != "" && downloadedTitles[title]) ||
-					(title != "" && queuedTitles[title])
+				return (encURL != "" && (downloadedURLs[encURL] || queuedURLs[encURL])) ||
+					(guid != "" && (downloadedGUIDs[guid] || queuedGUIDs[guid])) ||
+					(title != "" && (downloadedTitles[title] || queuedTitles[title]))
 			}
 
 			sortedCatalog := make([]FeedEpisode, len(feedEpisodes))

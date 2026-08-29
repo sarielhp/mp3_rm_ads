@@ -72,7 +72,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 						sem <- struct{}{}
 						defer func() { <-sem }()
 
-						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, true, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
 
 						countMu.Lock()
 						completedCount++
@@ -99,6 +99,13 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				}
 				if !cli.Silent {
 					fmt.Print("\r\x1b[K")
+				}
+
+				if totalNewlyDownloaded > 0 && !cli.NoWait && !cli.DryRun {
+					if !cli.Silent {
+						fmt.Printf("\nWaiting for Audiobookshelf to complete %d queued download(s)...\n", totalNewlyDownloaded)
+					}
+					waitForActiveDownloads(client, podcasts, cli.Silent)
 				}
 			}
 
@@ -334,5 +341,41 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
 		}
 		return
+	}
+}
+
+func waitForActiveDownloads(client *ABSClient, podcasts []PodcastItem, silent bool) {
+	startTime := time.Now()
+	for {
+		hasActive := false
+		var activeTitles []string
+		for _, p := range podcasts {
+			dls, err := client.ActiveDownloads(p.ID)
+			if err == nil && len(dls) > 0 {
+				hasActive = true
+				for _, d := range dls {
+					if d.EpisodeDisplayTitle != "" {
+						activeTitles = append(activeTitles, d.EpisodeDisplayTitle)
+					}
+				}
+			}
+		}
+		if !hasActive {
+			if !silent {
+				fmt.Println("\nAll downloads completed successfully!")
+			}
+			break
+		}
+		if !silent && len(activeTitles) > 0 {
+			fmt.Printf("\r    Downloading (%d active): %s\x1b[K", len(activeTitles), activeTitles[0])
+			os.Stdout.Sync()
+		}
+		time.Sleep(3 * time.Second)
+		if time.Since(startTime) > 300*time.Second {
+			if !silent {
+				fmt.Println("\nTimeout waiting for downloads to finish. Downloads continue in background.")
+			}
+			break
+		}
 	}
 }

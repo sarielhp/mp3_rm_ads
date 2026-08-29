@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -19,6 +20,7 @@ type ABSClient struct {
 	MaxAttempts int
 	RetryDelay  time.Duration
 	Silent      bool
+	reqMu       sync.Mutex
 }
 
 func NewABSClient(host, token string) *ABSClient {
@@ -44,6 +46,9 @@ func (c *ABSClient) getRetryDelay(attempt int) time.Duration {
 }
 
 func (c *ABSClient) Request(endpoint, method string, data interface{}) ([]byte, error) {
+	c.reqMu.Lock()
+	defer c.reqMu.Unlock()
+
 	reqURL := fmt.Sprintf("%s%s", c.Host, endpoint)
 
 	var jsonData []byte

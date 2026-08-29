@@ -282,6 +282,31 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 			},
 			{
+				Name:        "scan",
+				Description: "Scan Audiobookshelf for new podcasts and check for new episodes",
+				UsageLine:   "abs scan [podcasts_dir] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
+				},
+				Args:             clihelp.MaximumNArgs(1),
+				OptionsValidator: clihelp.MutuallyExclusive("--podcasts-only", "--episodes-only"),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
+					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+					clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
+					clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check and download new episodes (skip podcast folder scanning)"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "scan"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
 				Name:        "status",
 				Description: "Show a dry-run status report of all podcasts and episodes needing ad removal",
 				UsageLine:   "abs status [podcasts_dir]",
