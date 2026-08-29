@@ -100,6 +100,10 @@ func parseFlags() CLIOptions {
 			cli.IsScanCommand = true
 			detectedCommand = "scan"
 			args = args[1:]
+		case "status":
+			cli.IsStatusCommand = true
+			detectedCommand = "status"
+			args = args[1:]
 		}
 	}
 
@@ -329,6 +333,17 @@ func buildUsageApp() *clihelp.App {
 				Examples: []clihelp.Example{
 					{Line: "abs scan"},
 					{Line: "abs scan /media/podcasts/clean/"},
+				},
+			},
+			{
+				Name:        "status",
+				Description: "Show a dry-run status report of all podcasts and episodes needing ad removal",
+				UsageLine:   "abs status [podcasts_dir]",
+				Options: []clihelp.Option{
+					{Flags: "[podcasts_dir]", Description: "Local podcasts directory (default: podcasts_dir from config)"},
+				},
+				Examples: []clihelp.Example{
+					{Line: "abs status"},
 				},
 			},
 		},

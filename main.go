@@ -156,6 +156,21 @@ func main() {
 		return
 	}
 
+	if cli.IsStatusCommand {
+		targetDir := config.PodcastsDir
+		args := flag.Args()
+		if len(args) > 0 {
+			targetDir = args[0]
+		}
+		if targetDir == "" {
+			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
+			os.Exit(1)
+		}
+		config.PodcastsDir = targetDir
+		absStatus(config, cli.Quiet)
+		return
+	}
+
 	if cli.ListLLMs {
 		listProfiles(config)
 		return
