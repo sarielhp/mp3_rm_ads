@@ -150,7 +150,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs unless an error occurs"),
 					clihelp.String(&opts.RemoteFFmpegHost, "--remote-ffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host"),
 					clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of episodes to recut"),
 				},
@@ -213,7 +212,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Options: []clihelp.Option{
 							clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
 							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress status outputs"),
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
 						},
 						Run: func(ctx *clihelp.Context) error {
 							*action = "server"
@@ -255,7 +254,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress status outputs"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
@@ -293,7 +292,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
 					clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
@@ -398,7 +397,6 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 		clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-		clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs unless an error occurs"),
 		clihelp.BoolToggle(&opts.SaveTranscript, "--[no-]transcript", true, "Save default .transcript.json file"),
 		clihelp.Bool(&opts.UseChunks, "--use-chunks", false, "Split long audio into chunks for Whisper"),
 		clihelp.Bool(&opts.ExtractKeywords, "--extract-keywords", false, "Extract keywords to improve transcription"),

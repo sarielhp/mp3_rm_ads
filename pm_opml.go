@@ -68,7 +68,7 @@ func (c *ABSClient) OpenRSSFeed(itemID string) (string, error) {
 	return res.Slug, nil
 }
 
-func getABSClient(config Config, silent bool) (*ABSClient, error) {
+func getABSClient(config Config, quiet bool) (*ABSClient, error) {
 	token := config.AudiobookshelfToken
 	if token == "" {
 		token = getABSTokenFromDB(config.AudiobookshelfDBPath)
@@ -80,7 +80,7 @@ func getABSClient(config Config, silent bool) (*ABSClient, error) {
 		return nil, fmt.Errorf("Audiobookshelf API token not configured and could not be retrieved from DB or login")
 	}
 	client := NewABSClient(config.AudiobookshelfURL, token)
-	client.Silent = silent
+	client.Quiet = quiet
 	return client, nil
 }
 
@@ -239,13 +239,13 @@ func exportOPML(config Config, cli CLIOptions) {
 		os.Exit(1)
 	}
 
-	client, err := getABSClient(config, cli.Silent)
+	client, err := getABSClient(config, cli.Quiet)
 	if err != nil {
 		printError(fmt.Sprintf("Error: %v", err))
 		os.Exit(1)
 	}
 
-	feeds, err := fetchPodcastFeeds(client, config.AudiobookshelfURL, cli.Silent, cli.Verbose)
+	feeds, err := fetchPodcastFeeds(client, config.AudiobookshelfURL, cli.Quiet, cli.Verbose)
 	if err != nil {
 		printError(fmt.Sprintf("Error generating OPML: %v", err))
 		os.Exit(1)
@@ -272,7 +272,7 @@ func exportOPML(config Config, cli CLIOptions) {
 			printError(fmt.Sprintf("Error writing OPML file: %v", err))
 			os.Exit(1)
 		}
-		if !cli.Silent {
+		if !cli.Quiet {
 			fmt.Printf("Successfully generated OPML file at: %s\n", cli.Output)
 			fmt.Printf("Found and processed %d podcast feeds.\n", len(feeds))
 		}

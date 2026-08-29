@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, oldest, dryRun, noWait, fill, countGiven, checkNew, forceNewOnly bool, keep *int, verbose bool, silent bool) int {
+func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, oldest, dryRun, noWait, fill, countGiven, checkNew, forceNewOnly bool, keep *int, verbose bool, quiet bool) int {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
@@ -194,7 +194,7 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				if len(episodesToDownload) > 0 && len(reasons) == 0 {
 					reasons = append(reasons, fmt.Sprintf("%d gap/fill episode(s)", len(episodesToDownload)))
 				}
-				if gapTerminated && !silent {
+				if gapTerminated && !quiet {
 					fmt.Printf("Search for %s terminated: gap larger than 10 undownloaded episodes encountered.\n", podcastTitle)
 				}
 			} else {
@@ -256,7 +256,7 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 	}
 
 	if len(episodesToDownload) > 0 {
-		if !silent {
+		if !quiet {
 			fmt.Print("\r\x1b[K")
 			fmt.Printf("=== Podcast: %s ===\n", podcastTitle)
 		}
@@ -273,7 +273,7 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 		if oldest {
 			directionStr = "oldest -> newest"
 		}
-		if !silent {
+		if !quiet {
 			fmt.Printf("Found %s (%s).\n", strings.Join(reasons, " and "), directionStr)
 
 			fmt.Printf("\n=== Selected %d Episode(s) for Download ===\n", len(episodesToDownload))
@@ -296,18 +296,18 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 		}
 
 		if !dryRun {
-			if !silent {
+			if !quiet {
 				fmt.Printf("Queueing download request in Audiobookshelf for %d episode(s)...\n", len(episodesToDownload))
 			}
 			if err := client.DownloadEpisodes(itemID, episodesToDownload); err != nil {
 				printError(fmt.Sprintf("Failed to queue episode download: %v", err))
 			} else {
-				if !silent {
+				if !quiet {
 					fmt.Println("Download request successfully sent to Audiobookshelf!")
 				}
 
 				if !noWait {
-					if !silent {
+					if !quiet {
 						fmt.Println("\nWaiting for Audiobookshelf to complete episode download(s)...")
 					}
 					time.Sleep(2 * time.Second)
@@ -321,12 +321,12 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 							if updatedItem != nil {
 								newCount = len(updatedItem.Media.Episodes)
 							}
-							if !silent {
+							if !quiet {
 								fmt.Printf("\nDownload completed! Podcast now has %d downloaded episodes.\n", newCount)
 							}
 							break
 						} else if len(activeDls) > 0 {
-							if !silent {
+							if !quiet {
 								dl := activeDls[0]
 								title := dl.EpisodeDisplayTitle
 								if title == "" {
@@ -339,7 +339,7 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 
 						time.Sleep(3 * time.Second)
 						if time.Since(startTime) > 300*time.Second {
-							if !silent {
+							if !quiet {
 								fmt.Println("\nTimeout waiting for download to finish. Download continues in background.")
 							}
 							break
@@ -348,16 +348,16 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				}
 			}
 		} else {
-			if !silent {
+			if !quiet {
 				fmt.Println("Dry run mode enabled. Skipping actual download request.")
 			}
 		}
-	} else if !forceNewOnly && !silent {
+	} else if !forceNewOnly && !quiet {
 		fmt.Printf("No new episodes to download for %s.\n", podcastTitle)
 	}
 
 	if keep != nil {
-		applyKeepPolicy(client, itemID, podcastTitle, *keep, dryRun, verbose, silent)
+		applyKeepPolicy(client, itemID, podcastTitle, *keep, dryRun, verbose, quiet)
 	}
 
 	return len(episodesToDownload)

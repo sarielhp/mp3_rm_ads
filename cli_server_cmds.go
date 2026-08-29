@@ -24,7 +24,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
 					clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
@@ -44,7 +44,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Args:        clihelp.NoArgs,
 				Options: []clihelp.Option{
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
@@ -69,7 +69,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 					clihelp.BoolToggle(&opts.CheckNew, "--[no-]check-new", true, "Check new episodes published"),
 					clihelp.Bool(&opts.Oldest, "--oldest", false, "Download oldest first"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed info"),
 				},
@@ -106,7 +106,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast"),
 					clihelp.Int(keepVal, "-k, --keep <number>", -1, "Keep policy count"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Silent execution"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Dry run"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
 				},
@@ -137,7 +137,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by index or title"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview actions without updating DB"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed trace outputs"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress standard output"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.String(&opts.SqliteDBPath, "--db-path <path>", "", "Path to absdatabase.sqlite"),
 				},
 				Run: func(ctx *clihelp.Context) error {
@@ -169,7 +169,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Output, "-o, --output <file>", "", "Output OPML file path (default: stdout)"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed progress output"),
-					clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress status outputs"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress status outputs"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"

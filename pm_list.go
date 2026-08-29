@@ -5,8 +5,8 @@ import (
 	"strconv"
 )
 
-func printPodcastList(client *ABSClient, podcasts []PodcastItem, verbose bool, silent bool) {
-	if silent {
+func printPodcastList(client *ABSClient, podcasts []PodcastItem, verbose bool, quiet bool) {
+	if quiet {
 		return
 	}
 	fmt.Println("\n=== Available Podcasts in Audiobookshelf ===")

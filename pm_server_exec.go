@@ -32,7 +32,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 		}
 
 		if !cli.PodcastsOnly {
-			client, err := getABSClient(config, cli.Silent)
+			client, err := getABSClient(config, cli.Quiet)
 			if err != nil {
 				printError(fmt.Sprintf("Error: %v", err))
 				os.Exit(1)
@@ -52,7 +52,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 					os.Exit(1)
 				}
-				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Quiet)
 				if !cli.DryRun {
 					totalNewlyDownloaded += dlCount
 				}
@@ -72,14 +72,14 @@ func handleServerCommand(config Config, cli CLIOptions) {
 						sem <- struct{}{}
 						defer func() { <-sem }()
 
-						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, true, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, true, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Quiet)
 
 						countMu.Lock()
 						completedCount++
 						done := completedCount
 						countMu.Unlock()
 
-						if !cli.Silent {
+						if !cli.Quiet {
 							title := it.Media.Metadata.Title
 							if title == "" {
 								title = "Untitled"
@@ -97,19 +97,19 @@ func handleServerCommand(config Config, cli CLIOptions) {
 						totalNewlyDownloaded += res.count
 					}
 				}
-				if !cli.Silent {
+				if !cli.Quiet {
 					fmt.Print("\r\x1b[K")
 				}
 
 				if totalNewlyDownloaded > 0 && !cli.NoWait && !cli.DryRun {
-					if !cli.Silent {
+					if !cli.Quiet {
 						fmt.Printf("\nWaiting for Audiobookshelf to complete %d queued download(s)...\n", totalNewlyDownloaded)
 					}
-					waitForActiveDownloads(client, podcasts, cli.Silent)
+					waitForActiveDownloads(client, podcasts, cli.Quiet)
 				}
 			}
 
-			if !cli.Silent {
+			if !cli.Quiet {
 				fmt.Printf("\nChecked a total of %d podcast(s) for new episodes.\n", totalPodcastsChecked)
 				if totalNewlyDownloaded == 0 {
 					fmt.Println("No new episodes found.")
@@ -117,13 +117,13 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			}
 
 			if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-				runPostProcessors(config.PostProcessors, cli.Silent)
+				runPostProcessors(config.PostProcessors, cli.Quiet)
 			}
 		}
 		return
 
 	case "list":
-		client, err := getABSClient(config, cli.Silent)
+		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
 			printError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
@@ -133,11 +133,11 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
 			os.Exit(1)
 		}
-		printPodcastList(client, podcasts, cli.Verbose, cli.Silent)
+		printPodcastList(client, podcasts, cli.Verbose, cli.Quiet)
 		return
 
 	case "download":
-		client, err := getABSClient(config, cli.Silent)
+		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
 			printError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
@@ -155,7 +155,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				os.Exit(1)
 			}
-			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Quiet)
 			if !cli.DryRun {
 				totalNewlyDownloaded += dlCount
 			}
@@ -165,27 +165,27 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				if title == "" {
 					title = "Untitled"
 				}
-				if !cli.Silent {
+				if !cli.Quiet {
 					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
 					os.Stdout.Sync()
 				}
-				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Quiet)
 				if !cli.DryRun {
 					totalNewlyDownloaded += dlCount
 				}
 			}
-			if !cli.Silent {
+			if !cli.Quiet {
 				fmt.Print("\r\x1b[K")
 			}
 		}
 
 		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-			runPostProcessors(config.PostProcessors, cli.Silent)
+			runPostProcessors(config.PostProcessors, cli.Quiet)
 		}
 		return
 
 	case "keep":
-		client, err := getABSClient(config, cli.Silent)
+		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
 			printError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
@@ -206,20 +206,20 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			if title == "" {
 				title = "Untitled"
 			}
-			applyKeepPolicy(client, targetItem.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+			applyKeepPolicy(client, targetItem.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Quiet)
 		} else {
 			for _, item := range podcasts {
 				title := item.Media.Metadata.Title
 				if title == "" {
 					title = "Untitled"
 				}
-				applyKeepPolicy(client, item.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+				applyKeepPolicy(client, item.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Quiet)
 			}
 		}
 		return
 
 	case "rescan":
-		client, err := getABSClient(config, cli.Silent)
+		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
 			printError(fmt.Sprintf("Error: %v", err))
 			os.Exit(1)
@@ -254,7 +254,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				os.Exit(1)
 			}
-			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
+			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Quiet)
 			totalRescanned += rCount
 			totalChecked += cCount
 			podcastCount = 1
@@ -265,20 +265,20 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				if title == "" {
 					title = "Untitled"
 				}
-				if !cli.Silent {
+				if !cli.Quiet {
 					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
 					os.Stdout.Sync()
 				}
-				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
+				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Quiet)
 				totalRescanned += rCount
 				totalChecked += cCount
 			}
-			if !cli.Silent {
+			if !cli.Quiet {
 				fmt.Print("\r\x1b[K")
 			}
 		}
 
-		if !cli.Silent {
+		if !cli.Quiet {
 			fmt.Printf("\nChecked a total of %d MP3 file(s) across %d podcast(s).\n", totalChecked, podcastCount)
 			if totalRescanned == 0 {
 				fmt.Println("No episodes required database duration updates.")
@@ -344,7 +344,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	}
 }
 
-func waitForActiveDownloads(client *ABSClient, podcasts []PodcastItem, silent bool) {
+func waitForActiveDownloads(client *ABSClient, podcasts []PodcastItem, quiet bool) {
 	time.Sleep(2 * time.Second)
 	startTime := time.Now()
 	for {
@@ -362,18 +362,18 @@ func waitForActiveDownloads(client *ABSClient, podcasts []PodcastItem, silent bo
 			}
 		}
 		if !hasActive {
-			if !silent {
+			if !quiet {
 				fmt.Println("\nAll downloads completed successfully!")
 			}
 			break
 		}
-		if !silent && len(activeTitles) > 0 {
+		if !quiet && len(activeTitles) > 0 {
 			fmt.Printf("\r    Downloading (%d active): %s\x1b[K", len(activeTitles), activeTitles[0])
 			os.Stdout.Sync()
 		}
 		time.Sleep(3 * time.Second)
 		if time.Since(startTime) > 300*time.Second {
-			if !silent {
+			if !quiet {
 				fmt.Println("\nTimeout waiting for downloads to finish. Downloads continue in background.")
 			}
 			break

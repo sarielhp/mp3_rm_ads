@@ -19,7 +19,7 @@ type ABSClient struct {
 	httpClient  *http.Client
 	MaxAttempts int
 	RetryDelay  time.Duration
-	Silent      bool
+	Quiet       bool
 	Verbose     bool
 	reqMu       sync.Mutex
 }

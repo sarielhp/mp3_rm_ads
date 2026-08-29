@@ -130,7 +130,7 @@ func TestFetchPodcastFeedsAndOpenFeed(t *testing.T) {
 	defer server.Close()
 
 	client := NewABSClient(server.URL, "test-token")
-	client.Silent = true
+	client.Quiet = true
 	client.MaxAttempts = 1
 
 	feeds, err := fetchPodcastFeeds(client, server.URL, true, false)
@@ -202,7 +202,7 @@ func TestExportOPMLToFile(t *testing.T) {
 	}
 	cli := CLIOptions{
 		Output: outPath,
-		Silent: true,
+		Quiet:  true,
 	}
 
 	exportOPML(cfg, cli)

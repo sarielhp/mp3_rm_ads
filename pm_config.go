@@ -204,12 +204,12 @@ func printConfigInfo(cfg Config) {
 	}
 }
 
-func runPostProcessors(processors []string, silent bool) {
-	if !silent {
+func runPostProcessors(processors []string, quiet bool) {
+	if !quiet {
 		fmt.Printf("\n=== Executing %d Post-Processor(s) ===\n", len(processors))
 	}
 	for _, proc := range processors {
-		if !silent {
+		if !quiet {
 			fmt.Printf("Running post-processor: %s...\n", proc)
 		}
 		parts := strings.Fields(proc)

@@ -21,61 +21,7 @@ func main() {
 
 	action, cli := parseFlags()
 
-	var silentLogFile *os.File
-	var silentLogPath string
-	var origStdout *os.File
-	var origStderr *os.File
-	hasError := false
-
-	if cli.Silent {
-		origStdout = os.Stdout
-		origStderr = os.Stderr
-
-		origStdout.Sync()
-		origStderr.Sync()
-
-		tmpDir := userTmpDir()
-		tmp, err := os.CreateTemp(tmpDir, "abs_silent_*.log")
-		if err == nil {
-			silentLogFile = tmp
-			silentLogPath = tmp.Name()
-			os.Stdout = silentLogFile
-			os.Stderr = silentLogFile
-		}
-	}
-
-	finishSilent := func(hadError bool) {
-		if silentLogFile == nil {
-			os.Stdout.Sync()
-			os.Stderr.Sync()
-			return
-		}
-		os.Stdout.Sync()
-		os.Stderr.Sync()
-		silentLogFile.Sync()
-
-		os.Stdout = origStdout
-		os.Stderr = origStderr
-		silentLogFile.Close()
-
-		if hadError {
-			data, readErr := os.ReadFile(silentLogPath)
-			if readErr == nil {
-				origStderr.Write(data)
-				origStderr.Sync()
-			}
-		}
-		os.Remove(silentLogPath)
-		silentLogFile = nil
-	}
-
 	defer func() {
-		if r := recover(); r != nil {
-			finishSilent(true)
-			panic(r)
-		} else {
-			finishSilent(hasError)
-		}
 		if !cli.Quiet {
 			fmt.Println()
 		}
@@ -94,12 +40,10 @@ func main() {
 			testKittyImage(cli.Args)
 		} else if cli.TestABS {
 			if !testAudiobookshelfServer(config, cli.Quiet) {
-				hasError = true
 				os.Exit(1)
 			}
 		} else {
 			if !testWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
-				hasError = true
 				os.Exit(1)
 			}
 		}

@@ -5,7 +5,7 @@ import (
 	"sort"
 )
 
-func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, dryRun bool, verbose bool, silent bool) bool {
+func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, dryRun bool, verbose bool, quiet bool) bool {
 	updatedItem, err := client.GetItem(itemID)
 	if err != nil {
 		printError(fmt.Sprintf("Failed to fetch updated item for keep policy: %v", err))
@@ -31,7 +31,7 @@ func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, d
 		toDeleteCount := len(sortedDownloaded) - keep
 		episodesToDelete := sortedDownloaded[:toDeleteCount]
 
-		if !silent {
+		if !quiet {
 			fmt.Printf("\n=== Keep Policy (%d) for %s ===\n", keep, podcastTitle)
 			fmt.Printf("Currently downloaded: %d episode(s).\n", len(sortedDownloaded))
 			fmt.Printf("Keeping latest %d episode(s), deleting %d oldest episode(s)...\n", keep, toDeleteCount)
@@ -47,7 +47,7 @@ func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, d
 			if pub == "" {
 				pub = fmt.Sprintf("%d", ep.PublishedAt)
 			}
-			if !silent {
+			if !quiet {
 				if verbose {
 					fmt.Printf("  %d. Deleting: %s (Published: %s, ID: %s)\n", idx+1, title, pub, epID)
 				} else {
@@ -55,12 +55,12 @@ func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, d
 				}
 			}
 			if dryRun {
-				if !silent {
+				if !quiet {
 					fmt.Println("     Dry run: Skipping deletion.")
 				}
 			} else {
 				if err := client.DeletePodcastEpisode(itemID, epID); err == nil {
-					if !silent {
+					if !quiet {
 						fmt.Println("     Deleted successfully.")
 					}
 				} else {
@@ -69,7 +69,7 @@ func applyKeepPolicy(client *ABSClient, itemID, podcastTitle string, keep int, d
 			}
 		}
 	} else {
-		if !silent {
+		if !quiet {
 			fmt.Printf("\t%s: %d\n", podcastTitle, len(sortedDownloaded))
 		}
 	}

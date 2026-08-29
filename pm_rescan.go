@@ -134,7 +134,7 @@ type durationResult struct {
 	diskDuration float64
 }
 
-func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db *sql.DB, podcastsDir string, verbose bool, silent bool) (int, int) {
+func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db *sql.DB, podcastsDir string, verbose bool, quiet bool) (int, int) {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
@@ -235,7 +235,7 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db 
 	}
 
 	if len(episodesToUpdate) > 0 {
-		if !silent {
+		if !quiet {
 			fmt.Print("\r\x1b[K")
 			fmt.Printf("=== Podcast: %s (%d downloaded episode(s)) ===\n", podcastTitle, len(episodes))
 		}
@@ -251,7 +251,7 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db 
 			if dbDuration <= 0 {
 				dbDuration = ep.Duration
 			}
-			if !silent {
+			if !quiet {
 				if verbose {
 					fmt.Printf("  Episode: %s (ID: %s)\n", epTitle, ep.ID)
 				} else {
@@ -261,11 +261,11 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db 
 			}
 
 			if dryRun {
-				if !silent {
+				if !quiet {
 					fmt.Println("      Dry run: Would rescan episode and update database.")
 				}
 			} else if tx != nil {
-				if !silent && verbose {
+				if !quiet && verbose {
 					fmt.Println("      Queueing SQLite transaction update...")
 				}
 				updateEpisodeInTx(tx, ep.ID, diskDuration, episodeHostPaths[ep.ID])
@@ -277,7 +277,7 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db 
 	}
 
 	if rescanCount > 0 && !dryRun {
-		if !silent {
+		if !quiet {
 			if verbose {
 				fmt.Printf("      Triggering Audiobookshelf item scan for item ID: %s...\n", itemID)
 			} else {
@@ -288,13 +288,13 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db 
 		if err != nil {
 			printError(fmt.Sprintf("      Audiobookshelf scan API request failed: %v", err))
 		} else {
-			if !silent {
+			if !quiet {
 				fmt.Println("      Audiobookshelf scan triggered successfully.")
 			}
 		}
 	}
 
-	if rescanCount > 0 && !silent {
+	if rescanCount > 0 && !quiet {
 		desc := "rescanned and updated"
 		if dryRun {
 			desc = "would be rescanned/updated"
