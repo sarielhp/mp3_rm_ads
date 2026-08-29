@@ -54,7 +54,7 @@ func formatTimestamp(ms int64) string {
 	if ms > 1e11 {
 		sec = ms / 1000
 	}
-	t := time.Unix(sec, 0).UTC()
+	t := time.Unix(sec, 0).Local()
 	return t.Format("2006-01-02 15:04")
 }
 

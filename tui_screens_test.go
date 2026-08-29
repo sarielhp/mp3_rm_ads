@@ -308,7 +308,7 @@ func TestTUITimelineViewer(t *testing.T) {
 	if !strings.Contains(view, "ONLINE AVAILABILITY TIMELINE") {
 		t.Errorf("expected timeline header, got: %s", view)
 	}
-	if !strings.Contains(view, "Release Time (UTC)") {
+	if !strings.Contains(view, "Release Time") {
 		t.Errorf("expected table columns in view, got: %s", view)
 	}
 

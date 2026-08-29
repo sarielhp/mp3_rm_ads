@@ -41,8 +41,8 @@ func TestGetPodcastLastEpisodesOnlineTimeline(t *testing.T) {
 	if releases[0].Title != "Episode One" {
 		t.Errorf("expected newest episode first, got %q", releases[0].Title)
 	}
-	if !strings.Contains(releases[0].ExactTimeUTC, "2026-08-25 14:30:00 UTC") {
-		t.Errorf("unexpected UTC time: %s", releases[0].ExactTimeUTC)
+	if !strings.Contains(releases[0].ExactTimeLocal, "2026-08-25") {
+		t.Errorf("unexpected local time: %s", releases[0].ExactTimeLocal)
 	}
 	if !releases[0].HasAdsRemoved {
 		t.Error("expected HasAdsRemoved to be true for episode one")
@@ -55,7 +55,7 @@ func TestGetPodcastLastEpisodesOnlineTimeline(t *testing.T) {
 	if !strings.Contains(table, "Episode One") || !strings.Contains(table, "Episode Two") {
 		t.Error("table should contain both episode titles")
 	}
-	if !strings.Contains(table, "2026-08-25 14:30:00 UTC") {
+	if !strings.Contains(table, "2026-08-25") {
 		t.Error("table should contain exact timestamp")
 	}
 }

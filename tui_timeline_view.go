@@ -13,7 +13,6 @@ type EpisodeOnlineRelease struct {
 	Index           int
 	Filename        string
 	Title           string
-	ExactTimeUTC    string
 	ExactTimeLocal  string
 	Age             string
 	Duration        string
@@ -42,12 +41,10 @@ func getPodcastLastEpisodesOnlineTimeline(pod tuiPodcast, maxEpisodes int) []Epi
 		ep := eps[i]
 		d := ep.displayDate()
 
-		utcStr := "--:--"
 		localStr := "--:--"
 		source := "File"
 
 		if !d.IsZero() {
-			utcStr = d.UTC().Format("2006-01-02 15:04:05 UTC")
 			localStr = d.Local().Format("2006-01-02 15:04:05 MST")
 			if ep.publishedAt > 0 || (ep.absData != nil && parseABSEpisodePublishedAt(ep.absData) > 0) {
 				source = "Feed"
@@ -63,7 +60,6 @@ func getPodcastLastEpisodesOnlineTimeline(pod tuiPodcast, maxEpisodes int) []Epi
 			Index:           i + 1,
 			Filename:        ep.filename,
 			Title:           ep.displayTitle(),
-			ExactTimeUTC:    utcStr,
 			ExactTimeLocal:  localStr,
 			Age:             formatRelativeAge(d),
 			Duration:        durStr,
@@ -86,8 +82,8 @@ func formatEpisodesTimelineTable(releases []EpisodeOnlineRelease, podName string
 
 	out.WriteString(fmt.Sprintf("\n  Exact Online Release Timestamps for '%s' (Last %d Episodes):\n\n", podName, len(releases)))
 
-	hdr := fmt.Sprintf("  %-3s │ %-23s │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s",
-		"#", "Release Time (UTC)", "Release Time (Local)", "Age", "Duration", "Ads", "TX", "Title")
+	hdr := fmt.Sprintf("  %-3s │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s",
+		"#", "Release Time", "Age", "Duration", "Ads", "TX", "Title")
 	divider := strings.Repeat("─", max(20, min(termWidth-4, len(hdr)+30)))
 
 	out.WriteString("  " + divider + "\n")
@@ -103,11 +99,11 @@ func formatEpisodesTimelineTable(releases []EpisodeOnlineRelease, podName string
 		if r.HasTranscript {
 			txStr = "✓ Yes"
 		}
-		titleWidth := max(10, termWidth-90)
+		titleWidth := max(10, termWidth-66)
 		truncTitle := truncate(displayName(r.Title), titleWidth)
 
-		row := fmt.Sprintf("  %2d. │ %-23s │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s\n",
-			r.Index, r.ExactTimeUTC, r.ExactTimeLocal, r.Age, r.Duration, adsStr, txStr, truncTitle)
+		row := fmt.Sprintf("  %2d. │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s\n",
+			r.Index, r.ExactTimeLocal, r.Age, r.Duration, adsStr, txStr, truncTitle)
 		out.WriteString(row)
 	}
 
@@ -165,8 +161,8 @@ func (m *tuiModel) drawTimelineScreen() string {
 		return out.String()
 	}
 
-	hdr := fmt.Sprintf("  %-3s │ %-23s │ %-20s │ %-7s │ %-8s │ %-8s │ %-4s │ %s",
-		"#", "Release Time (UTC)", "Local Time", "Age", "Duration", "Ads", "TX", "Title")
+	hdr := fmt.Sprintf("  %-3s │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s",
+		"#", "Release Time", "Age", "Duration", "Ads", "TX", "Title")
 	out.WriteString(tuiLabelStyle.Render(hdr) + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
@@ -192,13 +188,12 @@ func (m *tuiModel) drawTimelineScreen() string {
 			txBadge = tuiCyanStyle.Render("✓ Yes")
 		}
 
-		titleWidth := max(10, m.width-85)
+		titleWidth := max(10, m.width-62)
 		truncTitle := truncate(displayName(r.Title), titleWidth)
 
-		row := fmt.Sprintf("  %2d. │ %s │ %s │ %-7s │ %-8s │ %s │ %s │ %s\n",
+		row := fmt.Sprintf("  %2d. │ %s │ %-7s │ %-8s │ %s │ %s │ %s\n",
 			r.Index,
-			tuiYellowStyle.Render(r.ExactTimeUTC),
-			tuiSubtextStyle.Render(truncate(r.ExactTimeLocal, 20)),
+			tuiYellowStyle.Render(r.ExactTimeLocal),
 			r.Age,
 			r.Duration,
 			adsBadge,
