@@ -36,7 +36,7 @@ func TestParseFlags(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 	os.Args = []string{"p", "-q", "--srt", "--txt", "f.mp3"}
-	cli := parseFlags()
+	_, cli := parseFlags()
 	if !cli.Quiet || !cli.ExportSRT || !cli.ExportTXT {
 		t.Error("parseFlags failed")
 	}
@@ -46,7 +46,7 @@ func TestParseFlagsConfigPodcastsDir(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 	os.Args = []string{"abs", "config", "--podcasts_dir", "/path/to/podcasts"}
-	cli := parseFlags()
+	_, cli := parseFlags()
 	if !cli.IsConfigCommand || cli.PodcastsDir != "/path/to/podcasts" {
 		t.Errorf("expected IsConfigCommand=true, PodcastsDir='/path/to/podcasts', got %v, %q", cli.IsConfigCommand, cli.PodcastsDir)
 	}
@@ -374,19 +374,19 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 	defer func() { os.Args = orig }()
 
 	os.Args = []string{"abs", "test", "whisper"}
-	cli := parseFlags()
+	_, cli := parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
 	os.Args = []string{"abs", "test"}
-	cli = parseFlags()
+	_, cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default test command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
 	os.Args = []string{"abs", "test-whisper"}
-	cli = parseFlags()
+	_, cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for test-whisper command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
@@ -397,13 +397,13 @@ func TestParseFlagsSilent(t *testing.T) {
 	defer func() { os.Args = orig }()
 
 	os.Args = []string{"abs", "-s", "file.mp3"}
-	cli := parseFlags()
+	_, cli := parseFlags()
 	if !cli.Silent {
 		t.Error("expected Silent=true for -s")
 	}
 
 	os.Args = []string{"abs", "--silent", "file.mp3"}
-	cli = parseFlags()
+	_, cli = parseFlags()
 	if !cli.Silent {
 		t.Error("expected Silent=true for --silent")
 	}
@@ -433,7 +433,9 @@ func TestScanningDirectoryOutput(t *testing.T) {
 }
 
 func TestBuildUsageApp(t *testing.T) {
-	app := buildUsageApp()
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
 	if app.Name != "abs" {
 		t.Errorf("expected app name 'abs', got %q", app.Name)
 	}

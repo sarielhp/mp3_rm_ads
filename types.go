@@ -130,6 +130,9 @@ type Config struct {
 	AudiobookshelfURL      string           `json:"audiobookshelf_url,omitempty"`
 	AudiobookshelfUser     string           `json:"audiobookshelf_user,omitempty"`
 	AudiobookshelfPass     string           `json:"audiobookshelf_pass,omitempty"`
+	AudiobookshelfToken    string           `json:"audiobookshelf_token,omitempty"`
+	AudiobookshelfDBPath   string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
+	PostProcessors         []string         `json:"post_processors,omitempty"`
 	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 
@@ -194,6 +197,23 @@ type CLIOptions struct {
 	RemoveWhisper     int
 	SetDefaultWhisper int
 	ListWhispers      bool
+
+	// Merged Library Management Options
+	Count          int
+	CountGiven     bool
+	Podcast        string
+	Fill           bool
+	KeepCount      *int
+	CheckNew       bool
+	Oldest         bool
+	NoWait         bool
+	SqliteDBPath   string
+	ProcessorCmd   string
+	ProcessorValue string
+	DryRun         bool
+	ConfigInfo     bool
+	ABSToken       string
+	Args           []string
 }
 
 type CostInfo struct {

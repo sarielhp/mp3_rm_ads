@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,6 +8,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/sarielhp/clihelp"
 )
 
 func main() {
@@ -20,14 +20,7 @@ func main() {
 		}
 	}()
 
-	if len(os.Args) <= 1 {
-		// Let clihelp handle the help display automatically
-		app := buildUsageApp()
-		app.Execute(os.Args[1:])
-		return
-	}
-
-	cli := parseFlags()
+	action, cli := parseFlags()
 
 	var silentLogFile *os.File
 	var silentLogPath string
@@ -89,48 +82,75 @@ func main() {
 		}
 	}()
 
-	if cli.TestWhisper || cli.TestABS || cli.TestABSMap || cli.TestKitty || cli.IsTestCommand {
-		ensureConfigExists()
-		config := loadConfig()
-		switch {
-		case cli.TestABSMap:
+	ensureConfigExists()
+	config := loadConfig()
+
+	switch action {
+	case "test":
+		if cli.TestABSMap {
 			absMapPodcasts(config, cli.Quiet)
-		case cli.TestABSDownload:
+		} else if cli.TestABSDownload {
 			absDownloadAllData(config, cli.Quiet)
-		case cli.TestKitty:
-			testKittyImage(flag.Args())
-		case cli.TestABS:
+		} else if cli.TestKitty {
+			testKittyImage(cli.Args)
+		} else if cli.TestABS {
 			if !testAudiobookshelfServer(config, cli.Quiet) {
 				hasError = true
 				os.Exit(1)
 			}
-		default:
+		} else {
 			if !testWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
 				hasError = true
 				os.Exit(1)
 			}
 		}
 		return
-	}
 
-	ensureConfigExists()
-	config := loadConfig()
-
-	if cli.SetPodcastsDir {
-		setPodcastsDir(&config, cli.PodcastsDir)
-		if cli.IsConfigCommand || flag.NArg() == 0 {
-			return
+	case "config":
+		if cli.PodcastsDir != "" {
+			setPodcastsDir(&config, cli.PodcastsDir)
 		}
-	}
-
-	if cli.SetABS {
-		setAudiobookshelf(&config, cli.ABSURL, cli.ABSUser, cli.ABSPass)
-		if cli.IsConfigCommand || flag.NArg() == 0 {
-			return
+		if cli.ABSURL != "" || cli.ABSUser != "" || cli.ABSPass != "" {
+			setAudiobookshelf(&config, cli.ABSURL, cli.ABSUser, cli.ABSPass)
 		}
-	}
+		if cli.ABSToken != "" {
+			config.AudiobookshelfToken = cli.ABSToken
+			saveConfig(config)
+			if !cli.Silent {
+				fmt.Println("Saved Audiobookshelf API token to config.")
+			}
+		}
+		if cli.SqliteDBPath != "" {
+			config.AudiobookshelfDBPath = cli.SqliteDBPath
+			saveConfig(config)
+			if !cli.Silent {
+				fmt.Printf("Saved SQLite DB path to config: %s\n", cli.SqliteDBPath)
+			}
+		}
+		if cli.ProcessorCmd != "" {
+			handleConfigProcessor(&config, cli.ProcessorCmd, cli.ProcessorValue)
+		} else if cli.ConfigInfo {
+			printConfigInfo(config)
+		} else if cli.ListLLMs {
+			listProfiles(config)
+		} else if cli.ListWhispers {
+			listWhispers(config)
+		} else if cli.SetDefault > 0 {
+			setDefaultProfile(&config, cli.SetDefault)
+		} else if cli.SetDefaultWhisper > 0 {
+			setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
+		} else if cli.AddWhisper != "" {
+			addWhisperProfile(&config, cli.AddWhisper)
+		} else if cli.RemoveWhisper > 0 {
+			removeWhisperProfile(&config, cli.RemoveWhisper)
+		} else if cli.CopyOpenCode {
+			copyLLMFromOpenCode(&config)
+		} else {
+			printConfig(config)
+		}
+		return
 
-	if cli.IsCacheCommand || cli.ResetCache {
+	case "cache":
 		if err := resetCache(); err != nil {
 			fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
 			os.Exit(1)
@@ -139,13 +159,11 @@ func main() {
 			fmt.Println("Cache reset successfully.")
 		}
 		return
-	}
 
-	if cli.IsScanCommand {
+	case "scan":
 		targetDir := config.PodcastsDir
-		args := flag.Args()
-		if len(args) > 0 {
-			targetDir = args[0]
+		if len(cli.Args) > 0 {
+			targetDir = cli.Args[0]
 		}
 		if targetDir == "" {
 			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
@@ -154,13 +172,11 @@ func main() {
 		config.PodcastsDir = targetDir
 		absScanPodcasts(config, cli.Quiet)
 		return
-	}
 
-	if cli.IsStatusCommand {
+	case "status":
 		targetDir := config.PodcastsDir
-		args := flag.Args()
-		if len(args) > 0 {
-			targetDir = args[0]
+		if len(cli.Args) > 0 {
+			targetDir = cli.Args[0]
 		}
 		if targetDir == "" {
 			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
@@ -169,105 +185,14 @@ func main() {
 		config.PodcastsDir = targetDir
 		absStatus(config, cli.Quiet)
 		return
-	}
 
-	if cli.ListLLMs {
-		listProfiles(config)
-		return
-	}
-
-	if cli.ListWhispers {
-		listWhispers(config)
-		return
-	}
-
-	if cli.CopyOpenCode {
-		copyLLMFromOpenCode(&config)
-		if !cli.IsConfigCommand {
-			return
-		}
-	}
-
-	if cli.SetDefault > 0 {
-		setDefaultProfile(&config, cli.SetDefault)
-		if !cli.IsConfigCommand {
-			return
-		}
-	}
-
-	if cli.SetDefaultWhisper > 0 {
-		setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
-		if !cli.IsConfigCommand {
-			return
-		}
-	}
-
-	if cli.AddWhisper != "" {
-		addWhisperProfile(&config, cli.AddWhisper)
-		if !cli.IsConfigCommand {
-			return
-		}
-	}
-
-	if cli.RemoveWhisper > 0 {
-		removeWhisperProfile(&config, cli.RemoveWhisper)
-		if !cli.IsConfigCommand {
-			return
-		}
-	}
-
-	configArgs := flag.Args()
-	isWhisperSubcmd := false
-	if cli.IsConfigCommand && len(configArgs) > 0 && configArgs[0] == "whisper" {
-		isWhisperSubcmd = true
-		if len(configArgs) >= 3 && configArgs[1] == "set" {
-			var targetID int
-			if _, err := fmt.Sscanf(configArgs[2], "%d", &targetID); err == nil {
-				setDefaultWhisperProfile(&config, targetID)
-			}
-		} else if len(configArgs) >= 2 && configArgs[1] == "list" {
-			listWhispers(config)
-			return
-		} else if len(configArgs) >= 3 && configArgs[1] == "add" {
-			addWhisperProfile(&config, configArgs[2])
-		} else if len(configArgs) >= 3 && (configArgs[1] == "remove" || configArgs[1] == "delete") {
-			var targetID int
-			if _, err := fmt.Sscanf(configArgs[2], "%d", &targetID); err == nil {
-				removeWhisperProfile(&config, targetID)
-			}
-		} else {
-			fmt.Println("Whisper management commands:")
-			fmt.Println("  abs config whisper list")
-			fmt.Println("  abs config whisper set <id>")
-			fmt.Println("  abs config whisper add \"<spec>\"")
-			fmt.Println("  abs config whisper remove <id>")
-			return
-		}
-	}
-
-	if cli.IsConfigCommand {
-		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs || cli.ListWhispers || cli.SetDefaultWhisper > 0 || cli.AddWhisper != "" || cli.RemoveWhisper > 0 || isWhisperSubcmd {
-			printConfig(config)
-		} else {
-			// Let clihelp handle the help display automatically
-			app := buildUsageApp()
-			app.Execute([]string{"config"})
-		}
-		return
-	}
-
-	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
-
-	if cli.IsTUICommand {
-		args := flag.Args()
+	case "tui":
 		dir := config.PodcastsDir
-		if len(args) > 0 {
-			dir = args[0]
+		if len(cli.Args) > 0 {
+			dir = cli.Args[0]
 		}
 		if dir == "" {
-			// Let clihelp handle the help display automatically
-			app := buildUsageApp()
-			app.Execute([]string{"tui"})
+			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
 			os.Exit(1)
 		}
 		bk := &TuiBackend{
@@ -284,28 +209,11 @@ func main() {
 			os.Exit(1)
 		}
 		return
-	}
 
-	args := flag.Args()
-
-	var expandedArgs []string
-
-	hasPrintedScanning := false
-	printScanning := func(dir string) {
-		if cli.Quiet {
-			return
-		}
-		if !hasPrintedScanning {
-			fmt.Println()
-			hasPrintedScanning = true
-		}
-		fmt.Printf("Scanning: %s\n", dir)
-	}
-
-	if cli.IsTimelineCommand {
+	case "timeline":
 		targetDir := "."
-		if len(args) > 0 {
-			targetDir = args[0]
+		if len(cli.Args) > 0 {
+			targetDir = cli.Args[0]
 		} else if config.PodcastsDir != "" {
 			targetDir = config.PodcastsDir
 		}
@@ -357,13 +265,286 @@ func main() {
 			fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
 		}
 		return
+
+	case "list":
+		token := config.AudiobookshelfToken
+		if token == "" {
+			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+		}
+		if token == "" {
+			token, _ = absLogin(config)
+		}
+		if token == "" {
+			printError("Error: Audiobookshelf API token not configured and could not be retrieved from DB or login.")
+			os.Exit(1)
+		}
+		client := NewABSClient(config.AudiobookshelfURL, token)
+		client.Silent = cli.Silent
+		podcasts, err := client.PodcastItems()
+		if err != nil {
+			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+			os.Exit(1)
+		}
+		printPodcastList(client, podcasts, cli.Verbose, cli.Silent)
+		return
+
+	case "download":
+		token := config.AudiobookshelfToken
+		if token == "" {
+			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+		}
+		if token == "" {
+			token, _ = absLogin(config)
+		}
+		if token == "" {
+			printError("Error: Audiobookshelf API token not configured.")
+			os.Exit(1)
+		}
+		client := NewABSClient(config.AudiobookshelfURL, token)
+		client.Silent = cli.Silent
+		podcasts, err := client.PodcastItems()
+		if err != nil {
+			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+			os.Exit(1)
+		}
+
+		totalNewlyDownloaded := 0
+		if cli.Podcast != "" {
+			targetItem := matchPodcast(podcasts, cli.Podcast)
+			if targetItem == nil {
+				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+				os.Exit(1)
+			}
+			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+			if !cli.DryRun {
+				totalNewlyDownloaded += dlCount
+			}
+		} else {
+			for idx, item := range podcasts {
+				title := item.Media.Metadata.Title
+				if title == "" {
+					title = "Untitled"
+				}
+				if !cli.Silent {
+					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+					os.Stdout.Sync()
+				}
+				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Silent)
+				if !cli.DryRun {
+					totalNewlyDownloaded += dlCount
+				}
+			}
+			if !cli.Silent {
+				fmt.Print("\r\x1b[K")
+			}
+		}
+
+		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
+			runPostProcessors(config.PostProcessors, cli.Silent)
+		}
+		return
+
+	case "new":
+		token := config.AudiobookshelfToken
+		if token == "" {
+			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+		}
+		if token == "" {
+			token, _ = absLogin(config)
+		}
+		if token == "" {
+			printError("Error: Audiobookshelf API token not configured.")
+			os.Exit(1)
+		}
+		client := NewABSClient(config.AudiobookshelfURL, token)
+		client.Silent = cli.Silent
+		podcasts, err := client.PodcastItems()
+		if err != nil {
+			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+			os.Exit(1)
+		}
+
+		totalNewlyDownloaded := 0
+		totalPodcastsChecked := 0
+
+		if cli.Podcast != "" {
+			targetItem := matchPodcast(podcasts, cli.Podcast)
+			if targetItem == nil {
+				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+				os.Exit(1)
+			}
+			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+			if !cli.DryRun {
+				totalNewlyDownloaded += dlCount
+			}
+			totalPodcastsChecked = 1
+		} else {
+			totalPodcastsChecked = len(podcasts)
+			for idx, item := range podcasts {
+				title := item.Media.Metadata.Title
+				if title == "" {
+					title = "Untitled"
+				}
+				if !cli.Silent {
+					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+					os.Stdout.Sync()
+				}
+				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Silent)
+				if !cli.DryRun {
+					totalNewlyDownloaded += dlCount
+				}
+			}
+			if !cli.Silent {
+				fmt.Print("\r\x1b[K")
+			}
+		}
+
+		if !cli.Silent {
+			fmt.Printf("\nChecked a total of %d podcast(s) for new episodes.\n", totalPodcastsChecked)
+			if totalNewlyDownloaded == 0 {
+				fmt.Println("No new episodes found.")
+			}
+		}
+
+		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
+			runPostProcessors(config.PostProcessors, cli.Silent)
+		}
+		return
+
+	case "keep":
+		token := config.AudiobookshelfToken
+		if token == "" {
+			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+		}
+		if token == "" {
+			token, _ = absLogin(config)
+		}
+		if token == "" {
+			printError("Error: Audiobookshelf API token not configured.")
+			os.Exit(1)
+		}
+		client := NewABSClient(config.AudiobookshelfURL, token)
+		client.Silent = cli.Silent
+		podcasts, err := client.PodcastItems()
+		if err != nil {
+			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+			os.Exit(1)
+		}
+
+		if cli.Podcast != "" {
+			targetItem := matchPodcast(podcasts, cli.Podcast)
+			if targetItem == nil {
+				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+				os.Exit(1)
+			}
+			title := targetItem.Media.Metadata.Title
+			if title == "" {
+				title = "Untitled"
+			}
+			applyKeepPolicy(client, targetItem.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+		} else {
+			for _, item := range podcasts {
+				title := item.Media.Metadata.Title
+				if title == "" {
+					title = "Untitled"
+				}
+				applyKeepPolicy(client, item.ID, title, *cli.KeepCount, cli.DryRun, cli.Verbose, cli.Silent)
+			}
+		}
+		return
+
+	case "rescan":
+		token := config.AudiobookshelfToken
+		if token == "" {
+			token = getABSTokenFromDB(config.AudiobookshelfDBPath)
+		}
+		if token == "" {
+			token, _ = absLogin(config)
+		}
+		if token == "" {
+			printError("Error: Audiobookshelf API token not configured.")
+			os.Exit(1)
+		}
+		client := NewABSClient(config.AudiobookshelfURL, token)
+		client.Silent = cli.Silent
+		podcasts, err := client.PodcastItems()
+		if err != nil {
+			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
+			os.Exit(1)
+		}
+
+		totalRescanned := 0
+		totalChecked := 0
+		podcastCount := 0
+
+		dbPath := cli.SqliteDBPath
+		if dbPath == "" {
+			dbPath = config.AudiobookshelfDBPath
+		}
+
+		if cli.Podcast != "" {
+			targetItem := matchPodcast(podcasts, cli.Podcast)
+			if targetItem == nil {
+				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
+				os.Exit(1)
+			}
+			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, dbPath, config.PodcastsDir, cli.Verbose, cli.Silent)
+			totalRescanned += rCount
+			totalChecked += cCount
+			podcastCount = 1
+		} else {
+			podcastCount = len(podcasts)
+			for idx, item := range podcasts {
+				title := item.Media.Metadata.Title
+				if title == "" {
+					title = "Untitled"
+				}
+				if !cli.Silent {
+					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
+					os.Stdout.Sync()
+				}
+				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, dbPath, config.PodcastsDir, cli.Verbose, cli.Silent)
+				totalRescanned += rCount
+				totalChecked += cCount
+			}
+			if !cli.Silent {
+				fmt.Print("\r\x1b[K")
+			}
+		}
+
+		if !cli.Silent {
+			fmt.Printf("\nChecked a total of %d MP3 file(s) across %d podcast(s).\n", totalChecked, podcastCount)
+			if totalRescanned == 0 {
+				fmt.Println("No episodes required database duration updates.")
+			}
+		}
+		return
+
+	case "file", "dir":
+		// Fall through
 	}
 
-	if cli.IsDirCommand {
+	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
+
+	args := cli.Args
+	var expandedArgs []string
+
+	hasPrintedScanning := false
+	printScanning := func(dir string) {
+		if cli.Quiet {
+			return
+		}
+		if !hasPrintedScanning {
+			fmt.Println()
+			hasPrintedScanning = true
+		}
+		fmt.Printf("Scanning: %s\n", dir)
+	}
+
+	if action == "dir" {
 		if len(args) == 0 {
-			// Let clihelp handle the help display automatically
-			app := buildUsageApp()
-			app.Execute([]string{"dir"})
+			app := buildCLIApp(&action, &cli)
+			app.RenderCommand(clihelp.Options{}, "dir")
 			os.Exit(1)
 		}
 		dir := args[0]
@@ -385,21 +566,13 @@ func main() {
 			return
 		}
 		expandedArgs = mp3Files
-	} else if cli.IsFileCommand {
+	} else {
 		if len(args) == 0 {
-			app := buildUsageApp()
-			app.Execute([]string{"file"})
+			app := buildCLIApp(&action, &cli)
+			app.RenderCommand(clihelp.Options{}, "file")
 			os.Exit(1)
 		}
 		expandedArgs = args
-	} else if len(args) == 0 {
-		app := buildUsageApp()
-		app.Execute([]string{})
-		return
-	} else {
-		app := buildUsageApp()
-		app.Execute([]string{})
-		os.Exit(1)
 	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)

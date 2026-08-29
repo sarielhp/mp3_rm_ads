@@ -124,6 +124,8 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.AudiobookshelfURL = v
 	} else if v := os.Getenv("AUDIOBOOKSHELF_URL"); v != "" {
 		cfg.AudiobookshelfURL = v
+	} else if v := os.Getenv("ABS_HOST"); v != "" {
+		cfg.AudiobookshelfURL = v
 	}
 	if v := os.Getenv("ABS_USER"); v != "" {
 		cfg.AudiobookshelfUser = v
@@ -134,6 +136,12 @@ func applyEnvOverrides(cfg *Config) {
 		cfg.AudiobookshelfPass = v
 	} else if v := os.Getenv("AUDIOBOOKSHELF_PASS"); v != "" {
 		cfg.AudiobookshelfPass = v
+	}
+	if v := os.Getenv("ABS_TOKEN"); v != "" {
+		cfg.AudiobookshelfToken = v
+	}
+	if v := os.Getenv("ABS_SQLITE_DB_PATH"); v != "" {
+		cfg.AudiobookshelfDBPath = v
 	}
 	if v := os.Getenv("PODCASTS_DIR"); v != "" {
 		cfg.PodcastsDir = v
@@ -175,14 +183,17 @@ func loadConfig() Config {
 	if err != nil {
 		cfg := defaultConfig
 		applyEnvOverrides(&cfg)
+		migratePodcastsManagerConfig(&cfg)
 		return cfg
 	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		cfg = defaultConfig
 		applyEnvOverrides(&cfg)
+		migratePodcastsManagerConfig(&cfg)
 		return cfg
 	}
+	migratePodcastsManagerConfig(&cfg)
 	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
