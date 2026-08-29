@@ -144,8 +144,6 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 
 	rescanCount := 0
 	checkedCount := 0
-
-	// 1. Parallel duration checking worker pool
 	numWorkers := 4
 	if len(episodes) < numWorkers {
 		numWorkers = len(episodes)
@@ -192,8 +190,6 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 		diskDurations[res.epIndex] = res.diskDuration
 	}
 	close(results)
-
-	// 2. Open DB and begin transaction
 	var db *sql.DB
 	var tx *sql.Tx
 	var err error
@@ -278,8 +274,6 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 			}
 		}
 	}
-
-	// 3. Commit and close DB connection to release lock
 	if tx != nil {
 		tx.Commit()
 	}
@@ -287,7 +281,6 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 		db.Close()
 	}
 
-	// 4. Trigger scan API sequentially AFTER DB is closed
 	if rescanCount > 0 && !dryRun {
 		if !silent {
 			if verbose {
