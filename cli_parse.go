@@ -568,12 +568,15 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Description: "Display usage help message for abs or a specific command",
 				UsageLine:   "abs help [<command>]",
 				Run: func(ctx *clihelp.Context) error {
-					*action = "help"
-					app := buildCLIApp(action, opts)
 					if len(ctx.Args) > 0 {
-						app.RenderCommand(clihelp.Options{}, ctx.Args...)
+						topic := strings.ToLower(ctx.Args[0])
+						if topic == "tree" || topic == "--tree" || topic == "t" {
+							ctx.App.RenderTree(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
+							os.Exit(0)
+						}
+						ctx.App.RenderCommand(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager}, ctx.Args...)
 					} else {
-						app.RenderGlobal(clihelp.Options{})
+						ctx.App.RenderGlobal(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
 					}
 					os.Exit(0)
 					return nil
@@ -613,35 +616,9 @@ func parseFlags() (string, CLIOptions) {
 	normArgs := normalizeCLIArgs(args)
 
 	for _, a := range normArgs {
-		switch a {
-		case "--tree":
+		if a == "--tree" {
 			app := buildCLIApp(&action, &opts)
 			app.RenderTree(clihelp.Options{})
-			os.Exit(0)
-		case "help", "usage", "-h", "--h", "-help", "--help", "?", "-?":
-			app := buildCLIApp(&action, &opts)
-			hasTree := false
-			for _, arg := range normArgs {
-				if arg == "tree" || arg == "--tree" {
-					hasTree = true
-					break
-				}
-			}
-			if hasTree {
-				app.RenderTree(clihelp.Options{})
-				os.Exit(0)
-			}
-			var path []string
-			for _, arg := range normArgs {
-				if arg != "help" && arg != "usage" && !strings.HasPrefix(arg, "-") && arg != "tree" && arg != "--tree" {
-					path = append(path, arg)
-				}
-			}
-			if len(path) > 0 {
-				app.RenderCommand(clihelp.Options{}, path...)
-			} else {
-				app.RenderGlobal(clihelp.Options{})
-			}
 			os.Exit(0)
 		}
 	}
