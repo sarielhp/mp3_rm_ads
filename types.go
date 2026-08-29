@@ -169,6 +169,7 @@ type CLIOptions struct {
 	IsTUICommand      bool
 	IsTimelineCommand bool
 	IsTestCommand     bool
+	IsScanCommand     bool
 	ListLLMs          bool
 	CopyOpenCode      bool
 	Quiet             bool

@@ -96,6 +96,10 @@ func parseFlags() CLIOptions {
 			cli.TestKitty = true
 			detectedCommand = "test"
 			args = args[1:]
+		case "scan":
+			cli.IsScanCommand = true
+			detectedCommand = "scan"
+			args = args[1:]
 		}
 	}
 
@@ -313,6 +317,18 @@ func buildUsageApp() *clihelp.App {
 				Examples: []clihelp.Example{
 					{Line: "abs cache reset"},
 					{Line: "abs cache clear"},
+				},
+			},
+			{
+				Name:        "scan",
+				Description: "Scan Audiobookshelf for new podcasts, create local directories, and download metadata/covers",
+				UsageLine:   "abs scan [podcasts_dir]",
+				Options: []clihelp.Option{
+					{Flags: "[podcasts_dir]", Description: "Local podcasts directory (default: podcasts_dir from config)"},
+				},
+				Examples: []clihelp.Example{
+					{Line: "abs scan"},
+					{Line: "abs scan /media/podcasts/clean/"},
 				},
 			},
 		},
