@@ -3,10 +3,10 @@
 all: check
 
 check:
-	@./tools/check.sh
+	@ruby ./tools/check.rb
 
 lint:
-	@./tools/lint.sh
+	@ruby ./tools/lint.rb
 
 audit:
 	@ruby ./tools/audit_lines.rb
@@ -45,10 +45,10 @@ version:
 	@./tools/version.sh
 
 bump:
-	@./tools/bump-version.sh
+	@ruby ./tools/bump-version.rb
 
 commit:
-	@./tools/commit.sh $(ARGS)
+	@ruby ./tools/commit.rb $(ARGS)
 
 push: bump
 

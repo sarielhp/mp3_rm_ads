@@ -12,9 +12,9 @@
 
 | Script | Purpose |
 |--------|---------|
-| `tools/check.sh` | Full quality gate: format → tidy → vet → staticcheck → test → build |
+| `tools/check.rb` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
-| `tools/lint.sh` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
+| `tools/lint.rb` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
 | `tools/audit_lines.rb` | Audit Go source file lengths against 150-300 target (600 limit) |
 | `tools/outline_symbols.rb` | Index all Go types, structs, interfaces, and functions |
 | `tools/show_symbol.rb <sym>` | Display single symbol code block with line numbers |
@@ -22,8 +22,8 @@
 | `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
-| `tools/bump-version.sh` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
-| `tools/commit.sh <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
+| `tools/bump-version.rb` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
+| `tools/commit.rb <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
 | `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
 
 ## Makefile

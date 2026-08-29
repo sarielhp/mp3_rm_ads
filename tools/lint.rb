@@ -1,0 +1,24 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'open3'
+
+root_dir = File.expand_path('..', __dir__)
+Dir.chdir(root_dir)
+
+def run_cmd(name, cmd)
+  stdout, stderr, status = Open3.capture3(cmd)
+  unless status.success?
+    puts "\e[31m✗ #{name} failed!\e[0m"
+    puts stdout unless stdout.empty?
+    puts stderr unless stderr.empty?
+    exit 1
+  end
+  [stdout, stderr]
+end
+
+run_cmd("Go vet", "go vet ./...")
+run_cmd("Staticcheck", "staticcheck -checks '-SA2001' ./...")
+
+stdout, _ = run_cmd("Line audit", "ruby tools/audit_lines.rb --quiet")
+puts stdout.strip unless stdout.strip.empty?
