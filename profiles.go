@@ -329,6 +329,12 @@ func removeWhisperProfile(cfg *Config, targetID int) {
 }
 
 func setDefaultWhisperProfile(cfg *Config, targetID int) {
+	if targetID == 0 {
+		cfg.ActiveWhisperID = 0
+		saveConfig(*cfg)
+		fmt.Println("Default Whisper server updated to fallback/legacy configuration.")
+		return
+	}
 	for _, wp := range cfg.WhisperProfiles {
 		if wp.ID == targetID {
 			cfg.ActiveWhisperID = targetID
