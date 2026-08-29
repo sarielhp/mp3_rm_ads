@@ -496,7 +496,6 @@ func parseFlags() (string, CLIOptions) {
 	}
 
 	if action == "" {
-		app.RenderGlobal(clihelp.Options{})
 		os.Exit(0)
 	}
 
