@@ -134,7 +134,7 @@ type durationResult struct {
 	diskDuration float64
 }
 
-func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbPath string, podcastsDir string, verbose bool, silent bool) (int, int) {
+func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, db *sql.DB, podcastsDir string, verbose bool, silent bool) (int, int) {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
@@ -144,6 +144,7 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 
 	rescanCount := 0
 	checkedCount := 0
+
 	numWorkers := 4
 	if len(episodes) < numWorkers {
 		numWorkers = len(episodes)
@@ -190,18 +191,15 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 		diskDurations[res.epIndex] = res.diskDuration
 	}
 	close(results)
-	var db *sql.DB
+
 	var tx *sql.Tx
 	var err error
-	if dbPath != "" && fileExists(dbPath) && !dryRun {
-		db, err = sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	if db != nil && !dryRun {
+		tx, err = db.Begin()
 		if err == nil {
-			tx, err = db.Begin()
-			if err != nil {
-				db.Close()
-				db = nil
-				tx = nil
-			}
+			defer tx.Rollback()
+		} else {
+			tx = nil
 		}
 	}
 
@@ -276,9 +274,6 @@ func rescanPodcastEpisodes(client *ABSClient, item PodcastItem, dryRun bool, dbP
 	}
 	if tx != nil {
 		tx.Commit()
-	}
-	if db != nil {
-		db.Close()
 	}
 
 	if rescanCount > 0 && !dryRun {

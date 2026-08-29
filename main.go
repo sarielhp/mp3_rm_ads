@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -482,13 +483,22 @@ func main() {
 			dbPath = config.AudiobookshelfDBPath
 		}
 
+		var db *sql.DB
+		if !cli.DryRun && dbPath != "" && fileExists(dbPath) {
+			var err error
+			db, err = sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+			if err == nil {
+				defer db.Close()
+			}
+		}
+
 		if cli.Podcast != "" {
 			targetItem := matchPodcast(podcasts, cli.Podcast)
 			if targetItem == nil {
 				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				os.Exit(1)
 			}
-			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, dbPath, config.PodcastsDir, cli.Verbose, cli.Silent)
+			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
 			totalRescanned += rCount
 			totalChecked += cCount
 			podcastCount = 1
@@ -503,7 +513,7 @@ func main() {
 					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
 					os.Stdout.Sync()
 				}
-				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, dbPath, config.PodcastsDir, cli.Verbose, cli.Silent)
+				rCount, cCount := rescanPodcastEpisodes(client, item, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Silent)
 				totalRescanned += rCount
 				totalChecked += cCount
 			}

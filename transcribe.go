@@ -142,6 +142,10 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 
 		resp, err := client.Do(req)
 		if err != nil {
+			if progressDone != nil {
+				close(progressDone)
+				progressDone = nil
+			}
 			if attempt < maxRetries {
 				if !quiet {
 					fmt.Printf("\nWhisper server connection error (attempt %d/%d): %v\n", attempt, maxRetries, err)
@@ -150,7 +154,6 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 				time.Sleep(time.Duration(retryDelay) * time.Second)
 				continue
 			}
-			close(progressDone)
 			return nil, fmt.Errorf("failed to connect to Whisper GPU server at '%s' after %d attempts: %w", whisperURL, maxRetries, err)
 		}
 
@@ -163,15 +166,21 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 			body, err := io.ReadAll(resp.Body)
 			resp.Body.Close()
 			if err != nil {
-				close(progressDone)
+				if progressDone != nil {
+					close(progressDone)
+				}
 				return nil, fmt.Errorf("failed to read response body: %w", err)
 			}
 			var data TranscriptionData
 			if err := json.Unmarshal(body, &data); err != nil {
-				close(progressDone)
+				if progressDone != nil {
+					close(progressDone)
+				}
 				return nil, fmt.Errorf("failed to parse transcription JSON: %w", err)
 			}
-			close(progressDone)
+			if progressDone != nil {
+				close(progressDone)
+			}
 			return &data, nil
 		}
 
@@ -179,6 +188,10 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 		resp.Body.Close()
 		if !quiet {
 			fmt.Printf("\nWhisper server returned status %d: %s\n", resp.StatusCode, string(body))
+		}
+		if progressDone != nil {
+			close(progressDone)
+			progressDone = nil
 		}
 		if attempt < maxRetries {
 			if !quiet {
@@ -188,7 +201,9 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 		}
 	}
 
-	close(progressDone)
+	if progressDone != nil {
+		close(progressDone)
+	}
 	return nil, fmt.Errorf("whisper transcription failed after %d attempts", maxRetries)
 }
 

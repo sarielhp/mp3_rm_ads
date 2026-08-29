@@ -311,6 +311,8 @@ func (p *AudioPlayer) ToggleMute() {
 }
 
 func (p *AudioPlayer) RefreshAudioInfo() {
+	var vol int
+	var hasVol bool
 	out, err := exec.Command("pactl", "get-sink-volume", "@DEFAULT_SINK@").Output()
 	if err == nil {
 		str := string(out)
@@ -320,18 +322,29 @@ func (p *AudioPlayer) RefreshAudioInfo() {
 				start--
 			}
 			if num, err := strconv.Atoi(str[start+1 : idx]); err == nil {
-				p.mu.Lock()
-				p.Volume = num
-				p.mu.Unlock()
+				vol = num
+				hasVol = true
 			}
 		}
 	}
 
+	var muted bool
+	var hasMuted bool
 	muteOut, err := exec.Command("pactl", "get-sink-mute", "@DEFAULT_SINK@").Output()
 	if err == nil {
+		muted = strings.Contains(strings.ToLower(string(muteOut)), "yes")
+		hasMuted = true
+	}
+
+	if hasVol || hasMuted {
 		p.mu.Lock()
-		p.Muted = strings.Contains(strings.ToLower(string(muteOut)), "yes")
-		p.mu.Unlock()
+		defer p.mu.Unlock()
+		if hasVol {
+			p.Volume = vol
+		}
+		if hasMuted {
+			p.Muted = muted
+		}
 	}
 
 	p.RefreshSinks()
@@ -365,11 +378,11 @@ func (p *AudioPlayer) RefreshSinks() {
 		}
 	}
 	p.mu.Lock()
+	defer p.mu.Unlock()
 	p.Sinks = sinks
 	if len(sinks) > 0 && p.CurrentSpeaker == "" {
 		p.CurrentSpeaker = sinks[0].Description
 	}
-	p.mu.Unlock()
 }
 
 func (p *AudioPlayer) CycleSpeaker() {
