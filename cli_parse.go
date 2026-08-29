@@ -135,6 +135,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "<file1.mp3> [file2.mp3 ...]", Description: "One or more audio files (.mp3) or existing transcript JSON files (.json) to process"},
 				},
+				Args:    clihelp.MinimumNArgs(1),
 				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "file"
@@ -149,6 +150,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "<directory>", Description: "The target directory containing MP3 files to recursively process"},
 				},
+				Args:    clihelp.ExactArgs(1),
 				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "dir"
@@ -163,6 +165,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "[directory]", Description: "Optional path to podcasts directory (defaults to configured podcasts_dir)"},
 				},
+				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.PodcastsDir, "--podcasts-dir, --podcasts_dir <dir>", "", "Podcasts directory"),
 				},
@@ -180,6 +183,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "[directory]", Description: "Optional path to podcasts directory"},
 				},
+				Args: clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "timeline"
 					opts.Args = ctx.Args
@@ -193,6 +197,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "[podcasts_dir]", Description: "Optional path to podcasts directory"},
 				},
+				Args: clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "status"
 					opts.Args = ctx.Args
@@ -206,6 +211,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "[reset|clear]", Description: "Action to perform (reset or clear cache)"},
 				},
+				Args: clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "cache"
 					opts.Args = ctx.Args
@@ -225,6 +231,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					{Name: "<whisper|abs|kitty>", Description: "Target service/device to test ('whisper', 'abs', or 'kitty')"},
 					{Name: "[args]", Description: "Optional test arguments (e.g., 'map' or 'download' for abs, or path to an image file for kitty)"},
 				},
+				Args: clihelp.RangeArgs(0, 2),
 				Options: []clihelp.Option{
 					clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
 					clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
@@ -274,6 +281,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Parameters: []clihelp.Param{
 							{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
 						},
+						Args: clihelp.MaximumNArgs(1),
 						Options: []clihelp.Option{
 							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 							clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
@@ -295,6 +303,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Aliases:     []string{"ls"},
 						Description: "List all available podcasts in Audiobookshelf with episode counts",
 						UsageLine:   "abs server list [options]",
+						Args:        clihelp.NoArgs,
 						Options: []clihelp.Option{
 							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
 							clihelp.Bool(&opts.Silent, "-s, --silent", false, "Suppress outputs"),
@@ -314,6 +323,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Parameters: []clihelp.Param{
 							{Name: "[<number>]", Description: "Optional number of undownloaded episodes to download (defaults to 1)"},
 						},
+						Args: clihelp.MaximumNArgs(1),
 						Options: []clihelp.Option{
 							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
 							clihelp.Int(&countVal, "-k, --count <number>", -1, "Number of undownloaded episodes to download"),
@@ -356,6 +366,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Parameters: []clihelp.Param{
 							{Name: "<number>", Description: "Number of latest episodes to keep per podcast"},
 						},
+						Args: clihelp.ExactArgs(1),
 						Options: []clihelp.Option{
 							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast"),
 							clihelp.Int(&keepVal, "-K, --keep <number>", -1, "Keep policy count"),
@@ -385,6 +396,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 						Name:        "rescan",
 						Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
 						UsageLine:   "abs server rescan [options]",
+						Args:        clihelp.NoArgs,
 						Options: []clihelp.Option{
 							clihelp.String(&opts.Podcast, "-p, -P, --podcast <podcast>", "", "Specify podcast by index or title"),
 							clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview actions without updating DB"),
