@@ -141,6 +141,51 @@ func main() {
 		return
 	}
 
+	if cli.ListLLMs {
+		listProfiles(config)
+		return
+	}
+
+	if cli.ListWhispers {
+		listWhispers(config)
+		return
+	}
+
+	if cli.CopyOpenCode {
+		copyLLMFromOpenCode(&config)
+		if !cli.IsConfigCommand {
+			return
+		}
+	}
+
+	if cli.SetDefault > 0 {
+		setDefaultProfile(&config, cli.SetDefault)
+		if !cli.IsConfigCommand {
+			return
+		}
+	}
+
+	if cli.SetDefaultWhisper > 0 {
+		setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
+		if !cli.IsConfigCommand {
+			return
+		}
+	}
+
+	if cli.AddWhisper != "" {
+		addWhisperProfile(&config, cli.AddWhisper)
+		if !cli.IsConfigCommand {
+			return
+		}
+	}
+
+	if cli.RemoveWhisper > 0 {
+		removeWhisperProfile(&config, cli.RemoveWhisper)
+		if !cli.IsConfigCommand {
+			return
+		}
+	}
+
 	if cli.IsConfigCommand {
 		if cli.SetPodcastsDir || cli.SetABS || cli.SetDefault > 0 || cli.CopyOpenCode || cli.ListLLMs || cli.ListWhispers || cli.SetDefaultWhisper > 0 || cli.AddWhisper != "" || cli.RemoveWhisper > 0 {
 			printConfig(config)
@@ -152,44 +197,7 @@ func main() {
 		return
 	}
 
-	if cli.CopyOpenCode {
-		copyLLMFromOpenCode(&config)
-		if flag.NArg() == 0 {
-			return
-		}
-	}
-
 	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
-
-	if cli.ListLLMs {
-		listProfiles(config)
-		return
-	}
-
-	if cli.SetDefault > 0 {
-		setDefaultProfile(&config, cli.SetDefault)
-		return
-	}
-
-	if cli.ListWhispers {
-		listWhispers(config)
-		return
-	}
-
-	if cli.SetDefaultWhisper > 0 {
-		setDefaultWhisperProfile(&config, cli.SetDefaultWhisper)
-		return
-	}
-
-	if cli.AddWhisper != "" {
-		addWhisperProfile(&config, cli.AddWhisper)
-		return
-	}
-
-	if cli.RemoveWhisper > 0 {
-		removeWhisperProfile(&config, cli.RemoveWhisper)
-		return
-	}
 
 	if cli.IsTUICommand {
 		args := flag.Args()
