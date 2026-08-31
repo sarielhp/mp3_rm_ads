@@ -122,6 +122,9 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		pushedCount++
 	}
 
+	triggerFile := fmt.Sprintf("%s/.scan_trigger", remoteWorkDir)
+	_, _ = transport.Exec(targetHost, fmt.Sprintf("touch %s", triggerFile))
+
 	if !quiet {
 		fmt.Printf("Triggering remote worker/scan on %s...\n", targetHost)
 	}

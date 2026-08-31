@@ -82,6 +82,7 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
+					clihelp.Bool(&opts.IfDirty, "--if-dirty", false, "Only scan if .scan_trigger file exists"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 				},
@@ -114,12 +115,12 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "ack",
-				Description: "Acknowledge pulled episode on remote: truncate audio to 0 bytes and archive",
-				UsageLine:   "abs remote ack <relative_path> [options]",
+				Description: "Acknowledge pulled episodes on remote: delete audio files and archive",
+				UsageLine:   "abs remote ack <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
-					{Name: "<relative_path>", Description: "Relative path of episode within remote work directory"},
+					{Name: "<path1> [path2 ...]", Description: "Relative paths of episodes within remote work directory"},
 				},
-				Args: clihelp.ExactArgs(1),
+				Args: clihelp.MinimumNArgs(1),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.RemoteWorkDir, "--dir <path>", "", "Remote mirror root directory"),
 				},
@@ -214,7 +215,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		if len(cli.Args) > 0 {
 			targetDir = cli.Args[0]
 		}
-		err = runRemoteScan(&config, targetDir, cli.Quiet, cli.Verbose)
+		err = runRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
 	case "worker":
 		targetDir := ""
 		if len(cli.Args) > 0 {
@@ -229,11 +230,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		if targetDir == "" {
 			targetDir = "~/.abs_remote"
 		}
-		relPath := ""
-		if len(cli.Args) > 0 {
-			relPath = cli.Args[0]
-		}
-		err = runRemoteAck(targetDir, relPath)
+		err = runRemoteAck(targetDir, cli.Args)
 	case "status":
 		err = runRemoteStatus(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "cancel":

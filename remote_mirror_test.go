@@ -28,7 +28,7 @@ func TestRemoteMirrorScanAndDoneJSON(t *testing.T) {
 		RemoteWorkDir: remoteDir,
 	}
 
-	err := runRemoteScan(cfg, remoteDir, true, false)
+	err := runRemoteScan(cfg, remoteDir, false, true, false)
 	if err != nil {
 		t.Fatalf("runRemoteScan failed: %v", err)
 	}
@@ -53,7 +53,7 @@ func TestRemoteMirrorScanAndDoneJSON(t *testing.T) {
 	}
 }
 
-func TestRemoteAckAndZeroTruncate(t *testing.T) {
+func TestRemoteAckAndFullDeletion(t *testing.T) {
 	tempDir := t.TempDir()
 	remoteDir := filepath.Join(tempDir, "abs_remote")
 	podDir := filepath.Join(remoteDir, "News_Show")
@@ -78,17 +78,13 @@ func TestRemoteAckAndZeroTruncate(t *testing.T) {
 		Status:  StateReadyForCopyBack,
 	})
 
-	err := runRemoteAck(remoteDir, relPath)
+	err := runRemoteAck(remoteDir, []string{relPath})
 	if err != nil {
 		t.Fatalf("runRemoteAck failed: %v", err)
 	}
 
-	fi, err := os.Stat(audioFile)
-	if err != nil {
-		t.Fatalf("expected audio file to exist after ack: %v", err)
-	}
-	if fi.Size() != 0 {
-		t.Errorf("expected audio file to be truncated to 0 bytes, got size %d", fi.Size())
+	if fileExists(audioFile) {
+		t.Errorf("expected audio file to be deleted after ack")
 	}
 
 	if fileExists(audioFile + ".precut") {

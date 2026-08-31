@@ -118,9 +118,8 @@ func TestProcCollectExecution(t *testing.T) {
 		t.Errorf("expected transcript.json to exist locally")
 	}
 
-	remFi, err := os.Stat(remAudio)
-	if err != nil || remFi.Size() != 0 {
-		t.Errorf("expected remote audio to be truncated to 0 bytes, got size %d", remFi.Size())
+	if fileExists(remAudio) {
+		t.Errorf("expected remote audio to be deleted after ack")
 	}
 }
 

@@ -33,23 +33,30 @@ func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) 
 	}
 }
 
-func runRemoteAck(remoteDir, relPath string) error {
+func runRemoteAck(remoteDir string, relPaths []string) error {
 	resolvedDir := resolveLocalPath(remoteDir)
-	audioPath := filepath.Join(resolvedDir, relPath)
-
-	_ = os.WriteFile(audioPath, []byte{}, 0644)
-	_ = os.Remove(audioPath + ".precut")
-	_ = os.Remove(audioPath + ".tmp.mp3")
-
-	statPath := statusPathFor(audioPath)
-	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil {
-		st.Status = StateArchived
-		_ = saveEpisodeStatus(statPath, st)
-	}
-
 	donePath := filepath.Join(resolvedDir, "done.json")
 	archPath := filepath.Join(resolvedDir, "archive.json")
-	return archiveDoneEpisode(donePath, archPath, relPath)
+
+	for _, relPath := range relPaths {
+		if strings.TrimSpace(relPath) == "" {
+			continue
+		}
+		audioPath := filepath.Join(resolvedDir, relPath)
+
+		_ = os.Remove(audioPath)
+		_ = os.Remove(audioPath + ".precut")
+		_ = os.Remove(audioPath + ".tmp.mp3")
+
+		statPath := statusPathFor(audioPath)
+		if st, err := loadEpisodeStatus(statPath); err == nil && st != nil {
+			st.Status = StateArchived
+			_ = saveEpisodeStatus(statPath, st)
+		}
+
+		_ = archiveDoneEpisode(donePath, archPath, relPath)
+	}
+	return nil
 }
 
 func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, verbose bool) error {
@@ -90,6 +97,8 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 				fmt.Printf("Found %d completed episode(s) in %s:%s\n", len(doneM.Episodes), targetHost, remoteDoneFile)
 			}
 
+			var verifiedRelPaths []string
+
 			for relPath, item := range doneM.Episodes {
 				if item.Status != StateReadyForCopyBack {
 					continue
@@ -119,7 +128,11 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 					continue
 				}
 
-				if fi, err := os.Stat(tempAudio); err != nil || fi.Size() == 0 {
+				fi, err := os.Stat(tempAudio)
+				if err != nil || fi.Size() == 0 || (item.CleanedSizeBytes > 0 && fi.Size() != item.CleanedSizeBytes) {
+					if !quiet && fi != nil && item.CleanedSizeBytes > 0 && fi.Size() != item.CleanedSizeBytes {
+						fmt.Fprintf(os.Stderr, "Warning: Download integrity verification failed for %s: expected %d bytes, got %d. Preserving on remote.\n", relPath, item.CleanedSizeBytes, fi.Size())
+					}
 					_ = os.RemoveAll(tempItemDir)
 					continue
 				}
@@ -154,19 +167,30 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 
 				syncAudiobookshelfDuration(cfg, localDestAudio, item.CleanedDurationSec)
 
-				ackCmd := fmt.Sprintf("abs remote ack %q || ~/.local/bin/abs remote ack %q", relPath, relPath)
-				_, errAck := transport.Exec(targetHost, ackCmd)
-				if errAck != nil {
-					truncCmd := fmt.Sprintf("truncate -s 0 %s && rm -f %s.precut %s.tmp.mp3", remoteAudio, remoteAudio, remoteAudio)
-					_, _ = transport.Exec(targetHost, truncCmd)
-				}
-
 				_ = os.RemoveAll(tempItemDir)
 				totalPulled++
 				totalCutSaved += item.CutDurationSec
+				verifiedRelPaths = append(verifiedRelPaths, relPath)
 
 				if !quiet {
 					fmt.Printf("✓ Pulled %s -> %s (saved %.1fs)\n", relPath, localDestAudio, item.CutDurationSec)
+				}
+			}
+
+			if len(verifiedRelPaths) > 0 {
+				var quotedArgs []string
+				for _, p := range verifiedRelPaths {
+					quotedArgs = append(quotedArgs, fmt.Sprintf("%q", p))
+				}
+				ackArgs := strings.Join(quotedArgs, " ")
+				ackCmd := fmt.Sprintf("abs remote ack %s || ~/.local/bin/abs remote ack %s", ackArgs, ackArgs)
+				_, errAck := transport.Exec(targetHost, ackCmd)
+				if errAck != nil {
+					for _, p := range verifiedRelPaths {
+						remAudio := fmt.Sprintf("%s/%s", remoteWorkDir, p)
+						delCmd := fmt.Sprintf("rm -f %s %s.precut %s.tmp.mp3", remAudio, remAudio, remAudio)
+						_, _ = transport.Exec(targetHost, delCmd)
+					}
 				}
 			}
 		}

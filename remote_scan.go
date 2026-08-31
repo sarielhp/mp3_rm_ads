@@ -40,7 +40,7 @@ func scanAudioFiles(rootDir string) []string {
 	return files
 }
 
-func runRemoteScan(cfg *Config, targetDir string, quiet, verbose bool) error {
+func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose bool) error {
 	remoteDir := targetDir
 	if remoteDir == "" {
 		if cfg != nil && cfg.RemoteWorkDir != "" {
@@ -53,6 +53,20 @@ func runRemoteScan(cfg *Config, targetDir string, quiet, verbose bool) error {
 	if err := os.MkdirAll(resolvedDir, 0755); err != nil {
 		return fmt.Errorf("failed to create scan directory %s: %w", resolvedDir, err)
 	}
+
+	triggerPath := filepath.Join(resolvedDir, ".scan_trigger")
+	if ifDirty {
+		if !fileExists(triggerPath) {
+			return nil
+		}
+	}
+	_ = os.Remove(triggerPath)
+
+	unlock, err := acquireWorkerLock(resolvedDir)
+	if err != nil {
+		return err
+	}
+	defer unlock()
 
 	files := scanAudioFiles(resolvedDir)
 	if len(files) == 0 {
@@ -231,18 +245,14 @@ func runRemoteWorkerLoop(cfg *Config, targetDir string, daemon bool, quiet, verb
 	resolvedDir := resolveLocalPath(remoteDir)
 	_ = os.MkdirAll(resolvedDir, 0755)
 
-	lockPath := filepath.Join(resolvedDir, ".worker.lock")
-	lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	unlock, err := acquireWorkerLock(resolvedDir)
 	if err != nil {
-		return fmt.Errorf("remote worker is already running (lockfile %s exists)", lockPath)
+		return err
 	}
-	defer func() {
-		_ = lockFile.Close()
-		_ = os.Remove(lockPath)
-	}()
+	defer unlock()
 
 	for {
-		if err := runRemoteScan(cfg, resolvedDir, quiet, verbose); err != nil {
+		if err := runRemoteScan(cfg, resolvedDir, false, quiet, verbose); err != nil {
 			if !quiet {
 				fmt.Fprintf(os.Stderr, "Worker error: %v\n", err)
 			}

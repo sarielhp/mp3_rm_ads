@@ -243,6 +243,7 @@ type CLIOptions struct {
 	Local               bool
 	NoCollect           bool
 	Daemon              bool
+	IfDirty             bool
 	BatchWorkerDir      string
 }
 

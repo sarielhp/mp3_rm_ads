@@ -77,17 +77,36 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 		}
 		return "", nil
 	}
+	if strings.HasPrefix(cmd, "touch ") {
+		parts := strings.Fields(cmd)[1:]
+		for _, p := range parts {
+			local := m.resolveRemotePath(p)
+			_ = os.WriteFile(local, []byte{}, 0644)
+		}
+		return "", nil
+	}
 	if strings.Contains(cmd, "remote ack") {
+		var rels []string
 		parts := strings.Split(cmd, "\"")
-		rel := ""
-		if len(parts) >= 2 {
-			rel = parts[1]
+		for i := 1; i < len(parts); i += 2 {
+			if strings.TrimSpace(parts[i]) != "" {
+				rels = append(rels, strings.TrimSpace(parts[i]))
+			}
+		}
+		if len(rels) == 0 {
+			fields := strings.Fields(cmd)
+			for i, f := range fields {
+				if f == "ack" && i+1 < len(fields) {
+					rels = append(rels, fields[i+1:]...)
+					break
+				}
+			}
 		}
 		dir := m.RemoteRoot
-		if fileExists(filepath.Join(m.RemoteRoot, "remote_root", rel)) {
+		if len(rels) > 0 && fileExists(filepath.Join(m.RemoteRoot, "remote_root", rels[0])) {
 			dir = filepath.Join(m.RemoteRoot, "remote_root")
 		}
-		_ = runRemoteAck(dir, rel)
+		_ = runRemoteAck(dir, rels)
 		return "", nil
 	}
 	if strings.Contains(cmd, "abs help") || strings.Contains(cmd, "abs version") {
