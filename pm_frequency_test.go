@@ -10,11 +10,11 @@ import (
 
 func TestAnalyzePodcastFrequency_IntermittentFewEpisodes(t *testing.T) {
 	var episodes []FeedEpisode
-	base := time.Now().Add(-24 * time.Hour)
+	base := time.Now().Add(-100 * 24 * time.Hour)
 	for i := 0; i < 5; i++ {
 		episodes = append(episodes, FeedEpisode{
 			Title:       fmt.Sprintf("Ep %d", i),
-			PublishedAt: base.Add(time.Duration(i) * 2 * time.Hour).UnixMilli(),
+			PublishedAt: base.Add(time.Duration(i*14) * 24 * time.Hour).UnixMilli(),
 		})
 	}
 
@@ -27,6 +27,28 @@ func TestAnalyzePodcastFrequency_IntermittentFewEpisodes(t *testing.T) {
 	}
 	if freq.AnalyzedAt.IsZero() {
 		t.Error("expected non-zero AnalyzedAt")
+	}
+}
+
+func TestAnalyzePodcastFrequency_RollingHourly(t *testing.T) {
+	var episodes []FeedEpisode
+	base := time.Date(2026, 8, 31, 12, 0, 0, 0, time.UTC)
+	for i := 0; i < 4; i++ {
+		episodes = append(episodes, FeedEpisode{
+			Title:       fmt.Sprintf("NPR News Now Ep %d", i),
+			PublishedAt: base.Add(time.Duration(i) * time.Hour).UnixMilli(),
+		})
+	}
+
+	freq := analyzePodcastFrequency(episodes)
+	if freq.Type != string(CadenceHourly) {
+		t.Errorf("expected %s, got %s", CadenceHourly, freq.Type)
+	}
+	if freq.MedianHoursInterval != 1.0 {
+		t.Errorf("expected median interval 1.0, got %f", freq.MedianHoursInterval)
+	}
+	if freq.EpisodesAnalyzed != 4 {
+		t.Errorf("expected 4 episodes analyzed, got %d", freq.EpisodesAnalyzed)
 	}
 }
 

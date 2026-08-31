@@ -29,7 +29,7 @@ type PodcastFrequencyInfo struct {
 }
 
 func analyzePodcastFrequency(episodes []FeedEpisode) PodcastFrequencyInfo {
-	if len(episodes) < 10 {
+	if len(episodes) < 3 {
 		return PodcastFrequencyInfo{
 			Type:             string(CadenceIntermittent),
 			EpisodesAnalyzed: len(episodes),
@@ -44,7 +44,7 @@ func analyzePodcastFrequency(episodes []FeedEpisode) PodcastFrequencyInfo {
 		}
 	}
 
-	if len(timestamps) < 10 {
+	if len(timestamps) < 3 {
 		return PodcastFrequencyInfo{
 			Type:             string(CadenceIntermittent),
 			EpisodesAnalyzed: len(episodes),
@@ -86,6 +86,8 @@ func analyzePodcastFrequency(episodes []FeedEpisode) PodcastFrequencyInfo {
 	var cadence PodcastCadence
 	if releasesPerDay > 10.0 || medianHoursInterval <= 4.0 {
 		cadence = CadenceHourly
+	} else if len(episodes) < 10 {
+		cadence = CadenceIntermittent
 	} else if episodesPerWeek >= 4.0 || medianHoursInterval <= 48.0 {
 		cadence = CadenceDaily
 	} else if episodesPerWeek >= 0.75 || medianHoursInterval <= 240.0 {
