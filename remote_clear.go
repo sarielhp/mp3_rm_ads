@@ -23,8 +23,11 @@ func runRemoteClear(cfg *Config, host string, transport RemoteTransport, quiet b
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
 
-	killCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true; rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
+	killCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true; pkill -f 'ffmpeg.*abs' 2>/dev/null || true; pkill -f 'whisper-server' 2>/dev/null || true; pkill -f 'whisper_server' 2>/dev/null || true; rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
 	_, _ = transport.Exec(targetHost, killCmd)
+
+	restartDockerCmd := "docker restart $(docker ps -q --filter 'ancestor=fedirz/faster-whisper-server' 2>/dev/null || docker ps -q 2>/dev/null) 2>/dev/null || true"
+	_, _ = transport.Exec(targetHost, restartDockerCmd)
 
 	findPendingCmd := fmt.Sprintf("grep -l -E '\"status\": \"(awaiting_transcription|transcribing_remotely|cutting_remotely|queued_remote)\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir)
 	pendingOut, _ := transport.Exec(targetHost, findPendingCmd)
