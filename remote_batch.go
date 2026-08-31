@@ -77,12 +77,19 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 
 	var toPush []string
 	for _, f := range files {
-		if !isEpisodeCompleted(f) {
+		if !isEpisodeCompleted(f) && !isEpisodeInRemoteFlight(f) {
 			toPush = append(toPush, f)
 		}
 	}
 	if len(toPush) == 0 {
-		toPush = files
+		if len(args) > 0 && len(files) > 0 {
+			toPush = files
+		} else {
+			if !quiet {
+				fmt.Println("All audio files are already completed or currently queued/processing remotely.")
+			}
+			return nil
+		}
 	}
 
 	if !quiet {

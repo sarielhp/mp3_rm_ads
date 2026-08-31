@@ -210,6 +210,18 @@ func isEpisodeCompleted(audioPath string) bool {
 	return false
 }
 
+func isEpisodeInRemoteFlight(audioPath string) bool {
+	statPath := statusPathFor(audioPath)
+	st, err := loadEpisodeStatus(statPath)
+	if err == nil && st != nil {
+		switch st.Status {
+		case StateQueuedRemote, StateTranscribingRemotely, StateCuttingRemotely, StateReadyForCopyBack, StateAwaitingTranscription:
+			return true
+		}
+	}
+	return false
+}
+
 func computeRelativeMediaDir(baseDir, fullPath string) (string, error) {
 	absBase, err := filepath.Abs(baseDir)
 	if err != nil {

@@ -178,7 +178,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 				continue
 			}
 			mainMP3File, _, _ := resolveAudioFiles(f, cli)
-			if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && isEpisodeCompleted(mainMP3File) {
+			if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (isEpisodeCompleted(mainMP3File) || isEpisodeInRemoteFlight(mainMP3File)) {
 				continue
 			}
 			filesToPush = append(filesToPush, f)
@@ -188,7 +188,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		}
 		if len(filesToPush) == 0 {
 			if !cli.Quiet {
-				fmt.Println("All audio files are already transcribed, cleaned, and ad-free.")
+				fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 			}
 			return
 		}
