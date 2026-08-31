@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -18,6 +19,8 @@ type lsEpisodeItem struct {
 	episodeName    string
 	modTime        time.Time
 	sizeBytes      int64
+	origDuration   float64
+	cleanDuration  float64
 	statusStr      string
 	statusColor    string
 }
@@ -186,7 +189,10 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 			continue
 		}
 		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		st := getOrCreateEpisodeStatus(mp3)
 		statusStr, statusColor := getEpisodeStatusLabel(mp3)
+		origDur, cleanDur := getEpisodeDurations(mp3, st)
+
 		items = append(items, lsEpisodeItem{
 			path:           mp3,
 			podcastDir:     podDir,
@@ -195,6 +201,8 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 			episodeName:    epName,
 			modTime:        fi.ModTime(),
 			sizeBytes:      fi.Size(),
+			origDuration:   origDur,
+			cleanDuration:  cleanDur,
 			statusStr:      statusStr,
 			statusColor:    statusColor,
 		})
@@ -212,27 +220,79 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 	}
 
 	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(title), shortID, len(items))
-	fmt.Printf("%s\n", strings.Repeat("=", 95))
-	fmt.Printf("  %-3s │ %-16s │ %-18s │ %-10s │ %s\n", "#", "Date / Time", "Status", "Size", "Episode Title")
-	fmt.Printf("  %-3s ┼ %-16s ┼ %-18s ┼ %-10s ┼ %s\n", strings.Repeat("─", 3), strings.Repeat("─", 16), strings.Repeat("─", 18), strings.Repeat("─", 10), strings.Repeat("─", 38))
+	fmt.Printf("%s\n", strings.Repeat("=", 80))
+	fmt.Printf("  %-3s │ %-8s │ %-8s │ %-7s │ %s\n", "#", "Orig", "Clean", "Status", "Episode Title")
+	fmt.Printf("  %-3s ┼ %-8s ┼ %-8s ┼ %-7s ┼ %s\n", strings.Repeat("─", 3), strings.Repeat("─", 8), strings.Repeat("─", 8), strings.Repeat("─", 7), strings.Repeat("─", 40))
 
 	for idx, item := range items {
-		dStr := item.modTime.Format("2006-01-02 15:04")
-		sizeStr := fmt.Sprintf("%.1f MB", float64(item.sizeBytes)/(1024.0*1024.0))
-		coloredStatus := item.statusStr
-		if item.statusColor == "green" {
-			coloredStatus = boldGreen(item.statusStr)
-		} else if item.statusColor == "yellow" {
-			coloredStatus = boldYellow(item.statusStr)
-		} else if item.statusColor == "cyan" {
-			coloredStatus = bold(item.statusStr)
+		origStr := formatClock(item.origDuration)
+		if item.origDuration <= 0 {
+			origStr = "-"
+		}
+		cleanStr := "-"
+		if item.statusStr == "Clean" {
+			if item.cleanDuration > 0 {
+				cleanStr = formatClock(item.cleanDuration)
+			} else if item.origDuration > 0 {
+				cleanStr = formatClock(item.origDuration)
+			}
 		}
 
-		fmt.Printf("  %-3d │ %-16s │ %-18s │ %-10s │ %s\n", idx+1, dStr, coloredStatus, sizeStr, item.episodeName)
+		shortStatus := item.statusStr
+		if shortStatus == "Needs Ad Removal" {
+			shortStatus = "NeedsAd"
+		} else if shortStatus == "Queued Remote" {
+			shortStatus = "Queued"
+		} else if shortStatus == "In Progress" {
+			shortStatus = "Active"
+		}
+
+		coloredStatus := shortStatus
+		if item.statusColor == "green" {
+			coloredStatus = boldGreen(shortStatus)
+		} else if item.statusColor == "yellow" {
+			coloredStatus = boldYellow(shortStatus)
+		} else if item.statusColor == "cyan" {
+			coloredStatus = bold(shortStatus)
+		}
+
+		t := item.episodeName
+		r := []rune(t)
+		if len(r) > 40 {
+			t = string(r[:37]) + "..."
+		}
+
+		fmt.Printf("  %-3d │ %-8s │ %-8s │ %-7s │ %s\n", idx+1, origStr, cleanStr, coloredStatus, t)
 	}
-	fmt.Printf("%s\n\n", strings.Repeat("=", 95))
+	fmt.Printf("%s\n\n", strings.Repeat("=", 80))
 
 	return nil
+}
+
+func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float64) {
+	origDur := 0.0
+	cleanDur := 0.0
+	if st != nil {
+		origDur = st.Original.DurationSec
+		cleanDur = st.Cleaned.DurationSec
+	}
+	if origDur == 0 {
+		cutsFile := stripExt(mp3Path) + ".cuts.json"
+		if data, err := os.ReadFile(cutsFile); err == nil {
+			var cd CutsData
+			if json.Unmarshal(data, &cd) == nil && cd.OriginalDurationSec > 0 {
+				origDur = cd.OriginalDurationSec
+				cleanDur = cd.OriginalDurationSec - cd.TotalCutDurationSec
+			}
+		}
+	}
+	if origDur == 0 {
+		origDur = getAudioDuration(mp3Path)
+		if st != nil && (st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path)) {
+			cleanDur = origDur
+		}
+	}
+	return origDur, cleanDur
 }
 
 func getEpisodeStatusLabel(mp3Path string) (string, string) {
