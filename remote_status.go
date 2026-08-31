@@ -63,11 +63,21 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		status.WorkerRunning = strings.TrimSpace(psOut) != ""
 	}
 
-	if status.WorkerRunning {
-		activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null | head -n 1", remoteWorkDir))
-		if activePath := strings.TrimSpace(activeOut); activePath != "" {
-			rel := strings.TrimSuffix(strings.TrimPrefix(activePath, remoteWorkDir+"/"), ".json")
-			status.ActiveTask = rel
+	activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"status\": \"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null | head -n 1", remoteWorkDir))
+	if activePath := strings.TrimSpace(activeOut); activePath != "" {
+		rel := strings.TrimSuffix(strings.TrimPrefix(activePath, remoteWorkDir+"/"), ".json")
+		status.ActiveTask = rel
+	}
+
+	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
+	if strings.TrimSpace(queuedOut) != "" {
+		for _, qPath := range splitLines(strings.TrimSpace(queuedOut)) {
+			qPath = strings.TrimSpace(qPath)
+			if qPath == "" {
+				continue
+			}
+			rel := strings.TrimSuffix(strings.TrimPrefix(qPath, remoteWorkDir+"/"), ".json")
+			status.QueuedTasks = append(status.QueuedTasks, rel)
 		}
 	}
 
@@ -136,10 +146,23 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 	fmt.Printf("  - Worker Process:  %s\n", workerStatusStr)
+	if len(status.QueuedTasks) > 0 {
+		fmt.Printf("  - Remote Queue:    %s\n", boldYellow(fmt.Sprintf("%d job(s) scheduled", len(status.QueuedTasks))))
+	} else {
+		fmt.Printf("  - Remote Queue:    0 jobs\n")
+	}
 	fmt.Printf("  - Ready to Pull:   %s\n", boldGreen(fmt.Sprintf("%d episode(s)", len(readyEpisodes))))
 	fmt.Printf("  - Remote Archive:  %d episode(s)\n", archiveCount)
 	if len(status.ActiveBatches) > 0 {
 		fmt.Printf("  - Staged Batches:  %d\n", len(status.ActiveBatches))
+	}
+
+	if len(status.QueuedTasks) > 0 {
+		fmt.Println()
+		fmt.Println(bold("Remote Queue (Scheduled Jobs):"))
+		for idx, task := range status.QueuedTasks {
+			fmt.Printf("  [%d] %s\n", idx+1, task)
+		}
 	}
 
 	if len(readyEpisodes) > 0 {

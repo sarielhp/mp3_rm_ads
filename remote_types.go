@@ -55,6 +55,7 @@ type RemoteServerStatus struct {
 	ActiveBatches []RemoteBatchManifest `json:"active_batches,omitempty"`
 	WorkerRunning bool                  `json:"worker_running"`
 	ActiveTask    string                `json:"active_task,omitempty"`
+	QueuedTasks   []string              `json:"queued_tasks,omitempty"`
 	Message       string                `json:"message,omitempty"`
 }
 
