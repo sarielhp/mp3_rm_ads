@@ -70,7 +70,7 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		return fmt.Errorf("no audio (.mp3) files found to push for batch processing")
 	}
 
-	remoteWorkDir := "~/.abs_remote"
+	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}

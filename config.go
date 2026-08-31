@@ -21,7 +21,7 @@ var defaultConfig = Config{
 	DefaultDownloadK:      3,
 	DefaultAdRemoval:      "all",
 	DefaultProcessing:     "local",
-	RemoteWorkDir:         "~/.abs_remote",
+	RemoteWorkDir:         "~/abs_remote",
 	WhisperURL:            "http://192.168.1.230:8088/inference",
 	WhisperSpeedFactor:    7.0,
 	ChunkDurationSec:      0,
@@ -238,7 +238,7 @@ func loadConfig() Config {
 		cfg.DefaultProcessing = "local"
 	}
 	if cfg.RemoteWorkDir == "" {
-		cfg.RemoteWorkDir = "~/.abs_remote"
+		cfg.RemoteWorkDir = "~/abs_remote"
 	}
 	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)

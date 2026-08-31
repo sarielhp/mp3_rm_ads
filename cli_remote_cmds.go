@@ -78,7 +78,7 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Description: "Scan remote mirror directory for pending episodes and process them",
 				UsageLine:   "abs remote scan [path] [options]",
 				Parameters: []clihelp.Param{
-					{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/.abs_remote)"},
+					{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/abs_remote)"},
 				},
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
@@ -98,7 +98,7 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Description: "Run remote worker scanner loop on mirror directory",
 				UsageLine:   "abs remote worker [path] [options]",
 				Parameters: []clihelp.Param{
-					{Name: "[path]", Description: "Target mirror directory (defaults to ~/.abs_remote)"},
+					{Name: "[path]", Description: "Target mirror directory (defaults to ~/abs_remote)"},
 				},
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
@@ -228,7 +228,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 			targetDir = config.RemoteWorkDir
 		}
 		if targetDir == "" {
-			targetDir = "~/.abs_remote"
+			targetDir = "~/abs_remote"
 		}
 		err = runRemoteAck(targetDir, cli.Args)
 	case "status":

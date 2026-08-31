@@ -31,7 +31,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		return nil
 	}
 
-	verOut, _ := transport.Exec(targetHost, "~/.local/bin/abs help 2>/dev/null || ~/.abs_remote/bin/abs help 2>/dev/null || abs help 2>/dev/null")
+	verOut, _ := transport.Exec(targetHost, "~/.local/bin/abs help 2>/dev/null || ~/abs_remote/bin/abs help 2>/dev/null || abs help 2>/dev/null")
 	if verOut != "" {
 		lines := splitLines(verOut)
 		if len(lines) > 0 {
@@ -42,7 +42,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	psOut, _ := transport.Exec(targetHost, "pgrep -f 'abs.*(scan|worker)' 2>/dev/null")
 	status.WorkerRunning = strings.TrimSpace(psOut) != ""
 
-	remoteWorkDir := "~/.abs_remote"
+	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
@@ -166,7 +166,7 @@ func runRemoteCancel(cfg *Config, host, batchID string, transport RemoteTranspor
 		transport = getRemoteTransport()
 	}
 
-	remoteWorkDir := "~/.abs_remote"
+	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}

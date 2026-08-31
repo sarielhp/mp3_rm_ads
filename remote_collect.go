@@ -72,7 +72,7 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 		transport = getRemoteTransport()
 	}
 
-	remoteWorkDir := "~/.abs_remote"
+	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}

@@ -99,7 +99,7 @@ func handleProcDryRun(files []string, cli CLIOptions, config Config) {
 			targetHost = h
 			transport := getRemoteTransport()
 			if isRemoteHostReachable(h, transport) {
-				remoteWorkDir := "~/.abs_remote"
+				remoteWorkDir := "~/abs_remote"
 				if config.RemoteWorkDir != "" {
 					remoteWorkDir = config.RemoteWorkDir
 				}

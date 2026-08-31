@@ -28,6 +28,7 @@ func (m *MockRemoteTransport) resolveRemotePath(remPath string) string {
 	}
 	clean := strings.TrimPrefix(remPath, "~/")
 	clean = strings.TrimPrefix(clean, ".abs_remote/")
+	clean = strings.TrimPrefix(clean, "abs_remote/")
 	clean = strings.TrimPrefix(clean, ".config/")
 	clean = strings.TrimPrefix(clean, ".local/")
 	return filepath.Join(m.RemoteRoot, clean)
@@ -183,8 +184,8 @@ func TestRemoteConfigOptions(t *testing.T) {
 	if cfg.DefaultProcessing != "local" {
 		t.Errorf("expected default processing to be 'local', got %s", cfg.DefaultProcessing)
 	}
-	if cfg.RemoteWorkDir != "~/.abs_remote" {
-		t.Errorf("expected default remote work dir to be '~/.abs_remote', got %s", cfg.RemoteWorkDir)
+	if cfg.RemoteWorkDir != "~/abs_remote" {
+		t.Errorf("expected default remote work dir to be '~/abs_remote', got %s", cfg.RemoteWorkDir)
 	}
 
 	if err := handleConfigSet(&cfg, "remote-host", "server1.lan"); err != nil {

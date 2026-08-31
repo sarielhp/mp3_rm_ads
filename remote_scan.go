@@ -46,7 +46,7 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		if cfg != nil && cfg.RemoteWorkDir != "" {
 			remoteDir = cfg.RemoteWorkDir
 		} else {
-			remoteDir = "~/.abs_remote"
+			remoteDir = "~/abs_remote"
 		}
 	}
 	resolvedDir := resolveLocalPath(remoteDir)
@@ -239,7 +239,7 @@ func runRemoteWorkerLoop(cfg *Config, targetDir string, daemon bool, quiet, verb
 		if cfg != nil && cfg.RemoteWorkDir != "" {
 			remoteDir = cfg.RemoteWorkDir
 		} else {
-			remoteDir = "~/.abs_remote"
+			remoteDir = "~/abs_remote"
 		}
 	}
 	resolvedDir := resolveLocalPath(remoteDir)

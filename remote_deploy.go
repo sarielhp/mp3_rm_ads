@@ -28,7 +28,7 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 		exePath = realExe
 	}
 
-	remoteWorkDir := "~/.abs_remote"
+	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
