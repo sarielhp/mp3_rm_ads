@@ -380,6 +380,10 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "get_info":
 		handleServerGetInfo(config, cli)
 		return
+
+	case "frequency", "disable_hourly":
+		handleServerFrequency(config, cli)
+		return
 	}
 }
 

@@ -303,6 +303,56 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 					return nil
 				},
 			},
+			{
+				Name:        "frequency",
+				Description: "Analyze podcast release cadence and save frequency metadata",
+				UsageLine:   "abs server frequency [<podcast>] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to analyze"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Filter to a single podcast"),
+					clihelp.Bool(&opts.Refresh, "--refresh", false, "Force re-fetching latest 100 episodes from online RSS feed"),
+					clihelp.Bool(&opts.DisableHourly, "--disable-hourly", false, "Automatically disable download and ad removal for hourly podcasts"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed metrics (span, days interval, hours interval)"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "frequency"
+					opts.Args = ctx.Args
+					if len(ctx.Args) > 0 && opts.Podcast == "" {
+						opts.Podcast = ctx.Args[0]
+					}
+					return nil
+				},
+			},
+			{
+				Name:        "disable_hourly",
+				Description: "Analyze podcasts and disable download policy and ad removal for all hourly podcasts",
+				UsageLine:   "abs server disable_hourly [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to filter"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Filter to a single podcast"),
+					clihelp.Bool(&opts.Refresh, "--refresh", false, "Force re-fetching latest 100 episodes from online RSS feed"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "disable_hourly"
+					opts.DisableHourly = true
+					opts.Args = ctx.Args
+					if len(ctx.Args) > 0 && opts.Podcast == "" {
+						opts.Podcast = ctx.Args[0]
+					}
+					return nil
+				},
+			},
 		},
 	}
 }

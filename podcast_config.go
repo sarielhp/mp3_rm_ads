@@ -24,10 +24,11 @@ const (
 )
 
 type PodcastConfig struct {
-	AdRemoval      string    `json:"ad_removal"`
-	DownloadPolicy string    `json:"download_policy,omitempty"`
-	DownloadK      int       `json:"download_k,omitempty"`
-	UpdatedAt      time.Time `json:"updated_at,omitempty"`
+	AdRemoval      string                `json:"ad_removal"`
+	DownloadPolicy string                `json:"download_policy,omitempty"`
+	DownloadK      int                   `json:"download_k,omitempty"`
+	Frequency      *PodcastFrequencyInfo `json:"frequency,omitempty"`
+	UpdatedAt      time.Time             `json:"updated_at,omitempty"`
 }
 
 func defaultPodcastConfig() PodcastConfig {

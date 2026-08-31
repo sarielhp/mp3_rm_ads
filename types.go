@@ -229,6 +229,8 @@ type CLIOptions struct {
 	ABSToken            string
 	Args                []string
 	ServerSubcmd        string
+	Refresh             bool
+	DisableHourly       bool
 	OPMLSubcmd          string
 	OPMLFile            string
 	PodcastsOnly        bool
