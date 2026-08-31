@@ -129,13 +129,37 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	}
 
 	if targetHost != "" {
-		filesToPush := expandedArgs
+		var filesToPush []string
+		for _, f := range expandedArgs {
+			if strings.HasSuffix(f, ".json") {
+				continue
+			}
+			mainMP3File, precutFile, _ := resolveAudioFiles(f, cli)
+			baseName := stripExt(mainMP3File)
+			jsonFile := cli.TranscriptPath
+			if jsonFile == "" {
+				jsonFile = baseName + ".transcript.json"
+			}
+			cutsFile := baseName + ".cuts.json"
+
+			if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut {
+				if fileExists(precutFile) {
+					continue
+				}
+				data, err := os.ReadFile(cutsFile)
+				var cd CutsData
+				if err == nil && json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) == 0 {
+					continue
+				}
+			}
+			filesToPush = append(filesToPush, f)
+		}
 		if cli.Count > 0 && len(filesToPush) > cli.Count {
 			filesToPush = filesToPush[:cli.Count]
 		}
 		if len(filesToPush) == 0 {
 			if !cli.Quiet {
-				fmt.Println("No audio files found that need ad removal.")
+				fmt.Println("All audio files are already transcribed, cleaned, and ad-free.")
 			}
 			return
 		}
