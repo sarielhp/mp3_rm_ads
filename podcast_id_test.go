@@ -17,15 +17,15 @@ func TestGeneratePodcastShortID(t *testing.T) {
 		title    string
 		expected string
 	}{
-		{"Huberman Lab", "huber"},
-		{"The Daily", "theda"},
-		{"Planet Money", "plane"},
+		{"Huberman Lab", "hbrmn"},
+		{"The Daily", "thdly"},
+		{"Planet Money", "plntm"},
 		{"Radiolab", "radio"},
 		{"99% Invisible", "99inv"},
-		{"Lex Fridman Podcast", "lexfr"},
-		{"This American Life", "thisa"},
-		{"Freakonomics Radio", "freak"},
-		{"Darknet Diaries", "darkn"},
+		{"Lex Fridman Podcast", "lxfrd"},
+		{"This American Life", "thsam"},
+		{"Freakonomics Radio", "frknm"},
+		{"Darknet Diaries", "drknt"},
 	}
 
 	for _, c := range cases {
@@ -88,8 +88,8 @@ func TestGetOrSetPodcastShortIDPersistence(t *testing.T) {
 	_ = os.MkdirAll(podDir, 0755)
 
 	id1 := getOrSetPodcastShortID(podDir, "Lex Fridman Podcast")
-	if id1 != "lexfr" {
-		t.Errorf("expected id 'lexfr', got %q", id1)
+	if id1 != "lxfrd" {
+		t.Errorf("expected id 'lxfrd', got %q", id1)
 	}
 
 	cfgPath := filepath.Join(podDir, "podcast.json")
@@ -102,13 +102,13 @@ func TestGetOrSetPodcastShortIDPersistence(t *testing.T) {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		t.Fatalf("failed to unmarshal podcast.json: %v", err)
 	}
-	if cfg.ID != "lexfr" {
-		t.Errorf("expected persisted id 'lexfr', got %q", cfg.ID)
+	if cfg.ID != "lxfrd" {
+		t.Errorf("expected persisted id 'lxfrd', got %q", cfg.ID)
 	}
 
 	id2 := getOrSetPodcastShortID(podDir, "Different Title That Should Not Overwrite")
-	if id2 != "lexfr" {
-		t.Errorf("expected existing id 'lexfr' to be returned, got %q", id2)
+	if id2 != "lxfrd" {
+		t.Errorf("expected existing id 'lxfrd' to be returned, got %q", id2)
 	}
 
 	cfg.ID = "custom"

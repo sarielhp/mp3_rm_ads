@@ -24,17 +24,86 @@ func generatePodcastShortID(title string) string {
 		return hex.EncodeToString(h[:])[:5]
 	}
 
-	var sb strings.Builder
-	for _, r := range t {
-		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
-			sb.WriteRune(r)
-		} else if r >= 'A' && r <= 'Z' {
-			sb.WriteRune(r + ('a' - 'A'))
+	fields := strings.FieldsFunc(t, func(r rune) bool {
+		return r == ' ' || r == '-' || r == '_' || r == ':' || r == ',' || r == '.' || r == '\'' || r == '"'
+	})
+
+	var cleanWords []string
+	for _, f := range fields {
+		var b strings.Builder
+		for _, r := range f {
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			} else if r >= 'A' && r <= 'Z' {
+				b.WriteRune(r + ('a' - 'A'))
+			}
+		}
+		if b.Len() > 0 {
+			cleanWords = append(cleanWords, b.String())
 		}
 	}
-	filtered := sb.String()
-	if len(filtered) >= 5 {
-		return filtered[:5]
+
+	if len(cleanWords) >= 3 {
+		var initials strings.Builder
+		for _, w := range cleanWords {
+			initials.WriteByte(w[0])
+		}
+		if initials.Len() >= 5 {
+			return initials.String()[:5]
+		}
+		var b strings.Builder
+		for _, w := range cleanWords {
+			b.WriteByte(w[0])
+			for i := 1; i < len(w); i++ {
+				c := w[i]
+				if c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' {
+					b.WriteByte(c)
+					if b.Len() == 5 {
+						return b.String()
+					}
+				}
+			}
+		}
+		if b.Len() >= 5 {
+			return b.String()[:5]
+		}
+	} else if len(cleanWords) == 2 {
+		w1, w2 := cleanWords[0], cleanWords[1]
+		var b strings.Builder
+		b.WriteByte(w1[0])
+		for i := 1; i < len(w1); i++ {
+			if w1[i] != 'a' && w1[i] != 'e' && w1[i] != 'i' && w1[i] != 'o' && w1[i] != 'u' {
+				b.WriteByte(w1[i])
+			}
+		}
+		b.WriteByte(w2[0])
+		for i := 1; i < len(w2); i++ {
+			if w2[i] != 'a' && w2[i] != 'e' && w2[i] != 'i' && w2[i] != 'o' && w2[i] != 'u' {
+				b.WriteByte(w2[i])
+			}
+		}
+		if b.Len() >= 5 {
+			return b.String()[:5]
+		}
+		comb := w1 + w2
+		if len(comb) >= 5 {
+			return comb[:5]
+		}
+	} else if len(cleanWords) == 1 {
+		w := cleanWords[0]
+		var b strings.Builder
+		b.WriteByte(w[0])
+		for i := 1; i < len(w); i++ {
+			if w[i] != 'a' && w[i] != 'e' && w[i] != 'i' && w[i] != 'o' && w[i] != 'u' {
+				b.WriteByte(w[i])
+			}
+		}
+		if b.Len() >= 5 {
+			return b.String()[:5]
+		}
+		if len(w) >= 5 {
+			return w[:5]
+		}
 	}
 
 	h := sha256.Sum256([]byte(t))
@@ -87,12 +156,10 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 			if cached, _ := loadPodcastCache(podPath); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
 				title = strings.TrimSpace(cached.PodcastName)
 			}
-			shortID := getOrSetPodcastShortID(podPath, title)
 			entries = append(entries, podcastDirEntry{
 				dir:        podPath,
 				folderName: de.Name(),
 				title:      title,
-				shortID:    shortID,
 			})
 		}
 	}
@@ -104,12 +171,10 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 			if cached, _ := loadPodcastCache(podcastsDir); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
 				title = strings.TrimSpace(cached.PodcastName)
 			}
-			shortID := getOrSetPodcastShortID(podcastsDir, title)
 			entries = append(entries, podcastDirEntry{
 				dir:        podcastsDir,
 				folderName: filepath.Base(podcastsDir),
 				title:      title,
-				shortID:    shortID,
 			})
 		}
 	}
@@ -117,6 +182,32 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 	sort.Slice(entries, func(i, j int) bool {
 		return strings.ToLower(entries[i].folderName) < strings.ToLower(entries[j].folderName)
 	})
+
+	seenIDs := make(map[string]string)
+	for i := range entries {
+		cfg := loadPodcastConfig(entries[i].dir)
+		candID := strings.TrimSpace(cfg.ID)
+		if candID == "" || seenIDs[candID] != "" {
+			candID = generatePodcastShortID(entries[i].title)
+		}
+		if seenIDs[candID] != "" {
+			h := sha256.Sum256([]byte(entries[i].title))
+			hexStr := hex.EncodeToString(h[:])
+			for off := 0; off+5 <= len(hexStr); off++ {
+				slice := hexStr[off : off+5]
+				if seenIDs[slice] == "" {
+					candID = slice
+					break
+				}
+			}
+		}
+		seenIDs[candID] = entries[i].dir
+		entries[i].shortID = candID
+		if cfg.ID != candID {
+			cfg.ID = candID
+			_ = savePodcastConfig(entries[i].dir, cfg)
+		}
+	}
 
 	return entries
 }
