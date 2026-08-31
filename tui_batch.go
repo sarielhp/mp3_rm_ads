@@ -84,3 +84,115 @@ func (m *tuiModel) batchQueuePlayback() {
 	m.clearSelectedEpisodes()
 	m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for playback", addedCount), ToastSuccess)
 }
+
+func (m *tuiModel) enqueueCurrentEpisodeDownload() {
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := m.podcasts[m.podIdx]
+	eps := m.filteredEpisodes()
+	if m.epIdx >= len(eps) {
+		return
+	}
+	ep := eps[m.epIdx]
+	epGUID := ""
+	pubDate := ""
+	var pubAt int64
+	if ep.absData != nil {
+		epGUID = ep.absData.ID
+		pubDate = ep.absData.PubDate
+		pubAt = parseABSEpisodePublishedAt(ep.absData)
+	}
+	if pubAt == 0 && ep.publishedAt > 0 {
+		pubAt = ep.publishedAt
+	}
+	podID := ""
+	if pod.absData != nil {
+		podID = pod.absData.ID
+	}
+	item := DownloadQueueItem{
+		PodcastTitle: pod.name,
+		PodcastDir:   pod.dir,
+		PodcastID:    podID,
+		EpisodeTitle: ep.displayTitle(),
+		GUID:         epGUID,
+		PubDate:      pubDate,
+		PublishedAt:  pubAt,
+		DurationSec:  ep.duration,
+	}
+	ok, reason := EnqueueDownload(item, m.podcasts)
+	if ok {
+		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
+		var absCli *ABSClient
+		if m.podcastsDir != "" {
+			cfg := loadConfig()
+			if cfg.AudiobookshelfURL != "" {
+				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+			}
+		}
+		TriggerDownloadQueueWorker(absCli)
+	} else if reason == "already_queued" {
+		m.showToast("Already in download queue", ToastWarning)
+	} else if reason == "already_downloaded" {
+		m.showToast("Episode already downloaded", ToastInfo)
+	} else {
+		m.showToast("Failed to enqueue download", ToastError)
+	}
+}
+
+func (m *tuiModel) batchQueueDownload() {
+	if len(m.selectedEpisodes) == 0 || m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := m.podcasts[m.podIdx]
+	eps := m.filteredEpisodes()
+	queuedCount := 0
+	for _, ep := range eps {
+		if !m.isEpisodeSelected(ep.path) {
+			continue
+		}
+		epGUID := ""
+		pubDate := ""
+		var pubAt int64
+		if ep.absData != nil {
+			epGUID = ep.absData.ID
+			pubDate = ep.absData.PubDate
+			pubAt = parseABSEpisodePublishedAt(ep.absData)
+		}
+		if pubAt == 0 && ep.publishedAt > 0 {
+			pubAt = ep.publishedAt
+		}
+		podID := ""
+		if pod.absData != nil {
+			podID = pod.absData.ID
+		}
+		item := DownloadQueueItem{
+			PodcastTitle: pod.name,
+			PodcastDir:   pod.dir,
+			PodcastID:    podID,
+			EpisodeTitle: ep.displayTitle(),
+			GUID:         epGUID,
+			PubDate:      pubDate,
+			PublishedAt:  pubAt,
+			DurationSec:  ep.duration,
+		}
+		ok, _ := EnqueueDownload(item, m.podcasts)
+		if ok {
+			queuedCount++
+		}
+	}
+	m.clearSelectedEpisodes()
+	if queuedCount > 0 {
+		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
+		var absCli *ABSClient
+		if m.podcastsDir != "" {
+			cfg := loadConfig()
+			if cfg.AudiobookshelfURL != "" {
+				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+			}
+		}
+		TriggerDownloadQueueWorker(absCli)
+	} else {
+		m.showToast("No new episodes enqueued", ToastWarning)
+	}
+}

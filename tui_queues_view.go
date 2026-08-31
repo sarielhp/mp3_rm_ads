@@ -242,3 +242,75 @@ func (m *tuiModel) drawAdQueueScreen() string {
 
 	return out.String()
 }
+
+func (m *tuiModel) drawDownloadQueueScreen() string {
+	out := &strings.Builder{}
+
+	items := GetDownloadQueueItems()
+	total := len(items)
+
+	banner := tuiHeaderBanner.Render(fmt.Sprintf(" DOWNLOAD QUEUE — %d items ", total))
+	out.WriteString("  " + banner + "\n\n")
+
+	dividerWidth := max(20, m.width-4)
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+
+	if total == 0 {
+		out.WriteString("\n  " + tuiDimStyle.Render("Download queue is empty. Press 'D' on any episode to enqueue.") + "\n\n")
+		out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+		out.WriteString(tuiDimStyle.Render("  F1 Player │ F2 Play Queue │ F3 Ad Queue │ Esc/q Back") + "\n")
+		return out.String()
+	}
+
+	maxVis := max(5, m.height-8)
+	if m.dlqIdx >= total {
+		m.dlqIdx = total - 1
+	}
+	if m.dlqIdx < 0 {
+		m.dlqIdx = 0
+	}
+	if m.dlqIdx < m.dlqScroll {
+		m.dlqScroll = m.dlqIdx
+	}
+	if m.dlqIdx-m.dlqScroll >= maxVis {
+		m.dlqScroll = m.dlqIdx - maxVis + 1
+	}
+
+	end := min(total, m.dlqScroll+maxVis)
+	for i := m.dlqScroll; i < end; i++ {
+		item := items[i]
+		idxPrefix := fmt.Sprintf("%2d. ", i+1)
+		podPrefix := "[" + displayName(item.PodcastTitle) + "] "
+		titleStr := displayName(item.EpisodeTitle)
+
+		statusBadge := ""
+		switch item.Status {
+		case "downloading":
+			statusBadge = "  " + tuiPlayerPlaying.Render("↓ Downloading")
+		case "completed":
+			statusBadge = "  " + tuiBadgeAdFree.Render("✓ Done")
+		case "failed":
+			statusBadge = "  " + tuiBadgeHasAds.Render("✗ Failed")
+		default:
+			statusBadge = "  " + tuiBadgeQueued.Render("⏳ Queued")
+		}
+
+		availW := max(20, m.width-6)
+		rawRow := idxPrefix + podPrefix + titleStr
+		truncRow := truncate(rawRow, max(10, availW-16))
+		fullRow := "  " + truncRow + statusBadge
+
+		if i == m.dlqIdx {
+			fullPad := max(0, availW-visibleRuneCount(fullRow))
+			out.WriteString(tuiSelectedStyle.Render("  "+truncRow+strings.Repeat(" ", fullPad)) + statusBadge)
+		} else {
+			out.WriteString(fullRow)
+		}
+		out.WriteByte('\n')
+	}
+
+	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ d/x Remove │ c Clear │ Enter Retry │ Esc/q Back") + "\n")
+
+	return out.String()
+}

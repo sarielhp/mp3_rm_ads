@@ -16,11 +16,14 @@ const configFileName = "config.json"
 const opencodeConfigFile = ".config/opencode/opencode.json"
 
 var defaultConfig = Config{
-	Instructions:       "Configuration file for abs. Select profiles by ID or set active_profile_id.",
-	WhisperURL:         "http://192.168.1.230:8088/inference",
-	WhisperSpeedFactor: 7.0,
-	ChunkDurationSec:   0,
-	ActiveProfileID:    1,
+	Instructions:          "Configuration file for abs. Select profiles by ID or set active_profile_id.",
+	DefaultDownloadPolicy: "latest",
+	DefaultDownloadK:      3,
+	DefaultAdRemoval:      "all",
+	WhisperURL:            "http://192.168.1.230:8088/inference",
+	WhisperSpeedFactor:    7.0,
+	ChunkDurationSec:      0,
+	ActiveProfileID:       1,
 	Profiles: []LLMProfile{
 		{ID: 1, Name: "Ollama Local (llama3.1:8b)", Type: "ollama", URL: "http://192.168.1.230:11434/v1/chat/completions", Model: "llama3.1:8b"},
 		{ID: 2, Name: "OpenRouter - Claude 3.5 Sonnet", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "anthropic/claude-3.5-sonnet"},
@@ -52,6 +55,9 @@ func configDir() string {
 }
 
 func configPath() string {
+	if testConfigPath != "" {
+		return testConfigPath
+	}
 	return filepath.Join(configDir(), configFileName)
 }
 
@@ -153,6 +159,19 @@ func applyEnvOverrides(cfg *Config) {
 	} else if v := os.Getenv("ABS_REMOTE_FFMPEG"); v != "" {
 		cfg.RemoteFFmpegHost = v
 	}
+	if v := os.Getenv("DEFAULT_DOWNLOAD_POLICY"); v != "" {
+		cfg.DefaultDownloadPolicy = normalizeDownloadPolicy(v)
+	}
+	if v := os.Getenv("DEFAULT_DOWNLOAD_K"); v != "" {
+		if k, err := strconv.Atoi(v); err == nil && k > 0 {
+			cfg.DefaultDownloadK = k
+		}
+	}
+	if v := os.Getenv("DEFAULT_AD_REMOVAL"); v != "" {
+		cfg.DefaultAdRemoval = normalizeAdRemovalMode(v)
+	} else if v := os.Getenv("DEFAULT_AD_POLICY"); v != "" {
+		cfg.DefaultAdRemoval = normalizeAdRemovalMode(v)
+	}
 }
 
 func resolveActiveWhisperProfile(cfg *Config) {
@@ -189,6 +208,15 @@ func loadConfig() Config {
 		applyEnvOverrides(&cfg)
 		return cfg
 	}
+	if cfg.DefaultDownloadPolicy == "" {
+		cfg.DefaultDownloadPolicy = "latest"
+	}
+	if cfg.DefaultDownloadK <= 0 {
+		cfg.DefaultDownloadK = 3
+	}
+	if cfg.DefaultAdRemoval == "" {
+		cfg.DefaultAdRemoval = "all"
+	}
 	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
@@ -220,6 +248,15 @@ func printConfig(cfg Config) {
 		podcastsDir = "(not set)"
 	}
 	fmt.Printf("  podcasts_dir:             %s\n", podcastsDir)
+	if cfg.DefaultDownloadPolicy != "" {
+		fmt.Printf("  default_download_policy:  %s\n", cfg.DefaultDownloadPolicy)
+	}
+	if cfg.DefaultDownloadK > 0 {
+		fmt.Printf("  default_download_k:       %d\n", cfg.DefaultDownloadK)
+	}
+	if cfg.DefaultAdRemoval != "" {
+		fmt.Printf("  default_ad_policy:        %s\n", cfg.DefaultAdRemoval)
+	}
 	fmt.Printf("  whisper_url:              %s\n", cfg.WhisperURL)
 	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
 	if cfg.WhisperDockerContainer != "" {
@@ -309,6 +346,16 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		} else {
 			return fmt.Errorf("invalid whisper id: %s", val)
 		}
+	case "default-download-policy", "default-download-mode", "download-policy":
+		cfg.DefaultDownloadPolicy = normalizeDownloadPolicy(val)
+	case "default-download-k", "default-k", "download-k":
+		if k, err := strconv.Atoi(val); err == nil && k > 0 {
+			cfg.DefaultDownloadK = k
+		} else {
+			return fmt.Errorf("invalid default download k: %s", val)
+		}
+	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
+		cfg.DefaultAdRemoval = normalizeAdRemovalMode(val)
 	default:
 		return fmt.Errorf("unknown configuration key: '%s'", key)
 	}
@@ -339,6 +386,12 @@ func handleConfigGet(cfg Config, key string) {
 		fmt.Println(cfg.ActiveProfileID)
 	case "active-whisper-id", "whisper-id":
 		fmt.Println(cfg.ActiveWhisperID)
+	case "default-download-policy", "default-download-mode", "download-policy":
+		fmt.Println(cfg.DefaultDownloadPolicy)
+	case "default-download-k", "default-k", "download-k":
+		fmt.Println(cfg.DefaultDownloadK)
+	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
+		fmt.Println(cfg.DefaultAdRemoval)
 	default:
 		fmt.Printf("Unknown configuration key: '%s'\n", key)
 	}

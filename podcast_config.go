@@ -31,10 +31,23 @@ type PodcastConfig struct {
 }
 
 func defaultPodcastConfig() PodcastConfig {
+	cfg := loadConfig()
+	dlPolicy := cfg.DefaultDownloadPolicy
+	if dlPolicy == "" {
+		dlPolicy = DownloadPolicyLatest
+	}
+	dlK := cfg.DefaultDownloadK
+	if dlK <= 0 {
+		dlK = 3
+	}
+	adPolicy := cfg.DefaultAdRemoval
+	if adPolicy == "" {
+		adPolicy = AdRemovalAll
+	}
 	return PodcastConfig{
-		AdRemoval:      AdRemovalAll,
-		DownloadPolicy: DownloadPolicyNone,
-		DownloadK:      3,
+		AdRemoval:      normalizeAdRemovalMode(adPolicy),
+		DownloadPolicy: normalizeDownloadPolicy(dlPolicy),
+		DownloadK:      dlK,
 	}
 }
 
@@ -156,6 +169,7 @@ func loadPodcastConfig(dir string) PodcastConfig {
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		return defaultPodcastConfig()
 	}
+	def := defaultPodcastConfig()
 	if cfg.AdRemoval == "" || cfg.DownloadPolicy == "" || cfg.DownloadK <= 0 {
 		var raw map[string]interface{}
 		if err := json.Unmarshal(data, &raw); err == nil {
@@ -182,10 +196,18 @@ func loadPodcastConfig(dir string) PodcastConfig {
 			}
 		}
 	}
-	cfg.AdRemoval = normalizeAdRemovalMode(cfg.AdRemoval)
-	cfg.DownloadPolicy = normalizeDownloadPolicy(cfg.DownloadPolicy)
+	if cfg.AdRemoval == "" {
+		cfg.AdRemoval = def.AdRemoval
+	} else {
+		cfg.AdRemoval = normalizeAdRemovalMode(cfg.AdRemoval)
+	}
+	if cfg.DownloadPolicy == "" {
+		cfg.DownloadPolicy = def.DownloadPolicy
+	} else {
+		cfg.DownloadPolicy = normalizeDownloadPolicy(cfg.DownloadPolicy)
+	}
 	if cfg.DownloadK <= 0 {
-		cfg.DownloadK = 3
+		cfg.DownloadK = def.DownloadK
 	}
 	return cfg
 }

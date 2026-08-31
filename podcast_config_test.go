@@ -104,16 +104,16 @@ func TestFilterMP3FilesByPodcastConfig(t *testing.T) {
 func TestPodcastConfigDownloadPolicyDefaults(t *testing.T) {
 	d := t.TempDir()
 	cfg := loadPodcastConfig(d)
-	if cfg.DownloadPolicy != DownloadPolicyNone {
-		t.Errorf("expected default DownloadPolicy to be %q, got %q", DownloadPolicyNone, cfg.DownloadPolicy)
+	if cfg.DownloadPolicy != DownloadPolicyLatest {
+		t.Errorf("expected default DownloadPolicy to be %q, got %q", DownloadPolicyLatest, cfg.DownloadPolicy)
 	}
 	if cfg.DownloadK != 3 {
 		t.Errorf("expected default DownloadK to be 3, got %d", cfg.DownloadK)
 	}
-	if downloadPolicyLabel(cfg.DownloadPolicy, cfg.DownloadK) != "No automatic downloads (none)" {
+	if downloadPolicyLabel(cfg.DownloadPolicy, cfg.DownloadK) != "Latest episode only (latest)" {
 		t.Errorf("unexpected label: %s", downloadPolicyLabel(cfg.DownloadPolicy, cfg.DownloadK))
 	}
-	if downloadPolicyBadge(cfg.DownloadPolicy, cfg.DownloadK) != "[DL: None]" {
+	if downloadPolicyBadge(cfg.DownloadPolicy, cfg.DownloadK) != "[DL: Latest]" {
 		t.Errorf("unexpected badge: %s", downloadPolicyBadge(cfg.DownloadPolicy, cfg.DownloadK))
 	}
 }

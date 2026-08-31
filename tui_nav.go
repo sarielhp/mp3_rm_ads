@@ -48,13 +48,15 @@ func (m *tuiModel) renderTopNavBar() string {
 	for _, q := range m.queue {
 		adQueueCount += len(q)
 	}
+	dlQueueCount := len(GetDownloadQueueItems())
 
 	tabs := []tabInfo{
 		{num: 1, label: "Podcasts", screen: screenPodcasts},
 		{num: 2, label: "Player", screen: screenPlayer},
 		{num: 3, label: fmt.Sprintf("Play Queue (%d)", playQueueCount), screen: screenPlayQueue},
 		{num: 4, label: fmt.Sprintf("Ad Queue (%d)", adQueueCount), screen: screenAdQueue},
-		{num: 5, label: "Timeline", screen: screenTimeline},
+		{num: 5, label: fmt.Sprintf("DL Queue (%d)", dlQueueCount), screen: screenDownloadQueue},
+		{num: 6, label: "Timeline", screen: screenTimeline},
 	}
 
 	var tabStrs []string
@@ -77,7 +79,7 @@ func (m *tuiModel) renderTopNavBar() string {
 	// Breadcrumb path
 	var pathParts []string
 	pathParts = append(pathParts, "Podcasts")
-	if m.podIdx >= 0 && m.podIdx < len(m.podcasts) && m.screen != screenPodcasts {
+	if m.podIdx >= 0 && m.podIdx < len(m.podcasts) && m.screen != screenPodcasts && m.screen != screenLatestEpisodes && m.screen != screenDownloadQueue {
 		pod := m.podcasts[m.podIdx]
 		pathParts = append(pathParts, truncate(displayName(pod.name), 25))
 		if m.screen == screenEpisodeDetail || m.screen == screenTranscript {
@@ -98,6 +100,10 @@ func (m *tuiModel) renderTopNavBar() string {
 		pathParts = []string{"Playback Queue"}
 	} else if m.screen == screenAdQueue {
 		pathParts = []string{"Ad Removal Queue"}
+	} else if m.screen == screenDownloadQueue {
+		pathParts = []string{"Download Queue"}
+	} else if m.screen == screenLatestEpisodes {
+		pathParts = []string{"Latest Episodes"}
 	}
 
 	breadcrumb := "  " + tuiDimStyle.Render("Location: ") + tuiSubtitleStyle.Render(strings.Join(pathParts, " > "))

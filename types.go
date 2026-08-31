@@ -134,6 +134,9 @@ type Config struct {
 	AudiobookshelfDBPath   string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
 	PostProcessors         []string         `json:"post_processors,omitempty"`
 	RemoteFFmpegHost       string           `json:"remote_ffmpeg_host,omitempty"`
+	DefaultDownloadPolicy  string           `json:"default_download_policy,omitempty"`
+	DefaultDownloadK       int              `json:"default_download_k,omitempty"`
+	DefaultAdRemoval       string           `json:"default_ad_policy,omitempty"`
 	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 
@@ -205,28 +208,31 @@ type CLIOptions struct {
 	ListWhispers      bool
 
 	// Merged Library Management Options
-	Count               int
-	CountGiven          bool
-	Podcast             string
-	Fill                bool
-	KeepCount           *int
-	CheckNew            bool
-	Oldest              bool
-	NoWait              bool
-	SqliteDBPath        string
-	ProcessorCmd        string
-	ProcessorValue      string
-	DryRun              bool
-	ConfigInfo          bool
-	ABSToken            string
-	Args                []string
-	ServerSubcmd        string
-	OPMLSubcmd          string
-	OPMLFile            string
-	PodcastsOnly        bool
-	EpisodesOnly        bool
-	RemoteFFmpegHost    string
-	SetRemoteFFmpegHost bool
+	Count                 int
+	CountGiven            bool
+	Podcast               string
+	Fill                  bool
+	KeepCount             *int
+	CheckNew              bool
+	Oldest                bool
+	NoWait                bool
+	SqliteDBPath          string
+	ProcessorCmd          string
+	ProcessorValue        string
+	DryRun                bool
+	ConfigInfo            bool
+	ABSToken              string
+	Args                  []string
+	ServerSubcmd          string
+	OPMLSubcmd            string
+	OPMLFile              string
+	PodcastsOnly          bool
+	EpisodesOnly          bool
+	RemoteFFmpegHost      string
+	SetRemoteFFmpegHost   bool
+	DefaultDownloadPolicy string
+	DefaultDownloadK      int
+	DefaultAdRemoval      string
 }
 
 type CostInfo struct {

@@ -537,7 +537,7 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 		t.Errorf("expected saved config on disk to match, got %+v", diskCfg)
 	}
 
-	m.screen = screenPodcastDetail
+	m.screen = screenPodcasts
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
 	if !m.showDownloadPolicyModal {
 		t.Fatalf("expected modal to open with 'D'")
@@ -549,6 +549,12 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	}
 	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
 		t.Errorf("expected policy to remain LatestK after Esc, got %s", m.podcasts[0].config.DownloadPolicy)
+	}
+
+	m.screen = screenPodcastDetail
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if m.toast == nil || !strings.Contains(m.toast.Message, "download") {
+		t.Errorf("expected toast feedback when pressing D in episode list, got %+v", m.toast)
 	}
 }
 

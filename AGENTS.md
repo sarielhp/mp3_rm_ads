@@ -22,7 +22,7 @@
 | `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
-| `tools/visual_audit.rb` | Live PTY visual audit: exercises and snapshots all 17 TUI screens/modes |
+| `tools/visual_audit.rb` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
 | `tools/bump-version.rb` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
 | `tools/commit.rb <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
 | `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
@@ -34,7 +34,7 @@ A `Makefile` at the project root delegates to all scripts:
 | Target | Action |
 |--------|--------|
 | `make check` | Full quality gate |
-| `make visual` | Run full live PTY visual audit across all 17 TUI screens (`tools/visual_audit.rb`) |
+| `make visual` | Run full live PTY visual audit across all 19 TUI screens (`tools/visual_audit.rb`) |
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
 | `make audit` | Audit Go source file line lengths (`tools/audit_lines.rb`) |
 | `make symbols` | Outline symbols (`tools/outline_symbols.rb ARGS="..."`) |

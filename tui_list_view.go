@@ -272,7 +272,7 @@ func (m *tuiModel) drawPodcastsList() string {
 		}
 	}
 
-	helpText := "↑↓ navigate │ Enter select │ c ad-policy │ d dl-policy │ e timeline │ / search │ ? help"
+	helpText := "↑↓ navigate │ Enter select │ L latest │ c ad-policy │ d dl-policy │ e timeline │ / search │ ? help"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
 	} else if len(pods) > maxVis {
@@ -394,17 +394,27 @@ func (m *tuiModel) drawPodcastDetail() string {
 			}
 		}
 
+		epGUID := ""
+		if ep.absData != nil {
+			epGUID = ep.absData.ID
+		}
+		inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+
 		if availWidth >= 40 {
 			qBadgeWidth := 0
 			if isQueued(ep.filename) {
 				qBadgeWidth = 4
+			}
+			dlBadgeWidth := 0
+			if inDLQueue {
+				dlBadgeWidth = 11
 			}
 			txBadgeWidth := 0
 			if ep.hasTranscript {
 				txBadgeWidth = 5
 			}
 			selWidth := len([]rune(selPrefix))
-			titleWidth := availWidth - 16 - qBadgeWidth - txBadgeWidth - selWidth
+			titleWidth := availWidth - 16 - qBadgeWidth - dlBadgeWidth - txBadgeWidth - selWidth
 			if titleWidth < 10 {
 				titleWidth = 10
 			}
@@ -425,7 +435,11 @@ func (m *tuiModel) drawPodcastDetail() string {
 				if isQueued(ep.filename) {
 					qBadge = " [Q]"
 				}
-				plainLine := "  " + selPrefix + dateStr + "  " + chk + txBadge + truncTitle + padding + qBadge
+				dlBadge := ""
+				if inDLQueue {
+					dlBadge = " [⏳ Queued]"
+				}
+				plainLine := "  " + selPrefix + dateStr + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
 				fullPad := max(0, availWidth-len([]rune(plainLine)))
 				fullRow := plainLine + strings.Repeat(" ", fullPad)
 				out.WriteString(tuiSelectedStyle.Render(fullRow))
@@ -442,11 +456,15 @@ func (m *tuiModel) drawPodcastDetail() string {
 				if isQueued(ep.filename) {
 					qBadge = " " + tuiBadgeQueued.Render("[Q]")
 				}
+				dlBadge := ""
+				if inDLQueue {
+					dlBadge = " " + tuiBadgeQueued.Render("[⏳ Queued]")
+				}
 				selRender := selPrefix
 				if isBatchSelected {
 					selRender = tuiYellowStyle.Render("[x] ")
 				}
-				line := "  " + selRender + tuiSubtextStyle.Render(dateStr) + "  " + chk + txBadge + truncTitle + padding + qBadge
+				line := "  " + selRender + tuiSubtextStyle.Render(dateStr) + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
 				out.WriteString(line)
 			}
 		} else {
@@ -491,7 +509,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		renderEpRow(i)
 	}
 
-	helpText := "↑↓ navigate │ Enter details │ p play │ v select │ a batch-queue │ t transcript │ c ad-policy │ d dl-policy │ ? help"
+	helpText := "↑↓ navigate │ Enter details │ p play │ D download │ v select │ a batch-queue │ t transcript │ c ad-policy │ d dl-policy │ ? help"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
 	} else if len(eps) > maxVis {

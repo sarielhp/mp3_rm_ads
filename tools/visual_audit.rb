@@ -45,12 +45,12 @@ def run_master_visual_tour
     sleep 1.5
 
     # 1. Root Podcasts List
-    puts "[1/17] Snapshot: Root Podcasts List"
+    puts "[1/19] Snapshot: Root Podcasts List"
     stdin.write("\e[24~") # F12
     sleep 0.4
 
     # 2. Search / Filter Mode
-    puts "[2/17] Snapshot: Search / Filter Mode"
+    puts "[2/19] Snapshot: Search / Filter Mode"
     stdin.write("/")
     sleep 0.2
     stdin.write("history")
@@ -61,7 +61,7 @@ def run_master_visual_tour
     sleep 0.3
 
     # 3. Ad Removal Policy Modal
-    puts "[3/17] Snapshot: Ad Policy Modal"
+    puts "[3/19] Snapshot: Ad Policy Modal"
     stdin.write("c")
     sleep 0.3
     stdin.write("\e[24~")
@@ -70,7 +70,7 @@ def run_master_visual_tour
     sleep 0.3
 
     # 4. 2-Column Help Modal
-    puts "[4/17] Snapshot: 2-Column Help Modal"
+    puts "[4/19] Snapshot: 2-Column Help Modal"
     stdin.write("?")
     sleep 0.3
     stdin.write("\e[24~")
@@ -79,7 +79,7 @@ def run_master_visual_tour
     sleep 0.3
 
     # 5. Online Availability Timeline
-    puts "[5/17] Snapshot: Timeline View"
+    puts "[5/19] Snapshot: Timeline View"
     stdin.write("5")
     sleep 0.4
     stdin.write("\e[24~")
@@ -88,21 +88,21 @@ def run_master_visual_tour
     sleep 0.3
 
     # 6. Podcast Detail (Episodes list)
-    puts "[6/17] Snapshot: Podcast Detail (Episodes List)"
+    puts "[6/19] Snapshot: Podcast Detail (Episodes List)"
     stdin.write("\r")
     sleep 0.8
     stdin.write("\e[24~")
     sleep 0.4
 
     # 7. Episode Detail (Full-Width Show Notes with Clean Header)
-    puts "[7/17] Snapshot: Episode Detail (Full-Width)"
+    puts "[7/19] Snapshot: Episode Detail (Full-Width)"
     stdin.write("\r")
     sleep 0.8
     stdin.write("\e[24~")
     sleep 0.4
 
     # 8. Episode Detail Scrolled Notes
-    puts "[8/17] Snapshot: Episode Detail Scrolled Notes"
+    puts "[8/19] Snapshot: Episode Detail Scrolled Notes"
     10.times do
       stdin.write("j")
       sleep 0.05
@@ -112,14 +112,14 @@ def run_master_visual_tour
     sleep 0.4
 
     # 9. Episode Detail with F4 Player Side-Pane Open
-    puts "[9/17] Snapshot: Episode Detail (F4 Player Pane Open)"
+    puts "[9/19] Snapshot: Episode Detail (F4 Player Pane Open)"
     stdin.write("\eOS") # F4
     sleep 0.5
     stdin.write("\e[24~")
     sleep 0.4
 
     # 10. Start playback (enqueue) & Collapse F4 pane (shows mini-player at bottom)
-    puts "[10/17] Snapshot: Episode Detail + Active Mini-Player"
+    puts "[10/19] Snapshot: Episode Detail + Active Mini-Player"
     stdin.write("p")
     sleep 0.4
     stdin.write("\eOS") # F4 collapse
@@ -128,28 +128,28 @@ def run_master_visual_tour
     sleep 0.4
 
     # 11. Transcript Mode 0 (Full Time Arrows)
-    puts "[11/17] Snapshot: Transcript Mode 0 (Full Arrows)"
+    puts "[11/19] Snapshot: Transcript Mode 0 (Full Arrows)"
     stdin.write("t")
     sleep 0.8
     stdin.write("\e[24~")
     sleep 0.4
 
     # 12. Transcript Mode 1 (Short Start Time)
-    puts "[12/17] Snapshot: Transcript Mode 1 (Short Time)"
+    puts "[12/19] Snapshot: Transcript Mode 1 (Short Time)"
     stdin.write("\t")
     sleep 0.4
     stdin.write("\e[24~")
     sleep 0.4
 
     # 13. Transcript Mode 2 (Bat-style Line Numbers + 80-Col Reflow)
-    puts "[13/17] Snapshot: Transcript Mode 2 (Bat Line Numbers)"
+    puts "[13/19] Snapshot: Transcript Mode 2 (Bat Line Numbers)"
     stdin.write("\t")
     sleep 0.4
     stdin.write("\e[24~")
     sleep 0.4
 
     # 14. Full-screen Player Screen (F1 / Tab 2)
-    puts "[14/17] Snapshot: Audio Player Full Screen"
+    puts "[14/19] Snapshot: Audio Player Full Screen"
     stdin.write("q") # Back to episode detail
     sleep 0.3
     stdin.write("2") # Top tab 2: Player
@@ -158,14 +158,14 @@ def run_master_visual_tour
     sleep 0.4
 
     # 15. Playing Queue Screen (F2 / Tab 3)
-    puts "[15/17] Snapshot: Playing Queue Screen"
+    puts "[15/19] Snapshot: Playing Queue Screen"
     stdin.write("3")
     sleep 0.4
     stdin.write("\e[24~")
     sleep 0.4
 
     # 16. Playing Queue Reorder Mode
-    puts "[16/17] Snapshot: Playing Queue Reorder Mode"
+    puts "[16/19] Snapshot: Playing Queue Reorder Mode"
     stdin.write(" ") # Grab track
     sleep 0.3
     stdin.write("\e[24~")
@@ -174,14 +174,28 @@ def run_master_visual_tour
     sleep 0.3
 
     # 17. Ad Removal Queue Screen (F3 / Tab 4)
-    puts "[17/17] Snapshot: Ad Removal Queue Screen"
+    puts "[17/19] Snapshot: Ad Removal Queue Screen"
     stdin.write("4")
     sleep 0.4
     stdin.write("\e[24~")
     sleep 0.4
 
+    # 18. Download Queue Screen (Tab 5)
+    puts "[18/19] Snapshot: Download Queue Screen"
+    stdin.write("5")
+    sleep 0.4
+    stdin.write("\e[24~")
+    sleep 0.4
+
+    # 19. Latest Episodes Screen (L key)
+    puts "[19/19] Snapshot: Latest Episodes Screen"
+    stdin.write("l")
+    sleep 0.5
+    stdin.write("\e[24~")
+    sleep 0.4
+
     # Clean Exit
-    stdin.write("1") # Return to main podcasts
+    stdin.write("q") # Exit latest episodes
     sleep 0.3
     stdin.write("q") # Quit app
     sleep 0.2

@@ -29,6 +29,24 @@ func main() {
 
 	ensureConfigExists()
 	config := loadConfig()
+	if cli.DefaultDownloadPolicy != "" {
+		config.DefaultDownloadPolicy = normalizeDownloadPolicy(cli.DefaultDownloadPolicy)
+		if cli.IsConfigCommand {
+			saveConfig(config)
+		}
+	}
+	if cli.DefaultDownloadK > 0 {
+		config.DefaultDownloadK = cli.DefaultDownloadK
+		if cli.IsConfigCommand {
+			saveConfig(config)
+		}
+	}
+	if cli.DefaultAdRemoval != "" {
+		config.DefaultAdRemoval = normalizeAdRemovalMode(cli.DefaultAdRemoval)
+		if cli.IsConfigCommand {
+			saveConfig(config)
+		}
+	}
 
 	switch action {
 	case "test":

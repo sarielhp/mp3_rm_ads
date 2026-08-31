@@ -64,7 +64,16 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	}
 	fullTitle := titlePrefix + displayHeader
 
+	epGUID := ""
+	if ep.absData != nil {
+		epGUID = ep.absData.ID
+	}
+	inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+
 	badgeLeft := ""
+	if inDLQueue {
+		badgeLeft += tuiBadgeQueued.Render("[⏳ Queued]") + " "
+	}
 	if ep.hasAdsRemoved {
 		badgeLeft += tuiBadgeAdFree.Render("✓ Ad-Free") + " "
 	} else {
@@ -264,7 +273,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	}
 
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", contentW)) + "\n")
-	out.WriteString(tuiDimStyle.Render("  ↑/↓ Scroll Notes │ Space Play/Pause │ p Play │ t Transcript │ F4 Show Player │ Esc/q Back") + "\n")
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Scroll Notes │ Space Play/Pause │ p Play │ D Download │ t Transcript │ F4 Show Player │ Esc/q Back") + "\n")
 
 	return out.String()
 }

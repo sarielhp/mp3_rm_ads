@@ -72,6 +72,9 @@ var (
 	tuiMagentaStyle = lipgloss.NewStyle().
 			Foreground(colorMagenta)
 
+	tuiPurpleStyle = lipgloss.NewStyle().
+			Foreground(colorPurple)
+
 	tuiLabelStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorBlue)

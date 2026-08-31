@@ -105,3 +105,50 @@ func (m *tuiModel) handleAdQueueKey(s string) (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
+	items := GetDownloadQueueItems()
+	switch s {
+	case "up", "k":
+		if m.dlqIdx > 0 {
+			m.dlqIdx--
+		}
+		if m.dlqIdx < m.dlqScroll {
+			m.dlqScroll = m.dlqIdx
+		}
+	case "down", "j":
+		if m.dlqIdx < len(items)-1 {
+			m.dlqIdx++
+		}
+		maxVis := m.visibleLines(3)
+		if m.dlqIdx >= m.dlqScroll+maxVis {
+			m.dlqScroll = m.dlqIdx - maxVis + 1
+		}
+	case "d", "D", "x", "X":
+		if len(items) > 0 && m.dlqIdx < len(items) {
+			RemoveDownloadQueueItemAt(m.dlqIdx)
+			m.showToast("Removed from download queue", ToastInfo)
+			if m.dlqIdx >= len(items)-1 && m.dlqIdx > 0 {
+				m.dlqIdx--
+			}
+		}
+	case "c", "C":
+		ClearDownloadQueue()
+		m.showToast("Download queue cleared", ToastInfo)
+		m.dlqIdx = 0
+		m.dlqScroll = 0
+	case "enter":
+		var absCli *ABSClient
+		if m.podcastsDir != "" {
+			cfg := loadConfig()
+			if cfg.AudiobookshelfURL != "" {
+				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+			}
+		}
+		TriggerDownloadQueueWorker(absCli)
+		m.showToast("Triggered download processing", ToastInfo)
+	case "esc", "q", "Q":
+		m.handleEscape()
+	}
+	return m, nil
+}

@@ -124,14 +124,14 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "2", "f1", "F1":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
 			m.prevScreen = m.screen
 		}
 		m.screen = screenPlayer
 		return m, nil
 
 	case "3", "f2", "F2":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
 			m.prevScreen = m.screen
 		}
 		m.screen = screenPlayQueue
@@ -139,11 +139,18 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "4", "f3", "F3":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue {
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
 			m.prevScreen = m.screen
 		}
 		m.screen = screenAdQueue
 		m.adqGrabbed = false
+		return m, nil
+
+	case "5", "f5", "F5":
+		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
+			m.prevScreen = m.screen
+		}
+		m.screen = screenDownloadQueue
 		return m, nil
 
 	case "f4", "F4":
@@ -152,8 +159,19 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "5":
+	case "6":
 		m.openTimelineViewer()
+		return m, nil
+
+	case "l", "L":
+		if m.screen != screenLatestEpisodes {
+			m.prevScreen = m.screen
+			m.screen = screenLatestEpisodes
+			m.latestIdx = 0
+			m.latestScroll = 0
+		} else {
+			m.handleEscape()
+		}
 		return m, nil
 
 	case "?", "h", "H":
@@ -169,6 +187,14 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.handleEscape()
 			return m, nil
 		}
+	}
+
+	if m.screen == screenLatestEpisodes {
+		return m.handleLatestViewKey(s)
+	}
+
+	if m.screen == screenDownloadQueue {
+		return m.handleDownloadQueueKey(s)
 	}
 
 	if m.screen == screenTranscript {
@@ -262,8 +288,16 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 
 	case "d", "D":
-		if m.screen == screenPodcasts || m.screen == screenPodcastDetail {
+		if m.screen == screenPodcasts {
 			m.openDownloadPolicyModal()
+		} else if m.screen == screenPodcastDetail {
+			if len(m.selectedEpisodes) > 0 {
+				m.batchQueueDownload()
+			} else {
+				m.enqueueCurrentEpisodeDownload()
+			}
+		} else if m.screen == screenEpisodeDetail {
+			m.enqueueCurrentEpisodeDownload()
 		}
 
 	case "t", "T":
@@ -467,9 +501,17 @@ func (m *tuiModel) handleEscape() {
 	case screenPodcastDetail:
 		m.screen = screenPodcasts
 	case screenEpisodeDetail:
-		m.screen = screenPodcastDetail
-	case screenPlayer, screenPlayQueue, screenAdQueue, screenTranscript, screenTimeline:
-		m.screen = m.prevScreen
+		if m.prevScreen == screenLatestEpisodes {
+			m.screen = screenLatestEpisodes
+		} else {
+			m.screen = screenPodcastDetail
+		}
+	case screenPlayer, screenPlayQueue, screenAdQueue, screenDownloadQueue, screenLatestEpisodes, screenTranscript, screenTimeline:
+		if m.prevScreen != 0 && m.prevScreen != m.screen {
+			m.screen = m.prevScreen
+		} else {
+			m.screen = screenPodcasts
+		}
 		m.pqGrabbed = false
 		m.adqGrabbed = false
 	}

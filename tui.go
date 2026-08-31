@@ -18,6 +18,8 @@ const (
 	screenPlayer
 	screenPlayQueue
 	screenAdQueue
+	screenDownloadQueue
+	screenLatestEpisodes
 	screenTranscript
 	screenTimeline
 )
@@ -151,6 +153,10 @@ type tuiModel struct {
 	adqIdx                  int
 	adqScroll               int
 	adqGrabbed              bool
+	dlqIdx                  int
+	dlqScroll               int
+	latestIdx               int
+	latestScroll            int
 	transcriptScroll        int
 	transcriptLines         []string
 	transcriptItems         []transcriptItem
@@ -461,6 +467,10 @@ func (m *tuiModel) View() string {
 		body.WriteString(m.drawPlayQueueScreen())
 	case screenAdQueue:
 		body.WriteString(m.drawAdQueueScreen())
+	case screenDownloadQueue:
+		body.WriteString(m.drawDownloadQueueScreen())
+	case screenLatestEpisodes:
+		body.WriteString(m.drawLatestEpisodesScreen())
 	case screenTranscript:
 		body.WriteString(m.drawTranscriptScreen())
 	case screenTimeline:

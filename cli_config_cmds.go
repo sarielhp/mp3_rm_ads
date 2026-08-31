@@ -54,6 +54,17 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			{
+				Name:        "list",
+				Description: "Display current configuration summary table",
+				UsageLine:   "abs config list",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "config"
+					opts.ConfigCmd = "show"
+					return nil
+				},
+			},
+			{
 				Name:        "llm",
 				Description: "Manage LLM profiles for ad detection",
 				Subcommands: []clihelp.Command{
@@ -252,6 +263,11 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			clihelp.CompletionCommand(),
+		},
+		Options: []clihelp.Option{
+			clihelp.String(&opts.DefaultDownloadPolicy, "--default-download-policy <policy>", "", "Set default download policy (latest, latest_k, all, none)"),
+			clihelp.Int(&opts.DefaultDownloadK, "--default-download-k <number>", 0, "Set default download count for latest_k"),
+			clihelp.String(&opts.DefaultAdRemoval, "--default-ad-policy <policy>", "", "Set default ad removal policy (none, latest, all)"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"
