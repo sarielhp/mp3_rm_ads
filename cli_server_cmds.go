@@ -172,6 +172,34 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				},
 			},
 			{
+				Name:        "get_info",
+				Description: "Force Audiobookshelf to fetch and cache metadata for the latest K episodes without downloading audio",
+				UsageLine:   "abs server get_info [<k>] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[<k>]", Description: "Number of latest episodes to fetch metadata for per podcast (defaults to 100)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID (defaults to all podcasts)"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed per-episode metadata"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "get_info"
+					opts.Count = 100
+					opts.CountGiven = false
+					opts.Args = ctx.Args
+					if len(ctx.Args) > 0 {
+						if k, err := strconv.Atoi(ctx.Args[0]); err == nil && k > 0 {
+							opts.Count = k
+							opts.CountGiven = true
+						}
+					}
+					return nil
+				},
+			},
+			{
 				Name:        "rescan",
 				Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
 				UsageLine:   "abs server rescan [options]",

@@ -376,6 +376,10 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			fmt.Print(formatEpisodesTimelineTable(releases, pod.name, 100))
 		}
 		return
+
+	case "get_info":
+		handleServerGetInfo(config, cli)
+		return
 	}
 }
 
