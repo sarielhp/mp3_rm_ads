@@ -35,7 +35,7 @@ func TestUnifiedABSStatusLocalFallback(t *testing.T) {
 	oldStdout := os.Stdout
 	os.Stdout = w
 
-	absStatus(cfg, false)
+	absStatus(cfg, true, false)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
@@ -51,6 +51,36 @@ func TestUnifiedABSStatusLocalFallback(t *testing.T) {
 	}
 	if !strings.Contains(out, "TOTAL") {
 		t.Errorf("expected TOTAL summary line, got: %s", out)
+	}
+}
+
+func TestUnifiedABSStatusSummary(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "ShowA")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
+
+	cfg := Config{
+		PodcastsDir: tempDir,
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	absStatus(cfg, false, false)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	if !strings.Contains(out, "Local Library Status") {
+		t.Errorf("expected summary header, got: %s", out)
+	}
+	if !strings.Contains(out, "Podcasts:") || !strings.Contains(out, "Total Episodes:") {
+		t.Errorf("expected summary fields, got: %s", out)
 	}
 }
 
@@ -85,7 +115,7 @@ func TestUnifiedABSStatusWithRemoteAndLocal(t *testing.T) {
 	oldStdout := os.Stdout
 	os.Stdout = w
 
-	absStatus(cfg, false)
+	absStatus(cfg, true, false)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
@@ -127,7 +157,7 @@ func TestUnifiedABSStatusRemoteUnreachable(t *testing.T) {
 	oldStdout := os.Stdout
 	os.Stdout = w
 
-	absStatus(cfg, false)
+	absStatus(cfg, true, false)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
@@ -206,7 +236,7 @@ func TestUnifiedABSStatusWithLiveABS(t *testing.T) {
 	oldStdout := os.Stdout
 	os.Stdout = w
 
-	absStatus(cfg, false)
+	absStatus(cfg, true, false)
 
 	_ = w.Close()
 	os.Stdout = oldStdout

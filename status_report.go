@@ -15,7 +15,21 @@ type podcastStatusEntry struct {
 	needsAdRemoval int
 }
 
-func absStatus(cfg Config, quiet bool) {
+func absStatus(cfg Config, showDetailed bool, quiet bool) {
+	if showDetailed {
+		targetHost := cfg.RemoteHost
+		if targetHost == "" {
+			targetHost = cfg.RemoteFFmpegHost
+		}
+		if targetHost != "" && !strings.EqualFold(targetHost, "local") {
+			renderRemoteStatusSection(&cfg, targetHost, nil, quiet)
+		}
+		renderLocalLibraryStatus(cfg, quiet)
+		return
+	}
+
+	renderLocalSummary(cfg, quiet)
+
 	targetHost := cfg.RemoteHost
 	if targetHost == "" {
 		targetHost = cfg.RemoteFFmpegHost
@@ -23,8 +37,52 @@ func absStatus(cfg Config, quiet bool) {
 	if targetHost != "" && !strings.EqualFold(targetHost, "local") {
 		renderRemoteStatusSection(&cfg, targetHost, nil, quiet)
 	}
+}
 
-	renderLocalLibraryStatus(cfg, quiet)
+func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
+	podcastsDir := cfg.PodcastsDir
+	if podcastsDir == "" {
+		podcastsDir = "."
+	}
+
+	podcastsCount := 0
+	totalEpisodes := 0
+	totalNeedsAd := 0
+
+	dirEntries, err := os.ReadDir(podcastsDir)
+	if err == nil {
+		for _, de := range dirEntries {
+			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" {
+				continue
+			}
+			podPath := filepath.Join(podcastsDir, de.Name())
+			mp3s := findMP3Files(podPath)
+			if len(mp3s) == 0 {
+				continue
+			}
+			podcastsCount++
+			totalEpisodes += len(mp3s)
+			for _, mp3 := range mp3s {
+				_ = getOrCreateEpisodeStatus(mp3)
+				if !isEpisodeCompleted(mp3) {
+					totalNeedsAd++
+				}
+			}
+		}
+	}
+
+	if !quiet {
+		fmt.Println()
+		fmt.Println("=== Local Library Status ===")
+		fmt.Printf("  - Podcasts:          %d\n", podcastsCount)
+		fmt.Printf("  - Total Episodes:    %d\n", totalEpisodes)
+		if totalNeedsAd > 0 {
+			fmt.Printf("  - Needs Ad Removal:  %s\n", boldYellow(fmt.Sprintf("%d episode(s)", totalNeedsAd)))
+		} else {
+			fmt.Printf("  - Needs Ad Removal:  %s\n", boldGreen("0 (All clean)"))
+		}
+	}
+	return podcastsCount, totalEpisodes, totalNeedsAd
 }
 
 func renderRemoteStatusSection(cfg *Config, targetHost string, transport RemoteTransport, quiet bool) {

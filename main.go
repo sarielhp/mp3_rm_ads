@@ -142,14 +142,24 @@ func main() {
 		return
 
 	case "status":
+		showDetailedPodcasts := false
 		targetDir := config.PodcastsDir
 		if len(cli.Args) > 0 {
-			targetDir = cli.Args[0]
+			arg := strings.ToLower(cli.Args[0])
+			if arg == "podcasts" || arg == "podcast" || arg == "all" {
+				showDetailedPodcasts = true
+			} else if fi, err := os.Stat(cli.Args[0]); err == nil && fi.IsDir() {
+				targetDir = cli.Args[0]
+				showDetailedPodcasts = true
+			}
+		}
+		if cli.Verbose {
+			showDetailedPodcasts = true
 		}
 		if targetDir != "" {
 			config.PodcastsDir = targetDir
 		}
-		absStatus(config, cli.Quiet)
+		absStatus(config, showDetailedPodcasts, cli.Quiet)
 		return
 
 	case "tui":

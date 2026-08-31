@@ -409,10 +409,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			},
 			{
 				Name:        "status",
-				Description: "Show a dry-run status report of all podcasts and episodes needing ad removal",
-				UsageLine:   "abs status [podcasts_dir]",
+				Description: "Show status overview of local library and remote worker (or 'status podcasts' for full table)",
+				UsageLine:   "abs status [podcasts|<podcasts_dir>]",
 				Parameters: []clihelp.Param{
-					{Name: "[podcasts_dir]", Description: "Optional path to podcasts directory"},
+					{Name: "[podcasts]", Description: "Use 'podcasts' or directory path to show full detailed table"},
 				},
 				Args: clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
