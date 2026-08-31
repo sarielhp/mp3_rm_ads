@@ -1,0 +1,249 @@
+package main
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strconv"
+	"strings"
+	"time"
+)
+
+type lsEpisodeItem struct {
+	path           string
+	podcastDir     string
+	podcastTitle   string
+	podcastShortID string
+	episodeName    string
+	modTime        time.Time
+	sizeBytes      int64
+	statusStr      string
+	statusColor    string
+}
+
+func runLsCommand(cfg Config, cli CLIOptions) error {
+	podcastsDir := cfg.PodcastsDir
+	if podcastsDir == "" {
+		podcastsDir = "."
+	}
+
+	limit := cli.Count
+	if limit <= 0 {
+		limit = 10
+	}
+
+	args := cli.Args
+	if cli.LsSubcmd == "latest" || (len(args) > 0 && args[0] == "latest") {
+		if len(args) > 0 && args[0] == "latest" {
+			args = args[1:]
+		}
+		if len(args) > 0 {
+			if n, err := strconv.Atoi(args[0]); err == nil && n > 0 {
+				limit = n
+			}
+		}
+		return listLatestEpisodes(podcastsDir, limit, cli.Quiet, cli.Verbose)
+	}
+
+	if len(args) == 0 {
+		return listLatestEpisodes(podcastsDir, limit, cli.Quiet, cli.Verbose)
+	}
+
+	target := args[0]
+	if n, err := strconv.Atoi(target); err == nil && n > 0 && !podcastExistsByIndexOrID(podcastsDir, target) {
+		return listLatestEpisodes(podcastsDir, n, cli.Quiet, cli.Verbose)
+	}
+
+	podDir, title, found := resolvePodcastDirByIDOrName(podcastsDir, target)
+	if !found {
+		if fi, err := os.Stat(target); err == nil && fi.IsDir() {
+			podDir = target
+			title = filepath.Base(target)
+			found = true
+		}
+	}
+
+	if !found {
+		return fmt.Errorf("podcast matching %q not found in %s", target, podcastsDir)
+	}
+
+	shortID := getOrSetPodcastShortID(podDir, title)
+	return listSinglePodcastEpisodes(podDir, title, shortID, cli.Quiet, cli.Verbose)
+}
+
+func podcastExistsByIndexOrID(podcastsDir, query string) bool {
+	_, _, found := resolvePodcastDirByIDOrName(podcastsDir, query)
+	return found
+}
+
+func listLatestEpisodes(podcastsDir string, limit int, quiet, verbose bool) error {
+	podEntries := scanPodcastDirs(podcastsDir)
+	podIDMap := make(map[string]string)
+	podTitleMap := make(map[string]string)
+	for _, p := range podEntries {
+		podIDMap[p.dir] = p.shortID
+		podTitleMap[p.dir] = p.title
+	}
+
+	allMp3s := findMP3Files(podcastsDir)
+	if len(allMp3s) == 0 {
+		if !quiet {
+			fmt.Println("No podcast audio files (.mp3) found.")
+		}
+		return nil
+	}
+
+	var items []lsEpisodeItem
+	for _, mp3 := range allMp3s {
+		fi, err := os.Stat(mp3)
+		if err != nil {
+			continue
+		}
+		podDir := filepath.Dir(mp3)
+		podTitle := podTitleMap[podDir]
+		if podTitle == "" {
+			podTitle = filepath.Base(podDir)
+		}
+		shortID := podIDMap[podDir]
+		if shortID == "" {
+			shortID = generatePodcastShortID(podTitle)
+		}
+
+		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		statusStr, statusColor := getEpisodeStatusLabel(mp3)
+
+		items = append(items, lsEpisodeItem{
+			path:           mp3,
+			podcastDir:     podDir,
+			podcastTitle:   podTitle,
+			podcastShortID: shortID,
+			episodeName:    epName,
+			modTime:        fi.ModTime(),
+			sizeBytes:      fi.Size(),
+			statusStr:      statusStr,
+			statusColor:    statusColor,
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].modTime.After(items[j].modTime)
+	})
+
+	if limit > len(items) {
+		limit = len(items)
+	}
+	latest := items[:limit]
+
+	if quiet {
+		for _, item := range latest {
+			fmt.Println(item.path)
+		}
+		return nil
+	}
+
+	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
+	fmt.Printf("%s\n", strings.Repeat("=", 95))
+	fmt.Printf("  %-16s │ %-6s │ %-24s │ %-18s │ %s\n", "Date / Time", "ID", "Podcast", "Status", "Episode Title")
+	fmt.Printf("  %-16s ┼ %-6s ┼ %-24s ┼ %-18s ┼ %s\n", strings.Repeat("─", 16), strings.Repeat("─", 6), strings.Repeat("─", 24), strings.Repeat("─", 18), strings.Repeat("─", 22))
+
+	for _, item := range latest {
+		dStr := item.modTime.Format("2006-01-02 15:04")
+		pName := displayName(item.podcastTitle)
+		if len(pName) > 24 {
+			pName = pName[:21] + "..."
+		}
+		coloredStatus := item.statusStr
+		if item.statusColor == "green" {
+			coloredStatus = boldGreen(item.statusStr)
+		} else if item.statusColor == "yellow" {
+			coloredStatus = boldYellow(item.statusStr)
+		} else if item.statusColor == "cyan" {
+			coloredStatus = bold(item.statusStr)
+		}
+
+		fmt.Printf("  %-16s │ %-6s │ %-24s │ %-18s │ %s\n", dStr, item.podcastShortID, pName, coloredStatus, item.episodeName)
+	}
+	fmt.Printf("%s\n\n", strings.Repeat("=", 95))
+
+	return nil
+}
+
+func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose bool) error {
+	mp3s := findMP3Files(podDir)
+	if len(mp3s) == 0 {
+		if !quiet {
+			fmt.Printf("No audio files found for %s (%s).\n", title, shortID)
+		}
+		return nil
+	}
+
+	var items []lsEpisodeItem
+	for _, mp3 := range mp3s {
+		fi, err := os.Stat(mp3)
+		if err != nil {
+			continue
+		}
+		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		statusStr, statusColor := getEpisodeStatusLabel(mp3)
+		items = append(items, lsEpisodeItem{
+			path:           mp3,
+			podcastDir:     podDir,
+			podcastTitle:   title,
+			podcastShortID: shortID,
+			episodeName:    epName,
+			modTime:        fi.ModTime(),
+			sizeBytes:      fi.Size(),
+			statusStr:      statusStr,
+			statusColor:    statusColor,
+		})
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].modTime.After(items[j].modTime)
+	})
+
+	if quiet {
+		for _, item := range items {
+			fmt.Println(item.path)
+		}
+		return nil
+	}
+
+	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(title), shortID, len(items))
+	fmt.Printf("%s\n", strings.Repeat("=", 95))
+	fmt.Printf("  %-3s │ %-16s │ %-18s │ %-10s │ %s\n", "#", "Date / Time", "Status", "Size", "Episode Title")
+	fmt.Printf("  %-3s ┼ %-16s ┼ %-18s ┼ %-10s ┼ %s\n", strings.Repeat("─", 3), strings.Repeat("─", 16), strings.Repeat("─", 18), strings.Repeat("─", 10), strings.Repeat("─", 38))
+
+	for idx, item := range items {
+		dStr := item.modTime.Format("2006-01-02 15:04")
+		sizeStr := fmt.Sprintf("%.1f MB", float64(item.sizeBytes)/(1024.0*1024.0))
+		coloredStatus := item.statusStr
+		if item.statusColor == "green" {
+			coloredStatus = boldGreen(item.statusStr)
+		} else if item.statusColor == "yellow" {
+			coloredStatus = boldYellow(item.statusStr)
+		} else if item.statusColor == "cyan" {
+			coloredStatus = bold(item.statusStr)
+		}
+
+		fmt.Printf("  %-3d │ %-16s │ %-18s │ %-10s │ %s\n", idx+1, dStr, coloredStatus, sizeStr, item.episodeName)
+	}
+	fmt.Printf("%s\n\n", strings.Repeat("=", 95))
+
+	return nil
+}
+
+func getEpisodeStatusLabel(mp3Path string) (string, string) {
+	st := getOrCreateEpisodeStatus(mp3Path)
+	if st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path) {
+		return "Clean", "green"
+	}
+	if st.Status == StateQueuedRemote {
+		return "Queued Remote", "cyan"
+	}
+	if st.Status == StateTranscribingRemotely || st.Status == StateCuttingRemotely || st.Status == StateTranscribingLocally || st.Status == StateCuttingLocally {
+		return "In Progress", "yellow"
+	}
+	return "Needs Ad Removal", "yellow"
+}

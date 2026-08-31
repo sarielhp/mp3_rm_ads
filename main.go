@@ -195,6 +195,13 @@ func main() {
 		handleRemoteCommand(config, cli)
 		return
 
+	case "ls":
+		if err := runLsCommand(config, cli); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		return
+
 	case "batch-worker":
 		handleBatchWorkerCommand(config, cli)
 		return
