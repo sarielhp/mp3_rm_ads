@@ -118,7 +118,31 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 
-	if !status.WorkerRunning && len(status.QueuedTasks) > 0 {
+	logOut, _ := transport.Exec(targetHost, fmt.Sprintf("tail -n 25 %s/worker.log 2>/dev/null", remoteWorkDir))
+	workerFailed := false
+	var failureReason string
+	if logOut != "" {
+		if strings.Contains(logOut, "context deadline exceeded") {
+			workerFailed = true
+			failureReason = "context deadline exceeded (client timeout)"
+		} else if strings.Contains(logOut, "panic:") || strings.Contains(logOut, "fatal error:") {
+			workerFailed = true
+			failureReason = "runtime panic/fatal error"
+		} else if strings.Contains(logOut, "failed to connect to Whisper GPU server") || strings.Contains(logOut, "failed to connect to Whisper") {
+			workerFailed = true
+			failureReason = "whisper server unreachable"
+		}
+	}
+
+	if workerFailed {
+		abortCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker)' 2>/dev/null || true; rm -f %s/.worker.lock; docker restart $(docker ps -q --filter 'ancestor=fedirz/faster-whisper-server' 2>/dev/null || docker ps -q 2>/dev/null) 2>/dev/null || true", remoteWorkDir)
+		_, _ = transport.Exec(targetHost, abortCmd)
+
+		relaunchCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		_, _ = transport.Exec(targetHost, relaunchCmd)
+		status.WorkerRunning = true
+		status.Message = fmt.Sprintf("Auto-recovered: detected '%s' in worker.log, restarted worker with updated binary", failureReason)
+	} else if !status.WorkerRunning && len(status.QueuedTasks) > 0 {
 		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		if _, err := transport.Exec(targetHost, wakeWorkerCmd); err != nil {
 			altCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
@@ -217,6 +241,9 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	fmt.Printf("  - Remote Archive:  %d episode(s)\n", archiveCount)
 	if len(status.ActiveBatches) > 0 {
 		fmt.Printf("  - Staged Batches:  %d\n", len(status.ActiveBatches))
+	}
+	if status.Message != "" {
+		fmt.Printf("  - Notice:          %s\n", boldYellow(status.Message))
 	}
 
 	if len(status.QueuedTasks) > 0 {
