@@ -472,6 +472,8 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.String(&opts.Force, "-f, --force <stage>", "", "Force re-running: 'whisper', 'llm', or 'all'"),
 		clihelp.String(&opts.UseLLM, "--profile <id/name>", "", "Select LLM profile ID or name"),
 		clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host (e.g. cloud8)"),
+		clihelp.Bool(&opts.Remote, "--remote", false, "Offload batch processing to remote host (e.g. cloud8)"),
+		clihelp.Bool(&opts.Local, "--local", false, "Force local processing (skip remote host)"),
 		clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of untranscribed episodes to process"),
 	}
 }

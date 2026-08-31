@@ -107,6 +107,39 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		return
 	}
 
+	targetHost := ""
+	if !cli.Local {
+		reqHost := ""
+		if cli.Remote {
+			reqHost = config.RemoteHost
+			if reqHost == "" {
+				reqHost = "cloud8"
+			}
+		}
+		h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
+		if err == nil && isRem {
+			targetHost = h
+		}
+	}
+
+	if targetHost != "" {
+		filesToPush := expandedArgs
+		if cli.Count > 0 && len(filesToPush) > cli.Count {
+			filesToPush = filesToPush[:cli.Count]
+		}
+		if len(filesToPush) == 0 {
+			if !cli.Quiet {
+				fmt.Println("No audio files found that need ad removal.")
+			}
+			return
+		}
+		if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
+			fmt.Fprintf(os.Stderr, "Error pushing batch to remote %s: %v\n", targetHost, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	selectedProfile := selectProfile(config, cli.UseLLM)
 	batchStartTime := time.Now()
 
