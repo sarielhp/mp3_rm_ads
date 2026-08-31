@@ -153,6 +153,26 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			{
+				Name:        "clear",
+				Description: "Stop remote workers and empty all scheduled/pending jobs from remote queue",
+				UsageLine:   "abs remote clear [host] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "clear"
+					if len(ctx.Args) > 0 {
+						opts.RemoteHost = ctx.Args[0]
+					}
+					return nil
+				},
+			},
+			{
 				Name:        "cancel",
 				Description: "Cancel a remote batch job or all active workers",
 				UsageLine:   "abs remote cancel [host] [batch_id] [options]",
@@ -210,6 +230,8 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "pull":
 		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+	case "clear", "empty", "purge":
+		err = runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
 	case "scan":
 		targetDir := ""
 		if len(cli.Args) > 0 {

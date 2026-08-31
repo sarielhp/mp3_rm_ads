@@ -210,6 +210,13 @@ func main() {
 			}
 			return
 		}
+		if cli.ProcSubcmd == "clear" {
+			if err := runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
+				fmt.Fprintf(os.Stderr, "Error clearing remote queue on %s: %v\n", cli.RemoteHost, err)
+				os.Exit(1)
+			}
+			return
+		}
 		processAudioFilesBatch(cli, config, action)
 		return
 	}

@@ -154,16 +154,45 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 							return nil
 						},
 					},
+					{
+						Name:        "clear",
+						Description: "Stop remote workers and empty all scheduled/pending jobs from remote queue",
+						UsageLine:   "abs proc clear [host] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
+						},
+						Args: clihelp.MaximumNArgs(1),
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "proc"
+							opts.ProcSubcmd = "clear"
+							if len(ctx.Args) > 0 {
+								opts.RemoteHost = ctx.Args[0]
+							}
+							return nil
+						},
+					},
 				},
 				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "proc"
-					if len(ctx.Args) > 0 && ctx.Args[0] == "collect" {
-						opts.ProcSubcmd = "collect"
-						if len(ctx.Args) > 1 {
-							opts.RemoteHost = ctx.Args[1]
+					if len(ctx.Args) > 0 {
+						if ctx.Args[0] == "collect" {
+							opts.ProcSubcmd = "collect"
+							if len(ctx.Args) > 1 {
+								opts.RemoteHost = ctx.Args[1]
+							}
+							return nil
 						}
-						return nil
+						if ctx.Args[0] == "clear" || ctx.Args[0] == "empty" {
+							opts.ProcSubcmd = "clear"
+							if len(ctx.Args) > 1 {
+								opts.RemoteHost = ctx.Args[1]
+							}
+							return nil
+						}
 					}
 					opts.Args = ctx.Args
 					return nil
