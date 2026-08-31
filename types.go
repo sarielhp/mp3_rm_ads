@@ -208,31 +208,28 @@ type CLIOptions struct {
 	ListWhispers      bool
 
 	// Merged Library Management Options
-	Count                 int
-	CountGiven            bool
-	Podcast               string
-	Fill                  bool
-	KeepCount             *int
-	CheckNew              bool
-	Oldest                bool
-	NoWait                bool
-	SqliteDBPath          string
-	ProcessorCmd          string
-	ProcessorValue        string
-	DryRun                bool
-	ConfigInfo            bool
-	ABSToken              string
-	Args                  []string
-	ServerSubcmd          string
-	OPMLSubcmd            string
-	OPMLFile              string
-	PodcastsOnly          bool
-	EpisodesOnly          bool
-	RemoteFFmpegHost      string
-	SetRemoteFFmpegHost   bool
-	DefaultDownloadPolicy string
-	DefaultDownloadK      int
-	DefaultAdRemoval      string
+	Count               int
+	CountGiven          bool
+	Podcast             string
+	Fill                bool
+	KeepCount           *int
+	CheckNew            bool
+	Oldest              bool
+	NoWait              bool
+	SqliteDBPath        string
+	ProcessorCmd        string
+	ProcessorValue      string
+	DryRun              bool
+	ConfigInfo          bool
+	ABSToken            string
+	Args                []string
+	ServerSubcmd        string
+	OPMLSubcmd          string
+	OPMLFile            string
+	PodcastsOnly        bool
+	EpisodesOnly        bool
+	RemoteFFmpegHost    string
+	SetRemoteFFmpegHost bool
 }
 
 type CostInfo struct {

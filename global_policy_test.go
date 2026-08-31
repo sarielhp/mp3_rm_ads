@@ -121,7 +121,7 @@ func TestPodcastConfigInheritanceFromGlobalDefaults(t *testing.T) {
 	}
 }
 
-func TestCLIConfigListAndOptions(t *testing.T) {
+func TestCLIConfigListAndSet(t *testing.T) {
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -138,17 +138,11 @@ func TestCLIConfigListAndOptions(t *testing.T) {
 	var opts2 CLIOptions
 	app2 := buildCLIApp(&action2, &opts2)
 
-	err = app2.Execute([]string{"config", "--default-download-policy", "all", "--default-download-k", "7", "--default-ad-policy", "none"})
+	err = app2.Execute([]string{"config", "set", "default_download_policy", "all"})
 	if err != nil {
-		t.Fatalf("executing config with options failed: %v", err)
+		t.Fatalf("executing config set failed: %v", err)
 	}
-	if opts2.DefaultDownloadPolicy != "all" {
-		t.Errorf("expected opts2.DefaultDownloadPolicy = 'all', got %q", opts2.DefaultDownloadPolicy)
-	}
-	if opts2.DefaultDownloadK != 7 {
-		t.Errorf("expected opts2.DefaultDownloadK = 7, got %d", opts2.DefaultDownloadK)
-	}
-	if opts2.DefaultAdRemoval != "none" {
-		t.Errorf("expected opts2.DefaultAdRemoval = 'none', got %q", opts2.DefaultAdRemoval)
+	if opts2.ConfigCmd != "set" || opts2.ConfigKey != "default_download_policy" || opts2.ConfigVal != "all" {
+		t.Errorf("unexpected set opts: %+v", opts2)
 	}
 }
