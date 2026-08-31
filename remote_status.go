@@ -65,8 +65,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 
 	activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"status\": \"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null | head -n 1", remoteWorkDir))
 	if activePath := strings.TrimSpace(activeOut); activePath != "" {
-		rel := strings.TrimSuffix(strings.TrimPrefix(activePath, remoteWorkDir+"/"), ".json")
-		status.ActiveTask = rel
+		status.ActiveTask = cleanRemoteRelPath(activePath, remoteWorkDir)
 	}
 
 	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
@@ -76,8 +75,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 			if qPath == "" {
 				continue
 			}
-			rel := strings.TrimSuffix(strings.TrimPrefix(qPath, remoteWorkDir+"/"), ".json")
-			status.QueuedTasks = append(status.QueuedTasks, rel)
+			status.QueuedTasks = append(status.QueuedTasks, cleanRemoteRelPath(qPath, remoteWorkDir))
 		}
 	}
 
@@ -256,4 +254,12 @@ func runRemoteCancel(cfg *Config, host, batchID string, transport RemoteTranspor
 		fmt.Printf("Cancelled all active batch/worker processes on %s.\n", targetHost)
 	}
 	return nil
+}
+
+func cleanRemoteRelPath(rawPath, remoteWorkDir string) string {
+	rawPath = strings.TrimSuffix(strings.TrimSpace(rawPath), ".json")
+	if idx := strings.Index(rawPath, "abs_remote/"); idx != -1 {
+		return rawPath[idx+len("abs_remote/"):]
+	}
+	return filepath.Base(rawPath)
 }
