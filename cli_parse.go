@@ -132,9 +132,39 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Parameters: []clihelp.Param{
 					{Name: "[<path1> ...]", Description: "Optional audio files (.mp3), transcript JSONs (.json), or directories (defaults to configured podcasts_dir)"},
 				},
+				Subcommands: []clihelp.Command{
+					{
+						Name:        "collect",
+						Description: "Pull completed batch results from remote host and update local library",
+						UsageLine:   "abs proc collect [host] [options]",
+						Parameters: []clihelp.Param{
+							{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
+						},
+						Args: clihelp.MaximumNArgs(1),
+						Options: []clihelp.Option{
+							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+						},
+						Run: func(ctx *clihelp.Context) error {
+							*action = "proc"
+							opts.ProcSubcmd = "collect"
+							if len(ctx.Args) > 0 {
+								opts.RemoteHost = ctx.Args[0]
+							}
+							return nil
+						},
+					},
+				},
 				Options: getTranscriptionOptions(opts),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "proc"
+					if len(ctx.Args) > 0 && ctx.Args[0] == "collect" {
+						opts.ProcSubcmd = "collect"
+						if len(ctx.Args) > 1 {
+							opts.RemoteHost = ctx.Args[1]
+						}
+						return nil
+					}
 					opts.Args = ctx.Args
 					return nil
 				},
@@ -480,6 +510,7 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host (e.g. cloud8)"),
 		clihelp.Bool(&opts.Remote, "--remote", false, "Offload batch processing to remote host (e.g. cloud8)"),
 		clihelp.Bool(&opts.Local, "--local", false, "Force local processing (skip remote host)"),
+		clihelp.Bool(&opts.NoCollect, "--no-collect", false, "Skip automatic remote collection before push"),
 		clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview and count episodes needing transcription, learning, or cutting without modifying files"),
 		clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of untranscribed episodes to process"),
 	}

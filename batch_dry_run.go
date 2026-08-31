@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 func handleProcDryRun(files []string, cli CLIOptions, config Config) {
@@ -82,6 +84,41 @@ func handleProcDryRun(files []string, cli CLIOptions, config Config) {
 		}
 	}
 
+	var remoteReadyOnServer int
+	var targetHost string
+	if !cli.Local {
+		reqHost := ""
+		if cli.Remote {
+			reqHost = config.RemoteHost
+			if reqHost == "" {
+				reqHost = "cloud8"
+			}
+		}
+		h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
+		if err == nil && isRem && h != "" {
+			targetHost = h
+			transport := getRemoteTransport()
+			if isRemoteHostReachable(h, transport) {
+				remoteWorkDir := "~/.abs_remote"
+				if config.RemoteWorkDir != "" {
+					remoteWorkDir = config.RemoteWorkDir
+				}
+				tempDonePath := filepath.Join(os.TempDir(), fmt.Sprintf("dryrun_done_%d.json", time.Now().UnixNano()))
+				remoteDoneFile := fmt.Sprintf("%s/done.json", remoteWorkDir)
+				if err := transport.Download(h, remoteDoneFile, tempDonePath); err == nil {
+					if doneM, err := loadDoneManifest(tempDonePath); err == nil && doneM != nil {
+						for _, it := range doneM.Episodes {
+							if it.Status == StateReadyForCopyBack {
+								remoteReadyOnServer++
+							}
+						}
+					}
+					_ = os.Remove(tempDonePath)
+				}
+			}
+		}
+	}
+
 	totalNeedingAction := needsTranscribe + needsLLM + needsCut
 
 	fmt.Println()
@@ -93,6 +130,9 @@ func handleProcDryRun(files []string, cli CLIOptions, config Config) {
 	fmt.Printf("  • Needs Audio Cutting (FFmpeg):  %d\n", needsCut)
 	if remotePending > 0 {
 		fmt.Printf("  • In Remote Queue / Ready:       %d\n", remotePending)
+	}
+	if targetHost != "" {
+		fmt.Printf("  • Ready for Remote Collection:   %d (%s)\n", remoteReadyOnServer, targetHost)
 	}
 	fmt.Printf("  • Already Processed / Ad-Free:   %d\n", alreadyComplete)
 	fmt.Println(strings.Repeat("─", 55))

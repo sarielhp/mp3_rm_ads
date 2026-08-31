@@ -146,11 +146,9 @@ func main() {
 		if len(cli.Args) > 0 {
 			targetDir = cli.Args[0]
 		}
-		if targetDir == "" {
-			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
-			os.Exit(1)
+		if targetDir != "" {
+			config.PodcastsDir = targetDir
 		}
-		config.PodcastsDir = targetDir
 		absStatus(config, cli.Quiet)
 		return
 
@@ -194,6 +192,13 @@ func main() {
 	case "proc", "recut":
 		if action == "recut" {
 			cli.Recut = true
+		}
+		if cli.ProcSubcmd == "collect" {
+			if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
+				fmt.Fprintf(os.Stderr, "Error collecting from remote %s: %v\n", cli.RemoteHost, err)
+				os.Exit(1)
+			}
+			return
 		}
 		processAudioFilesBatch(cli, config, action)
 		return

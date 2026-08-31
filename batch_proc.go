@@ -10,6 +10,14 @@ import (
 )
 
 func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
+	if cli.ProcSubcmd == "collect" {
+		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
+			fmt.Fprintf(os.Stderr, "Error collecting from remote %s: %v\n", cli.RemoteHost, err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	hasError := false
 	_ = hasError
 	if cli.Force != "" {
@@ -128,6 +136,14 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	}
 
 	if targetHost != "" {
+		if !cli.NoCollect && !cli.DryRun {
+			if err := runRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
+				if !cli.Quiet {
+					fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
+				}
+			}
+		}
+
 		var filesToPush []string
 		for _, f := range expandedArgs {
 			if strings.HasSuffix(f, ".json") {

@@ -77,6 +77,19 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 		}
 		return "", nil
 	}
+	if strings.Contains(cmd, "remote ack") {
+		parts := strings.Split(cmd, "\"")
+		rel := ""
+		if len(parts) >= 2 {
+			rel = parts[1]
+		}
+		dir := m.RemoteRoot
+		if fileExists(filepath.Join(m.RemoteRoot, "remote_root", rel)) {
+			dir = filepath.Join(m.RemoteRoot, "remote_root")
+		}
+		_ = runRemoteAck(dir, rel)
+		return "", nil
+	}
 	if strings.Contains(cmd, "abs help") || strings.Contains(cmd, "abs version") {
 		return "abs version 0.1.26", nil
 	}
