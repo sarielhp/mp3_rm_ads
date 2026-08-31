@@ -79,6 +79,18 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 
+	if !status.WorkerRunning && len(status.QueuedTasks) > 0 {
+		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		if _, err := transport.Exec(targetHost, wakeWorkerCmd); err != nil {
+			altCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+			_, _ = transport.Exec(targetHost, altCmd)
+		}
+		status.WorkerRunning = true
+		if status.ActiveTask == "" && len(status.QueuedTasks) > 0 {
+			status.ActiveTask = status.QueuedTasks[0]
+		}
+	}
+
 	var readyEpisodes []RemoteDoneItem
 	var archiveCount int
 
