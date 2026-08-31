@@ -88,7 +88,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 						elapsed := time.Since(tStart)
 						status.ActiveElapsed = formatClock(elapsed.Seconds())
 						if activeSt.Status == StateTranscribingRemotely && activeSt.Original.DurationSec > 0 {
-							estTotalSec := activeSt.Original.DurationSec / 6.0
+							estTotalSec := activeSt.Original.DurationSec / 4.5
 							if estTotalSec > 0 {
 								pct := int((elapsed.Seconds() / estTotalSec) * 100)
 								if pct > 99 {

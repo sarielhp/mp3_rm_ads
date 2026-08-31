@@ -97,13 +97,10 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 	maxRetries := 5
 	retryDelay := 5
 
-	estTranscribeSeconds := 900.0
-	if totalDuration > 0 && speedFactor > 0 {
-		estTranscribeSeconds = totalDuration / speedFactor
-	}
-	readTimeout := int(estTranscribeSeconds * 1.5)
-	if readTimeout < 600 {
-		readTimeout = 600
+	// Set generous timeout so client never aborts just before server finishes
+	readTimeout := int(totalDuration*1.5) + 600
+	if readTimeout < 1800 {
+		readTimeout = 1800 // Minimum 30 minutes
 	}
 
 	var progressDone chan struct{}

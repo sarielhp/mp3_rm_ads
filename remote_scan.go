@@ -137,7 +137,7 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		transcriptJSON := baseName + ".transcript.json"
 		speedFactor := cfg.WhisperSpeedFactor
 		if speedFactor <= 0 {
-			speedFactor = 7.0
+			speedFactor = 4.5
 		}
 
 		t0 := time.Now()
