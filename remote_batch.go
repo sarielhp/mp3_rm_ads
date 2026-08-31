@@ -130,9 +130,9 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		fmt.Printf("Triggering remote worker/scan on %s...\n", targetHost)
 	}
 
-	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 	if _, err := transport.Exec(targetHost, workerCmd); err != nil {
-		altCmd := fmt.Sprintf("nohup abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+		altCmd := fmt.Sprintf("nohup abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
 

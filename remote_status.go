@@ -138,14 +138,14 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		abortCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker)' 2>/dev/null || true; rm -f %s/.worker.lock; docker restart $(docker ps -q --filter 'ancestor=fedirz/faster-whisper-server' 2>/dev/null || docker ps -q 2>/dev/null) 2>/dev/null || true", remoteWorkDir)
 		_, _ = transport.Exec(targetHost, abortCmd)
 
-		relaunchCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		relaunchCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, relaunchCmd)
 		status.WorkerRunning = true
 		status.Message = fmt.Sprintf("Auto-recovered: detected '%s' in worker.log, restarted worker with updated binary", failureReason)
 	} else if !status.WorkerRunning && len(status.QueuedTasks) > 0 {
-		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		if _, err := transport.Exec(targetHost, wakeWorkerCmd); err != nil {
-			altCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+			altCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
 			_, _ = transport.Exec(targetHost, altCmd)
 		}
 		status.WorkerRunning = true
