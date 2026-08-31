@@ -15,6 +15,10 @@ import (
 	"sync"
 
 	"github.com/eliukblau/pixterm/pkg/ansimage"
+	"golang.org/x/image/draw"
+	"golang.org/x/image/font"
+	"golang.org/x/image/font/basicfont"
+	"golang.org/x/image/math/fixed"
 	"golang.org/x/term"
 )
 
@@ -41,7 +45,128 @@ var (
 	podcastCoverPathCacheMu sync.Mutex
 	coverGraphicsCache      = make(map[string]string)
 	coverGraphicsCacheMu    sync.Mutex
+	coverPngMemoryCache     = make(map[string][]byte)
+	coverPngMemoryCacheMu   sync.Mutex
 )
+
+func clearImageMemoryCache() {
+	podcastCoverPathCacheMu.Lock()
+	podcastCoverPathCache = make(map[string]string)
+	podcastCoverPathCacheMu.Unlock()
+
+	coverGraphicsCacheMu.Lock()
+	coverGraphicsCache = make(map[string]string)
+	coverGraphicsCacheMu.Unlock()
+
+	coverPngMemoryCacheMu.Lock()
+	coverPngMemoryCache = make(map[string][]byte)
+	coverPngMemoryCacheMu.Unlock()
+}
+
+func generateGenericCover(title string) image.Image {
+	const imgDim = 256
+	dst := image.NewRGBA(image.Rect(0, 0, imgDim, imgDim))
+
+	bg := color.RGBA{R: 248, G: 249, B: 250, A: 255}
+	border := color.RGBA{R: 220, G: 224, B: 230, A: 255}
+	accent := color.RGBA{R: 70, G: 130, B: 180, A: 255}
+
+	for y := 0; y < imgDim; y++ {
+		for x := 0; x < imgDim; x++ {
+			if x == 0 || x == imgDim-1 || y == 0 || y == imgDim-1 {
+				dst.Set(x, y, border)
+			} else if y < 4 {
+				dst.Set(x, y, accent)
+			} else {
+				dst.Set(x, y, bg)
+			}
+		}
+	}
+
+	words := strings.Fields(title)
+	var lines []string
+	var cur string
+	maxCharsPerLine := 14
+	if len(title) > 28 {
+		maxCharsPerLine = 18
+	}
+	for _, w := range words {
+		if cur == "" {
+			cur = w
+		} else if len(cur)+1+len(w) <= maxCharsPerLine {
+			cur += " " + w
+		} else {
+			lines = append(lines, cur)
+			cur = w
+			if len(lines) >= 4 {
+				break
+			}
+		}
+	}
+	if cur != "" && len(lines) < 4 {
+		lines = append(lines, cur)
+	}
+	if len(lines) == 0 {
+		lines = []string{"Podcast"}
+	}
+
+	lineH := 14
+	rawH := len(lines) * lineH
+	maxLineW := 0
+	for _, l := range lines {
+		w := len(l) * 7
+		if w > maxLineW {
+			maxLineW = w
+		}
+	}
+	if maxLineW <= 0 {
+		maxLineW = 7
+	}
+	if rawH <= 0 {
+		rawH = 13
+	}
+
+	srcBuf := image.NewRGBA(image.Rect(0, 0, maxLineW, rawH))
+	d := &font.Drawer{
+		Dst:  srcBuf,
+		Src:  image.NewUniform(color.RGBA{R: 30, G: 35, B: 42, A: 255}),
+		Face: basicfont.Face7x13,
+	}
+
+	for i, l := range lines {
+		lineW := len(l) * 7
+		startX := (maxLineW - lineW) / 2
+		d.Dot = fixed.P(startX, i*lineH+11)
+		d.DrawString(l)
+	}
+
+	targetW := float64(imgDim) * 0.80
+	targetH := float64(imgDim) * 0.80
+
+	scaleX := targetW / float64(maxLineW)
+	scaleY := targetH / float64(rawH)
+	scale := scaleX
+	if scale*float64(rawH) > targetH {
+		scale = scaleY
+	}
+
+	scaledW := int(float64(maxLineW) * scale)
+	scaledH := int(float64(rawH) * scale)
+	if scaledW <= 0 {
+		scaledW = 1
+	}
+	if scaledH <= 0 {
+		scaledH = 1
+	}
+
+	dstX := (imgDim - scaledW) / 2
+	dstY := (imgDim - scaledH) / 2
+	dstRect := image.Rect(dstX, dstY, dstX+scaledW, dstY+scaledH)
+
+	draw.ApproxBiLinear.Scale(dst, dstRect, srcBuf, srcBuf.Bounds(), draw.Over, nil)
+
+	return dst
+}
 
 func findCoverImage(podcastDir string) string {
 	podcastCoverPathCacheMu.Lock()
@@ -91,21 +216,125 @@ func findCoverImageUncached(podcastDir string) string {
 		return matchesPng[0]
 	}
 
+	genPath := filepath.Join(cDir, "cover.png")
+	if fi, err := os.Stat(genPath); err == nil && !fi.IsDir() && fi.Size() > 0 {
+		return genPath
+	}
+
+	title := displayName(filepath.Base(podcastDir))
+	if title == "" || title == "." || title == "/" {
+		title = "Podcast"
+	}
+	img := generateGenericCover(title)
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, img); err == nil {
+		_ = os.WriteFile(genPath, buf.Bytes(), 0644)
+		return genPath
+	}
+
 	return ""
 }
 
-func encodeNativeKittyGraphics(filePath string, cols, rows int) (string, error) {
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", err
+func scaleImageThumbnail(img image.Image, targetW, targetH int) image.Image {
+	if targetW <= 0 {
+		targetW = 256
+	}
+	if targetH <= 0 {
+		targetH = 256
+	}
+	bounds := img.Bounds()
+	w := bounds.Dx()
+	h := bounds.Dy()
+	if w <= 0 || h <= 0 {
+		return img
 	}
 
-	pngData := data
-	if img, _, err := image.Decode(bytes.NewReader(data)); err == nil {
-		var buf bytes.Buffer
-		if err := png.Encode(&buf, img); err == nil {
-			pngData = buf.Bytes()
+	dstRect := image.Rect(0, 0, targetW, targetH)
+	dstImg := image.NewRGBA(dstRect)
+	draw.ApproxBiLinear.Scale(dstImg, dstRect, img, bounds, draw.Over, nil)
+	return dstImg
+}
+
+func getOrCacheCoverPNG(filePath string) ([]byte, error) {
+	fi, err := os.Stat(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	key := fmt.Sprintf("%s:%d:%d", filePath, fi.ModTime().UnixNano(), fi.Size())
+
+	coverPngMemoryCacheMu.Lock()
+	if cached, ok := coverPngMemoryCache[key]; ok {
+		coverPngMemoryCacheMu.Unlock()
+		return cached, nil
+	}
+	coverPngMemoryCacheMu.Unlock()
+
+	cDir := podcastCacheDirForImage(filePath)
+	diskPngPath := filepath.Join(cDir, "cover.png")
+
+	if diskFi, err := os.Stat(diskPngPath); err == nil && diskFi.Size() > 0 {
+		if !diskFi.ModTime().Before(fi.ModTime()) {
+			if diskData, err := os.ReadFile(diskPngPath); err == nil && len(diskData) >= 8 && string(diskData[:8]) == "\x89PNG\r\n\x1a\n" {
+				coverPngMemoryCacheMu.Lock()
+				coverPngMemoryCache[key] = diskData
+				coverPngMemoryCacheMu.Unlock()
+				return diskData, nil
+			}
 		}
+	}
+
+	data, err := os.ReadFile(filePath)
+	if err != nil {
+		return nil, err
+	}
+
+	if len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n" {
+		img, _, err := image.Decode(bytes.NewReader(data))
+		if err == nil {
+			scaled := scaleImageThumbnail(img, 256, 256)
+			var buf bytes.Buffer
+			if err := png.Encode(&buf, scaled); err == nil {
+				pngBytes := buf.Bytes()
+				coverPngMemoryCacheMu.Lock()
+				coverPngMemoryCache[key] = pngBytes
+				coverPngMemoryCacheMu.Unlock()
+				_ = os.WriteFile(diskPngPath, pngBytes, 0644)
+				return pngBytes, nil
+			}
+		}
+		coverPngMemoryCacheMu.Lock()
+		coverPngMemoryCache[key] = data
+		coverPngMemoryCacheMu.Unlock()
+		return data, nil
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+
+	scaled := scaleImageThumbnail(img, 256, 256)
+
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, scaled); err != nil {
+		return nil, err
+	}
+	pngBytes := buf.Bytes()
+
+	coverPngMemoryCacheMu.Lock()
+	coverPngMemoryCache[key] = pngBytes
+	coverPngMemoryCacheMu.Unlock()
+
+	_ = os.WriteFile(diskPngPath, pngBytes, 0644)
+
+	return pngBytes, nil
+}
+
+func encodeNativeKittyGraphics(filePath string, cols, rows int) (string, error) {
+	pngData, err := getOrCacheCoverPNG(filePath)
+	if err != nil {
+		return "", err
 	}
 
 	b64 := base64.StdEncoding.EncodeToString(pngData)
@@ -149,6 +378,20 @@ func podcastCacheDirForImage(imagePath string) string {
 		return dir
 	}
 	return cacheDirForPodcast(dir)
+}
+
+func prewarmPodcastCovers(podcasts []tuiPodcast, cols, rows int) {
+	go func() {
+		for _, pod := range podcasts {
+			cp := pod.coverPath
+			if cp == "" {
+				cp = findCoverImage(pod.dir)
+			}
+			if cp != "" {
+				_, _ = encodeKittyGraphicsFile(cp, cols, rows)
+			}
+		}
+	}()
 }
 
 func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
@@ -205,10 +448,22 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	if isKitty {
 		result, err = encodeNativeKittyGraphics(filePath, cols, rows)
 	} else {
-		var ai *ansimage.ANSImage
-		ai, err = ansimage.NewScaledFromFile(filePath, rows, cols, color.Black, ansimage.ScaleModeFit, ansimage.NoDithering)
-		if err == nil {
-			result = ai.Render()
+		pngBytes, pErr := getOrCacheCoverPNG(filePath)
+		if pErr == nil {
+			if img, _, dErr := image.Decode(bytes.NewReader(pngBytes)); dErr == nil {
+				var ai *ansimage.ANSImage
+				ai, err = ansimage.NewScaledFromImage(img, rows, cols, color.Black, ansimage.ScaleModeResize, ansimage.NoDithering)
+				if err == nil {
+					result = ai.Render()
+				}
+			}
+		}
+		if result == "" {
+			var ai *ansimage.ANSImage
+			ai, err = ansimage.NewScaledFromFile(filePath, rows, cols, color.Black, ansimage.ScaleModeResize, ansimage.NoDithering)
+			if err == nil {
+				result = ai.Render()
+			}
 		}
 	}
 

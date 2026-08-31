@@ -12,7 +12,7 @@ func (m *tuiModel) drawPlayerScreen() string {
 	out.WriteString("  " + banner + "\n\n")
 
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n\n")
 
 	// 1. Now Playing Section
 	if globalPlayer.Current != nil {
@@ -58,7 +58,7 @@ func (m *tuiModel) drawPlayerScreen() string {
 	}
 
 	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	out.WriteString(tuiDimStyle.Render("  Space Play/Pause │ ←/→ Seek 30s │ +/- Volume │ s Speaker │ n Next │ F2 Queue │ Esc Back │ q Quit\n"))
+	out.WriteString(tuiDimStyle.Render("  Space Play/Pause │ ←/→ Seek 30s │ +/- Volume │ s Speaker │ n Next │ F2 Queue │ Esc/q Back") + "\n")
 
 	return out.String()
 }
@@ -77,12 +77,12 @@ func (m *tuiModel) drawPlayQueueScreen() string {
 	out.WriteString("\n\n")
 
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	if total == 0 {
 		out.WriteString("\n  " + tuiDimStyle.Render("Playing queue is empty. Press 'p' on any episode in podcast view to enqueue.") + "\n\n")
-		out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
-		out.WriteString(tuiDimStyle.Render("  F1 Player │ F3 Ad Queue │ Esc Back │ q Quit\n"))
+		out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+		out.WriteString(tuiDimStyle.Render("  F1 Player │ F3 Ad Queue │ Esc/q Back") + "\n")
 		return out.String()
 	}
 
@@ -160,7 +160,7 @@ func (m *tuiModel) drawPlayQueueScreen() string {
 	}
 
 	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ Enter Play │ d/x Delete │ c Clear │ Esc Back │ q Quit\n"))
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ Enter Play │ d/x Delete │ c Clear │ Esc/q Back") + "\n")
 
 	return out.String()
 }
@@ -180,12 +180,12 @@ func (m *tuiModel) drawAdQueueScreen() string {
 	out.WriteString("\n\n")
 
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	if total == 0 {
 		out.WriteString("\n  " + tuiDimStyle.Render("Ad removal queue is empty. Press 'r' on an episode or 'p' to enqueue for playback & ad removal.") + "\n\n")
-		out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
-		out.WriteString(tuiDimStyle.Render("  F1 Player │ F2 Play Queue │ Esc Back │ q Quit\n"))
+		out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+		out.WriteString(tuiDimStyle.Render("  F1 Player │ F2 Play Queue │ Esc/q Back") + "\n")
 		return out.String()
 	}
 
@@ -238,7 +238,7 @@ func (m *tuiModel) drawAdQueueScreen() string {
 	}
 
 	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ d/x/r Delete │ Esc Back │ q Quit\n"))
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ d/x/r Delete │ Esc/q Back") + "\n")
 
 	return out.String()
 }

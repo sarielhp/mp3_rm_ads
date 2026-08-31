@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"strings"
 	"unicode"
 
@@ -64,27 +65,236 @@ func renderHighlightedText(text string, matchedIndices []int, baseStyle, highlig
 }
 
 func (m *tuiModel) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	switch m.screen {
+	case screenTranscript:
+		return m.handleTranscriptSearchKey(msg)
+	case screenPodcastDetail:
+		return m.handlePodcastDetailSearchKey(msg)
+	default:
+		return m.handlePodcastsSearchKey(msg)
+	}
+}
+
+func (m *tuiModel) handlePodcastsSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	s := msg.String()
+	switch s {
 	case "esc":
 		m.searchMode = false
 		m.searchQuery = ""
+		if m.podIdx >= len(m.podcasts) {
+			m.podIdx = max(0, len(m.podcasts)-1)
+		}
 	case "enter":
 		m.searchMode = false
-		if m.screen == screenPodcasts {
-			m.podIdx = 0
-			m.podScroll = 0
-		} else if m.screen == screenPodcastDetail {
+		pods := m.filteredPodcasts()
+		if len(pods) > 0 && m.podIdx < len(pods) {
+			selectedPod := pods[m.podIdx]
+			for i, p := range m.podcasts {
+				if p.dir == selectedPod.dir {
+					m.podIdx = i
+					break
+				}
+			}
+			m.searchQuery = ""
+			m.screen = screenPodcastDetail
 			m.epIdx = 0
 			m.epScroll = 0
 		}
+	case "up", "ctrl+p", "ctrl+k":
+		m.handleUp()
+	case "down", "ctrl+n", "ctrl+j":
+		m.handleDown()
 	case "backspace":
 		if len(m.searchQuery) > 0 {
 			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			m.podIdx = 0
+			m.podScroll = 0
 		}
 	default:
-		if len(msg.String()) == 1 {
-			m.searchQuery += msg.String()
+		if isPrintableKey(msg) {
+			m.searchQuery += keyString(msg)
+			m.podIdx = 0
+			m.podScroll = 0
 		}
 	}
 	return m, nil
+}
+
+func (m *tuiModel) handlePodcastDetailSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	s := msg.String()
+	switch s {
+	case "esc":
+		m.searchMode = false
+		m.searchQuery = ""
+		if m.podIdx < len(m.podcasts) && m.epIdx >= len(m.podcasts[m.podIdx].episodes) {
+			m.epIdx = max(0, len(m.podcasts[m.podIdx].episodes)-1)
+		}
+	case "enter":
+		m.searchMode = false
+		eps := m.filteredEpisodes()
+		if m.podIdx < len(m.podcasts) && len(eps) > 0 && m.epIdx < len(eps) {
+			selectedEp := eps[m.epIdx]
+			pod := &m.podcasts[m.podIdx]
+			for i, e := range pod.episodes {
+				if e.path == selectedEp.path {
+					m.epIdx = i
+					break
+				}
+			}
+			m.searchQuery = ""
+			m.screen = screenEpisodeDetail
+			m.descScroll = 0
+			ep := &pod.episodes[m.epIdx]
+			if !ep.durationDone {
+				idx := m.epIdx
+				return m, func() tea.Msg {
+					dur := m.bk.GetDuration(ep.path)
+					return episodeDurationMsg{idx: idx, duration: dur}
+				}
+			}
+		}
+	case "up", "ctrl+p", "ctrl+k":
+		m.handleUp()
+	case "down", "ctrl+n", "ctrl+j":
+		m.handleDown()
+	case "backspace":
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			m.epIdx = 0
+			m.epScroll = 0
+		}
+	default:
+		if isPrintableKey(msg) {
+			m.searchQuery += keyString(msg)
+			m.epIdx = 0
+			m.epScroll = 0
+		}
+	}
+	return m, nil
+}
+
+func (m *tuiModel) handleTranscriptSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	s := msg.String()
+	switch s {
+	case "esc":
+		m.searchMode = false
+		m.searchQuery = ""
+		m.transcriptMatchIdx = 0
+	case "enter":
+		m.searchMode = false
+		m.nextTranscriptMatch()
+	case "up", "ctrl+p", "ctrl+k":
+		m.prevTranscriptMatch()
+	case "down", "ctrl+n", "ctrl+j":
+		m.nextTranscriptMatch()
+	case "backspace":
+		if len(m.searchQuery) > 0 {
+			m.searchQuery = m.searchQuery[:len(m.searchQuery)-1]
+			m.transcriptMatchIdx = 0
+			m.updateTranscriptSearch()
+		}
+	default:
+		if isPrintableKey(msg) {
+			m.searchQuery += keyString(msg)
+			m.transcriptMatchIdx = 0
+			m.updateTranscriptSearch()
+		}
+	}
+	return m, nil
+}
+
+func isPrintableKey(msg tea.KeyMsg) bool {
+	if msg.Type == tea.KeySpace {
+		return true
+	}
+	if msg.Type == tea.KeyRunes && len(msg.Runes) > 0 {
+		return true
+	}
+	if len(msg.String()) == 1 {
+		return true
+	}
+	return false
+}
+
+func keyString(msg tea.KeyMsg) string {
+	if msg.Type == tea.KeySpace {
+		return " "
+	}
+	if len(msg.Runes) > 0 {
+		return string(msg.Runes)
+	}
+	return msg.String()
+}
+
+func (m *tuiModel) matchingTranscriptIndices() []int {
+	if m.searchQuery == "" || len(m.transcriptLines) == 0 {
+		return nil
+	}
+	q := strings.ToLower(m.searchQuery)
+	var indices []int
+	for i, line := range m.transcriptLines {
+		if strings.Contains(strings.ToLower(line), q) {
+			indices = append(indices, i)
+		}
+	}
+	if len(indices) == 0 {
+		for i, line := range m.transcriptLines {
+			if matched, _, _ := fuzzyMatch(m.searchQuery, line); matched {
+				indices = append(indices, i)
+			}
+		}
+	}
+	return indices
+}
+
+func (m *tuiModel) updateTranscriptSearch() {
+	matches := m.matchingTranscriptIndices()
+	if len(matches) > 0 {
+		m.transcriptMatchIdx = 0
+		m.scrollToTranscriptLine(matches[0])
+	}
+}
+
+func (m *tuiModel) nextTranscriptMatch() {
+	matches := m.matchingTranscriptIndices()
+	if len(matches) == 0 {
+		if m.searchQuery != "" {
+			m.showPopup(fmt.Sprintf("No matches for %q", m.searchQuery))
+		}
+		return
+	}
+	m.transcriptMatchIdx = (m.transcriptMatchIdx + 1) % len(matches)
+	m.scrollToTranscriptLine(matches[m.transcriptMatchIdx])
+	m.showPopup(fmt.Sprintf("Match %d of %d", m.transcriptMatchIdx+1, len(matches)))
+}
+
+func (m *tuiModel) prevTranscriptMatch() {
+	matches := m.matchingTranscriptIndices()
+	if len(matches) == 0 {
+		if m.searchQuery != "" {
+			m.showPopup(fmt.Sprintf("No matches for %q", m.searchQuery))
+		}
+		return
+	}
+	m.transcriptMatchIdx--
+	if m.transcriptMatchIdx < 0 {
+		m.transcriptMatchIdx = len(matches) - 1
+	}
+	m.scrollToTranscriptLine(matches[m.transcriptMatchIdx])
+	m.showPopup(fmt.Sprintf("Match %d of %d", m.transcriptMatchIdx+1, len(matches)))
+}
+
+func (m *tuiModel) scrollToTranscriptLine(lineIdx int) {
+	maxVis := max(5, m.height-7)
+	total := len(m.transcriptLines)
+	if total == 0 {
+		m.transcriptScroll = 0
+		return
+	}
+	target := max(0, lineIdx-maxVis/3)
+	maxScroll := max(0, total-maxVis)
+	if target > maxScroll {
+		target = maxScroll
+	}
+	m.transcriptScroll = target
 }

@@ -96,6 +96,19 @@ func (e tuiEpisode) displayTitle() string {
 	return e.filename
 }
 
+func (e tuiEpisode) displayEpisodeNum(index int) string {
+	if e.episode != "" {
+		return "#" + e.episode
+	}
+	if e.absData != nil && e.absData.Episode != "" {
+		return "#" + e.absData.Episode
+	}
+	if index > 0 {
+		return fmt.Sprintf("#%d", index)
+	}
+	return ""
+}
+
 type TuiBackend struct {
 	LoadPodcasts func(dir string) ([]tuiPodcast, error)
 	LoadQueues   func(pods []tuiPodcast) map[string][]string
@@ -104,49 +117,56 @@ type TuiBackend struct {
 }
 
 type tuiModel struct {
-	width                int
-	height               int
-	ready                bool
-	screen               tuiScreen
-	podcasts             []tuiPodcast
-	podIdx               int
-	podScroll            int
-	epIdx                int
-	epScroll             int
-	queue                map[string][]string
-	loading              bool
-	loadErr              string
-	done                 bool
-	bk                   *TuiBackend
-	podcastsDir          string
-	vp                   viewport.Model
-	showCover            bool
-	searchMode           bool
-	searchQuery          string
-	showHelp             bool
-	popupMsg             string
-	popupTimer           int
-	marqueeTick          int
-	marqueePos           int
-	marqueeDir           int
-	lastMarqueeSelection string
-	descScroll           int
-	prevScreen           tuiScreen
-	pqIdx                int
-	pqScroll             int
-	pqGrabbed            bool
-	adqIdx               int
-	adqScroll            int
-	adqGrabbed           bool
-	transcriptScroll     int
-	transcriptLines      []string
-	transcriptLoadedFor  string
-	timelineScroll       int
-	toast                *Toast
-	showHelpModal        bool
-	showPolicyModal      bool
-	policyModalIdx       int
-	selectedEpisodes     map[string]bool
+	width                   int
+	height                  int
+	ready                   bool
+	screen                  tuiScreen
+	podcasts                []tuiPodcast
+	podIdx                  int
+	podScroll               int
+	epIdx                   int
+	epScroll                int
+	queue                   map[string][]string
+	loading                 bool
+	loadErr                 string
+	done                    bool
+	bk                      *TuiBackend
+	podcastsDir             string
+	vp                      viewport.Model
+	showCover               bool
+	searchMode              bool
+	searchQuery             string
+	showHelp                bool
+	popupMsg                string
+	popupTimer              int
+	marqueeTick             int
+	marqueePos              int
+	marqueeDir              int
+	lastMarqueeSelection    string
+	descScroll              int
+	prevScreen              tuiScreen
+	pqIdx                   int
+	pqScroll                int
+	pqGrabbed               bool
+	adqIdx                  int
+	adqScroll               int
+	adqGrabbed              bool
+	transcriptScroll        int
+	transcriptLines         []string
+	transcriptItems         []transcriptItem
+	transcriptViewMode      int
+	transcriptLoadedFor     string
+	timelineScroll          int
+	transcriptMatchIdx      int
+	toast                   *Toast
+	showHelpModal           bool
+	showPolicyModal         bool
+	policyModalIdx          int
+	showDownloadPolicyModal bool
+	downloadPolicyModalIdx  int
+	downloadPolicyModalK    int
+	selectedEpisodes        map[string]bool
+	showEpisodePlayerPane   bool
 }
 
 type playerTickMsg time.Time
@@ -211,6 +231,9 @@ func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.podcasts = msg.podcasts
 			m.queue = msg.queue
+			if len(msg.podcasts) > 0 && m.showCover {
+				prewarmPodcastCovers(msg.podcasts, 24, 7)
+			}
 		}
 
 	case episodeDurationMsg:
@@ -251,14 +274,23 @@ func (m *tuiModel) filteredPodcasts() []tuiPodcast {
 	if m.searchQuery == "" {
 		return m.podcasts
 	}
-	var filtered []tuiPodcast
+	q := strings.ToLower(m.searchQuery)
+	var exact []tuiPodcast
 	for _, p := range m.podcasts {
-		matched, _, _ := fuzzyMatch(m.searchQuery, p.name)
-		if matched {
-			filtered = append(filtered, p)
+		if strings.Contains(strings.ToLower(p.name), q) || strings.Contains(strings.ToLower(p.displayAuthor()), q) {
+			exact = append(exact, p)
 		}
 	}
-	return filtered
+	if len(exact) > 0 {
+		return exact
+	}
+	var fuzzy []tuiPodcast
+	for _, p := range m.podcasts {
+		if matched, _, _ := fuzzyMatch(m.searchQuery, p.name); matched {
+			fuzzy = append(fuzzy, p)
+		}
+	}
+	return fuzzy
 }
 
 func (m *tuiModel) filteredEpisodes() []tuiEpisode {
@@ -268,17 +300,27 @@ func (m *tuiModel) filteredEpisodes() []tuiEpisode {
 	if m.searchQuery == "" {
 		return m.podcasts[m.podIdx].episodes
 	}
-	var filtered []tuiEpisode
+	q := strings.ToLower(m.searchQuery)
+	var exact []tuiEpisode
+	for _, e := range m.podcasts[m.podIdx].episodes {
+		if strings.Contains(strings.ToLower(e.displayTitle()), q) || strings.Contains(strings.ToLower(e.filename), q) {
+			exact = append(exact, e)
+		}
+	}
+	if len(exact) > 0 {
+		return exact
+	}
+	var fuzzy []tuiEpisode
 	for _, e := range m.podcasts[m.podIdx].episodes {
 		matched, _, _ := fuzzyMatch(m.searchQuery, e.displayTitle())
 		if !matched {
 			matched, _, _ = fuzzyMatch(m.searchQuery, e.filename)
 		}
 		if matched {
-			filtered = append(filtered, e)
+			fuzzy = append(fuzzy, e)
 		}
 	}
-	return filtered
+	return fuzzy
 }
 
 func (m *tuiModel) showPopup(msg string) {
@@ -355,6 +397,9 @@ func (m *tuiModel) searchBar() string {
 		return ""
 	}
 	prompt := fmt.Sprintf("  Search: %s█", m.searchQuery)
+	if m.screen == screenTranscript {
+		prompt = fmt.Sprintf("  Search Transcript: %s█", m.searchQuery)
+	}
 	return tuiSearchStyle.Render(prompt)
 }
 
@@ -393,8 +438,14 @@ func (m *tuiModel) View() string {
 	if m.showPolicyModal {
 		return m.drawAdPolicyModal()
 	}
+	if m.showDownloadPolicyModal {
+		return m.drawDownloadPolicyModal()
+	}
 
 	var body strings.Builder
+	if isKittyTerminal() {
+		body.WriteString(kittyClearGraphics())
+	}
 	body.WriteString(m.renderTopNavBar())
 
 	switch m.screen {
@@ -414,10 +465,6 @@ func (m *tuiModel) View() string {
 		body.WriteString(m.drawTranscriptScreen())
 	case screenTimeline:
 		body.WriteString(m.drawTimelineScreen())
-	}
-
-	if m.searchMode {
-		body.WriteString("\n" + m.searchBar())
 	}
 
 	miniPlayer := m.renderMiniPlayerBar()

@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -103,7 +104,7 @@ func (m *tuiModel) renderTopNavBar() string {
 	out.WriteString(breadcrumb + "\n")
 
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	return out.String()
 }
@@ -115,7 +116,7 @@ func (m *tuiModel) renderMiniPlayerBar() string {
 
 	out := &strings.Builder{}
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	statusIcon := "▶"
 	if globalPlayer.IsPaused {
@@ -172,4 +173,93 @@ func (m *tuiModel) renderToastNotification() string {
 		Render(fmt.Sprintf(" %s %s ", icon, m.toast.Message))
 
 	return "\n  " + toastBox
+}
+
+func (m *tuiModel) handleSortToggle() {
+	if m.screen != screenPodcastDetail {
+		return
+	}
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	eps := m.podcasts[m.podIdx].episodes
+	for i, j := 0, len(eps)-1; i < j; i, j = i+1, j-1 {
+		eps[i], eps[j] = eps[j], eps[i]
+	}
+	m.podcasts[m.podIdx].episodes = eps
+	m.showPopup("Sort order reversed")
+}
+
+func (m *tuiModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	switch msg.Type {
+	case tea.MouseWheelUp:
+		switch m.screen {
+		case screenEpisodeDetail:
+			if m.descScroll > 0 {
+				m.descScroll--
+			}
+		case screenTranscript:
+			if m.transcriptScroll > 0 {
+				m.transcriptScroll--
+			}
+		case screenTimeline:
+			if m.timelineScroll > 0 {
+				m.timelineScroll--
+			}
+		default:
+			m.handleUp()
+		}
+	case tea.MouseWheelDown:
+		switch m.screen {
+		case screenEpisodeDetail:
+			m.descScroll++
+		case screenTranscript:
+			m.transcriptScroll++
+		case screenTimeline:
+			m.timelineScroll++
+		default:
+			m.handleDown()
+		}
+	}
+	return m, nil
+}
+
+func (m *tuiModel) handleQueueToggle() {
+	if m.screen != screenPodcastDetail && m.screen != screenEpisodeDetail {
+		return
+	}
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := &m.podcasts[m.podIdx]
+	eps := m.filteredEpisodes()
+	if m.epIdx >= len(eps) {
+		return
+	}
+	ep := eps[m.epIdx]
+	entries := m.queue[pod.dir]
+	if entries == nil {
+		entries = []string{}
+	}
+	found := false
+	for i, e := range entries {
+		if e == ep.filename {
+			m.queue[pod.dir] = append(entries[:i], entries[i+1:]...)
+			found = true
+			break
+		}
+	}
+	if !found {
+		if ep.hasAdsRemoved {
+			m.showPopup("Episode already has ads removed")
+			return
+		}
+		m.queue[pod.dir] = append(entries, ep.filename)
+		m.showPopup("Added to ad removal queue")
+	} else {
+		m.showPopup("Removed from ad removal queue")
+	}
+	if m.bk != nil && m.bk.SaveQueue != nil {
+		m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
+	}
 }

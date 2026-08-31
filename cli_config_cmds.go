@@ -234,6 +234,23 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 					return nil
 				},
 			},
+			{
+				Name:        "migrate",
+				Description: "Migrate configuration from legacy podcasts_manager or mp3_rm_ads",
+				UsageLine:   "abs config migrate [source]",
+				Parameters: []clihelp.Param{
+					{Name: "[source]", Description: "Optional migration source ('pm', 'podcasts_manager', 'legacy', 'mp3_rm_ads', or 'all')"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Run: func(ctx *clihelp.Context) error {
+					*action = "config"
+					opts.ConfigCmd = "migrate"
+					if len(ctx.Args) > 0 {
+						opts.ConfigVal = ctx.Args[0]
+					}
+					return nil
+				},
+			},
 			clihelp.CompletionCommand(),
 		},
 		Run: func(ctx *clihelp.Context) error {

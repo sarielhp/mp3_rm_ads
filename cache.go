@@ -151,6 +151,7 @@ func saveEpisodeDetails(podcastDir, filename string, details *CachedEpisodeDetai
 }
 
 func resetCache() error {
+	clearImageMemoryCache()
 	cacheHome := os.Getenv("XDG_CACHE_HOME")
 	if cacheHome == "" {
 		home, err := os.UserHomeDir()

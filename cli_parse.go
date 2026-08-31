@@ -307,6 +307,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),
+					clihelp.Bool(&opts.Debug, "-d, --debug", false, "Enable debug mode with key logging and screen snapshots (F12)"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "tui"

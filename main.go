@@ -128,6 +128,8 @@ func main() {
 			if !cli.Quiet {
 				fmt.Println("Cache reset successfully.")
 			}
+		case "migrate":
+			handleConfigMigrate(&config, cli.ConfigVal)
 		default:
 			if cli.ProcessorCmd != "" {
 				handleConfigProcessor(&config, cli.ProcessorCmd, cli.ProcessorValue)
@@ -153,6 +155,7 @@ func main() {
 		return
 
 	case "tui":
+		initDebugLogger(cli.Debug)
 		dir := config.PodcastsDir
 		if len(cli.Args) > 0 {
 			dir = cli.Args[0]

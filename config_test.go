@@ -251,3 +251,45 @@ func TestConfigCompletion(t *testing.T) {
 		t.Errorf("expected %s to exist", installedBash)
 	}
 }
+
+func TestConfigMigrate(t *testing.T) {
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	os.Setenv("HOME", tempDir)
+	defer os.Setenv("HOME", origHome)
+
+	pmDir := tempDir + "/.config/podcasts_manager"
+	_ = os.MkdirAll(pmDir, 0755)
+	pmCfg := `{"host":"http://migrated-host:8080","token":"tok123","sqlite_db_path":"/tmp/db.sqlite","podcasts_dir":"/tmp/pm_pods","post_processors":["/bin/true"]}`
+	_ = os.WriteFile(pmDir+"/config.json", []byte(pmCfg), 0644)
+
+	var cfg Config
+	handleConfigMigrate(&cfg, "pm")
+
+	if cfg.AudiobookshelfURL != "http://migrated-host:8080" {
+		t.Errorf("expected migrated host, got %q", cfg.AudiobookshelfURL)
+	}
+	if cfg.AudiobookshelfToken != "tok123" {
+		t.Errorf("expected tok123, got %q", cfg.AudiobookshelfToken)
+	}
+	if cfg.PodcastsDir != "/tmp/pm_pods" {
+		t.Errorf("expected /tmp/pm_pods, got %q", cfg.PodcastsDir)
+	}
+	if len(cfg.PostProcessors) != 1 || cfg.PostProcessors[0] != "/bin/true" {
+		t.Errorf("expected migrated post processors, got %v", cfg.PostProcessors)
+	}
+}
+
+func TestConfigMigrateCLI(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	err := app.Execute([]string{"config", "migrate", "pm"})
+	if err != nil {
+		t.Fatalf("config migrate failed: %v", err)
+	}
+	if action != "config" || opts.ConfigCmd != "migrate" || opts.ConfigVal != "pm" {
+		t.Errorf("unexpected action or opts: action=%q, cmd=%q, val=%q", action, opts.ConfigCmd, opts.ConfigVal)
+	}
+}

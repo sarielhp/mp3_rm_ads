@@ -2,20 +2,28 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	s := msg.String()
+	debugLog("KEY: %q (screen: %s, podIdx: %d, epIdx: %d)", s, m.screenName(), m.podIdx, m.epIdx)
+
+	if s == "f12" || s == "F12" {
+		snapPath := m.takeSnapshot()
+		m.showPopup("📸 Snapshot: " + filepath.Base(snapPath))
+		return m, nil
+	}
+
 	if m.searchMode {
 		return m.handleSearchKey(msg)
 	}
 
-	s := msg.String()
-
 	if m.showHelpModal {
 		switch s {
-		case "esc", "?", "h", "q", "enter":
+		case "esc", "?", "h", "q", "Q", "enter":
 			m.showHelpModal = false
 		}
 		return m, nil
@@ -42,8 +50,44 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.applyPolicyModal()
 		case "enter":
 			m.applyPolicyModal()
-		case "esc", "q", "c", "C":
+		case "esc", "q", "Q", "c", "C":
 			m.showPolicyModal = false
+		}
+		return m, nil
+	}
+
+	if m.showDownloadPolicyModal {
+		switch s {
+		case "up", "k":
+			if m.downloadPolicyModalIdx > 0 {
+				m.downloadPolicyModalIdx--
+			}
+		case "down", "j":
+			if m.downloadPolicyModalIdx < 4 {
+				m.downloadPolicyModalIdx++
+			}
+		case "1":
+			m.downloadPolicyModalIdx = 0
+		case "2":
+			m.downloadPolicyModalIdx = 1
+		case "3":
+			m.downloadPolicyModalIdx = 2
+		case "4":
+			m.downloadPolicyModalIdx = 3
+		case "5":
+			m.downloadPolicyModalIdx = 4
+		case "+", "=", "right", "l":
+			if m.downloadPolicyModalK < 99 {
+				m.downloadPolicyModalK++
+			}
+		case "-", "_", "left", "h":
+			if m.downloadPolicyModalK > 1 {
+				m.downloadPolicyModalK--
+			}
+		case "enter":
+			m.applyDownloadPolicyModal()
+		case "esc", "q", "d", "D":
+			m.showDownloadPolicyModal = false
 		}
 		return m, nil
 	}
@@ -55,7 +99,7 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loadErr = ""
 			m.loading = true
 			return m, m.Init()
-		case "q", "Q", "ctrl+c", "ctrl+d":
+		case "esc", "q", "Q", "ctrl+c", "ctrl+d":
 			m.done = true
 			return m, tea.Quit
 		}
@@ -63,10 +107,19 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch s {
-	case "q", "Q", "ctrl+c", "ctrl+d":
+	case "ctrl+c", "ctrl+d":
 		globalPlayer.Stop()
 		m.done = true
 		return m, tea.Quit
+
+	case "esc", "q", "Q":
+		if m.screen == screenPodcasts {
+			globalPlayer.Stop()
+			m.done = true
+			return m, tea.Quit
+		}
+		m.handleEscape()
+		return m, nil
 
 	case "1":
 		m.screen = screenPodcasts
@@ -95,6 +148,12 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.adqGrabbed = false
 		return m, nil
 
+	case "f4", "F4":
+		if m.screen == screenEpisodeDetail {
+			m.showEpisodePlayerPane = !m.showEpisodePlayerPane
+		}
+		return m, nil
+
 	case "5":
 		m.openTimelineViewer()
 		return m, nil
@@ -108,7 +167,7 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.screen == screenPlayer {
 		switch s {
-		case "esc":
+		case "esc", "q", "Q":
 			m.handleEscape()
 			return m, nil
 		}
@@ -123,105 +182,11 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.screen == screenPlayQueue {
-		unified := globalPlayer.GetUnifiedQueue()
-		switch s {
-		case "up", "k":
-			if m.pqGrabbed && m.pqIdx > 0 {
-				globalPlayer.MoveTrack(m.pqIdx, m.pqIdx-1)
-				m.pqIdx--
-			} else if m.pqIdx > 0 {
-				m.pqIdx--
-			}
-			if m.pqIdx < m.pqScroll {
-				m.pqScroll = m.pqIdx
-			}
-		case "down", "j":
-			if m.pqGrabbed && m.pqIdx < len(unified)-1 {
-				globalPlayer.MoveTrack(m.pqIdx, m.pqIdx+1)
-				m.pqIdx++
-			} else if m.pqIdx < len(unified)-1 {
-				m.pqIdx++
-			}
-			maxVis := m.visibleLines(3)
-			if m.pqIdx >= m.pqScroll+maxVis {
-				m.pqScroll = m.pqIdx - maxVis + 1
-			}
-		case " ", "g", "G":
-			m.pqGrabbed = !m.pqGrabbed
-			if m.pqGrabbed {
-				m.showPopup("Track grabbed (use ↑/↓ to move)")
-			} else {
-				m.showPopup("Track placed")
-			}
-		case "d", "D", "x", "X":
-			if len(unified) > 0 && m.pqIdx < len(unified) {
-				globalPlayer.RemoveTrack(m.pqIdx)
-				m.showPopup("Removed from queue")
-				if m.pqIdx >= len(unified)-1 && m.pqIdx > 0 {
-					m.pqIdx--
-				}
-			}
-		case "c", "C":
-			globalPlayer.ClearQueue()
-			m.showPopup("Queue cleared")
-		case "enter":
-			if len(unified) > 0 && m.pqIdx < len(unified) {
-				globalPlayer.PlayQueueIndex(m.pqIdx)
-				m.screen = screenPlayer
-			}
-		case "esc":
-			m.handleEscape()
-		}
-		return m, nil
+		return m.handlePlayQueueKey(s)
 	}
 
 	if m.screen == screenAdQueue {
-		items := getAllAdQueueItems(m.podcasts, m.queue)
-		switch s {
-		case "up", "k":
-			if m.adqIdx > 0 {
-				m.adqIdx--
-			}
-			if m.adqIdx < m.adqScroll {
-				m.adqScroll = m.adqIdx
-			}
-		case "down", "j":
-			if m.adqIdx < len(items)-1 {
-				m.adqIdx++
-			}
-			maxVis := m.visibleLines(3)
-			if m.adqIdx >= m.adqScroll+maxVis {
-				m.adqScroll = m.adqIdx - maxVis + 1
-			}
-		case " ", "g", "G":
-			m.adqGrabbed = !m.adqGrabbed
-			if m.adqGrabbed {
-				m.showPopup("Item grabbed (use ↑/↓ to move)")
-			} else {
-				m.showPopup("Item placed")
-			}
-		case "d", "D", "x", "X":
-			if len(items) > 0 && m.adqIdx < len(items) {
-				item := items[m.adqIdx]
-				entries := m.queue[item.PodcastDir]
-				for i, e := range entries {
-					if e == item.Filename {
-						m.queue[item.PodcastDir] = append(entries[:i], entries[i+1:]...)
-						break
-					}
-				}
-				if m.bk != nil && m.bk.SaveQueue != nil {
-					m.bk.SaveQueue(item.PodcastDir, m.queue[item.PodcastDir])
-				}
-				m.showPopup("Removed from ad queue")
-				if m.adqIdx >= len(items)-1 && m.adqIdx > 0 {
-					m.adqIdx--
-				}
-			}
-		case "esc":
-			m.handleEscape()
-		}
-		return m, nil
+		return m.handleAdQueueKey(s)
 	}
 
 	switch s {
@@ -296,6 +261,11 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			globalPlayer.ClearQueue()
 			m.showPopup("Queue cleared")
+		}
+
+	case "d", "D":
+		if m.screen == screenPodcasts || m.screen == screenPodcastDetail {
+			m.openDownloadPolicyModal()
 		}
 
 	case "t", "T":
@@ -431,7 +401,11 @@ func (m *tuiModel) handleDown() {
 		eps := m.filteredEpisodes()
 		if m.epIdx < len(eps)-1 {
 			m.epIdx++
-			maxVis := m.visibleLines(3)
+			overhead := 8
+			if globalPlayer.Current != nil {
+				overhead = 10
+			}
+			maxVis := max(3, m.height-overhead)
 			if m.epIdx >= m.epScroll+maxVis {
 				m.epScroll = m.epIdx - maxVis + 1
 			}
@@ -482,6 +456,15 @@ func (m *tuiModel) handleEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiModel) handleEscape() {
+	if m.searchMode {
+		m.searchMode = false
+		m.searchQuery = ""
+		return
+	}
+	if m.searchQuery != "" {
+		m.searchQuery = ""
+		return
+	}
 	switch m.screen {
 	case screenPodcastDetail:
 		m.screen = screenPodcasts
@@ -491,94 +474,5 @@ func (m *tuiModel) handleEscape() {
 		m.screen = m.prevScreen
 		m.pqGrabbed = false
 		m.adqGrabbed = false
-	}
-}
-
-func (m *tuiModel) handleSortToggle() {
-	if m.screen != screenPodcastDetail {
-		return
-	}
-	if m.podIdx >= len(m.podcasts) {
-		return
-	}
-	eps := m.podcasts[m.podIdx].episodes
-	for i, j := 0, len(eps)-1; i < j; i, j = i+1, j-1 {
-		eps[i], eps[j] = eps[j], eps[i]
-	}
-	m.podcasts[m.podIdx].episodes = eps
-	m.showPopup("Sort order reversed")
-}
-
-func (m *tuiModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	switch msg.Type {
-	case tea.MouseWheelUp:
-		switch m.screen {
-		case screenEpisodeDetail:
-			if m.descScroll > 0 {
-				m.descScroll--
-			}
-		case screenTranscript:
-			if m.transcriptScroll > 0 {
-				m.transcriptScroll--
-			}
-		case screenTimeline:
-			if m.timelineScroll > 0 {
-				m.timelineScroll--
-			}
-		default:
-			m.handleUp()
-		}
-	case tea.MouseWheelDown:
-		switch m.screen {
-		case screenEpisodeDetail:
-			m.descScroll++
-		case screenTranscript:
-			m.transcriptScroll++
-		case screenTimeline:
-			m.timelineScroll++
-		default:
-			m.handleDown()
-		}
-	}
-	return m, nil
-}
-
-func (m *tuiModel) handleQueueToggle() {
-	if m.screen != screenPodcastDetail && m.screen != screenEpisodeDetail {
-		return
-	}
-	if m.podIdx >= len(m.podcasts) {
-		return
-	}
-	pod := &m.podcasts[m.podIdx]
-	eps := m.filteredEpisodes()
-	if m.epIdx >= len(eps) {
-		return
-	}
-	ep := eps[m.epIdx]
-	entries := m.queue[pod.dir]
-	if entries == nil {
-		entries = []string{}
-	}
-	found := false
-	for i, e := range entries {
-		if e == ep.filename {
-			m.queue[pod.dir] = append(entries[:i], entries[i+1:]...)
-			found = true
-			break
-		}
-	}
-	if !found {
-		if ep.hasAdsRemoved {
-			m.showPopup("Episode already has ads removed")
-			return
-		}
-		m.queue[pod.dir] = append(entries, ep.filename)
-		m.showPopup("Added to ad removal queue")
-	} else {
-		m.showPopup("Removed from ad removal queue")
-	}
-	if m.bk != nil && m.bk.SaveQueue != nil {
-		m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
 	}
 }

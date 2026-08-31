@@ -22,6 +22,7 @@
 | `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
+| `tools/visual_audit.rb` | Live PTY visual audit: exercises and snapshots all 17 TUI screens/modes |
 | `tools/bump-version.rb` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
 | `tools/commit.rb <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
 | `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
@@ -33,6 +34,7 @@ A `Makefile` at the project root delegates to all scripts:
 | Target | Action |
 |--------|--------|
 | `make check` | Full quality gate |
+| `make visual` | Run full live PTY visual audit across all 17 TUI screens (`tools/visual_audit.rb`) |
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
 | `make audit` | Audit Go source file line lengths (`tools/audit_lines.rb`) |
 | `make symbols` | Outline symbols (`tools/outline_symbols.rb ARGS="..."`) |
@@ -157,7 +159,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
  - Ad detection: LLM API (Ollama, OpenRouter, etc.)
  - Audio cutting: ffmpeg filter_complex with concat
  - Config: `~/.config/abs/config.json`
- - Legacy Auto-Migration: If `~/.config/abs/config.json` does not exist, `abs` auto-migrates from `~/.config/mp3_rm_ads/config.json` on first run.
+ - Migration: Run `abs config migrate` to import settings from legacy `podcasts_manager` or `mp3_rm_ads` configs.
  - Environment Overrides: Supported env vars override config values:
    - `WHISPER_URL`
    - `ABS_URL` / `AUDIOBOOKSHELF_URL`

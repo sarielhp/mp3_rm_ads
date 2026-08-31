@@ -184,6 +184,7 @@ type CLIOptions struct {
 	CopyOpenCode      bool
 	Quiet             bool
 	Verbose           bool
+	Debug             bool
 	UseChunks         bool
 	TranscribeMin     string
 	ExtractKeywords   bool

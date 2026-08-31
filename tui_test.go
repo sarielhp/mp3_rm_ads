@@ -347,22 +347,32 @@ func TestTUINavigationEscape(t *testing.T) {
 }
 
 func TestTUIKeyQuit(t *testing.T) {
-	screens := []tuiScreen{
-		screenPodcasts,
+	// Root screen: q should quit
+	m := makeTestModel()
+	m.screen = screenPodcasts
+	m.done = false
+	_, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+	if cmd == nil || !m.done {
+		t.Errorf("q at screenPodcasts should trigger quit and set done")
+	}
+
+	// Sub-screens: q should behave as escape (back to parent/prev)
+	subscreens := []tuiScreen{
 		screenPodcastDetail,
 		screenEpisodeDetail,
 		screenPlayer,
 		screenPlayQueue,
 		screenAdQueue,
+		screenTranscript,
+		screenTimeline,
 	}
-
-	for _, s := range screens {
-		m := makeTestModel()
-		m.screen = s
-		m.done = false
-		_, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
-		if cmd == nil || !m.done {
-			t.Errorf("q at screen %v should trigger quit and set done", s)
+	for _, s := range subscreens {
+		sm := makeTestModel()
+		sm.screen = s
+		sm.done = false
+		_, _ = sm.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
+		if sm.done {
+			t.Errorf("q at subscreen %v should not hard quit, should navigate back", s)
 		}
 	}
 }

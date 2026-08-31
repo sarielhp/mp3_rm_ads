@@ -8,53 +8,73 @@ import (
 )
 
 func (m *tuiModel) drawHelpModal() string {
-	boxWidth := min(72, max(40, m.width-8))
+	boxWidth := min(82, max(56, m.width-6))
+	colW := (boxWidth - 7) / 2
 
 	var lines []string
 	lines = append(lines, tuiTitleStyle.Render("KEYBOARD SHORTCUTS & NAVIGATION"))
 	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
 	lines = append(lines, "")
 
-	col1 := []string{
+	leftLines := []string{
 		tuiLabelStyle.Render("Navigation & Tabs:"),
-		"  1-5 / F1-F4   Switch top tabs",
-		"  ↑/k, ↓/j      Move selection",
-		"  Enter         Open / Select / Details",
-		"  Esc           Back to previous view",
-		"  /             Fuzzy search / filter",
-		"  ? / h         Toggle this help modal",
-		"  q             Quit application",
+		"  1-5 / F1-F3  Switch tabs",
+		"  ↑/k, ↓/j     Navigate rows",
+		"  Enter        Open / Select",
+		"  Esc / q      Back / Close",
+		"  /            Search / filter",
+		"  ? / h        Toggle help",
+		"  F12          Take snapshot",
+		"",
+		tuiLabelStyle.Render("Episode & Notes:"),
+		"  F4           Toggle player",
+		"  t            Transcript",
+		"  Tab          Cycle format",
+		"  ↑/↓          Scroll notes",
 	}
 
-	col2 := []string{
+	rightLines := []string{
 		tuiLabelStyle.Render("Playback & Volume:"),
-		"  Space         Play / Pause",
-		"  p             Play selected episode",
-		"  ← / →         Seek backward / forward 30s",
-		"  + / -         Volume Up / Down",
-		"  m             Mute / Unmute",
-		"  s             Cycle audio speaker/sink",
-		"  n             Next track in queue",
+		"  Space        Play / Pause",
+		"  p            Play track",
+		"  ← / →        Seek ±30s",
+		"  + / -        Volume ±",
+		"  m            Mute / Unmute",
+		"  s            Cycle sink",
+		"  n            Next in queue",
+		"",
+		tuiLabelStyle.Render("Queues & Policy:"),
+		"  c            Ad policy",
+		"  d            Download policy",
+		"  e / o        Timeline",
+		"  v / Space    Multi-select",
+		"  r            Queue ad removal",
+		"  x            Delete queue item",
+		"  i            Cover art",
 	}
 
-	col3 := []string{
-		tuiLabelStyle.Render("Podcast & Queues:"),
-		"  c             Ad removal policy modal",
-		"  t             Open full transcript view",
-		"  e / o         Online release timeline",
-		"  v / Space     Multi-select episode",
-		"  r             Queue for ad removal",
-		"  d / x         Remove item from queue",
-		"  i             Toggle cover art (Kitty)",
+	totalRows := max(len(leftLines), len(rightLines))
+	for k := 0; k < totalRows; k++ {
+		lL := ""
+		if k < len(leftLines) {
+			lL = leftLines[k]
+		}
+		lPad := max(0, colW-visibleRuneCount(lL))
+		fullL := lL + strings.Repeat(" ", lPad)
+
+		rL := ""
+		if k < len(rightLines) {
+			rL = rightLines[k]
+		}
+		rPad := max(0, colW-visibleRuneCount(rL))
+		fullR := rL + strings.Repeat(" ", rPad)
+
+		lines = append(lines, fullL+tuiDividerStyle.Render(" │ ")+fullR)
 	}
 
-	for _, sec := range [][]string{col1, col2, col3} {
-		lines = append(lines, sec...)
-		lines = append(lines, "")
-	}
-
+	lines = append(lines, "")
 	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
-	lines = append(lines, tuiDimStyle.Render("Press Esc or ? to close this help window"))
+	lines = append(lines, tuiDimStyle.Render("Press Esc, ?, or q to close this help window"))
 
 	content := strings.Join(lines, "\n")
 	return lipgloss.NewStyle().
@@ -221,4 +241,123 @@ func (m *tuiModel) applyPolicyModal() {
 		}
 	}
 	m.showPolicyModal = false
+}
+
+func (m *tuiModel) drawDownloadPolicyModal() string {
+	if m.podIdx >= len(m.podcasts) {
+		return ""
+	}
+	pod := m.podcasts[m.podIdx]
+	boxWidth := min(70, max(42, m.width-8))
+
+	var lines []string
+	lines = append(lines, tuiTitleStyle.Render("DOWNLOAD POLICY"))
+	lines = append(lines, tuiSubtitleStyle.Render(truncate("for "+displayName(pod.name), boxWidth-6)))
+	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
+	lines = append(lines, "")
+
+	kVal := m.downloadPolicyModalK
+	if kVal <= 0 {
+		kVal = 3
+	}
+
+	options := []struct {
+		num    int
+		policy string
+		name   string
+		desc   string
+	}{
+		{1, DownloadPolicyNone, "1. No Automatic Downloads (none)", "Do not automatically download episodes"},
+		{2, DownloadPolicyLatest, "2. Latest Episode Only (latest)", "Download only the single newest episode"},
+		{3, DownloadPolicyLatestK, fmt.Sprintf("3. Latest K Episodes (latest_%d)", kVal), fmt.Sprintf("Keep the %d newest episodes from feed", kVal)},
+		{4, DownloadPolicyMoreK, fmt.Sprintf("4. Next K Undownloaded (more_%d)", kVal), fmt.Sprintf("Download up to %d missing backlog episodes", kVal)},
+		{5, DownloadPolicyAll, "5. All Episodes (all)", "Download the entire catalog backlog"},
+	}
+
+	curPolicy := normalizeDownloadPolicy(pod.config.DownloadPolicy)
+	for i, opt := range options {
+		isSel := (i == m.downloadPolicyModalIdx)
+		isCurrent := (opt.policy == curPolicy)
+
+		check := "( )"
+		if isCurrent {
+			check = "(•)"
+		}
+
+		optTitle := fmt.Sprintf("%s %s", check, opt.name)
+		optDesc := fmt.Sprintf("    %s", tuiDimStyle.Render(opt.desc))
+
+		if isSel {
+			lines = append(lines, tuiSelectedStyle.Render(" "+optTitle+" "))
+		} else {
+			lines = append(lines, tuiLabelStyle.Render(optTitle))
+		}
+		lines = append(lines, optDesc)
+		lines = append(lines, "")
+	}
+
+	if m.downloadPolicyModalIdx == 2 || m.downloadPolicyModalIdx == 3 {
+		adjuster := fmt.Sprintf("  Parameter K: [ < %d > ]  (Press + / - or ← / → to adjust)", kVal)
+		lines = append(lines, tuiStatStyle.Render(adjuster))
+		lines = append(lines, "")
+	}
+
+	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
+	lines = append(lines, tuiDimStyle.Render("↑/↓ Select │ 1-5 Choose │ +/- Adjust K │ Enter Apply │ Esc Cancel"))
+
+	content := strings.Join(lines, "\n")
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(colorCyan).
+		Padding(1, 2).
+		Width(boxWidth).
+		Render(content)
+}
+
+func (m *tuiModel) openDownloadPolicyModal() {
+	if m.podIdx >= len(m.podcasts) {
+		return
+	}
+	pod := &m.podcasts[m.podIdx]
+	cur := normalizeDownloadPolicy(pod.config.DownloadPolicy)
+	switch cur {
+	case DownloadPolicyLatest:
+		m.downloadPolicyModalIdx = 1
+	case DownloadPolicyLatestK:
+		m.downloadPolicyModalIdx = 2
+	case DownloadPolicyMoreK:
+		m.downloadPolicyModalIdx = 3
+	case DownloadPolicyAll:
+		m.downloadPolicyModalIdx = 4
+	default:
+		m.downloadPolicyModalIdx = 0
+	}
+	m.downloadPolicyModalK = pod.config.DownloadK
+	if m.downloadPolicyModalK <= 0 {
+		m.downloadPolicyModalK = 3
+	}
+	m.showDownloadPolicyModal = true
+}
+
+func (m *tuiModel) applyDownloadPolicyModal() {
+	if m.podIdx >= len(m.podcasts) {
+		m.showDownloadPolicyModal = false
+		return
+	}
+	pod := &m.podcasts[m.podIdx]
+	policies := []string{DownloadPolicyNone, DownloadPolicyLatest, DownloadPolicyLatestK, DownloadPolicyMoreK, DownloadPolicyAll}
+	if m.downloadPolicyModalIdx >= 0 && m.downloadPolicyModalIdx < len(policies) {
+		pod.config.DownloadPolicy = policies[m.downloadPolicyModalIdx]
+		if m.downloadPolicyModalK > 0 {
+			pod.config.DownloadK = m.downloadPolicyModalK
+		} else {
+			pod.config.DownloadK = 3
+		}
+		if err := savePodcastConfig(pod.dir, pod.config); err != nil {
+			m.showToast("Failed to save config: "+err.Error(), ToastError)
+		} else {
+			m.showToast("Saved download policy: "+downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK), ToastSuccess)
+		}
+	}
+	m.showDownloadPolicyModal = false
 }

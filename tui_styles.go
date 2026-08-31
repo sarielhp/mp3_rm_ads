@@ -49,6 +49,13 @@ var (
 	tuiSubtextStyle = lipgloss.NewStyle().
 			Foreground(colorSubtext)
 
+	tuiTranscriptTextStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#e6edf3"))
+
+	tuiAdStrikeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color("#768390")).
+				Strikethrough(true)
+
 	tuiGreenStyle = lipgloss.NewStyle().
 			Foreground(colorGreen).
 			Bold(true)

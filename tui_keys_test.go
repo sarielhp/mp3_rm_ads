@@ -101,6 +101,7 @@ func TestTUIViewPodcastDetailQ(t *testing.T) {
 
 func TestTUIViewEpisodeDetail(t *testing.T) {
 	m := makeTestModel()
+	m.epIdx = 1
 	m.screen = screenEpisodeDetail
 
 	view := m.View()
@@ -108,14 +109,24 @@ func TestTUIViewEpisodeDetail(t *testing.T) {
 	if !strings.Contains(view, "ep102.mp3") {
 		t.Error("should show episode filename")
 	}
-	if !strings.Contains(view, "AUDIO PLAYER") {
-		t.Error("should show AUDIO PLAYER")
-	}
 	if !strings.Contains(view, "Show Notes") {
 		t.Error("should show Show Notes")
 	}
 	if !strings.Contains(view, "Has Ads") {
 		t.Error("should show Has Ads status")
+	}
+	if !strings.Contains(view, "F4 Show Player") {
+		t.Error("should show F4 Show Player legend by default")
+	}
+
+	// Toggle player pane on
+	m.showEpisodePlayerPane = true
+	viewWithPlayer := m.View()
+	if !strings.Contains(viewWithPlayer, "AUDIO PLAYER") {
+		t.Error("should show AUDIO PLAYER when player pane is enabled")
+	}
+	if !strings.Contains(viewWithPlayer, "F4 Hide Player") {
+		t.Error("should show F4 Hide Player legend when player pane is enabled")
 	}
 }
 
@@ -139,6 +150,7 @@ func TestTUIViewEpisodeDetailNotQueued(t *testing.T) {
 	m.epIdx = 0
 	m.queue["/tmp/pods/tech"] = nil
 	m.screen = screenEpisodeDetail
+	m.showEpisodePlayerPane = true
 
 	view := m.View()
 

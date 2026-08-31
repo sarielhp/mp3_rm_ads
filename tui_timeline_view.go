@@ -152,12 +152,12 @@ func (m *tuiModel) drawTimelineScreen() string {
 	out.WriteString(fmt.Sprintf("    %s\n", tuiSubtitleStyle.Render(fmt.Sprintf("Exact availability timestamps for the last %d episode(s)", len(releases)))))
 
 	dividerWidth := max(20, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	if len(releases) == 0 {
 		out.WriteString("\n  " + tuiDimStyle.Render("No episodes found for this podcast.") + "\n\n")
-		out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
-		out.WriteString(tuiDimStyle.Render("  Esc/q/e Back\n"))
+		out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+		out.WriteString(tuiDimStyle.Render("  Esc/q/e Back") + "\n")
 		return out.String()
 	}
 
@@ -203,8 +203,8 @@ func (m *tuiModel) drawTimelineScreen() string {
 		out.WriteString(row)
 	}
 
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth) + "\n"))
-	out.WriteString(tuiDimStyle.Render("  ↑/↓ Scroll │ Esc/q/e Back\n"))
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Scroll │ Esc/q/e Back") + "\n")
 
 	return out.String()
 }

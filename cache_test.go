@@ -199,10 +199,14 @@ func TestCoverImageDiskAndMemoryCache(t *testing.T) {
 	os.Setenv("XDG_CACHE_HOME", tempCache)
 	defer os.Setenv("XDG_CACHE_HOME", origXDG)
 
-	// Create a dummy 2x2 PNG image
+	// Create a dummy PNG image
 	imgPath := filepath.Join(tempCache, "cover.png")
-	img := image.NewRGBA(image.Rect(0, 0, 2, 2))
-	img.Set(0, 0, color.RGBA{R: 255, A: 255})
+	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
+	for y := 0; y < 20; y++ {
+		for x := 0; x < 20; x++ {
+			img.Set(x, y, color.RGBA{R: 255, G: 100, B: 50, A: 255})
+		}
+	}
 	f, err := os.Create(imgPath)
 	if err != nil {
 		t.Fatalf("failed to create dummy image: %v", err)
@@ -244,5 +248,75 @@ func TestCoverImageDiskAndMemoryCache(t *testing.T) {
 	res2, err := encodeKittyGraphicsFile(imgPath, 10, 10)
 	if err != nil || res2 != res1 {
 		t.Fatalf("expected res2 to match res1 from disk cache, got %v (err: %v)", res2 == res1, err)
+	}
+}
+
+func TestCoverPNGCaching(t *testing.T) {
+	tempCache := t.TempDir()
+	origXDG := os.Getenv("XDG_CACHE_HOME")
+	os.Setenv("XDG_CACHE_HOME", tempCache)
+	defer os.Setenv("XDG_CACHE_HOME", origXDG)
+
+	clearImageMemoryCache()
+
+	imgPath := filepath.Join(tempCache, "cover.png")
+	img := image.NewRGBA(image.Rect(0, 0, 4, 4))
+	img.Set(1, 1, color.RGBA{G: 255, A: 255})
+	f, err := os.Create(imgPath)
+	if err != nil {
+		t.Fatalf("failed to create dummy image: %v", err)
+	}
+	if err := png.Encode(f, img); err != nil {
+		f.Close()
+		t.Fatalf("failed to encode dummy image: %v", err)
+	}
+	f.Close()
+
+	png1, err := getOrCacheCoverPNG(imgPath)
+	if err != nil || len(png1) == 0 {
+		t.Fatalf("getOrCacheCoverPNG failed: %v", err)
+	}
+
+	png2, err := getOrCacheCoverPNG(imgPath)
+	if err != nil || len(png2) != len(png1) {
+		t.Fatalf("expected cached PNG from memory, got len %d vs %d (err: %v)", len(png2), len(png1), err)
+	}
+
+	clearImageMemoryCache()
+
+	cDir := podcastCacheDirForImage(imgPath)
+	diskPngPath := filepath.Join(cDir, "cover.png")
+	if _, err := os.Stat(diskPngPath); err != nil {
+		_ = os.WriteFile(diskPngPath, png1, 0644)
+	}
+
+	png3, err := getOrCacheCoverPNG(imgPath)
+	if err != nil || len(png3) != len(png1) {
+		t.Fatalf("expected loaded PNG from disk, got len %d vs %d (err: %v)", len(png3), len(png1), err)
+	}
+}
+
+func TestGenerateGenericCover(t *testing.T) {
+	tempDir := t.TempDir()
+	origXDG := os.Getenv("XDG_CACHE_HOME")
+	os.Setenv("XDG_CACHE_HOME", tempDir)
+	defer os.Setenv("XDG_CACHE_HOME", origXDG)
+
+	clearImageMemoryCache()
+
+	podDir := filepath.Join(tempDir, "Common Sense with Dan Carlin")
+	_ = os.MkdirAll(podDir, 0755)
+
+	cover := findCoverImage(podDir)
+	if cover == "" {
+		t.Fatalf("expected generated generic cover for podcast without art, got empty")
+	}
+	if fi, err := os.Stat(cover); err != nil || fi.Size() == 0 {
+		t.Fatalf("expected valid cover file on disk: %v", err)
+	}
+
+	img := generateGenericCover("Common Sense with Dan Carlin")
+	if img == nil || img.Bounds().Dx() != 256 || img.Bounds().Dy() != 256 {
+		t.Fatalf("expected 256x256 image, got %v", img.Bounds())
 	}
 }

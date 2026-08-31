@@ -77,20 +77,26 @@ func (m *tuiModel) drawPodcastsList() string {
 
 			// 1. Cover Art (if available and enabled)
 			if isKittySupported() && m.showCover {
-				coverPath := findCoverImage(selPod.dir)
+				coverPath := selPod.coverPath
+				if coverPath == "" {
+					coverPath = findCoverImage(selPod.dir)
+				}
 				if coverPath != "" {
-					imgW := min(rightW-4, 24)
-					imgH := min(7, max(4, maxVis/3))
+					imgW := 24
+					imgH := 7
 					if imgEsc, err := encodeKittyGraphicsFile(coverPath, imgW, imgH); err == nil && imgEsc != "" {
 						if isKittyTerminal() {
 							rightLines = append(rightLines, imgEsc)
 							for h := 1; h < imgH; h++ {
-								rightLines = append(rightLines, strings.Repeat(" ", max(0, imgW)))
+								rightLines = append(rightLines, strings.Repeat(" ", imgW))
 							}
 						} else {
-							for _, imgLine := range strings.Split(imgEsc, "\n") {
-								if imgLine != "" {
-									rightLines = append(rightLines, imgLine)
+							lines := strings.Split(imgEsc, "\n")
+							for h := 0; h < imgH; h++ {
+								if h < len(lines) && lines[h] != "" {
+									rightLines = append(rightLines, lines[h])
+								} else {
+									rightLines = append(rightLines, strings.Repeat(" ", imgW))
 								}
 							}
 						}
@@ -148,6 +154,9 @@ func (m *tuiModel) drawPodcastsList() string {
 
 			policyLine := fmt.Sprintf("Ad Policy: %s ('c' change, 'e' timeline)", adRemovalModeLabel(selPod.config.AdRemoval))
 			rightLines = append(rightLines, tuiBadgePolicy.Render(truncate(policyLine, rightW-2)))
+
+			dlPolicyLine := fmt.Sprintf("Download: %s ('d' change)", downloadPolicyLabel(selPod.config.DownloadPolicy, selPod.config.DownloadK))
+			rightLines = append(rightLines, tuiBadgePolicy.Render(truncate(dlPolicyLine, rightW-2)))
 
 			if !newestDate.IsZero() {
 				dateInfo := fmt.Sprintf("Timeline: %s", newestDate.Format("2006-01-02"))
@@ -263,23 +272,19 @@ func (m *tuiModel) drawPodcastsList() string {
 		}
 	}
 
-	out.WriteByte('\n')
-	helpText := "↑↓ navigate  Enter select  c ad-policy  e timeline  / search  q quit"
-	if isKittySupported() {
-		helpText += "  I cover"
+	helpText := "↑↓ navigate │ Enter select │ c ad-policy │ d dl-policy │ e timeline │ / search │ ? help"
+	if m.searchMode {
+		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
+	} else if len(pods) > maxVis {
+		pct := int(float64(m.podIdx+1) / float64(len(pods)) * 100)
+		helpText += fmt.Sprintf(" │ [%d/%d (%d%%)]", m.podIdx+1, len(pods), pct)
 	}
-	if m.showHelp {
-		helpText += "  B hide help"
+	dividerWidth = max(0, m.width-4)
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+	if m.searchMode {
+		out.WriteString(tuiSearchStyle.Render("  "+helpText) + "\n")
 	} else {
-		helpText = ""
-	}
-	if len(pods) > maxVis {
-		pct := float64(m.podIdx+1) / float64(len(pods)) * 100
-		helpText += fmt.Sprintf("  [%d%%]", int(pct))
-	}
-	if helpText != "" {
-		out.WriteString(tuiHelpStyle.Render("  " + helpText))
-		out.WriteByte('\n')
+		out.WriteString(tuiDimStyle.Render("  "+helpText) + "\n")
 	}
 
 	return out.String()
@@ -287,6 +292,10 @@ func (m *tuiModel) drawPodcastsList() string {
 
 func (m *tuiModel) drawPodcastDetail() string {
 	out := &strings.Builder{}
+
+	if isKittyTerminal() {
+		out.WriteString(kittyClearGraphics())
+	}
 
 	if m.podIdx >= len(m.podcasts) {
 		m.screen = screenPodcasts
@@ -296,8 +305,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 	pod := m.podcasts[m.podIdx]
 
 	title := tuiTitleStyle.Render("  " + displayName(pod.name))
-	out.WriteString(title)
-	out.WriteByte('\n')
+	out.WriteString(title + "\n")
 
 	eps := m.filteredEpisodes()
 
@@ -312,25 +320,47 @@ func (m *tuiModel) drawPodcastDetail() string {
 
 	txCount := pod.transcribedCount()
 	policyLabel := adRemovalModeLabel(pod.config.AdRemoval)
+	dlPolicyLabel := downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
 	selCount := len(m.selectedEpisodes)
 	selInfo := ""
 	if selCount > 0 {
 		selInfo = fmt.Sprintf(" • %d selected ('a' queue ads, 'p' play)", selCount)
 	}
-	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • Policy: %s%s", total, done, txCount, queued, policyLabel, selInfo))
-	out.WriteString(statPill)
-	out.WriteByte('\n')
+	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • Ads: %s • DL: %s%s", total, done, txCount, queued, policyLabel, dlPolicyLabel, selInfo))
+	out.WriteString(statPill + "\n")
 
 	dividerWidth := max(0, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  " + strings.Repeat("─", dividerWidth)))
-	out.WriteByte('\n')
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
-	maxVis := m.visibleLines(3)
-	start := m.epScroll
-	end := start + maxVis
-	if end > len(eps) {
-		end = len(eps)
+	overhead := 8
+	if globalPlayer.Current != nil {
+		overhead = 10
 	}
+	maxVis := max(3, m.height-overhead)
+
+	if len(eps) > 0 {
+		if m.epIdx >= len(eps) {
+			m.epIdx = len(eps) - 1
+		}
+		if m.epIdx < 0 {
+			m.epIdx = 0
+		}
+		if m.epIdx < m.epScroll {
+			m.epScroll = m.epIdx
+		}
+		if m.epIdx >= m.epScroll+maxVis {
+			m.epScroll = m.epIdx - maxVis + 1
+		}
+		if m.epScroll > max(0, len(eps)-maxVis) {
+			m.epScroll = max(0, len(eps)-maxVis)
+		}
+		if m.epScroll < 0 {
+			m.epScroll = 0
+		}
+	}
+
+	start := m.epScroll
+	end := min(len(eps), start+maxVis)
 
 	queueEntries := m.queue[pod.dir]
 	isQueued := func(filename string) bool {
@@ -457,31 +487,21 @@ func (m *tuiModel) drawPodcastDetail() string {
 		out.WriteByte('\n')
 	}
 
-	// Clear graphics when viewing podcast episodes
-	if isKittyTerminal() {
-		out.WriteString(kittyClearGraphics())
-	}
-
 	for i := start; i < end; i++ {
 		renderEpRow(i)
 	}
 
-	out.WriteByte('\n')
-	helpText := "↑↓ navigate  Enter info  p play  v select  a batch-queue  t transcript  c policy  ? help"
-	if isKittySupported() {
-		helpText += "  I cover"
+	helpText := "↑↓ navigate │ Enter details │ p play │ v select │ a batch-queue │ t transcript │ c ad-policy │ d dl-policy │ ? help"
+	if m.searchMode {
+		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
+	} else if len(eps) > maxVis {
+		helpText += fmt.Sprintf(" │ [%d/%d]", m.epIdx+1, len(eps))
 	}
-	if m.showHelp {
-		helpText += "  B hide"
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+	if m.searchMode {
+		out.WriteString(tuiSearchStyle.Render("  "+helpText) + "\n")
 	} else {
-		helpText = ""
-	}
-	if len(eps) > maxVis {
-		helpText += fmt.Sprintf("  [%d/%d]", m.epIdx+1, len(eps))
-	}
-	if helpText != "" {
-		out.WriteString(tuiDimStyle.Render("  " + helpText))
-		out.WriteByte('\n')
+		out.WriteString(tuiDimStyle.Render("  "+helpText) + "\n")
 	}
 
 	return out.String()

@@ -264,8 +264,10 @@ func TestTUITranscriptViewer(t *testing.T) {
 	tempDir := t.TempDir()
 	mp3Path := tempDir + "/ep1.mp3"
 	txtPath := tempDir + "/ep1.transcript.txt"
+	cutsPath := tempDir + "/ep1.cuts.json"
 	os.WriteFile(mp3Path, []byte("audio"), 0644)
-	os.WriteFile(txtPath, []byte("[00:00.0 -> 00:10.0] Hello world\n[00:10.0 -> 00:20.0] Welcome to the podcast"), 0644)
+	os.WriteFile(txtPath, []byte("[00:00.0 -> 00:10.0] Hello world\n[00:10.0 -> 00:20.0] Buy our sponsor product now"), 0644)
+	os.WriteFile(cutsPath, []byte(`{"cut_intervals":[{"start_sec":10.0,"end_sec":20.0,"reason":"sponsor"}]}`), 0644)
 
 	m := makeTestModel()
 	m.podcasts[0].dir = tempDir
@@ -282,10 +284,48 @@ func TestTUITranscriptViewer(t *testing.T) {
 	if len(m.transcriptLines) != 2 {
 		t.Errorf("expected 2 transcript lines, got %d", len(m.transcriptLines))
 	}
+	if len(m.transcriptItems) != 2 {
+		t.Fatalf("expected 2 transcript items, got %d", len(m.transcriptItems))
+	}
+	if m.transcriptItems[0].isAd {
+		t.Errorf("expected item 0 not to be ad")
+	}
+	if !m.transcriptItems[1].isAd {
+		t.Errorf("expected item 1 to be identified as ad")
+	}
 
 	view := m.View()
 	if !strings.Contains(view, "TRANSCRIPT") || !strings.Contains(view, "Hello world") {
 		t.Errorf("expected transcript view to contain text, got: %s", view)
+	}
+	if !strings.Contains(view, "Tab Short Time") {
+		t.Errorf("expected view to contain Tab Short Time help, got: %s", view)
+	}
+
+	// Test Tab toggle 1: Short Time (mode 1)
+	m.handleTranscriptKey("tab")
+	if m.transcriptViewMode != 1 {
+		t.Errorf("expected transcriptViewMode to be 1 after 1st tab, got %d", m.transcriptViewMode)
+	}
+	viewShort := m.View()
+	if !strings.Contains(viewShort, "Tab Line Nums") {
+		t.Errorf("expected view to contain Tab Line Nums help, got: %s", viewShort)
+	}
+
+	// Test Tab toggle 2: Line Nums (mode 2)
+	m.handleTranscriptKey("tab")
+	if m.transcriptViewMode != 2 {
+		t.Errorf("expected transcriptViewMode to be 2 after 2nd tab, got %d", m.transcriptViewMode)
+	}
+	viewLines := m.View()
+	if !strings.Contains(viewLines, "Tab Time Arrows") || !strings.Contains(viewLines, "│") {
+		t.Errorf("expected view to contain Tab Time Arrows help and line separator, got: %s", viewLines)
+	}
+
+	// Test Tab toggle 3: Back to full arrows (mode 0)
+	m.handleTranscriptKey("tab")
+	if m.transcriptViewMode != 0 {
+		t.Errorf("expected transcriptViewMode to be 0 after 3rd tab, got %d", m.transcriptViewMode)
 	}
 
 	m.handleEscape()
@@ -395,5 +435,155 @@ func TestTUIErrorScreenQuit(t *testing.T) {
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("q")})
 	if !m.done {
 		t.Error("done should be true on quit from error screen")
+	}
+}
+
+func TestTUISearchSlashActivationScreens(t *testing.T) {
+	screens := []tuiScreen{screenPodcasts, screenPodcastDetail, screenTranscript}
+	for _, scr := range screens {
+		m := makeTestModel()
+		m.screen = scr
+		if scr == screenTranscript {
+			m.transcriptLines = []string{"[00:00.0 -> 00:05.0] test line"}
+		}
+		m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
+		if !m.searchMode {
+			t.Errorf("screen %v should activate searchMode on '/'", scr)
+		}
+		m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+		if m.searchMode {
+			t.Errorf("screen %v should exit searchMode on escape", scr)
+		}
+	}
+}
+
+func TestTUITranscriptScreenExportKeys(t *testing.T) {
+	tempDir := t.TempDir()
+	m := makeTestModel()
+	m.screen = screenTranscript
+	m.transcriptLoadedFor = tempDir + "/ep.mp3"
+	m.transcriptLines = []string{"[00:00.0 -> 00:05.0] Line 1"}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
+	if m.toast == nil || m.toast.Type != ToastSuccess {
+		t.Errorf("expected success toast on 's' key, got %+v", m.toast)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
+	if m.toast == nil || m.toast.Type != ToastSuccess {
+		t.Errorf("expected success toast on 'e' key, got %+v", m.toast)
+	}
+}
+
+func TestInteractiveDownloadPolicyModal(t *testing.T) {
+	tempDir := t.TempDir()
+	m := makeTestModel()
+	m.podcasts[0].dir = tempDir
+	m.podIdx = 0
+	m.width = 80
+	m.screen = screenPodcasts
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if !m.showDownloadPolicyModal {
+		t.Fatalf("expected showDownloadPolicyModal to be true after pressing 'd'")
+	}
+
+	modal := m.drawDownloadPolicyModal()
+	if !strings.Contains(modal, "DOWNLOAD POLICY") || !strings.Contains(modal, "Latest Episode Only") || !strings.Contains(modal, "Latest K Episodes") {
+		t.Errorf("expected download policy modal contents, got:\n%s", modal)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.downloadPolicyModalIdx != 2 {
+		t.Errorf("expected downloadPolicyModalIdx 2, got %d", m.downloadPolicyModalIdx)
+	}
+
+	kBefore := m.downloadPolicyModalK
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
+	if m.downloadPolicyModalK != kBefore+1 {
+		t.Errorf("expected K to increase to %d, got %d", kBefore+1, m.downloadPolicyModalK)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'-'}})
+	if m.downloadPolicyModalK != kBefore {
+		t.Errorf("expected K to return to %d, got %d", kBefore, m.downloadPolicyModalK)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRight})
+	if m.downloadPolicyModalK != kBefore+1 {
+		t.Errorf("expected K to increase with right arrow, got %d", m.downloadPolicyModalK)
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyLeft})
+	if m.downloadPolicyModalK != kBefore {
+		t.Errorf("expected K to decrease with left arrow, got %d", m.downloadPolicyModalK)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
+
+	if m.showDownloadPolicyModal {
+		t.Errorf("expected modal to close after pressing Enter")
+	}
+	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
+		t.Errorf("expected DownloadPolicyLatestK, got %s", m.podcasts[0].config.DownloadPolicy)
+	}
+	if m.podcasts[0].config.DownloadK != kBefore+2 {
+		t.Errorf("expected DownloadK %d, got %d", kBefore+2, m.podcasts[0].config.DownloadK)
+	}
+
+	diskCfg := loadPodcastConfig(tempDir)
+	if diskCfg.DownloadPolicy != DownloadPolicyLatestK || diskCfg.DownloadK != kBefore+2 {
+		t.Errorf("expected saved config on disk to match, got %+v", diskCfg)
+	}
+
+	m.screen = screenPodcastDetail
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	if !m.showDownloadPolicyModal {
+		t.Fatalf("expected modal to open with 'D'")
+	}
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
+	if m.showDownloadPolicyModal {
+		t.Errorf("expected modal to close after Esc")
+	}
+	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
+		t.Errorf("expected policy to remain LatestK after Esc, got %s", m.podcasts[0].config.DownloadPolicy)
+	}
+}
+
+func TestDownloadPolicyBadgesView(t *testing.T) {
+	m := makeTestModel()
+	m.width = 80
+	m.podIdx = 0
+	m.podcasts[0].config.DownloadPolicy = DownloadPolicyLatestK
+	m.podcasts[0].config.DownloadK = 4
+
+	m.screen = screenPodcasts
+	viewList := m.View()
+	if !strings.Contains(viewList, "Download:") || !strings.Contains(viewList, "Latest 4 episodes") {
+		t.Errorf("expected list view to render download policy info, got:\n%s", viewList)
+	}
+
+	m.screen = screenPodcastDetail
+	viewDetail := m.View()
+	if !strings.Contains(viewDetail, "DL:") || !strings.Contains(viewDetail, "Latest 4 episodes") {
+		t.Errorf("expected detail view to render DL info, got:\n%s", viewDetail)
+	}
+}
+
+func TestTUIEpisodeF4PlayerToggle(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenEpisodeDetail
+	m.showEpisodePlayerPane = false
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF4})
+	if !m.showEpisodePlayerPane {
+		t.Error("F4 on screenEpisodeDetail should enable showEpisodePlayerPane")
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyF4})
+	if m.showEpisodePlayerPane {
+		t.Error("second F4 on screenEpisodeDetail should collapse showEpisodePlayerPane")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -65,7 +66,14 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 				filesByFolder[folder] = append(filesByFolder[folder], f)
 			}
 
-			for podFolder, fList := range filesByFolder {
+			var podFolders []string
+			for folder := range filesByFolder {
+				podFolders = append(podFolders, folder)
+			}
+			sort.Strings(podFolders)
+
+			for _, podFolder := range podFolders {
+				fList := filesByFolder[podFolder]
 				podCfg := loadPodcastConfig(podFolder)
 				if podCfg.AdRemoval == AdRemovalNone {
 					if cli.Verbose && !cli.Quiet {
@@ -79,6 +87,17 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		} else {
 			expandedArgs = append(expandedArgs, arg)
 		}
+	}
+
+	if len(expandedArgs) > 1 {
+		sort.SliceStable(expandedArgs, func(i, j int) bool {
+			ti := getEpisodePublicationTime(expandedArgs[i])
+			tj := getEpisodePublicationTime(expandedArgs[j])
+			if ti.Equal(tj) {
+				return expandedArgs[i] < expandedArgs[j]
+			}
+			return ti.After(tj)
+		})
 	}
 
 	if len(expandedArgs) == 0 {

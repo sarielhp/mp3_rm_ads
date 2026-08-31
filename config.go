@@ -93,15 +93,6 @@ func ensureConfigExists() {
 		return
 	}
 	if _, err := os.Stat(configPath()); os.IsNotExist(err) {
-		legacy := legacyConfigPath()
-		if legacy != "" {
-			if legacyData, err := os.ReadFile(legacy); err == nil && len(legacyData) > 0 {
-				_ = os.WriteFile(configPath(), legacyData, 0644)
-				fmt.Printf("Migrated legacy configuration from '%s' to '%s'\n", legacy, configPath())
-				return
-			}
-		}
-
 		cfg := defaultConfig
 		ip := localIP()
 		cfg.WhisperURL = fmt.Sprintf("http://%s:8088/inference", ip)
@@ -190,17 +181,14 @@ func loadConfig() Config {
 	if err != nil {
 		cfg := defaultConfig
 		applyEnvOverrides(&cfg)
-		migratePodcastsManagerConfig(&cfg)
 		return cfg
 	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
 		cfg = defaultConfig
 		applyEnvOverrides(&cfg)
-		migratePodcastsManagerConfig(&cfg)
 		return cfg
 	}
-	migratePodcastsManagerConfig(&cfg)
 	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
