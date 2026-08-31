@@ -79,8 +79,12 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 						status.ActiveStage = "Step 3/3: FFmpeg Audio Cutting"
 					}
 				}
-				if activeSt.StepStartedAt != "" {
-					if tStart, err := time.Parse(time.RFC3339, activeSt.StepStartedAt); err == nil {
+				startTimeStr := activeSt.StepStartedAt
+				if startTimeStr == "" {
+					startTimeStr = activeSt.UpdatedAt
+				}
+				if startTimeStr != "" {
+					if tStart, err := time.Parse(time.RFC3339, startTimeStr); err == nil {
 						elapsed := time.Since(tStart)
 						status.ActiveElapsed = formatClock(elapsed.Seconds())
 						if activeSt.Status == StateTranscribingRemotely && activeSt.Original.DurationSec > 0 {
