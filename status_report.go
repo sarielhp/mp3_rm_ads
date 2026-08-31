@@ -151,6 +151,14 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
 
+	podEntries := scanPodcastDirs(podcastsDir)
+	podIDByDir := make(map[string]string)
+	for _, p := range podEntries {
+		podIDByDir[p.dir] = p.shortID
+		podIDByDir[strings.ToLower(p.title)] = p.shortID
+		podIDByDir[strings.ToLower(p.folderName)] = p.shortID
+	}
+
 	for idx, item := range allItems {
 		title := item.Media.Metadata.Title
 		relBase := filepath.Base(item.RelPath)
@@ -174,7 +182,10 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 
 		shortID := ""
 		if ok {
-			shortID = getOrSetPodcastShortID(lp.dir, title)
+			shortID = podIDByDir[lp.dir]
+			if shortID == "" {
+				shortID = getOrSetPodcastShortID(lp.dir, title)
+			}
 			mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
 			for _, mp3 := range mp3Files {
 				_ = getOrCreateEpisodeStatus(mp3)
@@ -183,7 +194,10 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 				}
 			}
 		} else {
-			shortID = generatePodcastShortID(title)
+			shortID = podIDByDir[strings.ToLower(title)]
+			if shortID == "" {
+				shortID = generatePodcastShortID(title)
+			}
 		}
 
 		totalEpisodes += absEpisodeCount
@@ -204,61 +218,26 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 }
 
 func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
+	podEntries := scanPodcastDirs(podcastsDir)
 	var entries []podcastStatusEntry
-	dirEntries, err := os.ReadDir(podcastsDir)
-	if err == nil {
-		for _, de := range dirEntries {
-			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" {
-				continue
-			}
-			podPath := filepath.Join(podcastsDir, de.Name())
-			mp3s := findMP3Files(podPath)
-			if len(mp3s) == 0 {
-				continue
-			}
-			needsAd := 0
-			for _, mp3 := range mp3s {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
-					needsAd++
-				}
-			}
-			title := de.Name()
-			if cached, _ := loadPodcastCache(podPath); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
-				title = strings.TrimSpace(cached.PodcastName)
-			}
-			shortID := getOrSetPodcastShortID(podPath, title)
-			entries = append(entries, podcastStatusEntry{
-				id:             shortID,
-				name:           title,
-				episodes:       len(mp3s),
-				needsAdRemoval: needsAd,
-			})
+	for _, pe := range podEntries {
+		mp3s := findMP3Files(pe.dir)
+		if len(mp3s) == 0 {
+			continue
 		}
-	}
-
-	if len(entries) == 0 {
-		mp3s := findMP3Files(podcastsDir)
-		if len(mp3s) > 0 {
-			needsAd := 0
-			for _, mp3 := range mp3s {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
-					needsAd++
-				}
+		needsAd := 0
+		for _, mp3 := range mp3s {
+			_ = getOrCreateEpisodeStatus(mp3)
+			if !isEpisodeCompleted(mp3) {
+				needsAd++
 			}
-			title := filepath.Base(podcastsDir)
-			if cached, _ := loadPodcastCache(podcastsDir); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
-				title = strings.TrimSpace(cached.PodcastName)
-			}
-			shortID := getOrSetPodcastShortID(podcastsDir, title)
-			entries = append(entries, podcastStatusEntry{
-				id:             shortID,
-				name:           title,
-				episodes:       len(mp3s),
-				needsAdRemoval: needsAd,
-			})
 		}
+		entries = append(entries, podcastStatusEntry{
+			id:             pe.shortID,
+			name:           pe.title,
+			episodes:       len(mp3s),
+			needsAdRemoval: needsAd,
+		})
 	}
 
 	sort.Slice(entries, func(i, j int) bool {
