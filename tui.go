@@ -74,6 +74,10 @@ type tuiEpisode struct {
 	season        string
 	episode       string
 	absData       *absEpisode
+	isFeedOnly    bool
+	enclosureURL  string
+	guid          string
+	description   string
 }
 
 func (e tuiEpisode) displayDate() time.Time {

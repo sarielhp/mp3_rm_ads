@@ -483,9 +483,9 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	m.width = 80
 	m.screen = screenPodcasts
 
-	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m.openDownloadPolicyModal()
 	if !m.showDownloadPolicyModal {
-		t.Fatalf("expected showDownloadPolicyModal to be true after pressing 'd'")
+		t.Fatalf("expected showDownloadPolicyModal to be true")
 	}
 
 	modal := m.drawDownloadPolicyModal()
@@ -538,9 +538,9 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	}
 
 	m.screen = screenPodcasts
-	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}})
+	m.openDownloadPolicyModal()
 	if !m.showDownloadPolicyModal {
-		t.Fatalf("expected modal to open with 'D'")
+		t.Fatalf("expected modal to open with openDownloadPolicyModal()")
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})

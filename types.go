@@ -216,6 +216,7 @@ type CLIOptions struct {
 	CountGiven          bool
 	Podcast             string
 	Fill                bool
+	DownloadAll         bool
 	KeepCount           *int
 	CheckNew            bool
 	Oldest              bool

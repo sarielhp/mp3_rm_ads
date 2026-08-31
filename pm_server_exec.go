@@ -79,7 +79,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 					os.Exit(1)
 				}
-				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Quiet)
+				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 				if !cli.DryRun {
 					totalNewlyDownloaded += dlCount
 				}
@@ -99,7 +99,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 						sem <- struct{}{}
 						defer func() { <-sem }()
 
-						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, true, false, cli.CountGiven, true, true, cli.KeepCount, cli.Verbose, cli.Quiet)
+						dlCount := downloadPodcastEpisodes(client, it, cli.Count, cli.Oldest, cli.DryRun, true, false, cli.CountGiven, true, true, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 
 						countMu.Lock()
 						completedCount++
@@ -182,7 +182,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				os.Exit(1)
 			}
-			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Quiet)
+			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 			if !cli.DryRun {
 				totalNewlyDownloaded += dlCount
 			}
@@ -196,7 +196,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 					fmt.Printf("\rScanning podcast %d/%d: %s\x1b[K", idx+1, len(podcasts), title)
 					os.Stdout.Sync()
 				}
-				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.KeepCount, cli.Verbose, cli.Quiet)
+				dlCount := downloadPodcastEpisodes(client, item, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 				if !cli.DryRun {
 					totalNewlyDownloaded += dlCount
 				}

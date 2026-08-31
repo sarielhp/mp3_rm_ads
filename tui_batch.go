@@ -103,6 +103,9 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		pubDate = ep.absData.PubDate
 		pubAt = parseABSEpisodePublishedAt(ep.absData)
 	}
+	if epGUID == "" && ep.guid != "" {
+		epGUID = ep.guid
+	}
 	if pubAt == 0 && ep.publishedAt > 0 {
 		pubAt = ep.publishedAt
 	}
@@ -119,16 +122,27 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		PubDate:      pubDate,
 		PublishedAt:  pubAt,
 		DurationSec:  ep.duration,
+		EnclosureURL: ep.enclosureURL,
 	}
 	ok, reason := EnqueueDownload(item, m.podcasts)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
+		cfg := loadConfig()
 		var absCli *ABSClient
-		if m.podcastsDir != "" {
-			cfg := loadConfig()
-			if cfg.AudiobookshelfURL != "" {
-				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+		if cfg.AudiobookshelfURL != "" {
+			absCli, _ = getABSClient(cfg, true)
+		}
+		if absCli != nil && ep.isFeedOnly && pod.absData != nil && ep.enclosureURL != "" {
+			fe := FeedEpisode{
+				Title:           ep.title,
+				GUID:            ep.guid,
+				PublishedAt:     ep.publishedAt,
+				DurationSeconds: ep.duration,
+				EnclosureURL:    ep.enclosureURL,
+				Enclosure:       &FeedEnclosure{URL: ep.enclosureURL},
+				Description:     ep.description,
 			}
+			_ = absCli.DownloadEpisodes(pod.absData.ID, []FeedEpisode{fe})
 		}
 		TriggerDownloadQueueWorker(absCli)
 	} else if reason == "already_queued" {
@@ -147,6 +161,8 @@ func (m *tuiModel) batchQueueDownload() {
 	pod := m.podcasts[m.podIdx]
 	eps := m.filteredEpisodes()
 	queuedCount := 0
+	var toDownload []FeedEpisode
+
 	for _, ep := range eps {
 		if !m.isEpisodeSelected(ep.path) {
 			continue
@@ -158,6 +174,9 @@ func (m *tuiModel) batchQueueDownload() {
 			epGUID = ep.absData.ID
 			pubDate = ep.absData.PubDate
 			pubAt = parseABSEpisodePublishedAt(ep.absData)
+		}
+		if epGUID == "" && ep.guid != "" {
+			epGUID = ep.guid
 		}
 		if pubAt == 0 && ep.publishedAt > 0 {
 			pubAt = ep.publishedAt
@@ -175,21 +194,34 @@ func (m *tuiModel) batchQueueDownload() {
 			PubDate:      pubDate,
 			PublishedAt:  pubAt,
 			DurationSec:  ep.duration,
+			EnclosureURL: ep.enclosureURL,
 		}
 		ok, _ := EnqueueDownload(item, m.podcasts)
 		if ok {
 			queuedCount++
+			if ep.isFeedOnly && ep.enclosureURL != "" {
+				toDownload = append(toDownload, FeedEpisode{
+					Title:           ep.title,
+					GUID:            ep.guid,
+					PublishedAt:     ep.publishedAt,
+					DurationSeconds: ep.duration,
+					EnclosureURL:    ep.enclosureURL,
+					Enclosure:       &FeedEnclosure{URL: ep.enclosureURL},
+					Description:     ep.description,
+				})
+			}
 		}
 	}
 	m.clearSelectedEpisodes()
 	if queuedCount > 0 {
 		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
+		cfg := loadConfig()
 		var absCli *ABSClient
-		if m.podcastsDir != "" {
-			cfg := loadConfig()
-			if cfg.AudiobookshelfURL != "" {
-				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
-			}
+		if cfg.AudiobookshelfURL != "" {
+			absCli, _ = getABSClient(cfg, true)
+		}
+		if absCli != nil && len(toDownload) > 0 && pod.absData != nil {
+			_ = absCli.DownloadEpisodes(pod.absData.ID, toDownload)
 		}
 		TriggerDownloadQueueWorker(absCli)
 	} else {

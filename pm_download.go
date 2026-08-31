@@ -60,13 +60,17 @@ func findPodcastDirForItem(item PodcastItem, podcastsDir string) string {
 	return ""
 }
 
-func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, oldest, dryRun, noWait, fill, countGiven, checkNew, forceNewOnly bool, keep *int, verbose bool, quiet bool) int {
+func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, oldest, dryRun, noWait, fill, countGiven, checkNew, forceNewOnly, downloadAll bool, keep *int, verbose bool, quiet bool) int {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
 	}
 	feedURL := item.Media.Metadata.FeedURL
 	itemID := item.ID
+
+	if downloadAll {
+		_ = resetPodcastDateCheck(client, loadConfig().AudiobookshelfDBPath, itemID, podcastTitle)
+	}
 
 	var episodesToDownload []FeedEpisode
 	var reasons []string
@@ -148,7 +152,12 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 				podCfg = loadPodcastConfig(podDir)
 			}
 
-			if !fill && !countGiven {
+			if downloadAll {
+				episodesToDownload, reasons = selectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, DownloadPolicyAll, 0, oldest)
+				if countGiven && count > 0 && len(episodesToDownload) > count {
+					episodesToDownload = episodesToDownload[:count]
+				}
+			} else if !fill && !countGiven {
 				episodesToDownload, reasons = selectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, podCfg.DownloadPolicy, podCfg.DownloadK, oldest)
 			} else if forceNewOnly {
 				if len(downloadedIndices) > 0 {

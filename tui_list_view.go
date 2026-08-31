@@ -272,7 +272,7 @@ func (m *tuiModel) drawPodcastsList() string {
 		}
 	}
 
-	helpText := "↑↓ navigate │ Enter select │ L latest │ c ad-policy │ d dl-policy │ e timeline │ / search │ ? help"
+	helpText := "↑↓ navigate │ Enter select │ F fetch-feed │ D dl-all │ L latest │ c ad-policy │ d dl-policy │ ? help"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
 	} else if len(pods) > maxVis {
@@ -424,7 +424,9 @@ func (m *tuiModel) drawPodcastDetail() string {
 
 			if isSelected {
 				chk := "  "
-				if ep.hasAdsRemoved {
+				if ep.isFeedOnly {
+					chk = "☁ "
+				} else if ep.hasAdsRemoved {
 					chk = "✓ "
 				}
 				txBadge := ""
@@ -445,7 +447,9 @@ func (m *tuiModel) drawPodcastDetail() string {
 				out.WriteString(tuiSelectedStyle.Render(fullRow))
 			} else {
 				chk := "  "
-				if ep.hasAdsRemoved {
+				if ep.isFeedOnly {
+					chk = tuiYellowStyle.Render("☁") + " "
+				} else if ep.hasAdsRemoved {
 					chk = tuiGreenStyle.Render("✓") + " "
 				}
 				txBadge := ""
@@ -470,7 +474,9 @@ func (m *tuiModel) drawPodcastDetail() string {
 		} else {
 			if isSelected {
 				chk := " "
-				if ep.hasAdsRemoved {
+				if ep.isFeedOnly {
+					chk = "☁"
+				} else if ep.hasAdsRemoved {
 					chk = "✓"
 				}
 				txBadge := ""
@@ -487,7 +493,9 @@ func (m *tuiModel) drawPodcastDetail() string {
 				out.WriteString(tuiSelectedStyle.Render(truncLine + strings.Repeat(" ", fullPad)))
 			} else {
 				chk := " "
-				if ep.hasAdsRemoved {
+				if ep.isFeedOnly {
+					chk = tuiYellowStyle.Render("☁")
+				} else if ep.hasAdsRemoved {
 					chk = tuiGreenStyle.Render("✓")
 				}
 				txBadge := ""
@@ -509,7 +517,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		renderEpRow(i)
 	}
 
-	helpText := "↑↓ navigate │ Enter details │ p play │ D download │ v select │ a batch-queue │ t transcript │ c ad-policy │ d dl-policy │ ? help"
+	helpText := "↑↓ navigate │ Enter details │ p play │ F fetch-feed │ D download │ v select │ a batch-queue │ t transcript │ ? help"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
 	} else if len(eps) > maxVis {

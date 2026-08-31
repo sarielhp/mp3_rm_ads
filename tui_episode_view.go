@@ -74,14 +74,16 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	if inDLQueue {
 		badgeLeft += tuiBadgeQueued.Render("[⏳ Queued]") + " "
 	}
-	if ep.hasAdsRemoved {
+	if ep.isFeedOnly {
+		badgeLeft += tuiYellowStyle.Render("[☁ Online / Feed]") + " "
+	} else if ep.hasAdsRemoved {
 		badgeLeft += tuiBadgeAdFree.Render("✓ Ad-Free") + " "
 	} else {
 		badgeLeft += tuiBadgeHasAds.Render("Has Ads") + " "
 	}
 	if ep.hasTranscript {
 		badgeLeft += tuiBadgeTranscript.Render("TX Transcript ('t')") + " "
-	} else {
+	} else if !ep.isFeedOnly {
 		badgeLeft += tuiDimStyle.Render("No Transcript") + " "
 	}
 	if totalDurStr != "" {
@@ -94,6 +96,8 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		descRaw = absEp.Description
 	} else if absEp != nil && absEp.Subtitle != "" {
 		descRaw = absEp.Subtitle
+	} else if ep.description != "" {
+		descRaw = ep.description
 	}
 	descClean := strings.TrimSpace(renderHTML(descRaw))
 

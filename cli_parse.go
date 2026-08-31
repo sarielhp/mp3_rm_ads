@@ -327,6 +327,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -355,6 +356,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),

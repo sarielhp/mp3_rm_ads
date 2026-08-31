@@ -287,9 +287,14 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.showPopup("Queue cleared")
 		}
 
+	case "f", "F":
+		if m.screen == screenPodcasts || m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
+			m.fetchPodcastFullFeed()
+		}
+
 	case "d", "D":
 		if m.screen == screenPodcasts {
-			m.openDownloadPolicyModal()
+			m.downloadAllForSelectedPodcast()
 		} else if m.screen == screenPodcastDetail {
 			if len(m.selectedEpisodes) > 0 {
 				m.batchQueueDownload()

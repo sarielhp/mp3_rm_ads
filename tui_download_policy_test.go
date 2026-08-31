@@ -15,9 +15,9 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	m.width = 80
 	m.screen = screenPodcasts
 
-	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	m.openDownloadPolicyModal()
 	if !m.showDownloadPolicyModal {
-		t.Fatalf("expected modal open after 'd'")
+		t.Fatalf("expected modal open after openDownloadPolicyModal()")
 	}
 	if m.downloadPolicyModalIdx != 0 {
 		t.Errorf("expected initial modal idx 0 for default none, got %d", m.downloadPolicyModalIdx)

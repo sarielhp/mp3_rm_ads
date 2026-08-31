@@ -25,6 +25,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Int(countVal, "-k, --count <number>", -1, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -54,6 +55,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
 					clihelp.Int(countVal, "-k, --count <number>", -1, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -98,6 +100,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
 					clihelp.Int(countVal, "-k, --count <number>", -1, "Number of undownloaded episodes to download"),
+					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
 					clihelp.Bool(&opts.Fill, "-f, --fill", false, "Fill gaps in downloaded episodes"),
 					clihelp.Int(keepVal, "-K, --keep <number>", -1, "Enforce keep count policies"),
 					clihelp.BoolToggle(&opts.CheckNew, "--[no-]check-new", true, "Check new episodes published"),
