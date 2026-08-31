@@ -150,8 +150,9 @@ func listLatestEpisodes(podcastsDir string, limit int, quiet, verbose bool) erro
 	for _, item := range latest {
 		dStr := item.modTime.Format("2006-01-02 15:04")
 		pName := displayName(item.podcastTitle)
-		if len(pName) > 24 {
-			pName = pName[:21] + "..."
+		r := []rune(pName)
+		if len(r) > 24 {
+			pName = string(r[:21]) + "..."
 		}
 		coloredStatus := item.statusStr
 		if item.statusColor == "green" {
