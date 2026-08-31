@@ -332,6 +332,8 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+					clihelp.Bool(&opts.Remote, "--remote", false, "Offload post-download audio processing to remote host (e.g. cloud8)"),
+					clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing (skip remote host)"),
 					clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
 					clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check and download new episodes (skip podcast folder scanning)"),
 				},
@@ -361,6 +363,8 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+					clihelp.Bool(&opts.Remote, "--remote", false, "Offload post-download audio processing to remote host (e.g. cloud8)"),
+					clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing (skip remote host)"),
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"

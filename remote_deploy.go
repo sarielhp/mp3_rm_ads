@@ -46,11 +46,11 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 		fmt.Printf("Uploading abs binary to %s:~/.local/bin/abs...\n", targetHost)
 	}
 
-	if err := transport.Upload(targetHost, exePath, "~/.local/bin/abs"); err != nil {
+	if err := transport.Upload(targetHost, exePath, "~/.local/bin/abs.new"); err != nil {
 		return fmt.Errorf("failed to upload binary to %s: %w", targetHost, err)
 	}
 
-	chmodCmd := fmt.Sprintf("chmod +x ~/.local/bin/abs && cp ~/.local/bin/abs %s/bin/abs 2>/dev/null || true", remoteWorkDir)
+	chmodCmd := fmt.Sprintf("mv -f ~/.local/bin/abs.new ~/.local/bin/abs && chmod +x ~/.local/bin/abs && cp -f ~/.local/bin/abs %s/bin/abs 2>/dev/null || true", remoteWorkDir)
 	if _, err := transport.Exec(targetHost, chmodCmd); err != nil {
 		if verbose {
 			fmt.Fprintf(os.Stderr, "Warning: chmod error: %v\n", err)

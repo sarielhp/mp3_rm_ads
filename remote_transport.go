@@ -130,14 +130,22 @@ func ResolveProcessingHost(cfg *Config, requestedHost string, transport RemoteTr
 		return requestedHost, true, nil
 	}
 
-	if cfg != nil && strings.EqualFold(cfg.DefaultProcessing, "remote") && cfg.RemoteHost != "" {
+	targetHost := ""
+	if cfg != nil {
+		targetHost = cfg.RemoteHost
+		if targetHost == "" {
+			targetHost = cfg.RemoteFFmpegHost
+		}
+	}
+
+	if cfg != nil && strings.EqualFold(cfg.DefaultProcessing, "remote") && targetHost != "" {
 		if transport == nil {
 			transport = getRemoteTransport()
 		}
-		if isRemoteHostReachable(cfg.RemoteHost, transport) {
-			return cfg.RemoteHost, true, nil
+		if isRemoteHostReachable(targetHost, transport) {
+			return targetHost, true, nil
 		}
-		fmt.Fprintf(os.Stderr, "Warning: Remote host '%s' unreachable. Falling back to local processing.\n", cfg.RemoteHost)
+		fmt.Fprintf(os.Stderr, "Warning: Remote host '%s' unreachable. Falling back to local processing.\n", targetHost)
 		return "local", false, nil
 	}
 

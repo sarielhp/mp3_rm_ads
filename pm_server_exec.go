@@ -143,8 +143,12 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				}
 			}
 
-			if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-				runPostProcessors(config.PostProcessors, cli.Quiet)
+			if totalNewlyDownloaded > 0 && !cli.DryRun {
+				if len(config.PostProcessors) > 0 {
+					runPostProcessors(config.PostProcessors, cli.Quiet)
+				} else {
+					processAudioFilesBatch(cli, config, "proc")
+				}
 			}
 		}
 		return
@@ -206,8 +210,12 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			}
 		}
 
-		if totalNewlyDownloaded > 0 && len(config.PostProcessors) > 0 {
-			runPostProcessors(config.PostProcessors, cli.Quiet)
+		if totalNewlyDownloaded > 0 && !cli.DryRun {
+			if len(config.PostProcessors) > 0 {
+				runPostProcessors(config.PostProcessors, cli.Quiet)
+			} else {
+				processAudioFilesBatch(cli, config, "proc")
+			}
 		}
 		return
 
