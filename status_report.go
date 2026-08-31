@@ -9,6 +9,7 @@ import (
 )
 
 type podcastStatusEntry struct {
+	id             string
 	name           string
 	episodes       int
 	needsAdRemoval int
@@ -85,20 +86,20 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		fmt.Printf("\n%s\n", strings.Repeat("=", 90))
 		fmt.Println("AUDIOBOOKSHELF DATABASE STATUS REPORT (DRY RUN)")
 		fmt.Printf("%s\n", strings.Repeat("=", 90))
-		fmt.Printf("  %-60s │ %-8s │ %-16s\n", "Podcast Name", "Episodes", "Needs Ad Removal")
-		fmt.Printf("  %-60s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 60), strings.Repeat("─", 8), strings.Repeat("─", 16))
+		fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-16s\n", "#", "ID", "Podcast Name", "Episodes", "Needs Ad Removal")
+		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
 	}
 
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
 
-	for _, item := range allItems {
+	for idx, item := range allItems {
 		title := item.Media.Metadata.Title
 		relBase := filepath.Base(item.RelPath)
 
 		dName := displayName(title)
-		if len(dName) > 60 {
-			dName = dName[:57] + "..."
+		if len(dName) > 48 {
+			dName = dName[:45] + "..."
 		}
 
 		var itemFull absItem
@@ -113,7 +114,9 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 			lp, ok = localByName[strings.ToLower(relBase)]
 		}
 
+		shortID := ""
 		if ok {
+			shortID = getOrSetPodcastShortID(lp.dir, title)
 			mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
 			for _, mp3 := range mp3Files {
 				_ = getOrCreateEpisodeStatus(mp3)
@@ -121,19 +124,21 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 					needsAdRemoval++
 				}
 			}
+		} else {
+			shortID = generatePodcastShortID(title)
 		}
 
 		totalEpisodes += absEpisodeCount
 		totalNeedsAdRemoval += needsAdRemoval
 
 		if !quiet {
-			fmt.Printf("  %-60s │ %-8d │ %-16d\n", dName, absEpisodeCount, needsAdRemoval)
+			fmt.Printf("  %-3d  %-6s  %-48s │ %-8d │ %-16d\n", idx+1, shortID, dName, absEpisodeCount, needsAdRemoval)
 		}
 	}
 
 	if !quiet {
-		fmt.Printf("  %-60s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 60), strings.Repeat("─", 8), strings.Repeat("─", 16))
-		fmt.Printf("  %-60s │ %-8d │ %-16d\n", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
+		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
+		fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
 		fmt.Printf("%s\n\n", strings.Repeat("=", 90))
 	}
 
@@ -145,7 +150,7 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	dirEntries, err := os.ReadDir(podcastsDir)
 	if err == nil {
 		for _, de := range dirEntries {
-			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") {
+			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" {
 				continue
 			}
 			podPath := filepath.Join(podcastsDir, de.Name())
@@ -160,8 +165,14 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 					needsAd++
 				}
 			}
+			title := de.Name()
+			if cached, _ := loadPodcastCache(podPath); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
+				title = strings.TrimSpace(cached.PodcastName)
+			}
+			shortID := getOrSetPodcastShortID(podPath, title)
 			entries = append(entries, podcastStatusEntry{
-				name:           de.Name(),
+				id:             shortID,
+				name:           title,
 				episodes:       len(mp3s),
 				needsAdRemoval: needsAd,
 			})
@@ -178,8 +189,14 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 					needsAd++
 				}
 			}
+			title := filepath.Base(podcastsDir)
+			if cached, _ := loadPodcastCache(podcastsDir); cached != nil && strings.TrimSpace(cached.PodcastName) != "" {
+				title = strings.TrimSpace(cached.PodcastName)
+			}
+			shortID := getOrSetPodcastShortID(podcastsDir, title)
 			entries = append(entries, podcastStatusEntry{
-				name:           filepath.Base(podcastsDir),
+				id:             shortID,
+				name:           title,
 				episodes:       len(mp3s),
 				needsAdRemoval: needsAd,
 			})
@@ -197,23 +214,23 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	fmt.Printf("\n%s\n", strings.Repeat("=", 90))
 	fmt.Println("LOCAL LIBRARY PODCAST STATUS REPORT")
 	fmt.Printf("%s\n", strings.Repeat("=", 90))
-	fmt.Printf("  %-60s │ %-8s │ %-16s\n", "Podcast Name", "Episodes", "Needs Ad Removal")
-	fmt.Printf("  %-60s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 60), strings.Repeat("─", 8), strings.Repeat("─", 16))
+	fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-16s\n", "#", "ID", "Podcast Name", "Episodes", "Needs Ad Removal")
+	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
 
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
 
-	for _, e := range entries {
+	for idx, e := range entries {
 		dName := displayName(e.name)
-		if len(dName) > 60 {
-			dName = dName[:57] + "..."
+		if len(dName) > 48 {
+			dName = dName[:45] + "..."
 		}
 		totalEpisodes += e.episodes
 		totalNeedsAdRemoval += e.needsAdRemoval
-		fmt.Printf("  %-60s │ %-8d │ %-16d\n", dName, e.episodes, e.needsAdRemoval)
+		fmt.Printf("  %-3d  %-6s  %-48s │ %-8d │ %-16d\n", idx+1, e.id, dName, e.episodes, e.needsAdRemoval)
 	}
 
-	fmt.Printf("  %-60s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 60), strings.Repeat("─", 8), strings.Repeat("─", 16))
-	fmt.Printf("  %-60s │ %-8d │ %-16d\n", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
+	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
+	fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
 	fmt.Printf("%s\n\n", strings.Repeat("=", 90))
 }

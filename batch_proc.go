@@ -33,7 +33,35 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 
 	args := cli.Args
-	if len(args) == 0 {
+	podcastsDir := config.PodcastsDir
+	if podcastsDir == "" {
+		podcastsDir = "."
+	}
+
+	if cli.Podcast != "" {
+		targetDir, _, found := resolvePodcastDirByIDOrName(podcastsDir, cli.Podcast)
+		if !found {
+			if !cli.Quiet {
+				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
+			}
+			return
+		}
+		args = []string{targetDir}
+	} else if len(args) == 1 {
+		arg := args[0]
+		if !strings.HasSuffix(strings.ToLower(arg), ".mp3") && !strings.HasSuffix(strings.ToLower(arg), ".json") {
+			if targetDir, _, found := resolvePodcastDirByIDOrName(podcastsDir, arg); found {
+				args = []string{targetDir}
+			} else if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
+				args = []string{arg}
+			} else {
+				if !cli.Quiet {
+					fmt.Printf("Podcast matching '%s' not found.\n", arg)
+				}
+				return
+			}
+		}
+	} else if len(args) == 0 {
 		if config.PodcastsDir != "" {
 			args = []string{config.PodcastsDir}
 		} else {

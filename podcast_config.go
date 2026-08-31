@@ -24,6 +24,7 @@ const (
 )
 
 type PodcastConfig struct {
+	ID             string                `json:"id,omitempty"`
 	AdRemoval      string                `json:"ad_removal"`
 	DownloadPolicy string                `json:"download_policy,omitempty"`
 	DownloadK      int                   `json:"download_k,omitempty"`
@@ -171,9 +172,16 @@ func loadPodcastConfig(dir string) PodcastConfig {
 		return defaultPodcastConfig()
 	}
 	def := defaultPodcastConfig()
-	if cfg.AdRemoval == "" || cfg.DownloadPolicy == "" || cfg.DownloadK <= 0 {
+	if cfg.AdRemoval == "" || cfg.DownloadPolicy == "" || cfg.DownloadK <= 0 || cfg.ID == "" {
 		var raw map[string]interface{}
 		if err := json.Unmarshal(data, &raw); err == nil {
+			if cfg.ID == "" {
+				if v, ok := raw["id"].(string); ok {
+					cfg.ID = v
+				} else if v, ok := raw["podcast_id"].(string); ok {
+					cfg.ID = v
+				}
+			}
 			if cfg.AdRemoval == "" {
 				if v, ok := raw["ad_removal_mode"].(string); ok {
 					cfg.AdRemoval = v
