@@ -127,7 +127,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	if status.BinaryVersion != "" {
 		fmt.Printf("  - Binary:          %s\n", status.BinaryVersion)
 	}
-	workerStatusStr := bold("Idle (Not running)")
+	workerStatusStr := bold("Not running (idle)")
 	if status.WorkerRunning {
 		if status.ActiveTask != "" {
 			workerStatusStr = boldGreen(fmt.Sprintf("Running (Processing: %s)", status.ActiveTask))
