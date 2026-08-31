@@ -134,6 +134,9 @@ type Config struct {
 	AudiobookshelfDBPath   string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
 	PostProcessors         []string         `json:"post_processors,omitempty"`
 	RemoteFFmpegHost       string           `json:"remote_ffmpeg_host,omitempty"`
+	RemoteHost             string           `json:"remote_host,omitempty"`
+	DefaultProcessing      string           `json:"default_processing,omitempty"`
+	RemoteWorkDir          string           `json:"remote_work_dir,omitempty"`
 	DefaultDownloadPolicy  string           `json:"default_download_policy,omitempty"`
 	DefaultDownloadK       int              `json:"default_download_k,omitempty"`
 	DefaultAdRemoval       string           `json:"default_ad_policy,omitempty"`
@@ -158,56 +161,57 @@ type TUIColorConfig struct {
 }
 
 type CLIOptions struct {
-	Output            string
-	TranscriptPath    string
-	SaveTranscript    bool
-	ExportSRT         bool
-	ExportTXT         bool
-	ExportFormat      string
-	Recut             bool
-	Force             string
-	ForceLLM          bool
-	ForceTranscribe   bool
-	UseLLM            string
-	ConfigCmd         string
-	ConfigKey         string
-	ConfigVal         string
-	SetDefault        int
-	PodcastsDir       string
-	SetPodcastsDir    bool
-	IsConfigCommand   bool
-	IsDirCommand      bool
-	IsFileCommand     bool
-	IsTUICommand      bool
-	IsTimelineCommand bool
-	IsTestCommand     bool
-	IsScanCommand     bool
-	IsStatusCommand   bool
-	ListLLMs          bool
-	CopyOpenCode      bool
-	Quiet             bool
-	Verbose           bool
-	Debug             bool
-	UseChunks         bool
-	TranscribeMin     string
-	ExtractKeywords   bool
-	TestWhisper       bool
-	TestABS           bool
-	TestABSMap        bool
-	TestABSDownload   bool
-	TestKitty         bool
-	ABSURL            string
-	ABSUser           string
-	ABSPass           string
-	SetABS            bool
-	IsCacheCommand    bool
-	ResetCache        bool
-	AddWhisper        string
-	RemoveWhisper     int
-	SetDefaultWhisper int
-	ListWhispers      bool
+	Output               string
+	TranscriptPath       string
+	SaveTranscript       bool
+	ExportSRT            bool
+	ExportTXT            bool
+	ExportFormat         string
+	Recut                bool
+	Force                string
+	ForceLLM             bool
+	ForceTranscribe      bool
+	UseLLM               string
+	ConfigCmd            string
+	ConfigKey            string
+	ConfigVal            string
+	SetDefault           int
+	PodcastsDir          string
+	SetPodcastsDir       bool
+	IsConfigCommand      bool
+	IsDirCommand         bool
+	IsFileCommand        bool
+	IsTUICommand         bool
+	IsTimelineCommand    bool
+	IsTestCommand        bool
+	IsScanCommand        bool
+	IsStatusCommand      bool
+	IsRemoteCommand      bool
+	IsBatchWorkerCommand bool
+	ListLLMs             bool
+	CopyOpenCode         bool
+	Quiet                bool
+	Verbose              bool
+	Debug                bool
+	UseChunks            bool
+	TranscribeMin        string
+	ExtractKeywords      bool
+	TestWhisper          bool
+	TestABS              bool
+	TestABSMap           bool
+	TestABSDownload      bool
+	TestKitty            bool
+	ABSURL               string
+	ABSUser              string
+	ABSPass              string
+	SetABS               bool
+	IsCacheCommand       bool
+	ResetCache           bool
+	AddWhisper           string
+	RemoveWhisper        int
+	SetDefaultWhisper    int
+	ListWhispers         bool
 
-	// Merged Library Management Options
 	Count               int
 	CountGiven          bool
 	Podcast             string
@@ -230,6 +234,9 @@ type CLIOptions struct {
 	EpisodesOnly        bool
 	RemoteFFmpegHost    string
 	SetRemoteFFmpegHost bool
+	RemoteSubcmd        string
+	RemoteHost          string
+	BatchWorkerDir      string
 }
 
 type CostInfo struct {

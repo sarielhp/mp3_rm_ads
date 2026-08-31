@@ -24,6 +24,10 @@ func boldYellow(s string) string {
 	return color.New(color.FgYellow, color.Bold).Sprint(s)
 }
 
+func boldRed(s string) string {
+	return color.New(color.FgRed, color.Bold).Sprint(s)
+}
+
 func printSeparator() {
 	w, _, err := term.GetSize(int(os.Stdout.Fd()))
 	if err != nil || w <= 1 {

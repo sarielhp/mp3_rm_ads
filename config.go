@@ -20,6 +20,8 @@ var defaultConfig = Config{
 	DefaultDownloadPolicy: "latest",
 	DefaultDownloadK:      3,
 	DefaultAdRemoval:      "all",
+	DefaultProcessing:     "local",
+	RemoteWorkDir:         "~/.abs_remote",
 	WhisperURL:            "http://192.168.1.230:8088/inference",
 	WhisperSpeedFactor:    7.0,
 	ChunkDurationSec:      0,
@@ -159,6 +161,21 @@ func applyEnvOverrides(cfg *Config) {
 	} else if v := os.Getenv("ABS_REMOTE_FFMPEG"); v != "" {
 		cfg.RemoteFFmpegHost = v
 	}
+	if v := os.Getenv("REMOTE_HOST"); v != "" {
+		cfg.RemoteHost = v
+	} else if v := os.Getenv("ABS_REMOTE_HOST"); v != "" {
+		cfg.RemoteHost = v
+	}
+	if v := os.Getenv("DEFAULT_PROCESSING"); v != "" {
+		cfg.DefaultProcessing = v
+	} else if v := os.Getenv("ABS_DEFAULT_PROCESSING"); v != "" {
+		cfg.DefaultProcessing = v
+	}
+	if v := os.Getenv("REMOTE_WORK_DIR"); v != "" {
+		cfg.RemoteWorkDir = v
+	} else if v := os.Getenv("ABS_REMOTE_WORK_DIR"); v != "" {
+		cfg.RemoteWorkDir = v
+	}
 	if v := os.Getenv("DEFAULT_DOWNLOAD_POLICY"); v != "" {
 		cfg.DefaultDownloadPolicy = normalizeDownloadPolicy(v)
 	}
@@ -217,6 +234,12 @@ func loadConfig() Config {
 	if cfg.DefaultAdRemoval == "" {
 		cfg.DefaultAdRemoval = "all"
 	}
+	if cfg.DefaultProcessing == "" {
+		cfg.DefaultProcessing = "local"
+	}
+	if cfg.RemoteWorkDir == "" {
+		cfg.RemoteWorkDir = "~/.abs_remote"
+	}
 	resolveActiveWhisperProfile(&cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
@@ -256,6 +279,15 @@ func printConfig(cfg Config) {
 	}
 	if cfg.DefaultAdRemoval != "" {
 		fmt.Printf("  default_ad_policy:        %s\n", cfg.DefaultAdRemoval)
+	}
+	if cfg.DefaultProcessing != "" {
+		fmt.Printf("  default_processing:       %s\n", cfg.DefaultProcessing)
+	}
+	if cfg.RemoteHost != "" {
+		fmt.Printf("  remote_host:              %s\n", cfg.RemoteHost)
+	}
+	if cfg.RemoteWorkDir != "" {
+		fmt.Printf("  remote_work_dir:          %s\n", cfg.RemoteWorkDir)
 	}
 	fmt.Printf("  whisper_url:              %s\n", cfg.WhisperURL)
 	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
@@ -356,6 +388,16 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		}
 	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
 		cfg.DefaultAdRemoval = normalizeAdRemovalMode(val)
+	case "remote-host", "remote.host", "rhost":
+		cfg.RemoteHost = val
+	case "default-processing", "default.processing", "processing":
+		norm := strings.ToLower(val)
+		if norm != "local" && norm != "remote" {
+			return fmt.Errorf("invalid default processing value: '%s' (must be 'local' or 'remote')", val)
+		}
+		cfg.DefaultProcessing = norm
+	case "remote-work-dir", "remote.work-dir", "remote-workdir", "rworkdir":
+		cfg.RemoteWorkDir = val
 	default:
 		return fmt.Errorf("unknown configuration key: '%s'", key)
 	}
@@ -378,6 +420,12 @@ func handleConfigGet(cfg Config, key string) {
 		fmt.Println(cfg.AudiobookshelfDBPath)
 	case "remote-ffmpeg", "remote-ffmpeg-host", "rffmpeg":
 		fmt.Println(cfg.RemoteFFmpegHost)
+	case "remote-host", "remote.host", "rhost":
+		fmt.Println(cfg.RemoteHost)
+	case "default-processing", "default.processing", "processing":
+		fmt.Println(cfg.DefaultProcessing)
+	case "remote-work-dir", "remote.work-dir", "remote-workdir", "rworkdir":
+		fmt.Println(cfg.RemoteWorkDir)
 	case "whisper-url", "whisper.url":
 		fmt.Println(cfg.WhisperURL)
 	case "whisper-language", "whisper.language", "lang":
@@ -395,169 +443,4 @@ func handleConfigGet(cfg Config, key string) {
 	default:
 		fmt.Printf("Unknown configuration key: '%s'\n", key)
 	}
-}
-
-func getProfileCost(profile LLMProfile) CostInfo {
-	t := profile.Type
-	u := profile.URL
-	m := profile.Model
-
-	if t == "ollama" || containsAny(u, []string{"11434", "localhost", "127.0.0.1"}) {
-		return CostInfo{
-			Type:     "Local",
-			CostStr:  "Free ($0.00 / Local GPU)",
-			Est1HStr: "$0.00",
-		}
-	}
-
-	if containsAny(u, []string{"openrouter.ai"}) || t == "openrouter" {
-		models := fetchOpenRouterModels()
-		clean := cleanModelName(m)
-		tokens := splitModelTokens(clean)
-
-		var found *OpenRouterModel
-		for i := range models {
-			mid := cleanModelName(models[i].ID)
-			if mid == clean || mid == m {
-				found = &models[i]
-				break
-			}
-		}
-		if found == nil {
-			for i := range models {
-				mid := cleanModelName(models[i].ID)
-				if allTokensMatch(mid, tokens) {
-					found = &models[i]
-					break
-				}
-			}
-		}
-		if found == nil {
-			keyTerms := filterKeyTerms(tokens)
-			if len(keyTerms) > 0 {
-				for i := range models {
-					mid := cleanModelName(models[i].ID)
-					if allTokensMatch(mid, keyTerms) {
-						found = &models[i]
-						break
-					}
-				}
-			}
-		}
-
-		if found != nil && found.Pricing.Prompt != "" {
-			promptPrice := parseFloat(found.Pricing.Prompt)
-			completionPrice := parseFloat(found.Pricing.Completion)
-			in1M := roundFloat(promptPrice*1_000_000, 4)
-			out1M := roundFloat(completionPrice*1_000_000, 4)
-			est1H := roundFloat(13000*promptPrice+300*completionPrice, 4)
-			return CostInfo{
-				Type:     fmt.Sprintf("OpenRouter (%s)", found.ID),
-				In1M:     in1M,
-				Out1M:    out1M,
-				CostStr:  fmt.Sprintf("In: $%.4f/1M, Out: $%.4f/1M", in1M, out1M),
-				Est1HStr: fmt.Sprintf("~$%.4f / 1-hr episode", est1H),
-			}
-		}
-	}
-
-	return CostInfo{
-		Type:     "Unknown",
-		CostStr:  "Dynamic pricing unavailable (Check OpenRouter API)",
-		Est1HStr: "N/A",
-	}
-}
-
-func containsAny(s string, substrs []string) bool {
-	for _, sub := range substrs {
-		if contains(s, sub) {
-			return true
-		}
-	}
-	return false
-}
-
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && containsStr(s, substr)
-}
-
-func containsStr(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-
-func cleanModelName(name string) string {
-	result := name
-	for _, prefix := range []string{"openrouter/", "~"} {
-		if len(result) >= len(prefix) && result[:len(prefix)] == prefix {
-			result = result[len(prefix):]
-		}
-	}
-	for i := 0; i < len(result); i++ {
-		if result[i] == ':' {
-			result = result[:i]
-			break
-		}
-	}
-	return result
-}
-
-func splitModelTokens(name string) []string {
-	var tokens []string
-	current := ""
-	for _, ch := range name {
-		if ch == '/' || ch == '.' || ch == '_' || ch == '-' {
-			if current != "" {
-				tokens = append(tokens, current)
-				current = ""
-			}
-		} else {
-			current += string(ch)
-		}
-	}
-	if current != "" {
-		tokens = append(tokens, current)
-	}
-	return tokens
-}
-
-func allTokensMatch(id string, tokens []string) bool {
-	for _, tok := range tokens {
-		if !contains(id, tok) {
-			return false
-		}
-	}
-	return true
-}
-
-func filterKeyTerms(tokens []string) []string {
-	keySet := map[string]bool{
-		"sonnet": true, "haiku": true, "opus": true, "flash": true,
-		"deepseek": true, "llama": true, "gemini": true, "qwen": true, "mistral": true,
-	}
-	var result []string
-	for _, t := range tokens {
-		if keySet[t] {
-			result = append(result, t)
-		}
-	}
-	return result
-}
-
-func parseFloat(s string) float64 {
-	var f float64
-	fmt.Sscanf(s, "%f", &f)
-	return f
-}
-
-func roundFloat(f float64, places int) float64 {
-	pow := 1.0
-	for i := 0; i < places; i++ {
-		pow *= 10
-	}
-	return float64(int64(f*pow+0.5)) / pow
 }

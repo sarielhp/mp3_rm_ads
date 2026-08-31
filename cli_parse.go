@@ -434,6 +434,8 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			},
 			buildServerCommand(opts, action, &countVal, &keepVal),
 			buildConfigCommand(opts, action),
+			buildRemoteCommand(opts, action),
+			buildBatchWorkerCommand(opts, action),
 			{
 				Name:        "help",
 				Description: "Display usage help message for abs or a specific command",
@@ -510,6 +512,8 @@ func parseFlags() (string, CLIOptions) {
 	opts.IsTestCommand = (action == "test")
 	opts.IsScanCommand = (action == "scan" || action == "new" || (action == "server" && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new")))
 	opts.IsStatusCommand = (action == "status")
+	opts.IsRemoteCommand = (action == "remote")
+	opts.IsBatchWorkerCommand = (action == "batch-worker")
 
 	return action, opts
 }

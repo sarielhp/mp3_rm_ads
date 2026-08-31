@@ -183,6 +183,14 @@ func main() {
 		handleServerCommand(config, cli)
 		return
 
+	case "remote":
+		handleRemoteCommand(config, cli)
+		return
+
+	case "batch-worker":
+		handleBatchWorkerCommand(config, cli)
+		return
+
 	case "proc", "recut":
 		if action == "recut" {
 			cli.Recut = true
