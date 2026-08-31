@@ -85,6 +85,15 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 		localPodcastsDir = "."
 	}
 
+	collectLock, err := acquireCollectLock("")
+	if err != nil || collectLock == nil {
+		if verbose {
+			fmt.Println("Another collect operation is currently in progress; skipping.")
+		}
+		return nil
+	}
+	defer collectLock.Release()
+
 	totalPulled := 0
 	var totalCutSaved float64
 
@@ -266,4 +275,20 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 	}
 
 	return nil
+}
+
+func triggerBackgroundCollect(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	var hosts []string
+	if cfg.RemoteHost != "" && !strings.EqualFold(cfg.RemoteHost, "local") {
+		hosts = append(hosts, cfg.RemoteHost)
+	}
+	if cfg.RemoteFFmpegHost != "" && !strings.EqualFold(cfg.RemoteFFmpegHost, "local") && cfg.RemoteFFmpegHost != cfg.RemoteHost {
+		hosts = append(hosts, cfg.RemoteFFmpegHost)
+	}
+	for _, h := range hosts {
+		_ = runRemotePull(cfg, h, nil, true, false)
+	}
 }

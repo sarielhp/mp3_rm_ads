@@ -93,3 +93,13 @@ func acquireWorkerLock(resolvedDir string) (func(), error) {
 		_ = os.Remove(lockPath)
 	}, nil
 }
+
+func acquireCollectLock(configDir string) (*fileLockWrapper, error) {
+	if configDir == "" {
+		home, _ := os.UserHomeDir()
+		configDir = filepath.Join(home, ".config", "abs")
+	}
+	_ = os.MkdirAll(configDir, 0755)
+	lockPath := filepath.Join(configDir, ".collect")
+	return acquireFileLock(lockPath)
+}

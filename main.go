@@ -180,6 +180,7 @@ func main() {
 			SaveQueue:   saveQueue,
 			GetDuration: getAudioDuration,
 		}
+		go triggerBackgroundCollect(&config)
 		p := tea.NewProgram(newTuiModel(bk, dir, &config), tea.WithAltScreen())
 		if _, err := p.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
