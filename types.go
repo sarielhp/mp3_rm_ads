@@ -237,8 +237,10 @@ type CLIOptions struct {
 	SetRemoteFFmpegHost bool
 	RemoteSubcmd        string
 	RemoteHost          string
+	RemoteWorkDir       string
 	Remote              bool
 	Local               bool
+	Daemon              bool
 	BatchWorkerDir      string
 }
 

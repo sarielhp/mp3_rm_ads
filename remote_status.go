@@ -39,15 +39,38 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 
-	psOut, _ := transport.Exec(targetHost, "pgrep -f 'abs.*batch-worker' 2>/dev/null")
+	psOut, _ := transport.Exec(targetHost, "pgrep -f 'abs.*(scan|worker)' 2>/dev/null")
 	status.WorkerRunning = strings.TrimSpace(psOut) != ""
 
 	remoteWorkDir := "~/.abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
-	remoteStagingDir := fmt.Sprintf("%s/staging", remoteWorkDir)
 
+	var readyEpisodes []RemoteDoneItem
+	var archiveCount int
+
+	tempDonePath := filepath.Join(os.TempDir(), fmt.Sprintf("status_done_%d.json", time.Now().UnixNano()))
+	if err := transport.Download(targetHost, fmt.Sprintf("%s/done.json", remoteWorkDir), tempDonePath); err == nil {
+		if doneM, err := loadDoneManifest(tempDonePath); err == nil && doneM != nil {
+			for _, it := range doneM.Episodes {
+				if it.Status == StateReadyForCopyBack {
+					readyEpisodes = append(readyEpisodes, it)
+				}
+			}
+		}
+		_ = os.Remove(tempDonePath)
+	}
+
+	tempArchPath := filepath.Join(os.TempDir(), fmt.Sprintf("status_arch_%d.json", time.Now().UnixNano()))
+	if err := transport.Download(targetHost, fmt.Sprintf("%s/archive.json", remoteWorkDir), tempArchPath); err == nil {
+		if archM, err := loadDoneManifest(tempArchPath); err == nil && archM != nil {
+			archiveCount = len(archM.Episodes)
+		}
+		_ = os.Remove(tempArchPath)
+	}
+
+	remoteStagingDir := fmt.Sprintf("%s/staging", remoteWorkDir)
 	out, _ := transport.Exec(targetHost, fmt.Sprintf("ls -1 %s 2>/dev/null", remoteStagingDir))
 	if strings.TrimSpace(out) != "" {
 		batchIDs := splitLines(strings.TrimSpace(out))
@@ -85,7 +108,19 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		workerStatusStr = boldGreen("Running (active jobs)")
 	}
 	fmt.Printf("  - Worker Process:  %s\n", workerStatusStr)
-	fmt.Printf("  - Staged Batches:  %d\n", len(status.ActiveBatches))
+	fmt.Printf("  - Ready to Pull:   %s\n", boldGreen(fmt.Sprintf("%d episode(s)", len(readyEpisodes))))
+	fmt.Printf("  - Remote Archive:  %d episode(s)\n", archiveCount)
+	if len(status.ActiveBatches) > 0 {
+		fmt.Printf("  - Staged Batches:  %d\n", len(status.ActiveBatches))
+	}
+
+	if len(readyEpisodes) > 0 {
+		fmt.Println()
+		fmt.Println(bold("Episodes ready for copy back (abs remote pull):"))
+		for _, ep := range readyEpisodes {
+			fmt.Printf("  [✓] %s (ad saved: %.1fs)\n", bold(ep.RelPath), ep.CutDurationSec)
+		}
+	}
 
 	if len(status.ActiveBatches) > 0 {
 		fmt.Println()
@@ -163,11 +198,11 @@ func runRemoteCancel(cfg *Config, host, batchID string, transport RemoteTranspor
 		return nil
 	}
 
-	killAllCmd := "pkill -f 'abs.*batch-worker' 2>/dev/null || true"
+	killAllCmd := "pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true"
 	_, _ = transport.Exec(targetHost, killAllCmd)
 
 	if !quiet {
-		fmt.Printf("Cancelled all active batch-worker processes on %s.\n", targetHost)
+		fmt.Printf("Cancelled all active batch/worker processes on %s.\n", targetHost)
 	}
 	return nil
 }

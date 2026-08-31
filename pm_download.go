@@ -393,6 +393,13 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 							if !quiet {
 								fmt.Printf("\nDownload completed! Podcast now has %d downloaded episodes.\n", newCount)
 							}
+							if podDir := findPodcastDirForItem(item, loadConfig().PodcastsDir); podDir != "" {
+								for _, m := range findMP3Files(podDir) {
+									if !fileExists(statusPathFor(m)) {
+										_ = getOrCreateEpisodeStatus(m)
+									}
+								}
+							}
 							break
 						} else if len(activeDls) > 0 {
 							if !quiet {

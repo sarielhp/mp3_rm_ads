@@ -23,6 +23,9 @@ func NewMockRemoteTransport(root string) *MockRemoteTransport {
 }
 
 func (m *MockRemoteTransport) resolveRemotePath(remPath string) string {
+	if strings.HasPrefix(remPath, m.RemoteRoot) {
+		return remPath
+	}
 	clean := strings.TrimPrefix(remPath, "~/")
 	clean = strings.TrimPrefix(clean, ".abs_remote/")
 	clean = strings.TrimPrefix(clean, ".config/")

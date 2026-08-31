@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -134,23 +133,9 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			if strings.HasSuffix(f, ".json") {
 				continue
 			}
-			mainMP3File, precutFile, _ := resolveAudioFiles(f, cli)
-			baseName := stripExt(mainMP3File)
-			jsonFile := cli.TranscriptPath
-			if jsonFile == "" {
-				jsonFile = baseName + ".transcript.json"
-			}
-			cutsFile := baseName + ".cuts.json"
-
-			if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut {
-				if fileExists(precutFile) {
-					continue
-				}
-				data, err := os.ReadFile(cutsFile)
-				var cd CutsData
-				if err == nil && json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) == 0 {
-					continue
-				}
+			mainMP3File, _, _ := resolveAudioFiles(f, cli)
+			if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && isEpisodeCompleted(mainMP3File) {
+				continue
 			}
 			filesToPush = append(filesToPush, f)
 		}
@@ -191,7 +176,6 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		if jsonFile == "" {
 			jsonFile = baseName + ".transcript.json"
 		}
-		cutsFile := baseName + ".cuts.json"
 
 		outputFile := resolveOutputFile(mainMP3File, cli, totalFiles)
 
@@ -202,7 +186,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 
 		shortName := displayName(filepath.Base(inputFile))
 
-		if fileExists(jsonFile) && fileExists(cutsFile) && !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut {
+		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && isEpisodeCompleted(mainMP3File) {
 			if cli.Verbose && !cli.Quiet {
 				fmt.Printf("skipping: %s\n", shortName)
 			}
@@ -246,6 +230,13 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			}
 		}
 		totalDuration := getAudioDuration(sourceAudioFile)
+		updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+			st.Status = StateTranscribingLocally
+			st.Original.DurationSec = totalDuration
+			if fi, err := os.Stat(sourceAudioFile); err == nil {
+				st.Original.SizeBytes = fi.Size()
+			}
+		})
 
 		if cli.TranscribeMin != "" {
 			totalDuration = handleTranscribeMin(&sourceAudioFile, totalDuration, cli)
@@ -366,6 +357,14 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 
 		if len(adSegments) == 0 {
 			saveCutsJSON(mainMP3File, totalDuration, adSegments, &selectedProfile, cli.Quiet)
+			updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+				st.Status = StateDone
+				st.Cleaned = EpisodeAudioMeta{
+					Filename:    filepath.Base(outputFile),
+					DurationSec: totalDuration,
+				}
+				st.Ads = nil
+			})
 			fileTotalDuration := time.Since(fileStartTime)
 			if !cli.Quiet {
 				fmt.Println("No ad segments detected by LLM!")
@@ -397,6 +396,9 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		keepSegments := cutsResult.KeepSegments
 
 		t0Step3 := time.Now()
+		updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+			st.Status = StateCuttingLocally
+		})
 		if !cli.Quiet {
 			fmt.Println()
 			fmt.Printf("Step 3/3: Cutting ads with ffmpeg (%d non-ad clips)...\n", len(keepSegments))
@@ -434,6 +436,30 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			if totalDuration > 0 {
 				pctCut = actualCut / totalDuration * 100
 			}
+
+			updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+				st.Status = StateDone
+				if fileExists(precutFile) {
+					st.Original.Filename = filepath.Base(precutFile)
+					if fi, err := os.Stat(precutFile); err == nil {
+						st.Original.SizeBytes = fi.Size()
+					}
+				}
+				st.Cleaned.Filename = filepath.Base(outputFile)
+				st.Cleaned.DurationSec = newDuration
+				st.Cleaned.AdDurationSec = actualCut
+				if fi, err := os.Stat(outputFile); err == nil {
+					st.Cleaned.SizeBytes = fi.Size()
+				}
+				st.Ads = make([]EpisodeAdCut, 0, len(adSegments))
+				for _, ad := range adSegments {
+					st.Ads = append(st.Ads, EpisodeAdCut{
+						Start:  ad.Start,
+						End:    ad.End,
+						Reason: ad.Reason,
+					})
+				}
+			})
 			fileTotalDuration := time.Since(fileStartTime)
 
 			if !cli.Quiet {
@@ -441,6 +467,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 					step1Duration(t0Step1), step2Duration, step3Duration, fileTotalDuration)
 				fmt.Printf("\nSuccess! Ad-free episode saved to: '%s'\n", outputFile)
 			}
+			syncAudiobookshelfDuration(&config, outputFile, newDuration)
 		} else {
 			hasError = true
 			os.Remove(tempOutputFile)
@@ -461,84 +488,4 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 
 	os.Stdout.Sync()
 	os.Stderr.Sync()
-}
-
-func handleProcDryRun(files []string, cli CLIOptions, config Config) {
-	var needsTranscribe int
-	var needsLLM int
-	var needsCut int
-	var alreadyComplete int
-
-	type fileStatus struct {
-		path   string
-		status string
-	}
-	var details []fileStatus
-
-	for _, inputFile := range files {
-		if strings.HasSuffix(inputFile, ".json") {
-			continue
-		}
-		mainMP3File, precutFile, _ := resolveAudioFiles(inputFile, cli)
-		baseName := stripExt(mainMP3File)
-		jsonFile := cli.TranscriptPath
-		if jsonFile == "" {
-			jsonFile = baseName + ".transcript.json"
-		}
-		cutsFile := baseName + ".cuts.json"
-
-		hasTx := fileExists(jsonFile)
-		hasCuts := fileExists(cutsFile)
-
-		if !hasTx {
-			needsTranscribe++
-			details = append(details, fileStatus{path: inputFile, status: "Needs Transcription"})
-		} else if !hasCuts {
-			needsLLM++
-			details = append(details, fileStatus{path: inputFile, status: "Needs Ad Detection (LLM)"})
-		} else {
-			if fileExists(precutFile) {
-				alreadyComplete++
-				details = append(details, fileStatus{path: inputFile, status: "Completed (Ad-Free)"})
-			} else if hasCuts {
-				data, err := os.ReadFile(cutsFile)
-				var cd CutsData
-				if err == nil && json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
-					needsCut++
-					details = append(details, fileStatus{path: inputFile, status: "Needs Audio Cutting"})
-				} else {
-					alreadyComplete++
-					details = append(details, fileStatus{path: inputFile, status: "Completed (0 ads)"})
-				}
-			} else {
-				alreadyComplete++
-				details = append(details, fileStatus{path: inputFile, status: "Completed"})
-			}
-		}
-	}
-
-	totalNeedingAction := needsTranscribe + needsLLM + needsCut
-
-	fmt.Println()
-	fmt.Println(bold("DRY RUN: Audio Processing Pipeline Status"))
-	fmt.Println(strings.Repeat("─", 55))
-	fmt.Printf("  • Total Episodes Scanned:        %d\n", len(files))
-	fmt.Printf("  • Needs Transcription (Whisper): %d\n", needsTranscribe)
-	fmt.Printf("  • Needs Ad Detection (LLM):      %d\n", needsLLM)
-	fmt.Printf("  • Needs Audio Cutting (FFmpeg):  %d\n", needsCut)
-	fmt.Printf("  • Already Processed / Ad-Free:   %d\n", alreadyComplete)
-	fmt.Println(strings.Repeat("─", 55))
-	fmt.Printf("  Total Needing Processing:        %s\n", bold(fmt.Sprintf("%d", totalNeedingAction)))
-	if cli.Count > 0 && totalNeedingAction > cli.Count {
-		fmt.Printf("  (Limit -n %d: would process first %d of %d episodes)\n", cli.Count, cli.Count, totalNeedingAction)
-	}
-	fmt.Println()
-
-	if cli.Verbose {
-		fmt.Println("Episode Details:")
-		for _, d := range details {
-			fmt.Printf("  [%s] %s\n", d.status, displayName(d.path))
-		}
-		fmt.Println()
-	}
 }

@@ -70,94 +70,71 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		return fmt.Errorf("no audio (.mp3) files found to push for batch processing")
 	}
 
-	batchID := generateBatchID()
-	localStagingDir := filepath.Join(os.TempDir(), "abs_staging", batchID)
-	localInDir := filepath.Join(localStagingDir, "in")
-	localOutDir := filepath.Join(localStagingDir, "out")
-
-	if err := os.MkdirAll(localInDir, 0755); err != nil {
-		return fmt.Errorf("failed to create local staging directory: %w", err)
-	}
-	if err := os.MkdirAll(localOutDir, 0755); err != nil {
-		return fmt.Errorf("failed to create local staging out directory: %w", err)
-	}
-	defer os.RemoveAll(localStagingDir)
-
-	manifest := RemoteBatchManifest{
-		BatchID:    batchID,
-		CreatedAt:  time.Now().UTC().Format(time.RFC3339),
-		Host:       targetHost,
-		Status:     BatchStatusQueued,
-		TotalItems: len(files),
-		Items:      make([]RemoteBatchJobItem, 0, len(files)),
-	}
-
-	if !quiet {
-		fmt.Printf("Staging %d audio file(s) for remote batch %s...\n", len(files), batchID)
-	}
-
-	for i, f := range files {
-		fname := filepath.Base(f)
-		stagedInPath := filepath.Join(localInDir, fname)
-		copyFile(f, stagedInPath)
-
-		item := RemoteBatchJobItem{
-			ID:            fmt.Sprintf("%s-%d", batchID, i+1),
-			SourceFile:    f,
-			AudioFileName: fname,
-			Status:        BatchStatusQueued,
-		}
-		manifest.Items = append(manifest.Items, item)
-	}
-
-	manifestPath := filepath.Join(localStagingDir, "manifest.json")
-	if err := saveManifest(manifestPath, &manifest); err != nil {
-		return fmt.Errorf("failed to write local manifest: %w", err)
-	}
-
 	remoteWorkDir := "~/.abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
-	remoteBatchDir := fmt.Sprintf("%s/staging/%s", remoteWorkDir, batchID)
 
-	if !quiet {
-		fmt.Printf("Uploading batch to %s:%s...\n", targetHost, remoteBatchDir)
-	}
-
-	mkdirCmd := fmt.Sprintf("mkdir -p %s/in %s/out", remoteBatchDir, remoteBatchDir)
-	if _, err := transport.Exec(targetHost, mkdirCmd); err != nil {
-		return fmt.Errorf("failed to create remote staging folder on %s: %w", targetHost, err)
-	}
-
-	if err := transport.RsyncTo(targetHost, localStagingDir+"/", remoteBatchDir+"/"); err != nil {
-		if errUpload := transport.Upload(targetHost, manifestPath, fmt.Sprintf("%s/manifest.json", remoteBatchDir)); errUpload != nil {
-			return fmt.Errorf("failed to rsync/upload batch to %s: %w", targetHost, err)
+	var toPush []string
+	for _, f := range files {
+		if !isEpisodeCompleted(f) {
+			toPush = append(toPush, f)
 		}
-		for _, item := range manifest.Items {
-			localFile := filepath.Join(localInDir, item.AudioFileName)
-			remoteDst := fmt.Sprintf("%s/in/%s", remoteBatchDir, item.AudioFileName)
-			if errUp := transport.Upload(targetHost, localFile, remoteDst); errUp != nil {
-				return fmt.Errorf("failed to upload audio file %s: %w", item.AudioFileName, errUp)
-			}
-		}
+	}
+	if len(toPush) == 0 {
+		toPush = files
 	}
 
 	if !quiet {
-		fmt.Printf("Triggering background worker on %s...\n", targetHost)
+		fmt.Printf("Pushing %d audio file(s) to mirror directory on %s:%s...\n", len(toPush), targetHost, remoteWorkDir)
 	}
 
-	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs batch-worker --batch-dir %s > %s/worker.log 2>&1 &", remoteBatchDir, remoteBatchDir)
+	pushedCount := 0
+	for _, f := range toPush {
+		relPath, _ := computeRelativeMediaDir(defaultDir, f)
+		remoteDstDir := fmt.Sprintf("%s/%s", remoteWorkDir, filepath.Dir(relPath))
+		remoteDstFile := fmt.Sprintf("%s/%s", remoteWorkDir, relPath)
+		remoteDstStatus := fmt.Sprintf("%s/%s.json", remoteWorkDir, relPath)
+
+		mkdirCmd := fmt.Sprintf("mkdir -p %s", remoteDstDir)
+		_, _ = transport.Exec(targetHost, mkdirCmd)
+
+		localStat := getOrCreateEpisodeStatus(f)
+		localStat.Status = StateQueuedRemote
+		_ = saveEpisodeStatus(statusPathFor(f), localStat)
+
+		remoteStat := *localStat
+		remoteStat.Status = StateAwaitingTranscription
+		remoteStat.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+
+		tmpStatPath := filepath.Join(os.TempDir(), fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
+		_ = saveEpisodeStatus(tmpStatPath, &remoteStat)
+
+		if err := transport.Upload(targetHost, f, remoteDstFile); err != nil {
+			_ = os.Remove(tmpStatPath)
+			return fmt.Errorf("failed to upload audio %s to %s: %w", f, targetHost, err)
+		}
+		if err := transport.Upload(targetHost, tmpStatPath, remoteDstStatus); err != nil {
+			_ = os.Remove(tmpStatPath)
+			return fmt.Errorf("failed to upload status file for %s to %s: %w", f, targetHost, err)
+		}
+		_ = os.Remove(tmpStatPath)
+		pushedCount++
+	}
+
+	if !quiet {
+		fmt.Printf("Triggering remote worker/scan on %s...\n", targetHost)
+	}
+
+	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 	if _, err := transport.Exec(targetHost, workerCmd); err != nil {
-		altWorkerCmd := fmt.Sprintf("nohup abs batch-worker --batch-dir %s > %s/worker.log 2>&1 &", remoteBatchDir, remoteBatchDir)
-		if _, errAlt := transport.Exec(targetHost, altWorkerCmd); errAlt != nil {
-			return fmt.Errorf("failed to trigger batch-worker on %s: %w", targetHost, err)
-		}
+		altCmd := fmt.Sprintf("nohup abs remote scan %s > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+		_, _ = transport.Exec(targetHost, altCmd)
 	}
 
 	if !quiet {
 		fmt.Println()
-		fmt.Printf("Successfully pushed batch %s to %s (%d files).\n", batchID, targetHost, len(files))
+		fmt.Printf("Successfully pushed %d episode(s) to %s:%s.\n", pushedCount, targetHost, remoteWorkDir)
 		fmt.Printf("  - Check status: abs remote status %s\n", targetHost)
 		fmt.Printf("  - Pull results: abs remote pull %s\n", targetHost)
 	}

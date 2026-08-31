@@ -5,6 +5,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) {
@@ -32,6 +33,25 @@ func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) 
 	}
 }
 
+func runRemoteAck(remoteDir, relPath string) error {
+	resolvedDir := resolveLocalPath(remoteDir)
+	audioPath := filepath.Join(resolvedDir, relPath)
+
+	_ = os.WriteFile(audioPath, []byte{}, 0644)
+	_ = os.Remove(audioPath + ".precut")
+	_ = os.Remove(audioPath + ".tmp.mp3")
+
+	statPath := statusPathFor(audioPath)
+	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil {
+		st.Status = StateArchived
+		_ = saveEpisodeStatus(statPath, st)
+	}
+
+	donePath := filepath.Join(resolvedDir, "done.json")
+	archPath := filepath.Join(resolvedDir, "archive.json")
+	return archiveDoneEpisode(donePath, archPath, relPath)
+}
+
 func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, verbose bool) error {
 	targetHost, _, err := ResolveProcessingHost(cfg, host, transport)
 	if err != nil {
@@ -49,108 +69,169 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
-	remoteStagingDir := fmt.Sprintf("%s/staging", remoteWorkDir)
 
-	out, err := transport.Exec(targetHost, fmt.Sprintf("ls -1 %s 2>/dev/null", remoteStagingDir))
-	if err != nil || strings.TrimSpace(out) == "" {
-		if !quiet {
-			fmt.Printf("No remote batches found on %s.\n", targetHost)
-		}
-		return nil
+	localPodcastsDir := ""
+	if cfg != nil {
+		localPodcastsDir = cfg.PodcastsDir
+	}
+	if localPodcastsDir == "" {
+		localPodcastsDir = "."
 	}
 
-	batchEntries := splitLines(strings.TrimSpace(out))
 	totalPulled := 0
 	var totalCutSaved float64
 
-	for _, batchID := range batchEntries {
-		batchID = strings.TrimSpace(batchID)
-		if batchID == "" {
-			continue
-		}
+	tempDonePath := filepath.Join(os.TempDir(), fmt.Sprintf("abs_done_%d.json", time.Now().UnixNano()))
+	remoteDoneFile := fmt.Sprintf("%s/done.json", remoteWorkDir)
 
-		tempPullDir := filepath.Join(os.TempDir(), "abs_pull", batchID)
-		_ = os.MkdirAll(tempPullDir, 0755)
-
-		manifestPath := filepath.Join(tempPullDir, "manifest.json")
-		remoteManifest := fmt.Sprintf("%s/%s/manifest.json", remoteStagingDir, batchID)
-
-		if err := transport.Download(targetHost, remoteManifest, manifestPath); err != nil {
-			_ = os.RemoveAll(tempPullDir)
-			continue
-		}
-
-		manifest, err := loadManifest(manifestPath)
-		if err != nil {
-			_ = os.RemoveAll(tempPullDir)
-			continue
-		}
-
-		if manifest.Status != BatchStatusCompleted && manifest.CompletedItems == 0 {
+	if err := transport.Download(targetHost, remoteDoneFile, tempDonePath); err == nil {
+		if doneM, err := loadDoneManifest(tempDonePath); err == nil && len(doneM.Episodes) > 0 {
 			if !quiet {
-				fmt.Printf("Batch %s is currently '%s' (%d/%d completed). Skipping.\n",
-					batchID, manifest.Status, manifest.CompletedItems, manifest.TotalItems)
+				fmt.Printf("Found %d completed episode(s) in %s:%s\n", len(doneM.Episodes), targetHost, remoteDoneFile)
 			}
-			_ = os.RemoveAll(tempPullDir)
-			continue
+
+			for relPath, item := range doneM.Episodes {
+				if item.Status != StateReadyForCopyBack {
+					continue
+				}
+
+				localDestAudio := filepath.Join(localPodcastsDir, relPath)
+				localDestDir := filepath.Dir(localDestAudio)
+				_ = os.MkdirAll(localDestDir, 0755)
+
+				baseRel := stripExt(relPath)
+				remoteBase := fmt.Sprintf("%s/%s", remoteWorkDir, baseRel)
+				remoteAudio := fmt.Sprintf("%s/%s", remoteWorkDir, relPath)
+				remoteStat := fmt.Sprintf("%s/%s.json", remoteWorkDir, relPath)
+				remoteCuts := fmt.Sprintf("%s.cuts.json", remoteBase)
+				remoteTrans := fmt.Sprintf("%s.transcript.json", remoteBase)
+
+				tempItemDir := filepath.Join(os.TempDir(), "abs_pull_item", fmt.Sprintf("%d", time.Now().UnixNano()))
+				_ = os.MkdirAll(tempItemDir, 0755)
+
+				tempAudio := filepath.Join(tempItemDir, filepath.Base(localDestAudio))
+				tempStat := filepath.Join(tempItemDir, filepath.Base(localDestAudio)+".json")
+				tempCuts := filepath.Join(tempItemDir, filepath.Base(baseRel)+".cuts.json")
+				tempTrans := filepath.Join(tempItemDir, filepath.Base(baseRel)+".transcript.json")
+
+				if err := transport.Download(targetHost, remoteAudio, tempAudio); err != nil {
+					_ = os.RemoveAll(tempItemDir)
+					continue
+				}
+
+				if fi, err := os.Stat(tempAudio); err != nil || fi.Size() == 0 {
+					_ = os.RemoveAll(tempItemDir)
+					continue
+				}
+
+				_ = transport.Download(targetHost, remoteStat, tempStat)
+				_ = transport.Download(targetHost, remoteCuts, tempCuts)
+				_ = transport.Download(targetHost, remoteTrans, tempTrans)
+
+				localPrecut := localDestAudio + ".precut"
+				if fileExists(localDestAudio) {
+					checkPrecutSymlink(localPrecut)
+					safeMove(localDestAudio, localPrecut)
+				}
+
+				safeMove(tempAudio, localDestAudio)
+				localBase := stripExt(localDestAudio)
+				if fileExists(tempCuts) {
+					safeMove(tempCuts, localBase+".cuts.json")
+				}
+				if fileExists(tempTrans) {
+					safeMove(tempTrans, localBase+".transcript.json")
+				}
+
+				localStat := getOrCreateEpisodeStatus(localDestAudio)
+				if fileExists(tempStat) {
+					if loaded, err := loadEpisodeStatus(tempStat); err == nil {
+						localStat = loaded
+					}
+				}
+				localStat.Status = StateDone
+				_ = saveEpisodeStatus(statusPathFor(localDestAudio), localStat)
+
+				syncAudiobookshelfDuration(cfg, localDestAudio, item.CleanedDurationSec)
+
+				ackCmd := fmt.Sprintf("abs remote ack %q || ~/.local/bin/abs remote ack %q", relPath, relPath)
+				_, errAck := transport.Exec(targetHost, ackCmd)
+				if errAck != nil {
+					truncCmd := fmt.Sprintf("truncate -s 0 %s && rm -f %s.precut %s.tmp.mp3", remoteAudio, remoteAudio, remoteAudio)
+					_, _ = transport.Exec(targetHost, truncCmd)
+				}
+
+				_ = os.RemoveAll(tempItemDir)
+				totalPulled++
+				totalCutSaved += item.CutDurationSec
+
+				if !quiet {
+					fmt.Printf("✓ Pulled %s -> %s (saved %.1fs)\n", relPath, localDestAudio, item.CutDurationSec)
+				}
+			}
 		}
+		_ = os.Remove(tempDonePath)
+	}
 
-		tempOutDir := filepath.Join(tempPullDir, "out")
-		_ = os.MkdirAll(tempOutDir, 0755)
-		remoteOut := fmt.Sprintf("%s/%s/out/", remoteStagingDir, batchID)
-		_ = transport.RsyncFrom(targetHost, remoteOut, tempOutDir+"/")
-
-		batchPulled := 0
-		for _, item := range manifest.Items {
-			if item.Status != BatchStatusCompleted {
+	remoteStagingDir := fmt.Sprintf("%s/staging", remoteWorkDir)
+	out, _ := transport.Exec(targetHost, fmt.Sprintf("ls -1 %s 2>/dev/null", remoteStagingDir))
+	if strings.TrimSpace(out) != "" {
+		batchEntries := splitLines(strings.TrimSpace(out))
+		for _, batchID := range batchEntries {
+			batchID = strings.TrimSpace(batchID)
+			if batchID == "" {
 				continue
 			}
+			tempPullDir := filepath.Join(os.TempDir(), "abs_pull", batchID)
+			_ = os.MkdirAll(tempPullDir, 0755)
+			manifestPath := filepath.Join(tempPullDir, "manifest.json")
+			remoteManifest := fmt.Sprintf("%s/%s/manifest.json", remoteStagingDir, batchID)
+			if err := transport.Download(targetHost, remoteManifest, manifestPath); err == nil {
+				if manifest, err := loadManifest(manifestPath); err == nil && (manifest.Status == BatchStatusCompleted || manifest.CompletedItems > 0) {
+					tempOutDir := filepath.Join(tempPullDir, "out")
+					_ = os.MkdirAll(tempOutDir, 0755)
+					remoteOut := fmt.Sprintf("%s/%s/out/", remoteStagingDir, batchID)
+					_ = transport.RsyncFrom(targetHost, remoteOut, tempOutDir+"/")
+					for _, item := range manifest.Items {
+						if item.Status != BatchStatusCompleted {
+							continue
+						}
+						srcAudio := filepath.Join(tempOutDir, item.AudioFileName)
+						baseName := stripExt(item.AudioFileName)
+						srcCuts := filepath.Join(tempOutDir, baseName+".cuts.json")
+						srcTranscript := filepath.Join(tempOutDir, baseName+".transcript.json")
 
-			srcAudio := filepath.Join(tempOutDir, item.AudioFileName)
-			baseName := stripExt(item.AudioFileName)
-			srcCuts := filepath.Join(tempOutDir, baseName+".cuts.json")
-			srcTranscript := filepath.Join(tempOutDir, baseName+".transcript.json")
+						destMP3 := item.SourceFile
+						destDir := filepath.Dir(destMP3)
+						_ = os.MkdirAll(destDir, 0755)
 
-			destMP3 := item.SourceFile
-			destDir := filepath.Dir(destMP3)
-			_ = os.MkdirAll(destDir, 0755)
+						destBase := stripExt(destMP3)
+						destPrecut := destMP3 + ".precut"
+						destCuts := destBase + ".cuts.json"
+						destTranscript := destBase + ".transcript.json"
 
-			destBase := stripExt(destMP3)
-			destPrecut := destMP3 + ".precut"
-			destCuts := destBase + ".cuts.json"
-			destTranscript := destBase + ".transcript.json"
-
-			if fileExists(destMP3) {
-				checkPrecutSymlink(destPrecut)
-				safeMove(destMP3, destPrecut)
+						if fileExists(destMP3) {
+							checkPrecutSymlink(destPrecut)
+							safeMove(destMP3, destPrecut)
+						}
+						if fileExists(srcAudio) {
+							safeMove(srcAudio, destMP3)
+						}
+						if fileExists(srcCuts) {
+							safeMove(srcCuts, destCuts)
+						}
+						if fileExists(srcTranscript) {
+							safeMove(srcTranscript, destTranscript)
+						}
+						updateEpisodeStatus(destMP3, func(st *EpisodeStatusFile) { st.Status = StateDone })
+						syncAudiobookshelfDuration(cfg, destMP3, item.CleanedDurationSec)
+						totalPulled++
+						totalCutSaved += item.CutDurationSec
+					}
+					_, _ = transport.Exec(targetHost, fmt.Sprintf("rm -rf %s/%s", remoteStagingDir, batchID))
+				}
 			}
-
-			if fileExists(srcAudio) {
-				safeMove(srcAudio, destMP3)
-			}
-			if fileExists(srcCuts) {
-				safeMove(srcCuts, destCuts)
-			}
-			if fileExists(srcTranscript) {
-				safeMove(srcTranscript, destTranscript)
-			}
-
-			syncAudiobookshelfDuration(cfg, destMP3, item.CleanedDurationSec)
-
-			batchPulled++
-			totalPulled++
-			totalCutSaved += item.CutDurationSec
-
-			if !quiet {
-				fmt.Printf("✓ Pulled %s -> %s (ad time cut: %.1fs)\n", item.AudioFileName, destMP3, item.CutDurationSec)
-			}
-		}
-
-		_, _ = transport.Exec(targetHost, fmt.Sprintf("rm -rf %s/%s", remoteStagingDir, batchID))
-		_ = os.RemoveAll(tempPullDir)
-
-		if !quiet && batchPulled > 0 {
-			fmt.Printf("Batch %s completed and pulled (%d item(s)). Remote staging cleaned up.\n", batchID, batchPulled)
+			_ = os.RemoveAll(tempPullDir)
 		}
 	}
 

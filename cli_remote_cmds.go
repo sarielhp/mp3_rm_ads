@@ -74,6 +74,63 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			{
+				Name:        "scan",
+				Description: "Scan remote mirror directory for pending episodes and process them",
+				UsageLine:   "abs remote scan [path] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/.abs_remote)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "scan"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "worker",
+				Description: "Run remote worker scanner loop on mirror directory",
+				UsageLine:   "abs remote worker [path] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[path]", Description: "Target mirror directory (defaults to ~/.abs_remote)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Daemon, "-d, --daemon", false, "Run as recurring background daemon loop"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "worker"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "ack",
+				Description: "Acknowledge pulled episode on remote: truncate audio to 0 bytes and archive",
+				UsageLine:   "abs remote ack <relative_path> [options]",
+				Parameters: []clihelp.Param{
+					{Name: "<relative_path>", Description: "Relative path of episode within remote work directory"},
+				},
+				Args: clihelp.ExactArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.RemoteWorkDir, "--dir <path>", "", "Remote mirror root directory"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "ack"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
 				Name:        "status",
 				Description: "Check remote server status, background workers, and active batches",
 				UsageLine:   "abs remote status [host] [options]",
@@ -152,6 +209,31 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "pull":
 		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+	case "scan":
+		targetDir := ""
+		if len(cli.Args) > 0 {
+			targetDir = cli.Args[0]
+		}
+		err = runRemoteScan(&config, targetDir, cli.Quiet, cli.Verbose)
+	case "worker":
+		targetDir := ""
+		if len(cli.Args) > 0 {
+			targetDir = cli.Args[0]
+		}
+		err = runRemoteWorkerLoop(&config, targetDir, cli.Daemon, cli.Quiet, cli.Verbose)
+	case "ack":
+		targetDir := cli.RemoteWorkDir
+		if targetDir == "" {
+			targetDir = config.RemoteWorkDir
+		}
+		if targetDir == "" {
+			targetDir = "~/.abs_remote"
+		}
+		relPath := ""
+		if len(cli.Args) > 0 {
+			relPath = cli.Args[0]
+		}
+		err = runRemoteAck(targetDir, relPath)
 	case "status":
 		err = runRemoteStatus(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "cancel":
