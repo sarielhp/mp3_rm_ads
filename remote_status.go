@@ -39,12 +39,36 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 
-	psOut, _ := transport.Exec(targetHost, "pgrep -f 'abs.*(scan|worker)' 2>/dev/null")
-	status.WorkerRunning = strings.TrimSpace(psOut) != ""
-
 	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
+	}
+
+	lockData, _ := transport.Exec(targetHost, fmt.Sprintf("cat %s/.worker.lock 2>/dev/null", remoteWorkDir))
+	var lockPID int
+	if strings.TrimSpace(lockData) != "" {
+		lines := splitLines(strings.TrimSpace(lockData))
+		if len(lines) > 0 {
+			_, _ = fmt.Sscanf(lines[0], "%d", &lockPID)
+		}
+	}
+
+	if lockPID > 0 {
+		aliveOut, _ := transport.Exec(targetHost, fmt.Sprintf("kill -0 %d 2>/dev/null && echo alive", lockPID))
+		if strings.TrimSpace(aliveOut) == "alive" {
+			status.WorkerRunning = true
+		}
+	} else {
+		psOut, _ := transport.Exec(targetHost, "pgrep -x abs 2>/dev/null")
+		status.WorkerRunning = strings.TrimSpace(psOut) != ""
+	}
+
+	if status.WorkerRunning {
+		activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null | head -n 1", remoteWorkDir))
+		if activePath := strings.TrimSpace(activeOut); activePath != "" {
+			rel := strings.TrimSuffix(strings.TrimPrefix(activePath, remoteWorkDir+"/"), ".json")
+			status.ActiveTask = rel
+		}
 	}
 
 	var readyEpisodes []RemoteDoneItem
@@ -103,9 +127,13 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	if status.BinaryVersion != "" {
 		fmt.Printf("  - Binary:          %s\n", status.BinaryVersion)
 	}
-	workerStatusStr := bold("Idle")
+	workerStatusStr := bold("Idle (Not running)")
 	if status.WorkerRunning {
-		workerStatusStr = boldGreen("Running (active jobs)")
+		if status.ActiveTask != "" {
+			workerStatusStr = boldGreen(fmt.Sprintf("Running (Processing: %s)", status.ActiveTask))
+		} else {
+			workerStatusStr = boldGreen("Running (Scanning mirror)")
+		}
 	}
 	fmt.Printf("  - Worker Process:  %s\n", workerStatusStr)
 	fmt.Printf("  - Ready to Pull:   %s\n", boldGreen(fmt.Sprintf("%d episode(s)", len(readyEpisodes))))
