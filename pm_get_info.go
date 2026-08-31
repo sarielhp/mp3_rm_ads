@@ -51,7 +51,7 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 	}
 
 	results := make([]getInfoResult, len(targetPodcasts))
-	sem := make(chan struct{}, 5)
+	sem := make(chan struct{}, 15)
 	var wg sync.WaitGroup
 
 	for idx, pod := range targetPodcasts {
@@ -71,37 +71,55 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 				return
 			}
 
-			feedEpisodes, err := client.PodcastFeedEpisodes(feedURL)
-			if err != nil {
-				results[i] = getInfoResult{title: title, err: err}
-				return
+			var cachedEps []FeedEpisode
+			totalEps := 0
+
+			if !cli.Refresh {
+				if entry := globalFeedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 {
+					totalEps = len(entry.Episodes)
+					takeCount := totalEps
+					if takeCount > limitK {
+						takeCount = limitK
+					}
+					cachedEps = entry.Episodes[:takeCount]
+				}
 			}
 
-			totalEps := len(feedEpisodes)
-			takeCount := totalEps
-			if takeCount > limitK {
-				takeCount = limitK
+			if len(cachedEps) == 0 {
+				feedEpisodes, err := client.PodcastFeedEpisodes(feedURL)
+				if err != nil {
+					results[i] = getInfoResult{title: title, err: err}
+					return
+				}
+
+				totalEps = len(feedEpisodes)
+				takeCount := totalEps
+				if takeCount > limitK {
+					takeCount = limitK
+				}
+				cachedEps = feedEpisodes[:takeCount]
+
+				latestGUID := ""
+				if len(cachedEps) > 0 {
+					latestGUID = cachedEps[0].GUID
+				}
+				globalFeedCache.Put(feedURL, &FeedCacheEntry{
+					FeedURL:     feedURL,
+					LastChecked: time.Now(),
+					LatestGUID:  latestGUID,
+					Episodes:    cachedEps,
+				})
 			}
-			cachedEps := feedEpisodes[:takeCount]
 
 			latestEpTitle := ""
 			latestEpDate := ""
-			latestGUID := ""
 			if len(cachedEps) > 0 {
 				latestEpTitle = cachedEps[0].Title
 				latestEpDate = cachedEps[0].PubDate
 				if latestEpDate == "" && cachedEps[0].PublishedAt > 0 {
 					latestEpDate = time.UnixMilli(cachedEps[0].PublishedAt).Format(time.RFC1123)
 				}
-				latestGUID = cachedEps[0].GUID
 			}
-
-			globalFeedCache.Put(feedURL, &FeedCacheEntry{
-				FeedURL:     feedURL,
-				LastChecked: time.Now(),
-				LatestGUID:  latestGUID,
-				Episodes:    cachedEps,
-			})
 
 			podDir := findPodcastDirForItem(item, config.PodcastsDir)
 			if podDir != "" {
@@ -120,7 +138,7 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 
 			results[i] = getInfoResult{
 				title:       title,
-				fetched:     takeCount,
+				fetched:     len(cachedEps),
 				totalInFeed: totalEps,
 				latestTitle: latestEpTitle,
 				latestDate:  latestEpDate,

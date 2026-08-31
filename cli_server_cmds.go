@@ -181,6 +181,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Args: clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID (defaults to all podcasts)"),
+					clihelp.Bool(&opts.Refresh, "-r, --refresh", false, "Force re-fetching latest metadata from online RSS feeds (bypasses cache)"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed per-episode metadata"),
 				},
