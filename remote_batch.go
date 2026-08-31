@@ -96,7 +96,8 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		remoteDstFile := fmt.Sprintf("%s/%s", remoteWorkDir, relPath)
 		remoteDstStatus := fmt.Sprintf("%s/%s.json", remoteWorkDir, relPath)
 
-		mkdirCmd := fmt.Sprintf("mkdir -p %s", remoteDstDir)
+		mkdirDir := strings.Replace(remoteDstDir, "~", "$HOME", 1)
+		mkdirCmd := fmt.Sprintf("mkdir -p %q", mkdirDir)
 		_, _ = transport.Exec(targetHost, mkdirCmd)
 
 		localStat := getOrCreateEpisodeStatus(f)

@@ -47,11 +47,10 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 		return "1", nil
 	}
 	if strings.HasPrefix(cmd, "mkdir -p") {
-		parts := strings.Fields(cmd)[2:]
-		for _, p := range parts {
-			local := m.resolveRemotePath(p)
-			_ = os.MkdirAll(local, 0755)
-		}
+		raw := strings.TrimPrefix(cmd, "mkdir -p")
+		raw = strings.Trim(strings.TrimSpace(raw), "\"")
+		local := m.resolveRemotePath(raw)
+		_ = os.MkdirAll(local, 0755)
 		return "", nil
 	}
 	if strings.HasPrefix(cmd, "ls -1") {

@@ -46,31 +46,11 @@ func (t *DefaultSSHTransport) Exec(host string, cmd string) (string, error) {
 }
 
 func (t *DefaultSSHTransport) Upload(host string, localSrc, remoteDst string) error {
-	c := exec.Command("scp", "-r", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", localSrc, fmt.Sprintf("%s:%s", host, remoteDst))
-	var errBuf bytes.Buffer
-	c.Stderr = &errBuf
-	if err := c.Run(); err != nil {
-		errStr := strings.TrimSpace(errBuf.String())
-		if errStr != "" {
-			return fmt.Errorf("scp upload to %s failed: %s (%w)", host, errStr, err)
-		}
-		return fmt.Errorf("scp upload to %s failed: %w", host, err)
-	}
-	return nil
+	return t.RsyncTo(host, localSrc, remoteDst)
 }
 
 func (t *DefaultSSHTransport) Download(host string, remoteSrc, localDst string) error {
-	c := exec.Command("scp", "-r", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", fmt.Sprintf("%s:%s", host, remoteSrc), localDst)
-	var errBuf bytes.Buffer
-	c.Stderr = &errBuf
-	if err := c.Run(); err != nil {
-		errStr := strings.TrimSpace(errBuf.String())
-		if errStr != "" {
-			return fmt.Errorf("scp download from %s failed: %s (%w)", host, errStr, err)
-		}
-		return fmt.Errorf("scp download from %s failed: %w", host, err)
-	}
-	return nil
+	return t.RsyncFrom(host, remoteSrc, localDst)
 }
 
 func (t *DefaultSSHTransport) RsyncTo(host string, localSrc, remoteDst string) error {
