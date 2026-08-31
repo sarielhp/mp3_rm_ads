@@ -63,7 +63,7 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.downloadPolicyModalIdx--
 			}
 		case "down", "j":
-			if m.downloadPolicyModalIdx < 4 {
+			if m.downloadPolicyModalIdx < 3 {
 				m.downloadPolicyModalIdx++
 			}
 		case "1":
@@ -74,8 +74,6 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.downloadPolicyModalIdx = 2
 		case "4":
 			m.downloadPolicyModalIdx = 3
-		case "5":
-			m.downloadPolicyModalIdx = 4
 		case "+", "=", "right", "l":
 			if m.downloadPolicyModalK < 99 {
 				m.downloadPolicyModalK++

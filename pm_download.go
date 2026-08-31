@@ -60,105 +60,6 @@ func findPodcastDirForItem(item PodcastItem, podcastsDir string) string {
 	return ""
 }
 
-func selectEpisodesByDownloadPolicy(sortedCatalog []FeedEpisode, isDownloaded func(ep FeedEpisode) bool, policy string, k int, oldest bool) ([]FeedEpisode, []string) {
-	normPolicy := normalizeDownloadPolicy(policy)
-	if k <= 0 {
-		k = 3
-	}
-
-	switch normPolicy {
-	case DownloadPolicyNone:
-		return nil, []string{"policy: none"}
-
-	case DownloadPolicyLatest:
-		if len(sortedCatalog) == 0 {
-			return nil, nil
-		}
-		var undownloaded []FeedEpisode
-		for _, ep := range sortedCatalog {
-			hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
-			if hasEnc && !isDownloaded(ep) {
-				undownloaded = append(undownloaded, ep)
-			}
-		}
-		if len(undownloaded) == 0 {
-			return nil, nil
-		}
-		latestEp := undownloaded[len(undownloaded)-1]
-		if oldest {
-			latestEp = undownloaded[0]
-		}
-		return []FeedEpisode{latestEp}, []string{"1 latest episode (policy: latest)"}
-
-	case DownloadPolicyLatestK:
-		if len(sortedCatalog) == 0 {
-			return nil, nil
-		}
-		startIdx := len(sortedCatalog) - k
-		if startIdx < 0 {
-			startIdx = 0
-		}
-		var toDownload []FeedEpisode
-		for _, ep := range sortedCatalog[startIdx:] {
-			hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
-			if hasEnc && !isDownloaded(ep) {
-				toDownload = append(toDownload, ep)
-			}
-		}
-		if len(toDownload) == 0 {
-			return nil, nil
-		}
-		if !oldest {
-			for i, j := 0, len(toDownload)-1; i < j; i, j = i+1, j-1 {
-				toDownload[i], toDownload[j] = toDownload[j], toDownload[i]
-			}
-		}
-		return toDownload, []string{fmt.Sprintf("%d episode(s) (policy: latest_%d)", len(toDownload), k)}
-
-	case DownloadPolicyMoreK:
-		var undownloaded []FeedEpisode
-		for _, ep := range sortedCatalog {
-			hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
-			if hasEnc && !isDownloaded(ep) {
-				undownloaded = append(undownloaded, ep)
-			}
-		}
-		if len(undownloaded) == 0 {
-			return nil, nil
-		}
-		if !oldest {
-			for i, j := 0, len(undownloaded)-1; i < j; i, j = i+1, j-1 {
-				undownloaded[i], undownloaded[j] = undownloaded[j], undownloaded[i]
-			}
-		}
-		if len(undownloaded) > k {
-			undownloaded = undownloaded[:k]
-		}
-		return undownloaded, []string{fmt.Sprintf("%d episode(s) (policy: more_%d)", len(undownloaded), k)}
-
-	case DownloadPolicyAll:
-		var undownloaded []FeedEpisode
-		for _, ep := range sortedCatalog {
-			hasEnc := (ep.Enclosure != nil && ep.Enclosure.URL != "") || ep.EnclosureURL != ""
-			if hasEnc && !isDownloaded(ep) {
-				undownloaded = append(undownloaded, ep)
-			}
-		}
-		if len(undownloaded) == 0 {
-			return nil, nil
-		}
-		if !oldest {
-			for i, j := 0, len(undownloaded)-1; i < j; i, j = i+1, j-1 {
-				undownloaded[i], undownloaded[j] = undownloaded[j], undownloaded[i]
-			}
-		}
-		return undownloaded, []string{fmt.Sprintf("%d episode(s) (policy: all)", len(undownloaded))}
-
-	default:
-		return nil, nil
-	}
-}
-
 func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, oldest, dryRun, noWait, fill, countGiven, checkNew, forceNewOnly bool, keep *int, verbose bool, quiet bool) int {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
@@ -243,17 +144,11 @@ func downloadPodcastEpisodes(client *ABSClient, item PodcastItem, count int, old
 
 			podDir := findPodcastDirForItem(item, "")
 			podCfg := defaultPodcastConfig()
-			hasCustomPolicy := false
 			if podDir != "" {
 				podCfg = loadPodcastConfig(podDir)
-				if podCfg.DownloadPolicy != "" && podCfg.DownloadPolicy != DownloadPolicyNone {
-					hasCustomPolicy = true
-				} else if podCfg.DownloadPolicy == DownloadPolicyNone {
-					hasCustomPolicy = true
-				}
 			}
 
-			if hasCustomPolicy && !fill && !countGiven {
+			if !fill && !countGiven {
 				episodesToDownload, reasons = selectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, podCfg.DownloadPolicy, podCfg.DownloadK, oldest)
 			} else if forceNewOnly {
 				if len(downloadedIndices) > 0 {

@@ -24,6 +24,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				OptionsValidator: clihelp.MutuallyExclusive("--podcasts-only", "--episodes-only"),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+					clihelp.Int(countVal, "-k, --count <number>", -1, "Explicit number of episodes to download (overrides policy)"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -34,6 +35,38 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
 					opts.ServerSubcmd = "scan"
+					if *countVal > 0 {
+						opts.Count = *countVal
+						opts.CountGiven = true
+					}
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "new",
+				Description: "Check and download new podcast episodes based on download policies",
+				UsageLine:   "abs server new [podcasts_dir] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+					clihelp.Int(countVal, "-k, --count <number>", -1, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "scan"
+					opts.EpisodesOnly = true
+					if *countVal > 0 {
+						opts.Count = *countVal
+						opts.CountGiven = true
+					}
 					opts.Args = ctx.Args
 					return nil
 				},

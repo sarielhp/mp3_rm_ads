@@ -326,6 +326,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				OptionsValidator: clihelp.MutuallyExclusive("--podcasts-only", "--episodes-only"),
 				Options: []clihelp.Option{
 					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
 					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
@@ -336,6 +337,36 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Run: func(ctx *clihelp.Context) error {
 					*action = "server"
 					opts.ServerSubcmd = "scan"
+					if opts.Count > 0 {
+						opts.CountGiven = true
+					}
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "new",
+				Description: "Check and download new podcast episodes based on download policies",
+				UsageLine:   "abs new [podcasts_dir] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
+					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
+					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "scan"
+					opts.EpisodesOnly = true
+					if opts.Count > 0 {
+						opts.CountGiven = true
+					}
 					opts.Args = ctx.Args
 					return nil
 				},
@@ -477,7 +508,7 @@ func parseFlags() (string, CLIOptions) {
 	opts.IsTUICommand = (action == "tui")
 	opts.IsTimelineCommand = (action == "timeline" || (action == "server" && opts.ServerSubcmd == "timeline"))
 	opts.IsTestCommand = (action == "test")
-	opts.IsScanCommand = (action == "scan")
+	opts.IsScanCommand = (action == "scan" || action == "new" || (action == "server" && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new")))
 	opts.IsStatusCommand = (action == "status")
 
 	return action, opts

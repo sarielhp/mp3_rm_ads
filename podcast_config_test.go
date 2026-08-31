@@ -133,9 +133,9 @@ func TestPodcastConfigDownloadPolicyNormalization(t *testing.T) {
 		{"latest_k", DownloadPolicyLatestK},
 		{"latest-k", DownloadPolicyLatestK},
 		{"latestk", DownloadPolicyLatestK},
-		{"more_k", DownloadPolicyMoreK},
-		{"more-k", DownloadPolicyMoreK},
-		{"more", DownloadPolicyMoreK},
+		{"more_k", DownloadPolicyLatestK},
+		{"more-k", DownloadPolicyLatestK},
+		{"more", DownloadPolicyLatestK},
 		{"all", DownloadPolicyAll},
 		{"full", DownloadPolicyAll},
 		{"every", DownloadPolicyAll},
@@ -161,12 +161,8 @@ func TestPodcastConfigDownloadPolicyCycle(t *testing.T) {
 		t.Errorf("expected cycle latest -> latest_k, got %s", m)
 	}
 	m = cycleDownloadPolicy(m)
-	if m != DownloadPolicyMoreK {
-		t.Errorf("expected cycle latest_k -> more_k, got %s", m)
-	}
-	m = cycleDownloadPolicy(m)
 	if m != DownloadPolicyAll {
-		t.Errorf("expected cycle more_k -> all, got %s", m)
+		t.Errorf("expected cycle latest_k -> all, got %s", m)
 	}
 	m = cycleDownloadPolicy(m)
 	if m != DownloadPolicyNone {
@@ -181,9 +177,6 @@ func TestPodcastConfigDownloadPolicyLabelsAndBadges(t *testing.T) {
 	if downloadPolicyLabel(DownloadPolicyLatestK, 5) != "Latest 5 episodes (latest_k)" {
 		t.Errorf("unexpected label for latest_k: %s", downloadPolicyLabel(DownloadPolicyLatestK, 5))
 	}
-	if downloadPolicyLabel(DownloadPolicyMoreK, 4) != "Next 4 undownloaded (more_k)" {
-		t.Errorf("unexpected label for more_k: %s", downloadPolicyLabel(DownloadPolicyMoreK, 4))
-	}
 	if downloadPolicyLabel(DownloadPolicyAll, 0) != "All episodes (all)" {
 		t.Errorf("unexpected label for all: %s", downloadPolicyLabel(DownloadPolicyAll, 0))
 	}
@@ -193,9 +186,6 @@ func TestPodcastConfigDownloadPolicyLabelsAndBadges(t *testing.T) {
 	}
 	if downloadPolicyBadge(DownloadPolicyLatestK, 5) != "[DL: Latest 5]" {
 		t.Errorf("unexpected badge for latest_k: %s", downloadPolicyBadge(DownloadPolicyLatestK, 5))
-	}
-	if downloadPolicyBadge(DownloadPolicyMoreK, 4) != "[DL: More 4]" {
-		t.Errorf("unexpected badge for more_k: %s", downloadPolicyBadge(DownloadPolicyMoreK, 4))
 	}
 	if downloadPolicyBadge(DownloadPolicyAll, 0) != "[DL: All]" {
 		t.Errorf("unexpected badge for all: %s", downloadPolicyBadge(DownloadPolicyAll, 0))
@@ -222,18 +212,18 @@ func TestPodcastConfigDownloadPolicySaveLoad(t *testing.T) {
 		t.Errorf("expected loaded DownloadK 7, got %d", loaded.DownloadK)
 	}
 
-	cfg.DownloadPolicy = DownloadPolicyMoreK
-	cfg.DownloadK = 2
+	cfg.DownloadPolicy = DownloadPolicyAll
+	cfg.DownloadK = 4
 	if err := savePodcastConfig(d, cfg); err != nil {
 		t.Fatalf("savePodcastConfig update failed: %v", err)
 	}
 
 	loaded2 := loadPodcastConfig(d)
-	if loaded2.DownloadPolicy != DownloadPolicyMoreK {
-		t.Errorf("expected loaded DownloadPolicy %q, got %q", DownloadPolicyMoreK, loaded2.DownloadPolicy)
+	if loaded2.DownloadPolicy != DownloadPolicyAll {
+		t.Errorf("expected loaded DownloadPolicy %q, got %q", DownloadPolicyAll, loaded2.DownloadPolicy)
 	}
-	if loaded2.DownloadK != 2 {
-		t.Errorf("expected loaded DownloadK 2, got %d", loaded2.DownloadK)
+	if loaded2.DownloadK != 4 {
+		t.Errorf("expected loaded DownloadK 4, got %d", loaded2.DownloadK)
 	}
 }
 
@@ -266,8 +256,8 @@ func TestSelectEpisodesByDownloadPolicy(t *testing.T) {
 
 	downloaded["g5"] = true
 	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyLatest, 0, false)
-	if len(eps) != 1 || eps[0].GUID != "g4" {
-		t.Errorf("expected next latest ep g4, got %+v", eps)
+	if len(eps) != 0 {
+		t.Errorf("expected 0 episodes when latest ep is already downloaded, got %+v", eps)
 	}
 	delete(downloaded, "g5")
 
@@ -276,19 +266,16 @@ func TestSelectEpisodesByDownloadPolicy(t *testing.T) {
 		t.Errorf("expected latest_2 eps [g5, g4], got %+v", eps)
 	}
 
+	downloaded["g5"] = true
+	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyLatestK, 2, false)
+	if len(eps) != 1 || eps[0].GUID != "g4" {
+		t.Errorf("expected latest_2 ep [g4] when g5 downloaded, got %+v", eps)
+	}
+	delete(downloaded, "g5")
+
 	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyLatestK, 3, false)
 	if len(eps) != 2 || eps[0].GUID != "g5" || eps[1].GUID != "g4" {
 		t.Errorf("expected latest_3 eps [g5, g4], got %+v", eps)
-	}
-
-	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyMoreK, 2, false)
-	if len(eps) != 2 || eps[0].GUID != "g5" || eps[1].GUID != "g4" {
-		t.Errorf("expected more_2 eps [g5, g4], got %+v", eps)
-	}
-
-	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyMoreK, 3, false)
-	if len(eps) != 3 || eps[0].GUID != "g5" || eps[1].GUID != "g4" || eps[2].GUID != "g2" {
-		t.Errorf("expected more_3 eps [g5, g4, g2], got %+v", eps)
 	}
 
 	eps, _ = selectEpisodesByDownloadPolicy(catalog, isDownloaded, DownloadPolicyAll, 0, false)

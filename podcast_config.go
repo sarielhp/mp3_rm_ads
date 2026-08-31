@@ -20,7 +20,6 @@ const (
 	DownloadPolicyNone    = "none"
 	DownloadPolicyLatest  = "latest"
 	DownloadPolicyLatestK = "latest_k"
-	DownloadPolicyMoreK   = "more_k"
 	DownloadPolicyAll     = "all"
 )
 
@@ -89,10 +88,8 @@ func normalizeDownloadPolicy(policy string) string {
 	switch strings.ToLower(strings.TrimSpace(policy)) {
 	case "latest", "last", "recent", "newest", "1", "single":
 		return DownloadPolicyLatest
-	case "latest_k", "latest-k", "latestk", "last_k", "last-k", "recent_k":
+	case "latest_k", "latest-k", "latestk", "last_k", "last-k", "recent_k", "more_k", "more-k", "morek", "next_k", "next-k", "more":
 		return DownloadPolicyLatestK
-	case "more_k", "more-k", "morek", "next_k", "next-k", "more":
-		return DownloadPolicyMoreK
 	case "all", "every", "full":
 		return DownloadPolicyAll
 	case "none", "off", "disabled", "no", "manual":
@@ -109,8 +106,6 @@ func cycleDownloadPolicy(current string) string {
 	case DownloadPolicyLatest:
 		return DownloadPolicyLatestK
 	case DownloadPolicyLatestK:
-		return DownloadPolicyMoreK
-	case DownloadPolicyMoreK:
 		return DownloadPolicyAll
 	case DownloadPolicyAll:
 		return DownloadPolicyNone
@@ -128,8 +123,6 @@ func downloadPolicyLabel(policy string, k int) string {
 		return "Latest episode only (latest)"
 	case DownloadPolicyLatestK:
 		return fmt.Sprintf("Latest %d episodes (latest_k)", k)
-	case DownloadPolicyMoreK:
-		return fmt.Sprintf("Next %d undownloaded (more_k)", k)
 	case DownloadPolicyAll:
 		return "All episodes (all)"
 	default:
@@ -146,8 +139,6 @@ func downloadPolicyBadge(policy string, k int) string {
 		return "[DL: Latest]"
 	case DownloadPolicyLatestK:
 		return fmt.Sprintf("[DL: Latest %d]", k)
-	case DownloadPolicyMoreK:
-		return fmt.Sprintf("[DL: More %d]", k)
 	case DownloadPolicyAll:
 		return "[DL: All]"
 	default:

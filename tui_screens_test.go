@@ -542,7 +542,7 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	if !m.showDownloadPolicyModal {
 		t.Fatalf("expected modal to open with 'D'")
 	}
-	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'5'}})
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
 	if m.showDownloadPolicyModal {
 		t.Errorf("expected modal to close after Esc")

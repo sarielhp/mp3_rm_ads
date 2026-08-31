@@ -268,10 +268,9 @@ func (m *tuiModel) drawDownloadPolicyModal() string {
 		desc   string
 	}{
 		{1, DownloadPolicyNone, "1. No Automatic Downloads (none)", "Do not automatically download episodes"},
-		{2, DownloadPolicyLatest, "2. Latest Episode Only (latest)", "Download only the single newest episode"},
-		{3, DownloadPolicyLatestK, fmt.Sprintf("3. Latest K Episodes (latest_%d)", kVal), fmt.Sprintf("Keep the %d newest episodes from feed", kVal)},
-		{4, DownloadPolicyMoreK, fmt.Sprintf("4. Next K Undownloaded (more_%d)", kVal), fmt.Sprintf("Download up to %d missing backlog episodes", kVal)},
-		{5, DownloadPolicyAll, "5. All Episodes (all)", "Download the entire catalog backlog"},
+		{2, DownloadPolicyLatest, "2. Latest Episode Only (latest)", "Download only the single newest episode if missing"},
+		{3, DownloadPolicyLatestK, fmt.Sprintf("3. Latest K Episodes (latest_%d)", kVal), fmt.Sprintf("Keep the %d newest episodes available from feed", kVal)},
+		{4, DownloadPolicyAll, "4. All Episodes (all)", "Download all missing episodes in feed"},
 	}
 
 	curPolicy := normalizeDownloadPolicy(pod.config.DownloadPolicy)
@@ -296,14 +295,14 @@ func (m *tuiModel) drawDownloadPolicyModal() string {
 		lines = append(lines, "")
 	}
 
-	if m.downloadPolicyModalIdx == 2 || m.downloadPolicyModalIdx == 3 {
+	if m.downloadPolicyModalIdx == 2 {
 		adjuster := fmt.Sprintf("  Parameter K: [ < %d > ]  (Press + / - or ← / → to adjust)", kVal)
 		lines = append(lines, tuiStatStyle.Render(adjuster))
 		lines = append(lines, "")
 	}
 
 	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
-	lines = append(lines, tuiDimStyle.Render("↑/↓ Select │ 1-5 Choose │ +/- Adjust K │ Enter Apply │ Esc Cancel"))
+	lines = append(lines, tuiDimStyle.Render("↑/↓ Select │ 1-4 Choose │ +/- Adjust K │ Enter Apply │ Esc Cancel"))
 
 	content := strings.Join(lines, "\n")
 	return lipgloss.NewStyle().
@@ -325,10 +324,8 @@ func (m *tuiModel) openDownloadPolicyModal() {
 		m.downloadPolicyModalIdx = 1
 	case DownloadPolicyLatestK:
 		m.downloadPolicyModalIdx = 2
-	case DownloadPolicyMoreK:
-		m.downloadPolicyModalIdx = 3
 	case DownloadPolicyAll:
-		m.downloadPolicyModalIdx = 4
+		m.downloadPolicyModalIdx = 3
 	default:
 		m.downloadPolicyModalIdx = 0
 	}
@@ -345,7 +342,7 @@ func (m *tuiModel) applyDownloadPolicyModal() {
 		return
 	}
 	pod := &m.podcasts[m.podIdx]
-	policies := []string{DownloadPolicyNone, DownloadPolicyLatest, DownloadPolicyLatestK, DownloadPolicyMoreK, DownloadPolicyAll}
+	policies := []string{DownloadPolicyNone, DownloadPolicyLatest, DownloadPolicyLatestK, DownloadPolicyAll}
 	if m.downloadPolicyModalIdx >= 0 && m.downloadPolicyModalIdx < len(policies) {
 		pod.config.DownloadPolicy = policies[m.downloadPolicyModalIdx]
 		if m.downloadPolicyModalK > 0 {
