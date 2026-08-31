@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -66,6 +67,40 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"status\": \"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null | head -n 1", remoteWorkDir))
 	if activePath := strings.TrimSpace(activeOut); activePath != "" {
 		status.ActiveTask = cleanRemoteRelPath(activePath, remoteWorkDir)
+		statContent, _ := transport.Exec(targetHost, fmt.Sprintf("cat %q 2>/dev/null", activePath))
+		if strings.TrimSpace(statContent) != "" {
+			var activeSt EpisodeStatusFile
+			if json.Unmarshal([]byte(statContent), &activeSt) == nil {
+				status.ActiveStage = activeSt.CurrentStep
+				if status.ActiveStage == "" {
+					if activeSt.Status == StateTranscribingRemotely {
+						status.ActiveStage = "Step 1/3: Whisper Transcription"
+					} else if activeSt.Status == StateCuttingRemotely {
+						status.ActiveStage = "Step 3/3: FFmpeg Audio Cutting"
+					}
+				}
+				if activeSt.StepStartedAt != "" {
+					if tStart, err := time.Parse(time.RFC3339, activeSt.StepStartedAt); err == nil {
+						elapsed := time.Since(tStart)
+						status.ActiveElapsed = formatClock(elapsed.Seconds())
+						if activeSt.Status == StateTranscribingRemotely && activeSt.Original.DurationSec > 0 {
+							estTotalSec := activeSt.Original.DurationSec / 6.0
+							if estTotalSec > 0 {
+								pct := int((elapsed.Seconds() / estTotalSec) * 100)
+								if pct > 99 {
+									pct = 99
+								}
+								remSec := estTotalSec - elapsed.Seconds()
+								if remSec < 0 {
+									remSec = 5
+								}
+								status.ActiveETA = fmt.Sprintf("Est. Remaining: ~%s (%d%%)", formatClock(remSec), pct)
+							}
+						}
+					}
+				}
+			}
+		}
 	}
 
 	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
@@ -150,12 +185,25 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	workerStatusStr := bold("Not running (idle)")
 	if status.WorkerRunning {
 		if status.ActiveTask != "" {
-			workerStatusStr = boldGreen(fmt.Sprintf("Running (Processing: %s)", status.ActiveTask))
+			workerStatusStr = boldGreen("Running")
 		} else {
 			workerStatusStr = boldGreen("Running (Scanning mirror)")
 		}
 	}
 	fmt.Printf("  - Worker Process:  %s\n", workerStatusStr)
+	if status.WorkerRunning && status.ActiveTask != "" {
+		fmt.Printf("      • Task:        %s\n", bold(status.ActiveTask))
+		if status.ActiveStage != "" {
+			fmt.Printf("      • Stage:       %s\n", status.ActiveStage)
+		}
+		if status.ActiveElapsed != "" {
+			progressInfo := fmt.Sprintf("Elapsed: %s", status.ActiveElapsed)
+			if status.ActiveETA != "" {
+				progressInfo += fmt.Sprintf(" | %s", status.ActiveETA)
+			}
+			fmt.Printf("      • Progress:    %s\n", boldCyan(progressInfo))
+		}
+	}
 	if len(status.QueuedTasks) > 0 {
 		fmt.Printf("  - Remote Queue:    %s\n", boldYellow(fmt.Sprintf("%d job(s) scheduled", len(status.QueuedTasks))))
 	} else {

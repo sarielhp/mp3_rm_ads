@@ -40,16 +40,18 @@ type EpisodeAdCut struct {
 }
 
 type EpisodeStatusFile struct {
-	Version    int              `json:"version"`
-	MediaFile  string           `json:"media_file"`
-	Status     EpisodeState     `json:"status"`
-	CreatedAt  string           `json:"created_at"`
-	UpdatedAt  string           `json:"updated_at"`
-	WorkerHost string           `json:"worker_host,omitempty"`
-	Original   EpisodeAudioMeta `json:"original,omitempty"`
-	Cleaned    EpisodeAudioMeta `json:"cleaned,omitempty"`
-	Ads        []EpisodeAdCut   `json:"ads,omitempty"`
-	LastError  string           `json:"last_error,omitempty"`
+	Version       int              `json:"version"`
+	MediaFile     string           `json:"media_file"`
+	Status        EpisodeState     `json:"status"`
+	CurrentStep   string           `json:"current_step,omitempty"`
+	StepStartedAt string           `json:"step_started_at,omitempty"`
+	CreatedAt     string           `json:"created_at"`
+	UpdatedAt     string           `json:"updated_at"`
+	WorkerHost    string           `json:"worker_host,omitempty"`
+	Original      EpisodeAudioMeta `json:"original,omitempty"`
+	Cleaned       EpisodeAudioMeta `json:"cleaned,omitempty"`
+	Ads           []EpisodeAdCut   `json:"ads,omitempty"`
+	LastError     string           `json:"last_error,omitempty"`
 }
 
 func statusPathFor(audioPath string) string {

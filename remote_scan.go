@@ -123,7 +123,10 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		}
 
 		st.Status = StateTranscribingRemotely
+		st.CurrentStep = "Step 1/3: Whisper Transcription"
+		st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
 		st.WorkerHost = hostname
+		st.Original.DurationSec = origDuration
 		_ = saveEpisodeStatus(statPath, st)
 
 		if !quiet {
@@ -155,6 +158,10 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 
 		saveJSONTranscript(audioFile, transData, transcriptJSON, quiet, map[string]string{})
 
+		st.CurrentStep = "Step 2/3: LLM Ad Detection"
+		st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
+		_ = saveEpisodeStatus(statPath, st)
+
 		formattedTranscript := formatTranscript(transData, origDuration)
 		adSegments := detectAdsLLM(formattedTranscript, profile)
 		if len(adSegments) > 0 {
@@ -178,6 +185,8 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 
 		if len(adSegments) > 0 && len(keepSegments) > 0 {
 			st.Status = StateCuttingRemotely
+			st.CurrentStep = "Step 3/3: FFmpeg Audio Cutting"
+			st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
 			_ = saveEpisodeStatus(statPath, st)
 
 			workDir := workDirFor(audioFile)
