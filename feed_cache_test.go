@@ -146,3 +146,29 @@ func TestFetchFeedDirect(t *testing.T) {
 		t.Error("expected 304 notModified")
 	}
 }
+
+func TestFeedCacheExpiration(t *testing.T) {
+	var nilEntry *FeedCacheEntry
+	if !nilEntry.IsExpired(48 * time.Hour) {
+		t.Error("expected nil entry to be expired")
+	}
+
+	zeroEntry := &FeedCacheEntry{}
+	if !zeroEntry.IsExpired(48 * time.Hour) {
+		t.Error("expected zero entry to be expired")
+	}
+
+	freshEntry := &FeedCacheEntry{
+		LastChecked: time.Now().Add(-10 * time.Hour),
+	}
+	if freshEntry.IsExpired(48 * time.Hour) {
+		t.Error("expected 10h old entry to not be expired with 48h TTL")
+	}
+
+	staleEntry := &FeedCacheEntry{
+		LastChecked: time.Now().Add(-49 * time.Hour),
+	}
+	if !staleEntry.IsExpired(48 * time.Hour) {
+		t.Error("expected 49h old entry to be expired with 48h TTL")
+	}
+}

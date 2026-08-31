@@ -122,7 +122,7 @@ func getEpisodesForFrequency(client *ABSClient, item PodcastItem, podcastsDir st
 
 	if !refresh {
 		if feedURL != "" {
-			if entry := globalFeedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 {
+			if entry := globalFeedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 && !entry.IsExpired(FeedCacheDefaultTTL) {
 				return entry.Episodes, nil
 			}
 		}

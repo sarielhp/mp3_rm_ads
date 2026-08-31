@@ -22,6 +22,18 @@ type FeedCacheEntry struct {
 	Episodes     []FeedEpisode `json:"episodes,omitempty"`
 }
 
+const FeedCacheDefaultTTL = 48 * time.Hour
+
+func (e *FeedCacheEntry) IsExpired(ttl time.Duration) bool {
+	if e == nil {
+		return true
+	}
+	if e.LastChecked.IsZero() {
+		return true
+	}
+	return time.Since(e.LastChecked) > ttl
+}
+
 type FeedCacheManager struct {
 	mu        sync.RWMutex
 	cacheFile string

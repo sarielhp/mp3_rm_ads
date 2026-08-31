@@ -75,7 +75,7 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 			totalEps := 0
 
 			if !cli.Refresh {
-				if entry := globalFeedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 {
+				if entry := globalFeedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 && !entry.IsExpired(FeedCacheDefaultTTL) {
 					totalEps = len(entry.Episodes)
 					takeCount := totalEps
 					if takeCount > limitK {
