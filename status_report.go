@@ -116,6 +116,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		if ok {
 			mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
 			for _, mp3 := range mp3Files {
+				_ = getOrCreateEpisodeStatus(mp3)
 				if !isEpisodeCompleted(mp3) {
 					needsAdRemoval++
 				}
@@ -154,6 +155,7 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 			}
 			needsAd := 0
 			for _, mp3 := range mp3s {
+				_ = getOrCreateEpisodeStatus(mp3)
 				if !isEpisodeCompleted(mp3) {
 					needsAd++
 				}
@@ -171,6 +173,7 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 		if len(mp3s) > 0 {
 			needsAd := 0
 			for _, mp3 := range mp3s {
+				_ = getOrCreateEpisodeStatus(mp3)
 				if !isEpisodeCompleted(mp3) {
 					needsAd++
 				}

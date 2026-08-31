@@ -120,6 +120,58 @@ func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {
 			SizeBytes:   sz,
 		},
 	}
+
+	base := stripExt(audioPath)
+	cutsFile := base + ".cuts.json"
+	transcriptFile := base + ".transcript.json"
+	precutFile := audioPath + ".precut"
+
+	if fileExists(precutFile) {
+		var origSz int64
+		if fi, err := os.Stat(precutFile); err == nil {
+			origSz = fi.Size()
+		}
+		origDur := getAudioDuration(precutFile)
+		st.Status = StateDone
+		st.Original = EpisodeAudioMeta{
+			Filename:    filepath.Base(precutFile),
+			DurationSec: origDur,
+			SizeBytes:   origSz,
+		}
+		st.Cleaned = EpisodeAudioMeta{
+			Filename:      fname,
+			DurationSec:   dur,
+			SizeBytes:     sz,
+			AdDurationSec: origDur - dur,
+		}
+	} else if fileExists(cutsFile) && fileExists(transcriptFile) {
+		data, err := os.ReadFile(cutsFile)
+		var cd CutsData
+		if err == nil && json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) == 0 {
+			st.Status = StateDone
+			st.Cleaned = EpisodeAudioMeta{
+				Filename:    fname,
+				DurationSec: dur,
+				SizeBytes:   sz,
+			}
+		}
+	}
+
+	if fileExists(cutsFile) {
+		if data, err := os.ReadFile(cutsFile); err == nil {
+			var cd CutsData
+			if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
+				for _, c := range cd.CutIntervals {
+					st.Ads = append(st.Ads, EpisodeAdCut{
+						Start:  c.StartSec,
+						End:    c.EndSec,
+						Reason: c.Reason,
+					})
+				}
+			}
+		}
+	}
+
 	_ = saveEpisodeStatus(statPath, st)
 	return st
 }
