@@ -443,6 +443,36 @@ func TestParseFlagsQuiet(t *testing.T) {
 	}
 }
 
+func TestParseFlagsDryRun(t *testing.T) {
+	orig := os.Args
+	defer func() { os.Args = orig }()
+
+	os.Args = []string{"abs", "proc", "--dry-run", "file.mp3"}
+	act, cli := parseFlags()
+	if act != "proc" || !cli.DryRun {
+		t.Errorf("expected proc with DryRun=true, got act=%s, DryRun=%v", act, cli.DryRun)
+	}
+}
+
+func TestHandleProcDryRun(t *testing.T) {
+	dir := t.TempDir()
+	ep1 := filepath.Join(dir, "ep1.mp3")
+	ep2 := filepath.Join(dir, "ep2.mp3")
+	ep3 := filepath.Join(dir, "ep3.mp3")
+	os.WriteFile(ep1, []byte("audio1"), 0644)
+	os.WriteFile(ep2, []byte("audio2"), 0644)
+	os.WriteFile(ep3, []byte("audio3"), 0644)
+
+	// ep2 has transcript, needs LLM
+	os.WriteFile(filepath.Join(dir, "ep2.transcript.json"), []byte("{}"), 0644)
+
+	// ep3 has transcript and cuts
+	os.WriteFile(filepath.Join(dir, "ep3.transcript.json"), []byte("{}"), 0644)
+	os.WriteFile(filepath.Join(dir, "ep3.cuts.json"), []byte(`{"cut_intervals":[]}`), 0644)
+
+	handleProcDryRun([]string{ep1, ep2, ep3}, CLIOptions{DryRun: true, Count: 2, Verbose: true}, Config{})
+}
+
 func TestScanningDirectoryOutput(t *testing.T) {
 	d := t.TempDir()
 
