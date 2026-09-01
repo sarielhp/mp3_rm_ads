@@ -1,15 +1,42 @@
-package main
+package backend
 
 import (
 	"database/sql"
 	"fmt"
+	"os"
 	"strings"
 
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func resetPodcastDateCheckInDB(dbPath, itemID, title string) error {
-	if dbPath == "" || !fileExists(dbPath) {
+func GetTokenFromDB(dbPath string) string {
+	if dbPath == "" {
+		return ""
+	}
+	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
+		return ""
+	}
+
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	if err != nil {
+		return ""
+	}
+	defer db.Close()
+
+	var token string
+	query := "SELECT token FROM users WHERE token IS NOT NULL AND token != '' ORDER BY createdAt ASC LIMIT 1;"
+	err = db.QueryRow(query).Scan(&token)
+	if err != nil {
+		return ""
+	}
+	return token
+}
+
+func ResetPodcastDateCheckInDB(dbPath, itemID, title string) error {
+	if dbPath == "" {
+		return fmt.Errorf("database path does not exist: %s", dbPath)
+	}
+	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
 		return fmt.Errorf("database path does not exist: %s", dbPath)
 	}
 
@@ -37,8 +64,8 @@ func resetPodcastDateCheckInDB(dbPath, itemID, title string) error {
 	return fmt.Errorf("no item ID or title provided for podcast date reset")
 }
 
-func (c *ABSClient) ResetPodcastDateCheckAPI(itemID string) error {
-	if c == nil || itemID == "" {
+func (c *AudiobookshelfBackend) ResetPodcastDateCheckAPI(itemID string) error {
+	if itemID == "" || c.Host == "" {
 		return nil
 	}
 	payload := map[string]interface{}{
@@ -53,19 +80,19 @@ func (c *ABSClient) ResetPodcastDateCheckAPI(itemID string) error {
 	return err
 }
 
-func resetPodcastDateCheck(client *ABSClient, dbPath, itemID, title string) error {
+func (c *AudiobookshelfBackend) ResetPodcastDateCheck(itemID, title string) error {
 	var errs []string
-	if dbPath != "" && fileExists(dbPath) {
-		if err := resetPodcastDateCheckInDB(dbPath, itemID, title); err != nil {
+	if c.DBPath != "" {
+		if err := ResetPodcastDateCheckInDB(c.DBPath, itemID, title); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
-	if client != nil && itemID != "" {
-		if err := client.ResetPodcastDateCheckAPI(itemID); err != nil {
+	if c.Host != "" && itemID != "" {
+		if err := c.ResetPodcastDateCheckAPI(itemID); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
-	if len(errs) > 0 && dbPath == "" && client == nil {
+	if len(errs) > 0 && c.DBPath == "" && c.Host == "" {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil

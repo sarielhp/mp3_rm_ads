@@ -8,31 +8,6 @@ import (
 	"time"
 )
 
-func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) {
-	if cfg == nil || cfg.AudiobookshelfURL == "" {
-		return
-	}
-
-	client, err := getABSClient(*cfg, true)
-	if err != nil {
-		return
-	}
-
-	items, err := client.PodcastItems()
-	if err != nil {
-		return
-	}
-
-	parentDir := filepath.Base(filepath.Dir(filePath))
-	for _, item := range items {
-		title := item.Media.Metadata.Title
-		if strings.EqualFold(title, parentDir) || strings.EqualFold(item.ID, parentDir) {
-			_, _ = client.Request(fmt.Sprintf("/api/items/%s/scan", item.ID), "POST", nil)
-			break
-		}
-	}
-}
-
 func runRemoteAck(remoteDir string, relPaths []string) error {
 	resolvedDir := resolveLocalPath(remoteDir)
 	donePath := filepath.Join(resolvedDir, "done.json")

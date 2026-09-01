@@ -1,159 +1,64 @@
 package main
 
-import (
-	"encoding/json"
-	"fmt"
-	"strconv"
+import "github.com/sariel/abs/pkg/backend"
+
+type (
+	Backend               = backend.Backend
+	LibraryFolder         = backend.LibraryFolder
+	Library               = backend.Library
+	AudioFileMetadata     = backend.AudioFileMetadata
+	PodcastAudioFile      = backend.PodcastAudioFile
+	Episode               = backend.Episode
+	PodcastEpisode        = backend.Episode
+	PodcastMetadata       = backend.PodcastMetadata
+	PodcastMedia          = backend.PodcastMedia
+	Podcast               = backend.Podcast
+	PodcastItem           = backend.Podcast
+	FeedEnclosure         = backend.FeedEnclosure
+	FeedEpisode           = backend.FeedEpisode
+	ActiveDownload        = backend.ActiveDownload
+	PodcastFeedInfo       = backend.OPMLFeed
+	PodcastCadence        = backend.PodcastCadence
+	PodcastFrequencyInfo  = backend.PodcastFrequencyInfo
+	ScanOptions           = backend.ScanOptions
+	ScanResult            = backend.ScanResult
+	RescanOptions         = backend.RescanOptions
+	RescanResult          = backend.RescanResult
+	OPMLExportOptions     = backend.OPMLExportOptions
+	OPMLImportOptions     = backend.OPMLImportOptions
+	OPMLImportResult      = backend.OPMLImportResult
+	AudiobookshelfBackend = backend.AudiobookshelfBackend
+	ABSClient             = backend.AudiobookshelfBackend
+
+	absItem      = backend.Podcast
+	absEpisode   = backend.Episode
+	absAudioFile = backend.PodcastAudioFile
+	absLibrary   = backend.Library
+	absFolder    = backend.LibraryFolder
+
+	absLibrariesResp struct {
+		Libraries []backend.Library `json:"libraries"`
+	}
+	absItemsResp struct {
+		Results []backend.Podcast `json:"results"`
+	}
+	SimplecastEpisode struct {
+		Title        string      `json:"title"`
+		Description  string      `json:"description"`
+		PublishedAt  string      `json:"published_at"`
+		Type         string      `json:"type"`
+		Season       interface{} `json:"season"`
+		Number       interface{} `json:"number"`
+		Duration     float64     `json:"duration"`
+		GUID         string      `json:"guid"`
+		EnclosureURL string      `json:"enclosure_url"`
+	}
 )
 
-type LibraryFolder struct {
-	ID        string `json:"id"`
-	FullPath  string `json:"fullPath"`
-	LibraryID string `json:"libraryId"`
-}
-
-type Library struct {
-	ID        string          `json:"id"`
-	Name      string          `json:"name"`
-	MediaType string          `json:"mediaType"`
-	Folders   []LibraryFolder `json:"folders"`
-}
-
-type AudioFileMetadata struct {
-	Path    string `json:"path"`
-	Size    int64  `json:"size"`
-	CTimeMs int64  `json:"ctimeMs"`
-	MTimeMs int64  `json:"mtimeMs"`
-}
-
-type PodcastAudioFile struct {
-	Duration float64            `json:"duration"`
-	AddedAt  int64              `json:"addedAt"`
-	Metadata *AudioFileMetadata `json:"metadata,omitempty"`
-}
-
-type PodcastEpisode struct {
-	ID           string            `json:"id"`
-	Title        string            `json:"title"`
-	PubDate      string            `json:"pubDate"`
-	PublishedAt  int64             `json:"publishedAt"`
-	EnclosureURL string            `json:"enclosureURL"`
-	GUID         string            `json:"guid"`
-	Duration     float64           `json:"duration"`
-	AudioFile    *PodcastAudioFile `json:"audioFile,omitempty"`
-}
-
-type PodcastMetadata struct {
-	Title   string `json:"title"`
-	FeedURL string `json:"feedUrl"`
-}
-
-type PodcastMedia struct {
-	ID       string           `json:"id"`
-	Metadata PodcastMetadata  `json:"metadata"`
-	Episodes []PodcastEpisode `json:"episodes"`
-}
-
-type PodcastItem struct {
-	ID    string       `json:"id"`
-	Media PodcastMedia `json:"media"`
-}
-
-type FeedEnclosure struct {
-	URL  string `json:"url"`
-	Type string `json:"type"`
-}
-
-type FeedEpisode struct {
-	Title            string         `json:"title"`
-	Subtitle         string         `json:"subtitle,omitempty"`
-	Description      string         `json:"description,omitempty"`
-	DescriptionPlain string         `json:"descriptionPlain,omitempty"`
-	PubDate          string         `json:"pubDate"`
-	PublishedAt      int64          `json:"publishedAt"`
-	EpisodeType      string         `json:"episodeType,omitempty"`
-	Season           string         `json:"season,omitempty"`
-	Episode          string         `json:"episode,omitempty"`
-	DurationSeconds  float64        `json:"durationSeconds,omitempty"`
-	GUID             string         `json:"guid,omitempty"`
-	EnclosureURL     string         `json:"enclosureUrl,omitempty"`
-	Enclosure        *FeedEnclosure `json:"enclosure,omitempty"`
-}
-
-func (f *FeedEpisode) UnmarshalJSON(data []byte) error {
-	type Alias FeedEpisode
-	aux := &struct {
-		PublishedAt  interface{} `json:"publishedAt"`
-		Season       interface{} `json:"season"`
-		Episode      interface{} `json:"episode"`
-		EnclosureURL string      `json:"enclosureUrl"`
-		*Alias
-	}{
-		Alias: (*Alias)(f),
-	}
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	if aux.EnclosureURL != "" && f.Enclosure == nil {
-		f.Enclosure = &FeedEnclosure{URL: aux.EnclosureURL}
-	}
-	if f.Enclosure != nil && f.Enclosure.URL != "" && f.EnclosureURL == "" {
-		f.EnclosureURL = f.Enclosure.URL
-	}
-
-	if aux.PublishedAt != nil {
-		switch v := aux.PublishedAt.(type) {
-		case float64:
-			f.PublishedAt = int64(v)
-		case int64:
-			f.PublishedAt = v
-		case string:
-			if n, err := strconv.ParseInt(v, 10, 64); err == nil {
-				f.PublishedAt = n
-			}
-		}
-	}
-
-	if aux.Season != nil {
-		if m, ok := aux.Season.(map[string]interface{}); ok {
-			if n, ok := m["number"]; ok && n != nil {
-				f.Season = fmt.Sprintf("%v", n)
-			}
-		} else {
-			f.Season = fmt.Sprintf("%v", aux.Season)
-		}
-	}
-
-	if aux.Episode != nil {
-		f.Episode = fmt.Sprintf("%v", aux.Episode)
-	}
-
-	return nil
-}
-
-type ActiveDownload struct {
-	ID                  string `json:"id"`
-	EpisodeDisplayTitle string `json:"episodeDisplayTitle"`
-	DisplayTitle        string `json:"displayTitle"`
-	Title               string `json:"title"`
-	EpisodeID           string `json:"episodeId"`
-	URL                 string `json:"url"`
-	Episode             struct {
-		Title        string `json:"title"`
-		GUID         string `json:"guid"`
-		EnclosureURL string `json:"enclosureUrl"`
-	} `json:"episode"`
-}
-
-type SimplecastEpisode struct {
-	Title        string      `json:"title"`
-	Description  string      `json:"description"`
-	PublishedAt  string      `json:"published_at"`
-	Type         string      `json:"type"`
-	Season       interface{} `json:"season"`
-	Number       interface{} `json:"number"`
-	Duration     float64     `json:"duration"`
-	GUID         string      `json:"guid"`
-	EnclosureURL string      `json:"enclosure_url"`
-}
+const (
+	CadenceHourly       = backend.CadenceHourly
+	CadenceDaily        = backend.CadenceDaily
+	CadenceWeekly       = backend.CadenceWeekly
+	CadenceMonthly      = backend.CadenceMonthly
+	CadenceIntermittent = backend.CadenceIntermittent
+)

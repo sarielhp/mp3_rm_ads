@@ -2,14 +2,13 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"github.com/sariel/abs/pkg/backend"
 )
 
 func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
@@ -214,29 +213,8 @@ func savePodcastToCache(pod *tuiPodcast) {
 }
 
 func absDownloadCover(baseURL, token, itemID, destPath string) error {
-	if _, err := os.Stat(destPath); err == nil {
-		return nil
-	}
-	url := fmt.Sprintf("%s/api/items/%s/cover", baseURL, itemID)
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Authorization", "Bearer "+token)
-	client := &http.Client{Timeout: 5 * time.Second}
-	resp, err := client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("cover status: %d", resp.StatusCode)
-	}
-	data, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(destPath, data, 0644)
+	client := backend.NewAudiobookshelf(backend.Config{Host: baseURL, Token: token})
+	return client.DownloadCover(itemID, destPath)
 }
 
 func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
@@ -249,28 +227,14 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 		return podcasts, nil
 	}
 
-	token, err := absLogin(cfg)
+	b, err := getBackend(cfg, true)
 	if err != nil {
 		return podcasts, nil
 	}
 
-	baseURL := strings.TrimRight(cfg.AudiobookshelfURL, "/")
-
-	var libsResp absLibrariesResp
-	if err := absGet(baseURL, token, "/api/libraries", &libsResp); err != nil {
+	allItems, err := b.Podcasts()
+	if err != nil {
 		return podcasts, nil
-	}
-
-	var allItems []absItem
-	for _, lib := range libsResp.Libraries {
-		if lib.MediaType != "podcast" {
-			continue
-		}
-		var itemsResp absItemsResp
-		endpoint := fmt.Sprintf("/api/libraries/%s/items?limit=1000", lib.ID)
-		if err := absGet(baseURL, token, endpoint, &itemsResp); err == nil {
-			allItems = append(allItems, itemsResp.Results...)
-		}
 	}
 
 	itemByRel := make(map[string]absItem)
@@ -293,11 +257,11 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 			continue
 		}
 
-		var fullItem absItem
-		if err := absGet(baseURL, token, "/api/items/"+itemSummary.ID, &fullItem); err != nil {
+		fullItem, err := b.GetPodcast(itemSummary.ID)
+		if err != nil || fullItem == nil {
 			continue
 		}
-		pod.absData = &fullItem
+		pod.absData = fullItem
 		if fullItem.Media.Metadata.Author != "" {
 			pod.author = fullItem.Media.Metadata.Author
 		}
@@ -308,12 +272,10 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 			pod.feedURL = fullItem.Media.Metadata.FeedURL
 		}
 
-		// Cache cover image locally
 		cDir := cacheDirForPodcast(pod.dir)
 		coverDest := filepath.Join(cDir, "cover.jpg")
-		_ = absDownloadCover(baseURL, token, fullItem.ID, coverDest)
+		_ = b.DownloadCover(fullItem.ID, coverDest)
 
-		// Quarantine any abandoned duplicates (e.g. Title.mp3 when Title (guid).mp3 exists)
 		quarantined := quarantineAbandonedDuplicates(pod.dir, fullItem.Media.Episodes)
 		if len(quarantined) > 0 {
 			printQuarantinedSummary(quarantined, pod.name)

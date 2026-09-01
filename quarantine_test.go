@@ -72,12 +72,7 @@ func TestQuarantineAbandonedDuplicates(t *testing.T) {
 		{
 			Title: "OpenAI Pause",
 			AudioFile: &absAudioFile{
-				Metadata: struct {
-					Filename string `json:"filename"`
-					Path     string `json:"path"`
-					RelPath  string `json:"relPath"`
-					Size     int64  `json:"size"`
-				}{
+				Metadata: &AudioFileMetadata{
 					Filename: "OpenAI Pause (90b50030-4e0f-4e45-af9d-6).mp3",
 				},
 			},

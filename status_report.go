@@ -98,12 +98,8 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 
 	renderedABS := false
 	if cfg.AudiobookshelfURL != "" {
-		token, err := absLogin(cfg)
-		if err == nil {
-			baseURL := strings.TrimRight(cfg.AudiobookshelfURL, "/")
-			if err := renderABSPodcastStatus(cfg, baseURL, token, podcastsDir, quiet); err == nil {
-				renderedABS = true
-			}
+		if err := renderABSPodcastStatus(cfg, cfg.AudiobookshelfURL, "", podcastsDir, quiet); err == nil {
+			renderedABS = true
 		}
 	}
 
@@ -113,25 +109,25 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 }
 
 func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quiet bool) error {
-	var libsResp absLibrariesResp
-	if err := absGet(baseURL, token, "/api/libraries", &libsResp); err != nil {
+	b, err := getBackend(cfg, quiet)
+	if err != nil {
 		return err
 	}
 
-	var allItems []absItem
-	for _, lib := range libsResp.Libraries {
-		if lib.MediaType != "podcast" {
-			continue
-		}
-		var itemsResp absItemsResp
-		endpoint := fmt.Sprintf("/api/libraries/%s/items?limit=1000", lib.ID)
-		if err := absGet(baseURL, token, endpoint, &itemsResp); err == nil {
-			allItems = append(allItems, itemsResp.Results...)
-		}
+	libs, err := b.PodcastLibraries()
+	if err != nil {
+		return err
+	}
+	if len(libs) == 0 {
+		return fmt.Errorf("no podcast libraries found in ABS")
 	}
 
+	allItems, err := b.Podcasts()
+	if err != nil {
+		return err
+	}
 	if len(allItems) == 0 {
-		return fmt.Errorf("no podcast libraries found in ABS")
+		return fmt.Errorf("no podcasts found in ABS")
 	}
 
 	localPodcasts, _ := loadTUIPodcasts(podcastsDir)
@@ -169,12 +165,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 			dName = dName[:45] + "..."
 		}
 
-		var itemFull absItem
-		absEpisodeCount := 0
-		if err := absGet(baseURL, token, "/api/items/"+item.ID, &itemFull); err == nil {
-			absEpisodeCount = len(itemFull.Media.Episodes)
-		}
-
+		absEpisodeCount := len(item.Media.Episodes)
 		needsAdRemoval := 0
 		lp, ok := localByName[strings.ToLower(title)]
 		if !ok {
