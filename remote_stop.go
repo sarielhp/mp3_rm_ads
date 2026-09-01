@@ -42,6 +42,9 @@ func runRemoteStop(cfg *Config, host string, transport RemoteTransport, quiet, v
 	cleanLockCmd := fmt.Sprintf("rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
 	_, _ = transport.Exec(targetHost, cleanLockCmd)
 
+	resetStatusCmd := fmt.Sprintf("sed -i 's/\"status\": \"transcribing_remotely\"/\"status\": \"awaiting_transcription\"/g' %s/*/*.mp3.json 2>/dev/null; sed -i 's/\"status\": \"cutting_remotely\"/\"status\": \"awaiting_transcription\"/g' %s/*/*.mp3.json 2>/dev/null; rm -rf %s/*/.work", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+	_, _ = transport.Exec(targetHost, resetStatusCmd)
+
 	dockerStopCmds := []string{
 		"docker stop whisper.cpp-server 2>/dev/null || true",
 	}
