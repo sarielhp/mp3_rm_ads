@@ -18,7 +18,7 @@ def run_cmd(name, cmd)
 end
 
 run_cmd("Go vet", "go vet ./...")
-run_cmd("Staticcheck", "staticcheck -checks '-SA2001' ./...")
+run_cmd("Staticcheck", "staticcheck -checks 'inherit,-SA2001' ./...")
 
 stdout, _ = run_cmd("Line audit", "ruby tools/audit_lines.rb --quiet")
 puts stdout.strip unless stdout.strip.empty?

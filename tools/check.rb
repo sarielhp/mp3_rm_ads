@@ -29,7 +29,34 @@ run_cmd("Config template generation", "ruby tools/generate_config_template.rb")
 run_cmd("Go vet", "go vet ./...")
 
 # 3. Staticcheck
-run_cmd("Staticcheck", "staticcheck -checks '-SA2001' ./...")
+# -checks REPLACES the default set, so a value that only subtracts selects
+# nothing. "inherit" seeds it with the defaults first. Advisory findings that
+# predate this gate are recorded in the baseline; only new ones fail the build.
+STATICCHECK_CHECKS = 'inherit,-SA2001'
+BASELINE_PATH = 'tools/staticcheck-baseline.txt'
+
+def run_staticcheck
+  stdout, stderr, = Open3.capture3("staticcheck -checks '#{STATICCHECK_CHECKS}' ./...")
+  if stderr.include?('not found') || stderr.include?('no such file')
+    puts "\e[31m✗ Staticcheck is not installed or not on PATH.\e[0m"
+    puts stderr
+    exit 1
+  end
+  found = stdout.lines.map(&:chomp).reject(&:empty?).sort
+  baseline = File.exist?(BASELINE_PATH) ? File.readlines(BASELINE_PATH).map(&:chomp).reject(&:empty?) : []
+  new_findings = found - baseline
+  unless new_findings.empty?
+    puts "\e[31m✗ Staticcheck found #{new_findings.length} new finding(s)!\e[0m"
+    puts new_findings
+    puts "\nIf these are pre-existing and intentional, refresh the baseline:"
+    puts "  staticcheck -checks '#{STATICCHECK_CHECKS}' ./... | sort > #{BASELINE_PATH}"
+    exit 1
+  end
+  fixed = baseline - found
+  puts "Staticcheck: #{found.length} baselined finding(s), 0 new#{fixed.empty? ? '' : ", #{fixed.length} resolved"}"
+end
+
+run_staticcheck
 
 # 4. Audit lines
 stdout, _ = run_cmd("Line audit", "ruby tools/audit_lines.rb --quiet")
