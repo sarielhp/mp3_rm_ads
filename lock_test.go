@@ -48,8 +48,9 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 
 	lock1.Release()
 
-	if fileExists(lockPath) {
-		t.Errorf("expected lock file %s to be removed on release", lockPath)
+	if !fileExists(lockPath) {
+		t.Errorf("lock file %s was unlinked on release; unlinking a lock path lets a "+
+			"second process create a fresh inode there and hold the lock simultaneously", lockPath)
 	}
 
 	lock3, err := acquireFileLock(targetFile)
@@ -65,4 +66,41 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 func TestNilFileLockRelease(t *testing.T) {
 	var l *fileLockWrapper
 	l.Release()
+}
+
+func TestDoubleReleaseDoesNotDropAnotherHoldersLock(t *testing.T) {
+	tempDir := t.TempDir()
+	target := filepath.Join(tempDir, "episode.mp3")
+	if err := os.WriteFile(target, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	lockPath := target + ".lock"
+
+	first, err := acquireFileLock(target)
+	if err != nil || first == nil {
+		t.Fatalf("first acquire failed: %v", err)
+	}
+	first.Release()
+
+	second, err := acquireFileLock(target)
+	if err != nil || second == nil {
+		t.Fatalf("second acquire failed: %v", err)
+	}
+	t.Cleanup(second.Release)
+
+	// The six stray Release() calls in the old processSingleAudioFile made a
+	// second release of an already-released wrapper an ordinary occurrence.
+	first.Release()
+
+	if !fileExists(lockPath) {
+		t.Errorf("a stale wrapper's second Release() deleted the lock file that %q now holds", lockPath)
+	}
+	third, err := acquireFileLock(target)
+	if err != nil {
+		t.Fatalf("third acquire errored: %v", err)
+	}
+	if third != nil {
+		third.Release()
+		t.Errorf("mutual exclusion was lost: a third holder acquired a lock the second still holds")
+	}
 }

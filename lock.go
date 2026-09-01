@@ -40,8 +40,9 @@ func (w *fileLockWrapper) Release() {
 	if w == nil || w.fl == nil {
 		return
 	}
-	_ = w.fl.Unlock()
-	_ = os.Remove(w.lockPath)
+	fl := w.fl
+	w.fl = nil
+	_ = fl.Unlock()
 }
 
 func isProcessAlive(pid int) bool {
