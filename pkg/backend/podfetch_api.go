@@ -155,7 +155,7 @@ func (c *PodFetchBackend) PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, er
 		}
 	}
 
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	req, err := http.NewRequest("GET", feedURL, nil)
 	if err != nil {
 		return nil, err
@@ -271,7 +271,7 @@ func (c *PodFetchBackend) DownloadCover(podcastID, destPath string) error {
 	if err == nil && pod != nil && pod.Media.Metadata.ImageURL != "" {
 		imgURL := pod.Media.Metadata.ImageURL
 		if strings.HasPrefix(imgURL, "http://") || strings.HasPrefix(imgURL, "https://") {
-			client := &http.Client{Timeout: 15 * time.Second}
+			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Get(imgURL)
 			if err == nil && resp.StatusCode == http.StatusOK {
 				defer resp.Body.Close()

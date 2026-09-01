@@ -238,7 +238,7 @@ func parseRSSXML(data []byte) ([]FeedEpisode, error) {
 }
 
 func fetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]FeedEpisode, string, string, bool, error) {
-	client := &http.Client{Timeout: 15 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 	req, err := http.NewRequest("GET", feedURL, nil)
 	if err != nil {
 		return nil, "", "", false, err

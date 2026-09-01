@@ -44,7 +44,7 @@ func (c *AudiobookshelfBackend) PodcastFeedEpisodes(feedURL string) ([]FeedEpiso
 
 	if hasSimplecast {
 		func() {
-			client := &http.Client{Timeout: 10 * time.Second}
+			client := &http.Client{Timeout: 60 * time.Second}
 			req, err := http.NewRequest("GET", feedURL, nil)
 			if err != nil {
 				return
@@ -187,7 +187,7 @@ type simplecastEpisode struct {
 func fetchSimplecastEpisodes(collectionID string) ([]FeedEpisode, error) {
 	var episodes []FeedEpisode
 	offset := 0
-	client := &http.Client{Timeout: 10 * time.Second}
+	client := &http.Client{Timeout: 60 * time.Second}
 
 	for {
 		urlStr := fmt.Sprintf("https://api.simplecast.com/podcasts/%s/episodes?limit=100&offset=%d&private=false&sort=latest&status=published", collectionID, offset)
