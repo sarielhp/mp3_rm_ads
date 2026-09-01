@@ -203,6 +203,9 @@ func TestBatchWorkerPreservesOrder(t *testing.T) {
 	saveJSONTranscript(filepath.Join(outDir, "long.mp3"), &dummyTranscript, filepath.Join(outDir, "long.transcript.json"), true, nil)
 	saveJSONTranscript(filepath.Join(outDir, "short.mp3"), &dummyTranscript, filepath.Join(outDir, "short.transcript.json"), true, nil)
 	saveJSONTranscript(filepath.Join(outDir, "urgent.mp3"), &dummyTranscript, filepath.Join(outDir, "urgent.transcript.json"), true, nil)
+	saveCutsJSON(filepath.Join(outDir, "long.mp3"), 3600.0, nil, nil, true)
+	saveCutsJSON(filepath.Join(outDir, "short.mp3"), 60.0, nil, nil, true)
+	saveCutsJSON(filepath.Join(outDir, "urgent.mp3"), 5000.0, nil, nil, true)
 
 	err := runBatchWorker(batchDir, true, false)
 	if err != nil {

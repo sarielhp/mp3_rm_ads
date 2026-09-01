@@ -1,4 +1,4 @@
-.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue
+.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue review-loop
 
 all: check
 
@@ -76,6 +76,9 @@ ci: check
 
 checkpoint:
 	@./tools/checkpoint.sh
+
+review-loop:
+	@ruby ./tools/review_loop.rb $(ARGS)
 
 clean:
 	@rm -f abs

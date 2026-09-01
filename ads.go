@@ -111,8 +111,11 @@ func callLLMChat(profile LLMProfile, sysPrompt, userPrompt string, maxTokens int
 }
 
 func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
+	if profile.URL == "" {
+		return nil
+	}
 	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
-	content, err := callLLMChat(profile, systemPrompt, userPrompt, 0, 300*time.Second, false)
+	content, err := callLLMChat(profile, systemPrompt, userPrompt, 0, 30*time.Second, false)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
 		return nil
