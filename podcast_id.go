@@ -141,7 +141,7 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 	dirEntries, err := os.ReadDir(podcastsDir)
 	if err == nil {
 		for _, de := range dirEntries {
-			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" {
+			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" || strings.HasSuffix(de.Name(), "-1") {
 				continue
 			}
 			podPath := filepath.Join(podcastsDir, de.Name())

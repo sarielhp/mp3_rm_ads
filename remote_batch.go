@@ -80,10 +80,16 @@ func findAudioFilesForRemote(paths []string, defaultDir string) []string {
 			continue
 		}
 		if fi.IsDir() {
+			if strings.HasSuffix(filepath.Clean(p), "-1") {
+				continue
+			}
 			mp3s := findMP3Files(p)
 			for _, m := range mp3s {
 				absM, err := filepath.Abs(m)
 				if err == nil && !seen[absM] && !strings.Contains(absM, "/.work/") && !strings.HasSuffix(absM, ".precut") {
+					if strings.Contains(absM, "-1/") || filepath.Base(absM) == "podcast.mp3" {
+						continue
+					}
 					seen[absM] = true
 					results = append(results, absM)
 				}

@@ -109,6 +109,9 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			sort.Strings(podFolders)
 
 			for _, podFolder := range podFolders {
+				if strings.HasSuffix(podFolder, "-1") || strings.HasSuffix(podFolder, "-1/") {
+					continue
+				}
 				fList := filesByFolder[podFolder]
 				podCfg := loadPodcastConfig(podFolder)
 				if podCfg.AdRemoval == AdRemovalNone {

@@ -19,7 +19,7 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 
 	var podcasts []tuiPodcast
 	for _, entry := range entries {
-		if !entry.IsDir() || entry.Name() == ".work" || strings.HasPrefix(entry.Name(), ".") {
+		if !entry.IsDir() || entry.Name() == ".work" || strings.HasPrefix(entry.Name(), ".") || strings.HasSuffix(entry.Name(), "-1") {
 			continue
 		}
 		podDir := filepath.Join(podcastsDir, entry.Name())

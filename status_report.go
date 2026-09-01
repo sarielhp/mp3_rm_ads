@@ -52,7 +52,7 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 	dirEntries, err := os.ReadDir(podcastsDir)
 	if err == nil {
 		for _, de := range dirEntries {
-			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" {
+			if !de.IsDir() || strings.HasPrefix(de.Name(), ".") || de.Name() == ".work" || strings.HasSuffix(de.Name(), "-1") {
 				continue
 			}
 			podPath := filepath.Join(podcastsDir, de.Name())
@@ -62,7 +62,12 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 			}
 			podcastsCount++
 			totalEpisodes += len(mp3s)
-			for _, mp3 := range mp3s {
+			podCfg := loadPodcastConfig(podPath)
+			if podCfg.AdRemoval == AdRemovalNone {
+				continue
+			}
+			filtered := filterMP3FilesByPodcastConfig(mp3s, podPath, podCfg)
+			for _, mp3 := range filtered {
 				_ = getOrCreateEpisodeStatus(mp3)
 				if !isEpisodeCompleted(mp3) {
 					totalNeedsAd++
@@ -179,10 +184,14 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 				shortID = getOrSetPodcastShortID(lp.dir, title)
 			}
 			mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
-			for _, mp3 := range mp3Files {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
-					needsAdRemoval++
+			podCfg := loadPodcastConfig(lp.dir)
+			if podCfg.AdRemoval != AdRemovalNone {
+				filtered := filterMP3FilesByPodcastConfig(mp3Files, lp.dir, podCfg)
+				for _, mp3 := range filtered {
+					_ = getOrCreateEpisodeStatus(mp3)
+					if !isEpisodeCompleted(mp3) {
+						needsAdRemoval++
+					}
 				}
 			}
 		} else {
@@ -218,10 +227,14 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 			continue
 		}
 		needsAd := 0
-		for _, mp3 := range mp3s {
-			_ = getOrCreateEpisodeStatus(mp3)
-			if !isEpisodeCompleted(mp3) {
-				needsAd++
+		podCfg := loadPodcastConfig(pe.dir)
+		if podCfg.AdRemoval != AdRemovalNone {
+			filtered := filterMP3FilesByPodcastConfig(mp3s, pe.dir, podCfg)
+			for _, mp3 := range filtered {
+				_ = getOrCreateEpisodeStatus(mp3)
+				if !isEpisodeCompleted(mp3) {
+					needsAd++
+				}
 			}
 		}
 		entries = append(entries, podcastStatusEntry{

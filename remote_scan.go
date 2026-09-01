@@ -25,14 +25,16 @@ func scanAudioFiles(rootDir string) []string {
 			return nil
 		}
 		if info.IsDir() {
-			if info.Name() == ".work" || strings.HasPrefix(info.Name(), ".") {
+			if info.Name() == ".work" || strings.HasPrefix(info.Name(), ".") || strings.HasSuffix(info.Name(), "-1") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if strings.HasSuffix(strings.ToLower(info.Name()), ".mp3") && !strings.HasSuffix(info.Name(), ".tmp.mp3") {
-			if info.Size() > 0 {
-				files = append(files, path)
+			if info.Name() != "podcast.mp3" && !strings.Contains(path, "-1/") {
+				if info.Size() > 0 {
+					files = append(files, path)
+				}
 			}
 		}
 		return nil
@@ -68,16 +70,6 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 	}
 	defer unlock()
 
-	files := scanAudioFiles(resolvedDir)
-	if len(files) == 0 {
-		if !quiet {
-			fmt.Printf("Scan complete: No pending audio files found in %s.\n", resolvedDir)
-		}
-		return nil
-	}
-
-	sortAudioFilesByDuration(files)
-
 	if cfg == nil {
 		c := loadConfig()
 		cfg = &c
@@ -88,12 +80,30 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 	processedCount := 0
 	hostname, _ := os.Hostname()
 
-	for _, audioFile := range files {
+	for {
+		files := scanAudioFiles(resolvedDir)
+		var pendingFiles []string
+		for _, audioFile := range files {
+			statPath := statusPathFor(audioFile)
+			st, _ := loadEpisodeStatus(statPath)
+			if st != nil && (st.Status == StateReadyForCopyBack || st.Status == StateDone || st.Status == StateArchived || st.Status == StateCopiedBack || st.Status == StateFailed) {
+				continue
+			}
+			pendingFiles = append(pendingFiles, audioFile)
+		}
+
+		if len(pendingFiles) == 0 {
+			if !quiet && processedCount == 0 {
+				fmt.Printf("Scan complete: No pending audio files found in %s.\n", resolvedDir)
+			}
+			break
+		}
+
+		sortAudioFilesByDuration(pendingFiles)
+		audioFile := pendingFiles[0]
+
 		statPath := statusPathFor(audioFile)
 		st, _ := loadEpisodeStatus(statPath)
-		if st != nil && (st.Status == StateReadyForCopyBack || st.Status == StateDone || st.Status == StateArchived || st.Status == StateCopiedBack) {
-			continue
-		}
 
 		relPath, _ := filepath.Rel(resolvedDir, audioFile)
 		if relPath == "" || strings.HasPrefix(relPath, "..") {
@@ -132,7 +142,7 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		_ = saveEpisodeStatus(statPath, st)
 
 		if !quiet {
-			fmt.Printf("Scanning & Processing: %s (Duration: %.1fs)\n", relPath, origDuration)
+			fmt.Printf("Scanning & Processing: %s (Length: %s, %.1fs)\n", relPath, formatClock(origDuration), origDuration)
 		}
 
 		baseName := stripExt(audioFile)
