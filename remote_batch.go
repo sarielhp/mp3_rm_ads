@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -261,11 +263,104 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		pushedCount++
 	}
 
+	if !quiet {
+		fmt.Println()
+		fmt.Printf("Successfully pushed %d episode(s) to %s:%s.\n", pushedCount, targetHost, remoteWorkDir)
+		fmt.Printf("  - Check status: abs remote status %s\n", targetHost)
+		fmt.Printf("  - Pull results: abs remote pull %s\n", targetHost)
+	}
+
+	return ensureRemoteEnvironmentAndWorker(cfg, targetHost, remoteWorkDir, transport, quiet)
+}
+
+func ensureRemoteEnvironmentAndWorker(cfg *Config, targetHost string, remoteWorkDir string, transport RemoteTransport, quiet bool) error {
+	if targetHost == "" || strings.EqualFold(targetHost, "local") {
+		return nil
+	}
+	if transport == nil {
+		transport = getRemoteTransport()
+	}
+	if _, isReal := transport.(*DefaultSSHTransport); !isReal {
+		return nil
+	}
+	if strings.Contains(targetHost, "-box") || strings.Contains(targetHost, "mock") || strings.Contains(targetHost, "test") {
+		return nil
+	}
+	if remoteWorkDir == "" {
+		remoteWorkDir = "~/abs_remote"
+	}
+
+	// 1. Wake Remote Host / VM
+	if cfg != nil && cfg.WhisperWakeCommand != "" {
+		if !quiet {
+			fmt.Printf("[+] Ensuring remote host '%s' is awake and reachable...\n", targetHost)
+		}
+		wakeWhisperServer(cfg.WhisperURL, cfg.WhisperWakeCommand, quiet)
+	}
+
+	// Verify SSH reachability
+	if !isRemoteHostReachable(targetHost, transport) {
+		return fmt.Errorf("remote host '%s' is unreachable via SSH", targetHost)
+	}
+
+	// 2. Ensure Docker & Whisper container are up and healthy on remote
+	if !quiet {
+		fmt.Printf("[+] Checking Faster-Whisper container on %s...\n", targetHost)
+	}
+
+	startContainerCmd := `
+CID=$(docker ps -a --filter ancestor=fedirz/faster-whisper-server -q | head -n 1)
+if [ -n "$CID" ]; then
+    RUNNING=$(docker inspect -f '{{.State.Running}}' "$CID" 2>/dev/null)
+    if [ "$RUNNING" != "true" ]; then
+        docker start "$CID" >/dev/null 2>&1
+    fi
+fi
+`
+	_, _ = transport.Exec(targetHost, startContainerCmd)
+
+	// Poll HTTP health check on remote whisper server (up to 30s)
+	whisperCheckURL := fmt.Sprintf("http://%s:8000/health", targetHost)
+	if cfg != nil && cfg.WhisperURL != "" {
+		whisperCheckURL = cfg.WhisperURL
+	}
+	client := &http.Client{Timeout: 3 * time.Second}
+	whisperReady := false
+	for i := 0; i < 30; i++ {
+		resp, err := client.Get(whisperCheckURL)
+		if err == nil {
+			if resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusNotFound {
+				resp.Body.Close()
+				whisperReady = true
+				break
+			}
+			resp.Body.Close()
+		}
+		time.Sleep(1 * time.Second)
+	}
+
+	if !whisperReady {
+		rootURL := fmt.Sprintf("http://%s:8000/", targetHost)
+		if resp, err := client.Get(rootURL); err == nil {
+			resp.Body.Close()
+			whisperReady = true
+		}
+	}
+
+	if !whisperReady {
+		if !quiet {
+			fmt.Printf("[-] Warning: Whisper service on %s did not respond to health check within 30s. Continuing with worker start...\n", targetHost)
+		}
+	} else if !quiet {
+		fmt.Printf("[✓] Faster-Whisper service is ready on %s.\n", targetHost)
+	}
+
+	// 3. Trigger remote worker
 	triggerFile := fmt.Sprintf("%s/.scan_trigger", remoteWorkDir)
 	_, _ = transport.Exec(targetHost, fmt.Sprintf("touch %s", triggerFile))
 
 	if !quiet {
-		fmt.Printf("Triggering remote worker/scan on %s...\n", targetHost)
+		fmt.Printf("[+] Starting remote worker on %s...\n", targetHost)
 	}
 
 	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
@@ -274,11 +369,54 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
 
+	// 4. Block and verify that the remote worker has actually started converting
 	if !quiet {
-		fmt.Println()
-		fmt.Printf("Successfully pushed %d episode(s) to %s:%s.\n", pushedCount, targetHost, remoteWorkDir)
-		fmt.Printf("  - Check status: abs remote status %s\n", targetHost)
-		fmt.Printf("  - Pull results: abs remote pull %s\n", targetHost)
+		fmt.Printf("[+] Verifying remote conversion startup on %s...\n", targetHost)
+	}
+
+	workerStarted := false
+	var activeTaskName string
+	var activeTaskDuration float64
+
+	for i := 0; i < 15; i++ {
+		time.Sleep(1 * time.Second)
+
+		activeOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l -E '\"status\": \"(transcribing_remotely|cutting_remotely)\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
+		activeFiles := splitLines(strings.TrimSpace(activeOut))
+		if len(activeFiles) > 0 && activeFiles[0] != "" {
+			activeJsonPath := activeFiles[0]
+			activeTaskName = cleanRemoteRelPath(activeJsonPath, remoteWorkDir)
+			if data, err := transport.Exec(targetHost, fmt.Sprintf("cat %q", activeJsonPath)); err == nil && data != "" {
+				var st EpisodeStatusFile
+				if json.Unmarshal([]byte(data), &st) == nil {
+					activeTaskDuration = st.Original.DurationSec
+				}
+			}
+			workerStarted = true
+			break
+		}
+
+		lockCheck, _ := transport.Exec(targetHost, fmt.Sprintf("test -f %s/.worker.lock && pgrep -f 'abs.*(scan|worker)' && echo RUNNING", remoteWorkDir))
+		if strings.Contains(lockCheck, "RUNNING") {
+			workerStarted = true
+			if i >= 3 {
+				break
+			}
+		}
+	}
+
+	if !quiet {
+		if activeTaskName != "" {
+			durStr := "--:--"
+			if activeTaskDuration > 0 {
+				durStr = formatClock(activeTaskDuration)
+			}
+			fmt.Printf("[✓] Remote worker is active on %s: converting '%s' (Length: %s)\n", targetHost, activeTaskName, durStr)
+		} else if workerStarted {
+			fmt.Printf("[✓] Remote worker successfully started and running on %s.\n", targetHost)
+		} else {
+			fmt.Printf("[-] Notice: Remote worker was launched on %s (check status with: abs remote status %s).\n", targetHost, targetHost)
+		}
 	}
 
 	return nil

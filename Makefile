@@ -36,7 +36,7 @@ vuln:
 	@$$HOME/.go/bin/govulncheck ./...
 
 build:
-	@go build -o abs .
+	@ruby ./tools/build_local.rb
 
 format:
 	@./tools/format.sh

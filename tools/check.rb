@@ -52,6 +52,6 @@ else
 end
 
 # 6. Build
-run_cmd("Go build", "go build -o abs .")
+run_cmd("Go build", "ruby tools/build_local.rb")
 
 puts full_mode ? "Success: Full CI Quality Gate Passed" : "Success: Quality Gate Passed"

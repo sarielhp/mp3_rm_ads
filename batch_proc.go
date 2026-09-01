@@ -30,8 +30,6 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		}
 	}
 
-	go wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
-
 	args := cli.Args
 	podcastsDir := config.PodcastsDir
 	if podcastsDir == "" {
@@ -191,6 +189,11 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			filesToPush = filesToPush[:cli.Count]
 		}
 		if len(filesToPush) == 0 {
+			remoteWorkDir := config.RemoteWorkDir
+			if remoteWorkDir == "" {
+				remoteWorkDir = "~/abs_remote"
+			}
+			_ = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
 			if !cli.Quiet {
 				fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 			}
@@ -202,6 +205,8 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		}
 		return
 	}
+
+	wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
 	batchStartTime := time.Now()

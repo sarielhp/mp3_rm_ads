@@ -95,6 +95,25 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			{
+				Name:        "start",
+				Description: "Start and verify remote worker processing on a remote host",
+				UsageLine:   "abs remote start [host] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "start"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
 				Name:        "worker",
 				Description: "Run remote worker scanner loop on mirror directory",
 				UsageLine:   "abs remote worker [path] [options]",
@@ -248,12 +267,28 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		err = runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
 	case "stop":
 		err = runRemoteStop(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
-	case "scan":
-		targetDir := ""
-		if len(cli.Args) > 0 {
-			targetDir = cli.Args[0]
+	case "scan", "start":
+		hostCandidate := cli.RemoteHost
+		if hostCandidate == "" && len(cli.Args) > 0 {
+			arg := cli.Args[0]
+			if fi, sErr := os.Stat(arg); sErr != nil || !fi.IsDir() {
+				hostCandidate = arg
+			}
 		}
-		err = runRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
+		targetHost, isRem, _ := ResolveProcessingHost(&config, hostCandidate, nil)
+		if isRem {
+			remoteWorkDir := config.RemoteWorkDir
+			if remoteWorkDir == "" {
+				remoteWorkDir = "~/abs_remote"
+			}
+			err = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
+		} else {
+			targetDir := ""
+			if len(cli.Args) > 0 {
+				targetDir = cli.Args[0]
+			}
+			err = runRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
+		}
 	case "worker":
 		targetDir := ""
 		if len(cli.Args) > 0 {

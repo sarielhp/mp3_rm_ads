@@ -252,8 +252,10 @@ func getEpisodePublicationTime(filePath string) time.Time {
 			return t
 		}
 	}
-	if fi, err := os.Stat(filePath); err == nil {
-		return fi.ModTime()
+	if !strings.Contains(filePath, "abs_remote") && !strings.Contains(filePath, "/.work/") {
+		if fi, err := os.Stat(filePath); err == nil {
+			return fi.ModTime()
+		}
 	}
 	return time.Time{}
 }

@@ -3,7 +3,7 @@
 ## Build & Quality
 
 - **Go 1.26+** — single `main` package with files organized by concern
-- Build: `go build -o abs .`
+- Build: `ruby tools/build_local.rb` (or `make build`)
 - Test: `go test -timeout 30s ./...` (all tests use `t.TempDir()` for isolation)
 - Lint: `go vet ./...` then `staticcheck ./...`
 - Format: `gofmt -s -w .` before committing
@@ -12,6 +12,7 @@
 
 | Script | Purpose |
 |--------|---------|
+| `tools/build_local.rb` | Build local `./abs` binary strictly within repo directory |
 | `tools/check.rb` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
 | `tools/lint.rb` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
@@ -193,6 +194,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
     or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
 11. **No CLI Aliases**: Avoid defining command or subcommand aliases in CLI apps (`clihelp`). Each command and subcommand must have a single canonical name to maintain clarity, prevent command-space collisions, and keep documentation consistent.
+12. **Local Build Isolation**: All local Go builds must be executed using `tools/build_local.rb` (or `make build`). The build script must generate a local binary (`./abs`) within this repository directory and must NEVER write into or modify directories outside this repository.
 
 ## Test Suite
 
