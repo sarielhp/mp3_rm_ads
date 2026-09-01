@@ -233,7 +233,7 @@ func savePodcastConfig(dir string, cfg PodcastConfig) error {
 		return err
 	}
 	cfgPath := filepath.Join(dir, podcastConfigFileName)
-	return os.WriteFile(cfgPath, append(data, '\n'), 0644)
+	return writeFileAtomic(cfgPath, append(data, '\n'), 0644)
 }
 
 func getEpisodePublicationTime(filePath string) time.Time {

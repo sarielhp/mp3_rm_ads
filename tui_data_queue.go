@@ -57,5 +57,5 @@ func saveQueue(dir string, entries []string) {
 	if err != nil {
 		return
 	}
-	os.WriteFile(filepath.Join(dir, "queue.json"), data, 0644)
+	_ = writeFileAtomic(filepath.Join(dir, "queue.json"), data, 0644)
 }

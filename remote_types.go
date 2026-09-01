@@ -92,7 +92,7 @@ func saveManifest(path string, m *RemoteBatchManifest) error {
 		return fmt.Errorf("failed to marshal manifest json: %w", err)
 	}
 	data = append(data, '\n')
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := writeFileAtomic(path, data, 0644); err != nil {
 		return fmt.Errorf("failed to write manifest file %s: %w", path, err)
 	}
 	return nil

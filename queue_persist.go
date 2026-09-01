@@ -49,7 +49,7 @@ func (p *AudioPlayer) saveQueueLocked() {
 	if err != nil {
 		return
 	}
-	_ = os.WriteFile(filePath, bytes, 0644)
+	_ = writeFileAtomic(filePath, bytes, 0600)
 }
 
 func (p *AudioPlayer) LoadQueueFromFile() {

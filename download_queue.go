@@ -69,7 +69,7 @@ func saveDownloadQueue(q *DownloadQueuePersist) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, append(data, '\n'), 0644)
+	return writeFileAtomic(path, append(data, '\n'), 0644)
 }
 
 func matchEpisodeDeduplication(guid1, enc1, title1, guid2, enc2, title2 string) bool {

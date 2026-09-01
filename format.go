@@ -332,7 +332,7 @@ func readFile(path string) ([]byte, error) {
 }
 
 func writeFile(path string, data []byte) error {
-	return os.WriteFile(path, data, 0644)
+	return writeFileAtomic(path, data, 0644)
 }
 
 func jsonMarshalIndent(v interface{}) ([]byte, error) {
@@ -353,7 +353,7 @@ func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
 	if err := os.WriteFile(tmp, data, perm); err != nil {
 		return err
 	}
-	if err := os.Rename(tmp, path); err != nil {
+	if err := renameFn(tmp, path); err != nil {
 		_ = os.Remove(tmp)
 		return err
 	}
