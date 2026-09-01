@@ -38,8 +38,11 @@ type AudioPlayer struct {
 	Muted          bool
 	CurrentSpeaker string
 	Sinks          []AudioSink
+	LastError      string
 	isStarting     bool
 }
+
+const playerFailFastWindow = 2 * time.Second
 
 var globalPlayer = &AudioPlayer{
 	Volume: 70,
@@ -129,7 +132,8 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 	cmd := exec.Command("ffplay", args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
-	if err := cmd.Start(); err != nil {
+	startErr := cmd.Start()
+	if startErr != nil {
 		mpgArgs := []string{"-q"}
 		if startSec > 0 {
 			mpgArgs = append(mpgArgs, "-k", fmt.Sprintf("%d", int(startSec*38.28)))
@@ -137,27 +141,49 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 		mpgArgs = append(mpgArgs, p.Current.Path)
 		cmd = exec.Command("mpg123", mpgArgs...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		_ = cmd.Start()
+		startErr = cmd.Start()
 	}
 
+	if startErr != nil {
+		p.cmd = nil
+		p.IsPlaying = false
+		p.IsPaused = false
+		p.LastError = fmt.Sprintf("no audio player available (tried ffplay and mpg123): %v", startErr)
+		return
+	}
+
+	p.LastError = ""
 	p.cmd = cmd
 	p.IsPlaying = true
 	p.IsPaused = false
 	p.startPlayTime = time.Now()
 	p.startOffsetSec = startSec
 
-	go func(targetCmd *exec.Cmd) {
+	trackPath := p.Current.Path
+	launchedAt := time.Now()
+	expectedRemaining := p.Duration - startSec
+
+	go func(targetCmd *exec.Cmd, startedAt time.Time, path string, expected float64) {
 		if targetCmd == nil {
 			return
 		}
 		_ = targetCmd.Wait()
 		p.mu.Lock()
 		defer p.mu.Unlock()
-		if p.cmd == targetCmd {
-			p.cmd = nil
-			p.nextLocked()
+		if p.cmd != targetCmd {
+			return
 		}
-	}(cmd)
+		p.cmd = nil
+
+		elapsed := time.Since(startedAt)
+		if elapsed < playerFailFastWindow && (expected <= 0 || expected > playerFailFastWindow.Seconds()) {
+			p.IsPlaying = false
+			p.IsPaused = false
+			p.LastError = fmt.Sprintf("could not play %s", filepathBase(path))
+			return
+		}
+		p.nextLocked()
+	}(cmd, launchedAt, trackPath, expectedRemaining)
 }
 
 func (p *AudioPlayer) killProcessLocked() {
