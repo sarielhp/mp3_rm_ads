@@ -20,12 +20,19 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 		transport = getRemoteTransport()
 	}
 
-	exePath, err := os.Executable()
-	if err != nil {
-		return fmt.Errorf("failed to locate current abs executable: %w", err)
+	home, _ := os.UserHomeDir()
+	exePath := filepath.Join(home, "bin", "abs")
+	if !fileExists(exePath) {
+		if curExe, err := os.Executable(); err == nil {
+			if realExe, err := filepath.EvalSymlinks(curExe); err == nil {
+				exePath = realExe
+			} else {
+				exePath = curExe
+			}
+		}
 	}
-	if realExe, err := filepath.EvalSymlinks(exePath); err == nil {
-		exePath = realExe
+	if !fileExists(exePath) {
+		return fmt.Errorf("failed to locate abs executable at %s", exePath)
 	}
 
 	remoteWorkDir := "~/abs_remote"

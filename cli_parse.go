@@ -1,6 +1,7 @@
 package main
 
 import (
+	_ "embed"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -99,7 +100,13 @@ func normalizeCLIArgs(args []string) []string {
 	return args
 }
 
+//go:embed VERSION
+var embeddedVersion string
+
 func getVersion() string {
+	if strings.TrimSpace(embeddedVersion) != "" {
+		return strings.TrimSpace(embeddedVersion)
+	}
 	if data, err := os.ReadFile("VERSION"); err == nil {
 		return strings.TrimSpace(string(data))
 	}
@@ -109,7 +116,7 @@ func getVersion() string {
 			return strings.TrimSpace(string(data))
 		}
 	}
-	return "0.1.26"
+	return "0.2.11"
 }
 
 func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
