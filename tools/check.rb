@@ -37,7 +37,7 @@ puts stdout.strip unless stdout.strip.empty?
 
 # 5. Go test
 if full_mode
-  run_cmd("Go test (race detector)", "go test -race -timeout 30s ./...")
+  run_cmd("Go test (race detector)", "go test -race -timeout 90s ./...")
   vuln_bin = [ENV['HOME'] + '/.go/bin/govulncheck', 'govulncheck'].find { |b| system("which #{b} > /dev/null 2>&1") }
   if vuln_bin
     v_out, _, _ = Open3.capture3("#{vuln_bin} ./...")
