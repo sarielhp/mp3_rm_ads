@@ -584,3 +584,87 @@ Do **not** run the suite again until H-16's `TestMain` is in place.
   something the current locking does not cover.
 - **Mutation testing on `format.go`.** Given that 23 of 417 tests contain no assertion, I
   would not assume the well-covered modules actually assert.
+
+---
+
+## 9. Fix pass outcome (appended after implementation)
+
+Scope: the **Now** and **Next** blocks of §5, on branch `fix/deep-review-011-2026-09`.
+21 commits, one fix per commit, each with a regression test teeth-checked against the
+unfixed code. `ruby tools/check.rb --full` (format → vet → staticcheck → line audit →
+`go test -race` → govulncheck → build) is green on the final tree, and the suite is
+race-clean across three consecutive runs. **Not pushed.**
+
+Every proof-of-concept from §2–§4 was re-run unmodified against the final tree; all now
+fail to reproduce.
+
+### What the fix pass proved this document wrong about
+
+1. **`ffplay` exits 0 on a missing file.** H-12's analysis, and the agent report behind it,
+   assumed `cmd.Wait()` returns an error for an unplayable track. Measured: `ffplay -nodisp
+   -autoexit -loglevel quiet /tmp/definitely-not-here.mp3` returns **0**. An exit-code-based
+   fail-fast guard would have been silently inert. The implemented guard is duration-based:
+   a process that ends in under two seconds while the track had more than two seconds left
+   did not play.
+2. **Go does not flag a discarded return value in an expression statement.** C-2's fix note
+   claimed "the compiler finds them all" when `safeMove` gained an `error` return. It does
+   not — `safeMove(a, b)` remains valid. All 15 call sites were located and reviewed by hand.
+3. **Sanitizing ad segments does not by itself prevent the one-second episode.** With
+   clamping, `calculateKeepSegments(3600, [{1, 99999}])` still returns `[[0 1]]`. What
+   protects the library is the separate keep-fraction refusal in `cutAudioFFmpegWithHost`.
+   Both were implemented; the report previously implied the sanitizer was sufficient.
+4. **The keep-fraction floor is 25%, not 50%** — see the amendment under H-4.
+5. **Inverted ad segments produced overlapping keep ranges**, not merely a short episode:
+   `calculateKeepSegments(3600, [{100,50}])` returned `[[0 100] [50 3600]]`. Recorded under H-4.
+
+### Defects introduced by the fix pass, and caught
+
+Twice, a fix added a package-level global (`configLoadFailed`, then
+`configFileSnapshot`) written by `loadConfig`, which the download-queue worker and the TUI
+call concurrently. Both were data races, and both were caught by the `-race` gate this
+branch added — the un-gated suite would not have seen either. They are fixed under
+`configLoadMu`. This is the clearest argument for M-8's recommendation: `make check` needed
+`-race` more than it needed anything else.
+
+One commit was made on a red gate: the first staticcheck baseline keyed on
+`file:line:col`, so unrelated edits shifted pre-existing findings into looking new. The
+baseline now keys on file + message with occurrence counts, and that commit was amended.
+
+### Tests that asserted current-but-wrong behaviour
+
+Three existing tests had to change as part of a fix, and each is recorded above:
+
+| Test | Asserted | Resolution |
+|---|---|---|
+| `lock_test.go:51` | that `Release()` **deletes** the lock file — the exact unlink that breaks mutual exclusion | assertion inverted (M-1) |
+| `main_test.go:168` | `workDirFor("/p/f.mp3") == "/p/.work"` — the per-folder design | updated to the per-episode path |
+| `remote_batch_mock_test.go` | parsed remote arguments by splitting on `"`, an assumption about Go `%q` output | now unquotes POSIX single-quoting |
+
+`tui_suggestions_test.go` was also changed: it assigned `globalPlayer` fields with no lock,
+which is the same defect the production render path had.
+
+### Deliberate behaviour changes a user will notice
+
+- `abs recut`, `abs proc -t`, and `abs proc --srt/--txt` now stop where they always
+  claimed to, instead of continuing into the full pipeline.
+- An episode with no detected ads is no longer re-encoded, and gets no `.precut`.
+- A cut retaining under 25% of the source is refused, with the reason on stderr.
+- `abs config cache` reports instead of wiping; an unknown action is an error.
+- A corrupt `config.json` blocks config *writes* (reads still work) rather than being
+  silently replaced.
+- Environment overrides are no longer written into `config.json`.
+- `config.json` and `play_queue.json` are now `0600`; `.lock` files persist and are added
+  to `.absignore`.
+- `make check` and `make test` run `-race` (timeout 30s → 180s).
+- Operations that previously "succeeded" silently now fail loudly and leave both copies.
+
+### Not done, and why
+
+Everything in §5's **Later** block, specifically: `--local` still does not suppress
+`--rffmpeg` (**H-8**, and the `cloud8` default is still in `defaultConfig`); `-f/--force`
+still silently accepts typos (**H-10**); the six destructive commands still have no
+confirmation prompt (**H-9**); `abs proc -o <file> <dir>` still collapses every episode
+onto one path (**H-15** — verified still reproducible on the final tree); `abs proc` still
+exits 0 on failure (**H-14** — the signal handler and `_ = hasError` are untouched); and
+the 55 ghost tests (**H-17**) are still not compiled in. `processSingleAudioFile` remains a
+~320-line function with no seam for its five external effects.
