@@ -1,6 +1,9 @@
 package main
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/sarielhp/clihelp"
 )
 
@@ -189,7 +192,18 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Args: clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
-					opts.ConfigCmd = "cache-reset"
+					if len(ctx.Args) == 0 {
+						opts.ConfigCmd = "cache-show"
+						return nil
+					}
+					switch strings.ToLower(ctx.Args[0]) {
+					case "clear", "reset":
+						opts.ConfigCmd = "cache-reset"
+					case "show":
+						opts.ConfigCmd = "cache-show"
+					default:
+						return fmt.Errorf("unknown cache action %q (want show, clear or reset)", ctx.Args[0])
+					}
 					return nil
 				},
 			},

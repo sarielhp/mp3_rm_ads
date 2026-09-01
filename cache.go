@@ -164,3 +164,22 @@ func resetCache() error {
 	absCacheDir := filepath.Join(cacheHome, "abs")
 	return os.RemoveAll(absCacheDir)
 }
+
+func cacheStats() (dir string, entries int, bytes int64) {
+	dir = cacheBaseDir()
+	items, err := os.ReadDir(dir)
+	if err != nil {
+		return dir, 0, 0
+	}
+	entries = len(items)
+	for _, it := range items {
+		p := filepath.Join(dir, it.Name())
+		filepath.Walk(p, func(_ string, fi os.FileInfo, err error) error {
+			if err == nil && fi != nil && !fi.IsDir() {
+				bytes += fi.Size()
+			}
+			return nil
+		})
+	}
+	return dir, entries, bytes
+}

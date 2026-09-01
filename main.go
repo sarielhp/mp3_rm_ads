@@ -120,6 +120,12 @@ func main() {
 				fmt.Fprintf(os.Stderr, "Error: Invalid Whisper profile ID '%s'\n", cli.ConfigVal)
 				os.Exit(1)
 			}
+		case "cache-show":
+			dir, entries, size := cacheStats()
+			fmt.Printf("Cache directory: '%s'\n", dir)
+			fmt.Printf("  entries: %d\n", entries)
+			fmt.Printf("  size:    %.1f MB\n", float64(size)/(1024*1024))
+			fmt.Println("Run 'abs config cache clear' to delete it.")
 		case "cache-reset":
 			if err := resetCache(); err != nil {
 				fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
