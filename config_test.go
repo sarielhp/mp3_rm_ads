@@ -293,3 +293,71 @@ func TestConfigMigrateCLI(t *testing.T) {
 		t.Errorf("unexpected action or opts: action=%q, cmd=%q, val=%q", action, opts.ConfigCmd, opts.ConfigVal)
 	}
 }
+
+func TestPodFetchConfigSetGet(t *testing.T) {
+	orig := testConfigPath
+	testConfigPath = t.TempDir() + "/config.json"
+	defer func() { testConfigPath = orig }()
+
+	cfg := Config{}
+	if err := handleConfigSet(&cfg, "backend-type", "podfetch"); err != nil {
+		t.Fatalf("set backend-type failed: %v", err)
+	}
+	if err := handleConfigSet(&cfg, "podfetch-url", "http://localhost:8000"); err != nil {
+		t.Fatalf("set podfetch-url failed: %v", err)
+	}
+	if err := handleConfigSet(&cfg, "podfetch-user", "pfuser"); err != nil {
+		t.Fatalf("set podfetch-user failed: %v", err)
+	}
+	if err := handleConfigSet(&cfg, "podfetch-pass", "pfpass"); err != nil {
+		t.Fatalf("set podfetch-pass failed: %v", err)
+	}
+	if err := handleConfigSet(&cfg, "podfetch-api-key", "pfkey123"); err != nil {
+		t.Fatalf("set podfetch-api-key failed: %v", err)
+	}
+	if err := handleConfigSet(&cfg, "podfetch-db-path", "/path/to/podcast.db"); err != nil {
+		t.Fatalf("set podfetch-db-path failed: %v", err)
+	}
+
+	if cfg.BackendType != "podfetch" || cfg.PodfetchURL != "http://localhost:8000" || cfg.PodfetchUser != "pfuser" || cfg.PodfetchPass != "pfpass" || cfg.PodfetchAPIKey != "pfkey123" || cfg.PodfetchDBPath != "/path/to/podcast.db" {
+		t.Errorf("unexpected cfg values: %+v", cfg)
+	}
+
+	handleConfigGet(cfg, "backend-type")
+	handleConfigGet(cfg, "podfetch-url")
+	handleConfigGet(cfg, "podfetch-user")
+	handleConfigGet(cfg, "podfetch-pass")
+	handleConfigGet(cfg, "podfetch-api-key")
+	handleConfigGet(cfg, "podfetch-db-path")
+}
+
+func TestApplyEnvOverridesPodFetch(t *testing.T) {
+	origBackend := os.Getenv("BACKEND_TYPE")
+	origURL := os.Getenv("PODFETCH_URL")
+	origUser := os.Getenv("PODFETCH_USER")
+	origPass := os.Getenv("PODFETCH_PASS")
+	origKey := os.Getenv("PODFETCH_API_KEY")
+	origDB := os.Getenv("PODFETCH_DB_PATH")
+	defer func() {
+		os.Setenv("BACKEND_TYPE", origBackend)
+		os.Setenv("PODFETCH_URL", origURL)
+		os.Setenv("PODFETCH_USER", origUser)
+		os.Setenv("PODFETCH_PASS", origPass)
+		os.Setenv("PODFETCH_API_KEY", origKey)
+		os.Setenv("PODFETCH_DB_PATH", origDB)
+	}()
+
+	os.Setenv("BACKEND_TYPE", "podfetch")
+	os.Setenv("PODFETCH_URL", "http://podfetch:8000")
+	os.Setenv("PODFETCH_USER", "envuser")
+	os.Setenv("PODFETCH_PASS", "envpass")
+	os.Setenv("PODFETCH_API_KEY", "envkey")
+	os.Setenv("PODFETCH_DB_PATH", "/env/podcast.db")
+
+	cfg := Config{}
+	applyEnvOverrides(&cfg)
+
+	if cfg.BackendType != "podfetch" || cfg.PodfetchURL != "http://podfetch:8000" || cfg.PodfetchUser != "envuser" || cfg.PodfetchPass != "envpass" || cfg.PodfetchAPIKey != "envkey" || cfg.PodfetchDBPath != "/env/podcast.db" {
+		t.Errorf("unexpected config after env overrides: %+v", cfg)
+	}
+}

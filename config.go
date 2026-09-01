@@ -147,6 +147,38 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("ABS_SQLITE_DB_PATH"); v != "" {
 		cfg.AudiobookshelfDBPath = v
 	}
+	if v := os.Getenv("BACKEND_TYPE"); v != "" {
+		cfg.BackendType = v
+	} else if v := os.Getenv("ABS_BACKEND"); v != "" {
+		cfg.BackendType = v
+	} else if v := os.Getenv("BACKEND"); v != "" {
+		cfg.BackendType = v
+	}
+	if v := os.Getenv("PODFETCH_URL"); v != "" {
+		cfg.PodfetchURL = v
+	} else if v := os.Getenv("PODFETCH_HOST"); v != "" {
+		cfg.PodfetchURL = v
+	}
+	if v := os.Getenv("PODFETCH_USER"); v != "" {
+		cfg.PodfetchUser = v
+	}
+	if v := os.Getenv("PODFETCH_PASS"); v != "" {
+		cfg.PodfetchPass = v
+	}
+	if v := os.Getenv("PODFETCH_API_KEY"); v != "" {
+		cfg.PodfetchAPIKey = v
+	} else if v := os.Getenv("PODFETCH_KEY"); v != "" {
+		cfg.PodfetchAPIKey = v
+	} else if v := os.Getenv("PODFETCH_TOKEN"); v != "" {
+		cfg.PodfetchAPIKey = v
+	}
+	if v := os.Getenv("PODFETCH_DB_PATH"); v != "" {
+		cfg.PodfetchDBPath = v
+	} else if v := os.Getenv("PODFETCH_SQLITE_DB_PATH"); v != "" {
+		cfg.PodfetchDBPath = v
+	} else if v := os.Getenv("PODFETCH_DB"); v != "" {
+		cfg.PodfetchDBPath = v
+	}
 	if v := os.Getenv("PODCASTS_DIR"); v != "" {
 		cfg.PodcastsDir = v
 	}
@@ -313,6 +345,18 @@ func printConfig(cfg Config) {
 	if cfg.AudiobookshelfUser != "" {
 		fmt.Printf("  audiobookshelf_user:      %s\n", cfg.AudiobookshelfUser)
 	}
+	if cfg.BackendType != "" {
+		fmt.Printf("  backend_type:             %s\n", cfg.BackendType)
+	}
+	if cfg.PodfetchURL != "" {
+		fmt.Printf("  podfetch_url:             %s\n", cfg.PodfetchURL)
+	}
+	if cfg.PodfetchUser != "" {
+		fmt.Printf("  podfetch_user:            %s\n", cfg.PodfetchUser)
+	}
+	if cfg.PodfetchDBPath != "" {
+		fmt.Printf("  podfetch_db_path:         %s\n", cfg.PodfetchDBPath)
+	}
 	if cfg.RemoteFFmpegHost != "" {
 		fmt.Printf("  remote_ffmpeg_host:       %s\n", cfg.RemoteFFmpegHost)
 	}
@@ -345,6 +389,18 @@ func handleConfigSet(cfg *Config, key, val string) error {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
 	case "podcasts-dir", "podcasts.dir", "dir":
 		cfg.PodcastsDir = val
+	case "backend-type", "backend.type", "backend":
+		cfg.BackendType = val
+	case "podfetch-url", "podfetch.url":
+		cfg.PodfetchURL = val
+	case "podfetch-user", "podfetch.user":
+		cfg.PodfetchUser = val
+	case "podfetch-pass", "podfetch.pass":
+		cfg.PodfetchPass = val
+	case "podfetch-api-key", "podfetch.api-key", "podfetch-key", "podfetch-token":
+		cfg.PodfetchAPIKey = val
+	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
+		cfg.PodfetchDBPath = val
 	case "abs-url", "abs.url", "audiobookshelf-url", "url":
 		cfg.AudiobookshelfURL = val
 	case "abs-user", "abs.user", "audiobookshelf-user", "user":
@@ -413,6 +469,18 @@ func handleConfigGet(cfg Config, key string) {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
 	case "podcasts-dir", "podcasts.dir", "dir":
 		fmt.Println(cfg.PodcastsDir)
+	case "backend-type", "backend.type", "backend":
+		fmt.Println(cfg.BackendType)
+	case "podfetch-url", "podfetch.url":
+		fmt.Println(cfg.PodfetchURL)
+	case "podfetch-user", "podfetch.user":
+		fmt.Println(cfg.PodfetchUser)
+	case "podfetch-pass", "podfetch.pass":
+		fmt.Println(cfg.PodfetchPass)
+	case "podfetch-api-key", "podfetch.api-key", "podfetch-key", "podfetch-token":
+		fmt.Println(cfg.PodfetchAPIKey)
+	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
+		fmt.Println(cfg.PodfetchDBPath)
 	case "abs-url", "abs.url", "audiobookshelf-url", "url":
 		fmt.Println(cfg.AudiobookshelfURL)
 	case "abs-user", "abs.user", "audiobookshelf-user", "user":

@@ -24,6 +24,22 @@ func TestBackendRegistry(t *testing.T) {
 		t.Errorf("expected name audiobookshelf, got %s", b2.Name())
 	}
 
+	b3, err := New("podfetch", Config{Host: "http://localhost:8000"})
+	if err != nil {
+		t.Fatalf("failed to create backend 'podfetch': %v", err)
+	}
+	if b3.Name() != "podfetch" {
+		t.Errorf("expected name podfetch, got %s", b3.Name())
+	}
+
+	b4, err := New("pod_fetch", Config{Host: "http://localhost:8000"})
+	if err != nil {
+		t.Fatalf("failed to create backend by alias 'pod_fetch': %v", err)
+	}
+	if b4.Name() != "podfetch" {
+		t.Errorf("expected name podfetch, got %s", b4.Name())
+	}
+
 	_, err = New("non_existent", Config{})
 	if err == nil {
 		t.Errorf("expected error for non existent backend")

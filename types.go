@@ -132,6 +132,12 @@ type Config struct {
 	AudiobookshelfPass     string           `json:"audiobookshelf_pass,omitempty"`
 	AudiobookshelfToken    string           `json:"audiobookshelf_token,omitempty"`
 	AudiobookshelfDBPath   string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
+	BackendType            string           `json:"backend_type,omitempty"`
+	PodfetchURL            string           `json:"podfetch_url,omitempty"`
+	PodfetchUser           string           `json:"podfetch_user,omitempty"`
+	PodfetchPass           string           `json:"podfetch_pass,omitempty"`
+	PodfetchAPIKey         string           `json:"podfetch_api_key,omitempty"`
+	PodfetchDBPath         string           `json:"podfetch_db_path,omitempty"`
 	PostProcessors         []string         `json:"post_processors,omitempty"`
 	RemoteFFmpegHost       string           `json:"remote_ffmpeg_host,omitempty"`
 	RemoteHost             string           `json:"remote_host,omitempty"`

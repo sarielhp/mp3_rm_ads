@@ -39,6 +39,12 @@
   "audiobookshelf_url": "http://127.0.0.1:8080",
   "audiobookshelf_user": "admin",
   "audiobookshelf_pass": "password",
+  "backend_type": "audiobookshelf",
+  "podfetch_url": "",
+  "podfetch_user": "",
+  "podfetch_pass": "",
+  "podfetch_api_key": "",
+  "podfetch_db_path": "",
   "profiles": [
     {
       "id": 1,

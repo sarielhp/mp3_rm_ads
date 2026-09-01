@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/sariel/abs/pkg/backend"
@@ -28,16 +29,42 @@ func stripHTML(s string) string {
 }
 
 func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
-	bCfg := backend.Config{
-		Host:        cfg.AudiobookshelfURL,
-		User:        cfg.AudiobookshelfUser,
-		Pass:        cfg.AudiobookshelfPass,
-		Token:       cfg.AudiobookshelfToken,
-		DBPath:      cfg.AudiobookshelfDBPath,
-		PodcastsDir: cfg.PodcastsDir,
-		Quiet:       quiet,
+	backendName := cfg.BackendType
+	if backendName == "" {
+		if cfg.PodfetchURL != "" || cfg.PodfetchDBPath != "" {
+			if cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" {
+				backendName = "podfetch"
+			}
+		}
 	}
-	return backend.New("audiobookshelf", bCfg)
+	if backendName == "" {
+		backendName = "audiobookshelf"
+	}
+	switch strings.ToLower(backendName) {
+	case "podfetch", "pod_fetch":
+		bCfg := backend.Config{
+			Host:        cfg.PodfetchURL,
+			User:        cfg.PodfetchUser,
+			Pass:        cfg.PodfetchPass,
+			Token:       cfg.PodfetchAPIKey,
+			APIKey:      cfg.PodfetchAPIKey,
+			DBPath:      cfg.PodfetchDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       quiet,
+		}
+		return backend.New("podfetch", bCfg)
+	default:
+		bCfg := backend.Config{
+			Host:        cfg.AudiobookshelfURL,
+			User:        cfg.AudiobookshelfUser,
+			Pass:        cfg.AudiobookshelfPass,
+			Token:       cfg.AudiobookshelfToken,
+			DBPath:      cfg.AudiobookshelfDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       quiet,
+		}
+		return backend.New("audiobookshelf", bCfg)
+	}
 }
 
 func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error) {
@@ -111,7 +138,10 @@ func absScanPodcasts(cfg Config, quiet bool) {
 }
 
 func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) {
-	if cfg == nil || cfg.AudiobookshelfURL == "" {
+	if cfg == nil {
+		return
+	}
+	if cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" && cfg.PodfetchURL == "" && cfg.PodfetchDBPath == "" {
 		return
 	}
 	b, err := getBackend(*cfg, true)

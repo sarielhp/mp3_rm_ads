@@ -38,6 +38,7 @@ type Config struct {
 	User        string
 	Pass        string
 	Token       string
+	APIKey      string
 	DBPath      string
 	PodcastsDir string
 	Timeout     time.Duration
