@@ -208,13 +208,25 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 
 			if cutAudioFFmpeg(audioFile, keepSegments, tempOut) {
 				precutPath := audioFile + ".precut"
-				safeMove(audioFile, precutPath)
-				safeMove(tempOut, audioFile)
-				cleanDuration = getAudioDuration(audioFile)
-				if fi, err := os.Stat(audioFile); err == nil {
-					cleanSize = fi.Size()
+				installed := true
+				if !fileExists(precutPath) {
+					checkPrecutSymlink(precutPath)
+					if mvErr := safeMove(audioFile, precutPath); mvErr != nil {
+						fmt.Fprintf(os.Stderr, "Error: could not preserve the original for %s: %v\n", audioFile, mvErr)
+						installed = false
+					}
 				}
-				st.Original.Filename = filepath.Base(precutPath)
+				if installed {
+					if mvErr := safeMove(tempOut, audioFile); mvErr != nil {
+						fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", audioFile, mvErr)
+					} else {
+						cleanDuration = getAudioDuration(audioFile)
+						if fi, err := os.Stat(audioFile); err == nil {
+							cleanSize = fi.Size()
+						}
+						st.Original.Filename = filepath.Base(precutPath)
+					}
+				}
 			}
 			_ = os.RemoveAll(workDir)
 		}

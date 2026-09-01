@@ -91,13 +91,21 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 
 		if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
 			checkPrecutSymlink(precutFile)
-			safeMove(mainMP3File, precutFile)
+			if mvErr := safeMove(mainMP3File, precutFile); mvErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", mvErr)
+				fmt.Fprintf(os.Stderr, "The episode was left unchanged; the recut audio is in %s\n", workDir)
+				return
+			}
 			if !cli.Quiet {
 				fmt.Printf("Original file preserved at: '%s'\n", precutFile)
 			}
 		}
 
-		safeMove(tempOutputFile, outputFile)
+		if mvErr := safeMove(tempOutputFile, outputFile); mvErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: could not install the recut audio: %v\n", mvErr)
+			fmt.Fprintf(os.Stderr, "The original is at %s and the recut audio is in %s; neither was deleted.\n", precutFile, workDir)
+			return
+		}
 		os.RemoveAll(workDir)
 
 		newDuration := getAudioDuration(outputFile)

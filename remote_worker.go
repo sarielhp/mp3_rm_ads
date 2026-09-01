@@ -106,8 +106,12 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 			verifyTempFile(tempOut)
 
 			if cutAudioFFmpeg(inputFile, keepSegments, tempOut) {
-				safeMove(tempOut, outMP3)
-				cleanDuration = getAudioDuration(outMP3)
+				if mvErr := safeMove(tempOut, outMP3); mvErr != nil {
+					fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", outMP3, mvErr)
+					copyFile(inputFile, outMP3)
+				} else {
+					cleanDuration = getAudioDuration(outMP3)
+				}
 			} else {
 				copyFile(inputFile, outMP3)
 			}

@@ -2,10 +2,13 @@ package main
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 func saveJSONTranscript(mainFile string, data *TranscriptionData, jsonFile string, quiet bool, id3Tags map[string]string) {
@@ -137,18 +140,55 @@ func checkPrecutSymlink(precutFile string) {
 	}
 }
 
-func safeMove(src, dst string) {
-	os.Remove(dst)
-	os.Rename(src, dst)
+var renameFn = os.Rename
+
+func safeMove(src, dst string) error {
+	err := renameFn(src, dst)
+	if err == nil {
+		return nil
+	}
+	if !errors.Is(err, syscall.EXDEV) {
+		return fmt.Errorf("move %s -> %s: %w", src, dst, err)
+	}
+
+	tmp := dst + ".partial"
+	if cErr := copyFileErr(src, tmp); cErr != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("move %s -> %s: %w", src, dst, cErr)
+	}
+	if rErr := renameFn(tmp, dst); rErr != nil {
+		_ = os.Remove(tmp)
+		return fmt.Errorf("move %s -> %s: %w", src, dst, rErr)
+	}
+	return os.Remove(src)
+}
+
+func copyFileErr(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.OpenFile(dst, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0644)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(out, in); err != nil {
+		out.Close()
+		return err
+	}
+	if err := out.Sync(); err != nil {
+		out.Close()
+		return err
+	}
+	return out.Close()
 }
 
 func copyFile(src, dst string) {
-	data, err := readFile(src)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "copyFile read error: %v\n", err)
-		return
+	if err := copyFileErr(src, dst); err != nil {
+		fmt.Fprintf(os.Stderr, "copyFile error: %v\n", err)
 	}
-	writeFile(dst, data)
 }
 
 func findMP3Files(dir string) []string {

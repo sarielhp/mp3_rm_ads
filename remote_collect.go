@@ -99,7 +99,7 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 				remoteCuts := fmt.Sprintf("%s.cuts.json", remoteBase)
 				remoteTrans := fmt.Sprintf("%s.transcript.json", remoteBase)
 
-				tempItemDir := filepath.Join(os.TempDir(), "abs_pull_item", fmt.Sprintf("%d", time.Now().UnixNano()))
+				tempItemDir := filepath.Join(workDirFor(localDestAudio), fmt.Sprintf("pull_%d", time.Now().UnixNano()))
 				_ = os.MkdirAll(tempItemDir, 0755)
 
 				tempAudio := filepath.Join(tempItemDir, filepath.Base(localDestAudio))
@@ -126,18 +126,27 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 				_ = transport.Download(targetHost, remoteTrans, tempTrans)
 
 				localPrecut := localDestAudio + ".precut"
-				if fileExists(localDestAudio) {
+				if fileExists(localDestAudio) && !fileExists(localPrecut) {
 					checkPrecutSymlink(localPrecut)
-					safeMove(localDestAudio, localPrecut)
+					if mvErr := safeMove(localDestAudio, localPrecut); mvErr != nil {
+						fmt.Fprintf(os.Stderr, "Error: could not preserve the local original for %s: %v\n", relPath, mvErr)
+						fmt.Fprintf(os.Stderr, "Leaving the remote copy in place; nothing was changed locally.\n")
+						_ = os.RemoveAll(tempItemDir)
+						continue
+					}
 				}
 
-				safeMove(tempAudio, localDestAudio)
+				if mvErr := safeMove(tempAudio, localDestAudio); mvErr != nil {
+					fmt.Fprintf(os.Stderr, "Error: could not install the pulled audio for %s: %v\n", relPath, mvErr)
+					fmt.Fprintf(os.Stderr, "The download is kept at %s and the remote copy is NOT acknowledged.\n", tempAudio)
+					continue
+				}
 				localBase := stripExt(localDestAudio)
 				if fileExists(tempCuts) {
-					safeMove(tempCuts, localBase+".cuts.json")
+					_ = safeMove(tempCuts, localBase+".cuts.json")
 				}
 				if fileExists(tempTrans) {
-					safeMove(tempTrans, localBase+".transcript.json")
+					_ = safeMove(tempTrans, localBase+".transcript.json")
 				}
 
 				localStat := getOrCreateEpisodeStatus(localDestAudio)
@@ -218,18 +227,25 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 						destCuts := destBase + ".cuts.json"
 						destTranscript := destBase + ".transcript.json"
 
-						if fileExists(destMP3) {
+						if fileExists(destMP3) && !fileExists(destPrecut) {
 							checkPrecutSymlink(destPrecut)
-							safeMove(destMP3, destPrecut)
+							if mvErr := safeMove(destMP3, destPrecut); mvErr != nil {
+								fmt.Fprintf(os.Stderr, "Error: could not preserve the original for %s: %v\n", destMP3, mvErr)
+								continue
+							}
 						}
 						if fileExists(srcAudio) {
-							safeMove(srcAudio, destMP3)
+							if mvErr := safeMove(srcAudio, destMP3); mvErr != nil {
+								fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", destMP3, mvErr)
+								fmt.Fprintf(os.Stderr, "The remote staging directory is NOT removed.\n")
+								continue
+							}
 						}
 						if fileExists(srcCuts) {
-							safeMove(srcCuts, destCuts)
+							_ = safeMove(srcCuts, destCuts)
 						}
 						if fileExists(srcTranscript) {
-							safeMove(srcTranscript, destTranscript)
+							_ = safeMove(srcTranscript, destTranscript)
 						}
 						updateEpisodeStatus(destMP3, func(st *EpisodeStatusFile) { st.Status = StateDone })
 						syncAudiobookshelfDuration(cfg, destMP3, item.CleanedDurationSec)
