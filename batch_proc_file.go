@@ -60,6 +60,8 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		}
 		return hasError, processed, false
 	}
+	defer fileLock.Release()
+	processed = true
 
 	if !cli.Quiet {
 		if cli.Count > 0 {
@@ -91,7 +93,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 
 	if cli.Recut {
 		handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, config, cli, fileStartTime)
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	costInfo := getProfileCost(selectedProfile)
@@ -113,7 +115,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 	if err != nil {
 		hasError = true
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	detectedLang := transcriptionData.Language
@@ -146,7 +148,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 
 	if !validateTranscriptSanity(transcriptionData, totalDuration, cli.Quiet) {
 		hasError = true
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	if isNewlyTranscribed && cli.SaveTranscript {
@@ -166,7 +168,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		if !cli.Quiet {
 			fmt.Printf("Export completed in %s\n", formatClock(fileTotalDuration.Seconds()))
 		}
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	if cli.TranscribeMin != "" {
@@ -178,7 +180,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
 			os.Remove(sourceAudioFile)
 		}
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	formattedTranscript := formatTranscript(transcriptionData, totalDuration)
@@ -216,7 +218,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 			copyFile(sourceAudioFile, outputFile)
 		}
 		fmt.Printf("Result saved to: '%s'\n", outputFile)
-		fileLock.Release()
+		return hasError, processed, false
 	}
 
 	if cli.Verbose && !cli.Quiet {
@@ -319,7 +321,5 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 	if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
 		os.Remove(sourceAudioFile)
 	}
-	fileLock.Release()
-	processed = true
 	return hasError, processed, false
 }
