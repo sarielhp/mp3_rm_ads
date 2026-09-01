@@ -3,13 +3,25 @@ package main
 import (
 	"fmt"
 	"strconv"
+	"strings"
 )
 
 func printPodcastList(client *ABSClient, podcasts []PodcastItem, verbose bool, quiet bool) {
 	if quiet {
 		return
 	}
-	fmt.Println("\n=== Available Podcasts in Audiobookshelf ===")
+	name := "Podcast Server"
+	if client != nil {
+		bname := client.Name()
+		if bname == "podfetch" {
+			name = "PodFetch"
+		} else if bname == "audiobookshelf" {
+			name = "Audiobookshelf"
+		} else {
+			name = strings.Title(bname)
+		}
+	}
+	fmt.Printf("\n=== Available Podcasts in %s ===\n", name)
 	for idx, item := range podcasts {
 		title := item.Media.Metadata.Title
 		if title == "" {
