@@ -145,6 +145,7 @@ func safeMove(src, dst string) {
 func copyFile(src, dst string) {
 	data, err := readFile(src)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "copyFile read error: %v\n", err)
 		return
 	}
 	writeFile(dst, data)
@@ -154,6 +155,7 @@ func findMP3Files(dir string) []string {
 	var files []string
 	entries, err := os.ReadDir(dir)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "findMP3Files read error: %v\n", err)
 		return files
 	}
 	for _, entry := range entries {

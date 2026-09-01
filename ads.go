@@ -114,7 +114,7 @@ func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
 	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
 	content, err := callLLMChat(profile, systemPrompt, userPrompt, 0, 300*time.Second, false)
 	if err != nil {
-		fmt.Printf("Warning during LLM ad detection: %v\n", err)
+		fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
 		return nil
 	}
 	return extractJSONArray(content)
@@ -169,6 +169,7 @@ func extractJSONArray(content string) []AdSegment {
 
 	var ads []AdSegment
 	if err := json.Unmarshal([]byte(content[start:end+1]), &ads); err != nil {
+		fmt.Fprintf(os.Stderr, "Error unmarshaling ads JSON: %v\n", err)
 		return nil
 	}
 	return ads
@@ -179,7 +180,7 @@ func extractKeywordsLLM(transcriptText string, profile LLMProfile, quiet bool) s
 	content, err := callLLMChat(profile, keywordExtractionPrompt, userPrompt, 200, 60*time.Second, quiet)
 	if err != nil {
 		if !quiet {
-			fmt.Printf("Warning during keyword extraction: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Error during keyword extraction: %v\n", err)
 		}
 		return ""
 	}

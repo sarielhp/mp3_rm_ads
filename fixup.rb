@@ -1,0 +1,22 @@
+content = File.read('output.go')
+content.sub!('func _ = copyFile() error {', 'func copyFile(src, dst string) error {')
+content.sub!('subFiles, _, _ := findMP3Files', 'subFiles, _ := findMP3Files')
+File.write('output.go', content)
+
+content = File.read('batch_proc_file.go')
+content.gsub!('_, _ = convertJSONToSRT( )', '_, _ = convertJSONToSRT(jsonFile, transcriptionData, cli.TranscriptPath, cli.Quiet)')
+content.gsub!('_, _ = convertJSONToTXT( )', '_, _ = convertJSONToTXT(jsonFile, transcriptionData, totalDuration, cli.TranscriptPath, cli.Quiet)')
+content.sub!('_ = copyFile()', '_ = copyFile(sourceAudioFile, outputFile)')
+File.write('batch_proc_file.go', content)
+
+content = File.read('main.go')
+content.sub!('_, _ = convertJSONToTXT( )', '_, _ = convertJSONToTXT(f, nil, 0, cli.Output, cli.Quiet)')
+content.sub!('_, _ = convertJSONToSRT( )', '_, _ = convertJSONToSRT(f, nil, cli.Output, cli.Quiet)')
+content.sub!('_, _ = convertJSONToTXT( )', '_, _ = convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)')
+content.sub!('_, _ = convertJSONToSRT( )', '_, _ = convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)')
+File.write('main.go', content)
+
+content = File.read('pipeline.go')
+content.sub!('_, _ = convertJSONToSRT( )', '_, _ = convertJSONToSRT(inputFile, nil, cli.TranscriptPath, cli.Quiet)')
+content.sub!('_, _ = convertJSONToTXT( )', '_, _ = convertJSONToTXT(inputFile, nil, 0, cli.TranscriptPath, cli.Quiet)')
+File.write('pipeline.go', content)

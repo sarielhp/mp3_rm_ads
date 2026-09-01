@@ -17,14 +17,16 @@ func execCommand(name string, args ...string) *exec.Cmd {
 func getAudioDuration(filePath string) float64 {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get absolute path: %v\n", err)
 		return 0.0
 	}
 	cmd := exec.Command("ffprobe", "-v", "error",
 		"-show_entries", "format=duration",
 		"-of", "default=noprint_wrappers=1:nokey=1",
 		absPath)
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffprobe failed: %v, output: %s\n", err, string(output))
 		return 0.0
 	}
 	var dur float64
@@ -35,14 +37,16 @@ func getAudioDuration(filePath string) float64 {
 func extractID3Tags(filePath string) map[string]string {
 	absPath, err := filepath.Abs(filePath)
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "failed to get absolute path: %v\n", err)
 		return nil
 	}
 	cmd := exec.Command("ffprobe", "-v", "error",
 		"-show_entries", "format_tags",
 		"-of", "default=noprint_wrappers=1",
 		absPath)
-	output, err := cmd.Output()
+	output, err := cmd.CombinedOutput()
 	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffprobe failed: %v, output: %s\n", err, string(output))
 		return nil
 	}
 
@@ -103,11 +107,12 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 		if ext == "" {
 			ext = ".mp3"
 		}
-		remIn := fmt.Sprintf("/tmp/%s_in%s", tempID, ext)
-		remOut := fmt.Sprintf("/tmp/%s_out%s", tempID, filepath.Ext(absOutput))
+		remIn := fmt.Sprintf(".work/%s_in%s", tempID, ext)
+		remOut := fmt.Sprintf(".work/%s_out%s", tempID, filepath.Ext(absOutput))
 
 		scpInCmd := exec.Command("scp", "-B", "-q", absInput, fmt.Sprintf("%s:%s", remoteHost, remIn))
 		if err := scpInCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "scp in failed: %v\n", err)
 			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 		}
 		defer func() {
@@ -119,11 +124,13 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 			fmt.Sprintf("ffmpeg -y -loglevel error -i %s -filter_complex %q -map '[aout]' -c:a libmp3lame -b:a 192k %s",
 				remIn, filterComplex, remOut))
 		if err := remFFmpegCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "remote ffmpeg failed: %v\n", err)
 			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 		}
 
 		scpOutCmd := exec.Command("scp", "-B", "-q", fmt.Sprintf("%s:%s", remoteHost, remOut), absOutput)
 		if err := scpOutCmd.Run(); err != nil {
+			fmt.Fprintf(os.Stderr, "scp out failed: %v\n", err)
 			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 		}
 
@@ -137,14 +144,24 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 		"-c:a", "libmp3lame",
 		"-b:a", "192k",
 		absOutput)
-	return cmd.Run() == nil
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffmpeg failed: %v, output: %s\n", err, string(out))
+		return false
+	}
+	return true
 }
 
 func convertToWAV(inputPath, wavPath string) bool {
 	cmd := exec.Command("ffmpeg", "-y", "-loglevel", "error",
 		"-i", inputPath,
 		"-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", wavPath)
-	return cmd.Run() == nil
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffmpeg convert failed: %v, output: %s\n", err, string(out))
+		return false
+	}
+	return true
 }
 
 func truncateAudio(inputPath, outputPath string, durationSec float64) bool {
@@ -152,5 +169,10 @@ func truncateAudio(inputPath, outputPath string, durationSec float64) bool {
 		"-ss", "0", "-i", inputPath,
 		"-to", fmt.Sprintf("%.3f", durationSec),
 		"-ar", "16000", "-ac", "1", "-c:a", "pcm_s16le", outputPath)
-	return cmd.Run() == nil
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffmpeg truncate failed: %v, output: %s\n", err, string(out))
+		return false
+	}
+	return true
 }
