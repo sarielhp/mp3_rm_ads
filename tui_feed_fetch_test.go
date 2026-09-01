@@ -55,7 +55,7 @@ func TestTUIFeedFetchAndDownloadAll(t *testing.T) {
 	}
 
 	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	model.downloadAllForSelectedPodcast()
 	items := GetDownloadQueueItems()

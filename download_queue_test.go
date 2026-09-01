@@ -13,7 +13,7 @@ func TestDownloadQueuePersistence(t *testing.T) {
 	tempDir := t.TempDir()
 	queueFile := filepath.Join(tempDir, "download_queue.json")
 	testDownloadQueuePath = queueFile
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	q := &DownloadQueuePersist{
 		Items: []DownloadQueueItem{
@@ -58,7 +58,7 @@ func TestDownloadQueueStrictDeduplication(t *testing.T) {
 	tempDir := t.TempDir()
 	queueFile := filepath.Join(tempDir, "download_queue.json")
 	testDownloadQueuePath = queueFile
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 
@@ -135,7 +135,7 @@ func TestDownloadQueueFIFOOrderAndWorker(t *testing.T) {
 	tempDir := t.TempDir()
 	queueFile := filepath.Join(tempDir, "download_queue.json")
 	testDownloadQueuePath = queueFile
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 
@@ -240,7 +240,7 @@ func TestDownloadQueueRemoveAndClear(t *testing.T) {
 	tempDir := t.TempDir()
 	queueFile := filepath.Join(tempDir, "download_queue.json")
 	testDownloadQueuePath = queueFile
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 

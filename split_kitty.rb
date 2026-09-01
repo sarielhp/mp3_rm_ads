@@ -1,0 +1,7 @@
+lines = File.readlines("kitty.go")
+cover_start = lines.index { |l| l.include?("func generateGenericCover") }
+file1 = lines[0...cover_start]
+file2 = ["package main\n\n", "import (\n", "\t\"bytes\"\n", "\t\"crypto/md5\"\n", "\t\"encoding/hex\"\n", "\t\"fmt\"\n", "\t\"image\"\n", "\t\"image/color\"\n", "\t\"image/draw\"\n", "\t\"image/png\"\n", "\t\"io\"\n", "\t\"net/http\"\n", "\t\"os\"\n", "\t\"path/filepath\"\n", "\t\"strings\"\n", ")\n\n"] + lines[cover_start..-1]
+
+File.write("kitty.go", file1.join)
+File.write("kitty_cover.go", file2.join)

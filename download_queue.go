@@ -310,3 +310,16 @@ func TriggerDownloadQueueWorker(client *ABSClient) {
 		}
 	}()
 }
+
+// WaitDownloadWorkerForTest blocks until the download queue worker finishes.
+func WaitDownloadWorkerForTest() {
+	for {
+		downloadWorkerMu.Lock()
+		running := downloadWorkerRunning
+		downloadWorkerMu.Unlock()
+		if !running {
+			break
+		}
+		time.Sleep(5 * time.Millisecond)
+	}
+}

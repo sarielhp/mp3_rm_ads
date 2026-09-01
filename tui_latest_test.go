@@ -71,7 +71,7 @@ func TestLatestEpisodesSortingAndBuilding(t *testing.T) {
 func TestLatestEpisodesNavigationAndDKey(t *testing.T) {
 	tempDir := t.TempDir()
 	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 
@@ -124,7 +124,7 @@ func TestLatestEpisodesNavigationAndDKey(t *testing.T) {
 func TestDKeyInEpisodeViews(t *testing.T) {
 	tempDir := t.TempDir()
 	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 
@@ -157,7 +157,7 @@ func TestDKeyInEpisodeViews(t *testing.T) {
 func TestDownloadQueueViewAndKeyHandling(t *testing.T) {
 	tempDir := t.TempDir()
 	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { testDownloadQueuePath = "" }()
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
 
 	ClearDownloadQueue()
 
