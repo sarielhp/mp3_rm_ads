@@ -177,15 +177,27 @@ func resolveActiveWhisperProfile(cfg *Config) {
 	}
 }
 
+var configLoadFailed bool
+
 func loadConfig() Config {
+	configLoadFailed = false
 	data, err := os.ReadFile(configPath())
 	if err != nil {
+		if !os.IsNotExist(err) {
+			configLoadFailed = true
+			fmt.Fprintf(os.Stderr, "Error: cannot read configuration file '%s': %v\n", configPath(), err)
+			fmt.Fprintf(os.Stderr, "Running with defaults. Configuration changes will be refused until this is resolved.\n")
+		}
 		cfg := defaultConfig
 		applyEnvOverrides(&cfg)
 		return cfg
 	}
 	var cfg Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
+		configLoadFailed = true
+		fmt.Fprintf(os.Stderr, "Error: configuration file '%s' is not valid JSON: %v\n", configPath(), err)
+		fmt.Fprintf(os.Stderr, "Running with defaults. Configuration changes will be refused so your\n")
+		fmt.Fprintf(os.Stderr, "existing settings and credentials are not overwritten. Fix or remove the file.\n")
 		cfg = defaultConfig
 		applyEnvOverrides(&cfg)
 		return cfg
@@ -213,6 +225,11 @@ func loadConfig() Config {
 var testConfigPath string
 
 func saveConfig(cfg Config) {
+	if configLoadFailed {
+		fmt.Fprintf(os.Stderr, "Refusing to write '%s': the existing file could not be read or parsed.\n", configPath())
+		fmt.Fprintf(os.Stderr, "Writing now would replace your settings and credentials with defaults.\n")
+		return
+	}
 	dir := configDir()
 	os.MkdirAll(dir, 0755)
 	data, _ := json.MarshalIndent(cfg, "", "  ")
