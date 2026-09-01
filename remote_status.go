@@ -130,31 +130,64 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 			status.QueuedTasks = append(status.QueuedTasks, cleanRemoteRelPath(qPath, remoteWorkDir))
 		}
 		if len(status.QueuedTasks) > 1 {
+			now := time.Now()
 			durMap := make(map[string]float64, len(status.QueuedTasks))
 			priMap := make(map[string]int, len(status.QueuedTasks))
+			pubMap := make(map[string]time.Time, len(status.QueuedTasks))
+			recMap := make(map[string]bool, len(status.QueuedTasks))
 			for _, qTask := range status.QueuedTasks {
 				var dur float64
 				var pri int
+				var isRec bool
+				var pt time.Time
 				if cfg != nil && cfg.PodcastsDir != "" {
 					localAudio := filepath.Join(cfg.PodcastsDir, qTask)
 					dur = getEpisodeDurationForQueue(localAudio)
 					pri = getEpisodePriorityForQueue(localAudio)
+					isRec, pt = isEpisodeRecent24h(localAudio, now)
 				}
 				durMap[qTask] = dur
 				priMap[qTask] = pri
+				pubMap[qTask] = pt
+				recMap[qTask] = isRec
 			}
 			sort.SliceStable(status.QueuedTasks, func(i, j int) bool {
-				pi := priMap[status.QueuedTasks[i]]
-				pj := priMap[status.QueuedTasks[j]]
+				ti := status.QueuedTasks[i]
+				tj := status.QueuedTasks[j]
+				pi := priMap[ti]
+				pj := priMap[tj]
 				if pi != pj {
 					return pi > pj
 				}
-				di := durMap[status.QueuedTasks[i]]
-				dj := durMap[status.QueuedTasks[j]]
+				recI := recMap[ti]
+				recJ := recMap[tj]
+				if recI != recJ {
+					return recI && !recJ
+				}
+				if recI {
+					pubI := pubMap[ti]
+					pubJ := pubMap[tj]
+					if !pubI.Equal(pubJ) {
+						return pubI.After(pubJ)
+					}
+					di := durMap[ti]
+					dj := durMap[tj]
+					if di != dj {
+						return di < dj
+					}
+					return ti < tj
+				}
+				di := durMap[ti]
+				dj := durMap[tj]
 				if di != dj {
 					return di < dj
 				}
-				return status.QueuedTasks[i] < status.QueuedTasks[j]
+				pubI := pubMap[ti]
+				pubJ := pubMap[tj]
+				if !pubI.Equal(pubJ) {
+					return pubI.After(pubJ)
+				}
+				return ti < tj
 			})
 		}
 	}
@@ -293,22 +326,51 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	if len(status.QueuedTasks) > 0 {
 		fmt.Println()
 		fmt.Println(bold("Remote Queue (Scheduled Jobs):"))
+		now := time.Now()
+		hasPrintedSeparator := false
 		for idx, task := range status.QueuedTasks {
 			var dur float64
 			var pri int
+			var isRec bool
+			var pt time.Time
 			if cfg != nil && cfg.PodcastsDir != "" {
 				localAudio := filepath.Join(cfg.PodcastsDir, task)
 				dur = getEpisodeDurationForQueue(localAudio)
 				pri = getEpisodePriorityForQueue(localAudio)
+				isRec, pt = isEpisodeRecent24h(localAudio, now)
 			}
 			durStr := "--:--"
 			if dur > 0 {
 				durStr = formatClock(dur)
 			}
+
+			if idx > 0 && !hasPrintedSeparator {
+				prevTask := status.QueuedTasks[idx-1]
+				prevRec := false
+				if cfg != nil && cfg.PodcastsDir != "" {
+					prevAudio := filepath.Join(cfg.PodcastsDir, prevTask)
+					prevRec, _ = isEpisodeRecent24h(prevAudio, now)
+				}
+				if prevRec && !isRec {
+					fmt.Printf("  %s\n", repeatStr("─", 76))
+					hasPrintedSeparator = true
+				}
+			}
+
+			timeTag := ""
+			if isRec && !pt.IsZero() {
+				ago := now.Sub(pt)
+				if ago < time.Hour {
+					timeTag = fmt.Sprintf(" (%dm ago)", int(ago.Minutes()))
+				} else {
+					timeTag = fmt.Sprintf(" (%dh ago)", int(ago.Hours()))
+				}
+			}
+
 			if pri > 0 {
-				fmt.Printf("  [%d] %s  %s (priority: %d)\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task, pri)
+				fmt.Printf("  [%d] %s  %s%s (priority: %d)\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task, timeTag, pri)
 			} else {
-				fmt.Printf("  [%d] %s  %s\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task)
+				fmt.Printf("  [%d] %s  %s%s\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task, timeTag)
 			}
 		}
 	}

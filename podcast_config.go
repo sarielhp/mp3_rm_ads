@@ -246,6 +246,12 @@ func getEpisodePublicationTime(filePath string) time.Time {
 			}
 		}
 	}
+	statPath := statusPathFor(filePath)
+	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil && st.PublishedAt != "" {
+		if t, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !t.IsZero() {
+			return t
+		}
+	}
 	if fi, err := os.Stat(filePath); err == nil {
 		return fi.ModTime()
 	}

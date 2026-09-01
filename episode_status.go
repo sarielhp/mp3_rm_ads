@@ -47,6 +47,7 @@ type EpisodeStatusFile struct {
 	StepStartedAt string           `json:"step_started_at,omitempty"`
 	CreatedAt     string           `json:"created_at"`
 	UpdatedAt     string           `json:"updated_at"`
+	PublishedAt   string           `json:"published_at,omitempty"`
 	WorkerHost    string           `json:"worker_host,omitempty"`
 	Original      EpisodeAudioMeta `json:"original,omitempty"`
 	Cleaned       EpisodeAudioMeta `json:"cleaned,omitempty"`
@@ -111,12 +112,17 @@ func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {
 		sz = fi.Size()
 	}
 	dur := getAudioDuration(audioPath)
+	pubStr := ""
+	if pt := getEpisodePublicationTime(audioPath); !pt.IsZero() {
+		pubStr = pt.UTC().Format(time.RFC3339)
+	}
 	st := &EpisodeStatusFile{
-		Version:   1,
-		MediaFile: fname,
-		Status:    StateDownloaded,
-		CreatedAt: now,
-		UpdatedAt: now,
+		Version:     1,
+		MediaFile:   fname,
+		Status:      StateDownloaded,
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		PublishedAt: pubStr,
 		Original: EpisodeAudioMeta{
 			Filename:    fname,
 			DurationSec: dur,

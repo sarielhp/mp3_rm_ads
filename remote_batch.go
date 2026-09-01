@@ -36,29 +36,81 @@ func getEpisodePriorityForQueue(audioPath string) int {
 	return 0
 }
 
-func sortAudioFilesByDuration(files []string) {
+func isEpisodeRecent24h(audioPath string, now time.Time) (bool, time.Time) {
+	pt := getEpisodePublicationTime(audioPath)
+	if pt.IsZero() {
+		return false, pt
+	}
+	cutoff := now.Add(-24 * time.Hour)
+	return pt.After(cutoff), pt
+}
+
+func sortAudioFilesByQueuePolicy(files []string, now time.Time) {
 	if len(files) <= 1 {
 		return
 	}
+	if now.IsZero() {
+		now = time.Now()
+	}
 	durMap := make(map[string]float64, len(files))
 	priMap := make(map[string]int, len(files))
+	pubMap := make(map[string]time.Time, len(files))
+	recentMap := make(map[string]bool, len(files))
+
 	for _, f := range files {
 		durMap[f] = getEpisodeDurationForQueue(f)
 		priMap[f] = getEpisodePriorityForQueue(f)
+		isRec, pt := isEpisodeRecent24h(f, now)
+		pubMap[f] = pt
+		recentMap[f] = isRec
 	}
+
 	sort.SliceStable(files, func(i, j int) bool {
-		pi := priMap[files[i]]
-		pj := priMap[files[j]]
+		fi := files[i]
+		fj := files[j]
+
+		pi := priMap[fi]
+		pj := priMap[fj]
 		if pi != pj {
 			return pi > pj
 		}
-		di := durMap[files[i]]
-		dj := durMap[files[j]]
+
+		recI := recentMap[fi]
+		recJ := recentMap[fj]
+		if recI != recJ {
+			return recI && !recJ
+		}
+
+		if recI {
+			pubI := pubMap[fi]
+			pubJ := pubMap[fj]
+			if !pubI.Equal(pubJ) {
+				return pubI.After(pubJ)
+			}
+			di := durMap[fi]
+			dj := durMap[fj]
+			if di != dj {
+				return di < dj
+			}
+			return fi < fj
+		}
+
+		di := durMap[fi]
+		dj := durMap[fj]
 		if di != dj {
 			return di < dj
 		}
-		return files[i] < files[j]
+		pubI := pubMap[fi]
+		pubJ := pubMap[fj]
+		if !pubI.Equal(pubJ) {
+			return pubI.After(pubJ)
+		}
+		return fi < fj
 	})
+}
+
+func sortAudioFilesByDuration(files []string) {
+	sortAudioFilesByQueuePolicy(files, time.Now())
 }
 
 func findAudioFilesForRemote(paths []string, defaultDir string) []string {

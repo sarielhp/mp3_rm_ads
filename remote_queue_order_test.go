@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 )
 
 func TestSortAudioFilesByDurationAndPriority(t *testing.T) {
@@ -240,5 +241,53 @@ func TestRemoteStatusShowsActiveAndQueueDuration(t *testing.T) {
 	err := runRemoteStatus(cfg, "stat-box", mock, false, false)
 	if err != nil {
 		t.Fatalf("runRemoteStatus failed: %v", err)
+	}
+}
+
+func TestRemoteQueue24HourPolicy(t *testing.T) {
+	tempDir := t.TempDir()
+	now := time.Date(2026, 9, 1, 12, 0, 0, 0, time.UTC)
+
+	epRecentNew := filepath.Join(tempDir, "recent_new.mp3")
+	epRecentOld := filepath.Join(tempDir, "recent_old.mp3")
+	epOlderShort := filepath.Join(tempDir, "older_short.mp3")
+	epOlderLong := filepath.Join(tempDir, "older_long.mp3")
+
+	for _, p := range []string{epRecentNew, epRecentOld, epOlderShort, epOlderLong} {
+		_ = os.WriteFile(p, []byte("audio"), 0644)
+	}
+
+	// Recent new: 2 hours ago, duration 50 mins
+	_ = saveEpisodeStatus(statusPathFor(epRecentNew), &EpisodeStatusFile{
+		MediaFile: "recent_new.mp3", PublishedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
+		Original: EpisodeAudioMeta{DurationSec: 3000.0},
+	})
+	// Recent old: 10 hours ago, duration 20 mins
+	_ = saveEpisodeStatus(statusPathFor(epRecentOld), &EpisodeStatusFile{
+		MediaFile: "recent_old.mp3", PublishedAt: now.Add(-10 * time.Hour).Format(time.RFC3339),
+		Original: EpisodeAudioMeta{DurationSec: 1200.0},
+	})
+	// Older short: 3 days ago, duration 5 mins
+	_ = saveEpisodeStatus(statusPathFor(epOlderShort), &EpisodeStatusFile{
+		MediaFile: "older_short.mp3", PublishedAt: now.Add(-72 * time.Hour).Format(time.RFC3339),
+		Original: EpisodeAudioMeta{DurationSec: 300.0},
+	})
+	// Older long: 4 days ago, duration 60 mins
+	_ = saveEpisodeStatus(statusPathFor(epOlderLong), &EpisodeStatusFile{
+		MediaFile: "older_long.mp3", PublishedAt: now.Add(-96 * time.Hour).Format(time.RFC3339),
+		Original: EpisodeAudioMeta{DurationSec: 3600.0},
+	})
+
+	files := []string{epOlderLong, epRecentOld, epOlderShort, epRecentNew}
+	sortAudioFilesByQueuePolicy(files, now)
+
+	expected := []string{epRecentNew, epRecentOld, epOlderShort, epOlderLong}
+	if len(files) != len(expected) {
+		t.Fatalf("expected %d files, got %d", len(expected), len(files))
+	}
+	for i := range expected {
+		if files[i] != expected[i] {
+			t.Errorf("at index %d: expected %s, got %s", i, filepath.Base(expected[i]), filepath.Base(files[i]))
+		}
 	}
 }
