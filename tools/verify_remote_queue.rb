@@ -83,9 +83,18 @@ q_files.each do |r_json_path|
 
   if !pub_time && local_cache[fn]
     pub_time = local_cache[fn]
-    # Update remote json with published_at
-    update_cmd = "ssh #{target_host} \"python3 -c \\\"import json; p='#{r_json_path}'; d=json.load(open(p)); d['published_at']='#{pub_time.iso8601}'; json.dump(d, open(p, 'w'), indent=2)\\\" 2>/dev/null || true\""
-    system(update_cmd)
+  end
+
+  if !pub_time
+    local_path = File.join(podcasts_dir, rel_path)
+    if File.exist?(local_path)
+      pub_time = File.mtime(local_path).utc
+    else
+      pod_dir = File.dirname(local_path)
+      base = File.basename(local_path, ".*").sub(/\s+\([a-f0-9\-]+\)$/, "")
+      matching = Dir.glob(File.join(pod_dir, "#{base}*")).find { |f| File.file?(f) && !f.end_with?(".json") }
+      pub_time = File.mtime(matching).utc if matching
+    end
   end
 
   dur = st.dig("original", "duration_sec") || 0.0
