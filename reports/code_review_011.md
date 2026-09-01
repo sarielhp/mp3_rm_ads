@@ -222,8 +222,14 @@ a merely wrong model output does the same damage. Run twice, the `.precut` origi
 overwritten too.
 
 **Fix.** Clamp and reject in `detectAdsLLM`; then refuse the cut outright if the retained
-fraction falls below a threshold (50% is defensible — no podcast is half advertisement),
-logging loudly rather than silently.
+fraction falls below a threshold, logging loudly rather than silently.
+
+> **Amended during the fix pass.** The implemented floor is **25%**, not the 50% originally
+> proposed here. Genuinely ad-heavy podcasts at ~50% do exist and a 50% floor would reject
+> them; shows above 75% advertisement do not. The fix also revealed a consequence not
+> recorded above: an *inverted* segment produced **overlapping** keep ranges —
+> `calculateKeepSegments(3600, [{100,50}])` returned `[[0 100] [50 3600]]`, which ffmpeg
+> concatenates into duplicated audio.
 
 ### [H-5] Remote `rm -f` is entirely unquoted and breaks on ordinary podcast names — VERIFIED
 
