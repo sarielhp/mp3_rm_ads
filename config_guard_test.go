@@ -71,3 +71,71 @@ func TestValidConfigStillSaves(t *testing.T) {
 		t.Errorf("a valid config round-trip lost the password")
 	}
 }
+
+func TestEnvOverridesAreNotPersistedToDisk(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	old := testConfigPath
+	testConfigPath = path
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); configFileSnapshot = nil })
+
+	onDisk := `{"podcasts_dir":"/srv/media/podcasts",` +
+		`"whisper_url":"http://real-whisper:8088/inference",` +
+		`"audiobookshelf_pass":"REAL-PASSWORD"}`
+	if err := os.WriteFile(path, []byte(onDisk), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	t.Setenv("WHISPER_URL", "http://EPHEMERAL:9999/inference")
+	t.Setenv("ABS_PASS", "EPHEMERAL-PASSWORD")
+
+	cfg := loadConfig()
+	if cfg.WhisperURL != "http://EPHEMERAL:9999/inference" {
+		t.Fatalf("the env override did not take effect for this run: %q", cfg.WhisperURL)
+	}
+
+	// Any ordinary config mutation writes the whole struct back.
+	setPodcastsDir(&cfg, "/tmp/newdir")
+
+	after, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := string(after)
+	if strings.Contains(got, "EPHEMERAL") {
+		t.Errorf("a per-invocation environment override was written into config.json:\n%s", got)
+	}
+	if !strings.Contains(got, "http://real-whisper:8088/inference") {
+		t.Errorf("the on-disk whisper_url was destroyed")
+	}
+	if !strings.Contains(got, "REAL-PASSWORD") {
+		t.Errorf("the on-disk password was destroyed")
+	}
+	if !strings.Contains(got, "/tmp/newdir") {
+		t.Errorf("the intended change was not written")
+	}
+}
+
+func TestConfigIsWrittenPrivately(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	old := testConfigPath
+	testConfigPath = path
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); configFileSnapshot = nil })
+
+	if err := os.WriteFile(path, []byte(`{"podcasts_dir":"/x"}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cfg := loadConfig()
+	cfg.AudiobookshelfPass = "secret"
+	saveConfig(cfg)
+
+	fi, err := os.Stat(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if fi.Mode().Perm()&0o077 != 0 {
+		t.Errorf("config holding credentials is mode %04o; it must not be group/other readable",
+			fi.Mode().Perm())
+	}
+}

@@ -192,6 +192,91 @@ func configLoadDidFail() bool {
 	return configLoadFailed
 }
 
+var configFileSnapshot *Config
+
+// envOverriddenFields mirrors applyEnvOverrides. Each entry restores the value
+// that was on disk whenever the corresponding environment variable is set, so a
+// per-invocation override is never persisted by a later saveConfig.
+func restoreEnvOverriddenFields(cfg *Config, disk Config) {
+	anySet := func(names ...string) bool {
+		for _, n := range names {
+			if os.Getenv(n) != "" {
+				return true
+			}
+		}
+		return false
+	}
+	if anySet("WHISPER_URL") {
+		cfg.WhisperURL = disk.WhisperURL
+	}
+	if anySet("ABS_URL", "AUDIOBOOKSHELF_URL", "ABS_HOST") {
+		cfg.AudiobookshelfURL = disk.AudiobookshelfURL
+	}
+	if anySet("ABS_USER", "AUDIOBOOKSHELF_USER") {
+		cfg.AudiobookshelfUser = disk.AudiobookshelfUser
+	}
+	if anySet("ABS_PASS", "AUDIOBOOKSHELF_PASS") {
+		cfg.AudiobookshelfPass = disk.AudiobookshelfPass
+	}
+	if anySet("ABS_TOKEN") {
+		cfg.AudiobookshelfToken = disk.AudiobookshelfToken
+	}
+	if anySet("ABS_SQLITE_DB_PATH") {
+		cfg.AudiobookshelfDBPath = disk.AudiobookshelfDBPath
+	}
+	if anySet("BACKEND_TYPE", "ABS_BACKEND", "BACKEND") {
+		cfg.BackendType = disk.BackendType
+	}
+	if anySet("PODFETCH_URL", "PODFETCH_HOST") {
+		cfg.PodfetchURL = disk.PodfetchURL
+	}
+	if anySet("PODFETCH_USER") {
+		cfg.PodfetchUser = disk.PodfetchUser
+	}
+	if anySet("PODFETCH_PASS") {
+		cfg.PodfetchPass = disk.PodfetchPass
+	}
+	if anySet("PODFETCH_API_KEY", "PODFETCH_KEY", "PODFETCH_TOKEN") {
+		cfg.PodfetchAPIKey = disk.PodfetchAPIKey
+	}
+	if anySet("PODFETCH_DB_PATH", "PODFETCH_SQLITE_DB_PATH", "PODFETCH_DB") {
+		cfg.PodfetchDBPath = disk.PodfetchDBPath
+	}
+	if anySet("PODCASTS_DIR") {
+		cfg.PodcastsDir = disk.PodcastsDir
+	}
+	if anySet("WHISPER_LANGUAGE") {
+		cfg.WhisperLanguage = disk.WhisperLanguage
+	}
+	if anySet("WHISPER_DOCKER_CONTAINER") {
+		cfg.WhisperDockerContainer = disk.WhisperDockerContainer
+	}
+	if anySet("WHISPER_WAKE_COMMAND") {
+		cfg.WhisperWakeCommand = disk.WhisperWakeCommand
+	}
+	if anySet("REMOTE_FFMPEG_HOST", "ABS_REMOTE_FFMPEG") {
+		cfg.RemoteFFmpegHost = disk.RemoteFFmpegHost
+	}
+	if anySet("REMOTE_HOST", "ABS_REMOTE_HOST") {
+		cfg.RemoteHost = disk.RemoteHost
+	}
+	if anySet("DEFAULT_PROCESSING", "ABS_DEFAULT_PROCESSING") {
+		cfg.DefaultProcessing = disk.DefaultProcessing
+	}
+	if anySet("REMOTE_WORK_DIR", "ABS_REMOTE_WORK_DIR") {
+		cfg.RemoteWorkDir = disk.RemoteWorkDir
+	}
+	if anySet("DEFAULT_DOWNLOAD_POLICY") {
+		cfg.DefaultDownloadPolicy = disk.DefaultDownloadPolicy
+	}
+	if anySet("DEFAULT_DOWNLOAD_K") {
+		cfg.DefaultDownloadK = disk.DefaultDownloadK
+	}
+	if anySet("DEFAULT_AD_REMOVAL", "DEFAULT_AD_POLICY") {
+		cfg.DefaultAdRemoval = disk.DefaultAdRemoval
+	}
+}
+
 func loadConfig() Config {
 	setConfigLoadFailed(false)
 	data, err := os.ReadFile(configPath())
@@ -231,6 +316,8 @@ func loadConfig() Config {
 		cfg.RemoteWorkDir = "~/abs_remote"
 	}
 	resolveActiveWhisperProfile(&cfg)
+	snapshot := cfg
+	configFileSnapshot = &snapshot
 	applyEnvOverrides(&cfg)
 	return cfg
 }
@@ -245,12 +332,22 @@ func saveConfig(cfg Config) {
 	}
 	dir := configDir()
 	os.MkdirAll(dir, 0755)
-	data, _ := json.MarshalIndent(cfg, "", "  ")
+	if configFileSnapshot != nil {
+		restoreEnvOverriddenFields(&cfg, *configFileSnapshot)
+	}
+
+	data, err := json.MarshalIndent(cfg, "", "  ")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not serialise configuration: %v\n", err)
+		return
+	}
 	path := configPath()
 	if testConfigPath != "" {
 		path = testConfigPath
 	}
-	os.WriteFile(path, append(data, '\n'), 0644)
+	if err := writeFileAtomic(path, append(data, '\n'), 0600); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not write '%s': %v\n", path, err)
+	}
 }
 
 func setPodcastsDir(cfg *Config, dir string) {

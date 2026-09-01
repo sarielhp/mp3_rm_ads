@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"os"
+	"path/filepath"
 )
 
 func formatTime(seconds float64) string {
@@ -340,4 +341,21 @@ func jsonMarshalIndent(v interface{}) ([]byte, error) {
 
 func jsonUnmarshal(data []byte, v interface{}) error {
 	return json.Unmarshal(data, v)
+}
+
+func writeFileAtomic(path string, data []byte, perm os.FileMode) error {
+	if dir := filepath.Dir(path); dir != "" {
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return err
+		}
+	}
+	tmp := fmt.Sprintf("%s.tmp.%d", path, os.Getpid())
+	if err := os.WriteFile(tmp, data, perm); err != nil {
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }
