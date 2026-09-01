@@ -116,7 +116,7 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		}
 		fileTotalDuration := time.Since(fileStartTime)
 
-		updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+		if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 			st.Status = StateDone
 			if fileExists(precutFile) {
 				st.Original.Filename = filepath.Base(precutFile)
@@ -130,7 +130,9 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 			if fi, err := os.Stat(outputFile); err == nil {
 				st.Cleaned.SizeBytes = fi.Size()
 			}
-		})
+		}); stErr != nil {
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+		}
 		syncAudiobookshelfDuration(&config, outputFile, newDuration)
 
 		if !cli.Quiet {

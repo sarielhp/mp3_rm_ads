@@ -253,7 +253,9 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 						if fileExists(srcTranscript) {
 							_ = safeMove(srcTranscript, destTranscript)
 						}
-						updateEpisodeStatus(destMP3, func(st *EpisodeStatusFile) { st.Status = StateDone })
+						if stErr := updateEpisodeStatus(destMP3, func(st *EpisodeStatusFile) { st.Status = StateDone }); stErr != nil {
+							fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+						}
 						syncAudiobookshelfDuration(cfg, destMP3, item.CleanedDurationSec)
 						totalPulled++
 						totalCutSaved += item.CutDurationSec

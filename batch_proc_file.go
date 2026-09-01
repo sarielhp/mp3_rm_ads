@@ -79,13 +79,15 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		}
 	}
 	totalDuration := getAudioDuration(sourceAudioFile)
-	updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+	if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 		st.Status = StateTranscribingLocally
 		st.Original.DurationSec = totalDuration
 		if fi, err := os.Stat(sourceAudioFile); err == nil {
 			st.Original.SizeBytes = fi.Size()
 		}
-	})
+	}); stErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+	}
 
 	if cli.TranscribeMin != "" {
 		totalDuration = handleTranscribeMin(&sourceAudioFile, totalDuration, cli)
@@ -201,14 +203,17 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 
 	if len(adSegments) == 0 {
 		saveCutsJSON(mainMP3File, totalDuration, adSegments, &selectedProfile, cli.Quiet)
-		updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+		if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 			st.Status = StateDone
 			st.Cleaned = EpisodeAudioMeta{
 				Filename:    filepath.Base(outputFile),
 				DurationSec: totalDuration,
 			}
 			st.Ads = nil
-		})
+		}); stErr != nil {
+			hasError = true
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+		}
 		fileTotalDuration := time.Since(fileStartTime)
 		if !cli.Quiet {
 			fmt.Println("No ad segments detected by LLM!")
@@ -239,9 +244,11 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 	keepSegments := cutsResult.KeepSegments
 
 	t0Step3 := time.Now()
-	updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+	if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 		st.Status = StateCuttingLocally
-	})
+	}); stErr != nil {
+		fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+	}
 	if !cli.Quiet {
 		fmt.Println()
 		fmt.Printf("Step 3/3: Cutting ads with ffmpeg (%d non-ad clips)...\n", len(keepSegments))
@@ -290,7 +297,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 			pctCut = actualCut / totalDuration * 100
 		}
 
-		updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+		if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 			st.Status = StateDone
 			if fileExists(precutFile) {
 				st.Original.Filename = filepath.Base(precutFile)
@@ -312,7 +319,10 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 					Reason: ad.Reason,
 				})
 			}
-		})
+		}); stErr != nil {
+			hasError = true
+			fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
+		}
 		fileTotalDuration := time.Since(fileStartTime)
 
 		if !cli.Quiet {

@@ -185,11 +185,14 @@ func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {
 	return st
 }
 
-func updateEpisodeStatus(audioPath string, mutate func(*EpisodeStatusFile)) {
+func updateEpisodeStatus(audioPath string, mutate func(*EpisodeStatusFile)) error {
 	statPath := statusPathFor(audioPath)
 	st := getOrCreateEpisodeStatus(audioPath)
 	mutate(st)
-	_ = saveEpisodeStatus(statPath, st)
+	if err := saveEpisodeStatus(statPath, st); err != nil {
+		return fmt.Errorf("could not record status for %s: %w", audioPath, err)
+	}
+	return nil
 }
 
 func isEpisodeCompleted(audioPath string) bool {
