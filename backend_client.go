@@ -176,25 +176,21 @@ func parseOPMLXML(data []byte) ([]backend.OPMLFeed, error) {
 func exportOPML(config Config, opmlFile string, quiet, verbose bool) {
 	if opmlFile == "" {
 		showOPMLExportUsage()
-		printError("Error: missing required <file> argument for 'abs opml export <file>'.")
-		os.Exit(1)
+		fatalError("%s\n", "Error: missing required <file> argument for 'abs opml export <file>'.")
 	}
 	b, err := getBackend(config, quiet)
 	if err != nil {
-		printError(fmt.Sprintf("Error: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 	}
 	data, err := b.ExportOPML(backend.OPMLExportOptions{Quiet: quiet, Verbose: verbose})
 	if err != nil {
-		printError(fmt.Sprintf("Error generating OPML: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error generating OPML: %v", err))
 	}
 	if dir := filepath.Dir(opmlFile); dir != "." && dir != "" {
 		_ = os.MkdirAll(dir, 0755)
 	}
 	if err := os.WriteFile(opmlFile, data, 0644); err != nil {
-		printError(fmt.Sprintf("Error writing OPML file: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error writing OPML file: %v", err))
 	}
 	if !quiet {
 		fmt.Printf("Successfully exported podcast RSS feed(s) to: %s\n", opmlFile)
@@ -204,23 +200,19 @@ func exportOPML(config Config, opmlFile string, quiet, verbose bool) {
 func importOPML(config Config, opmlFile string, quiet, verbose bool) {
 	if opmlFile == "" {
 		showOPMLImportUsage()
-		printError("Error: missing required <file> argument for 'abs opml import <file>'.")
-		os.Exit(1)
+		fatalError("%s\n", "Error: missing required <file> argument for 'abs opml import <file>'.")
 	}
 	data, err := os.ReadFile(opmlFile)
 	if err != nil {
-		printError(fmt.Sprintf("Error reading OPML file '%s': %v", opmlFile, err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error reading OPML file '%s': %v", opmlFile, err))
 	}
 	b, err := getBackend(config, quiet)
 	if err != nil {
-		printError(fmt.Sprintf("Error connecting to backend: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error connecting to backend: %v", err))
 	}
 	res, err := b.ImportOPML(data, backend.OPMLImportOptions{Quiet: quiet, Verbose: verbose})
 	if err != nil {
-		printError(fmt.Sprintf("Error importing OPML: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error importing OPML: %v", err))
 	}
 	if !quiet {
 		if res.SkippedSelfFeeds > 0 {

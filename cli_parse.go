@@ -2,7 +2,6 @@ package main
 
 import (
 	_ "embed"
-	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -435,8 +434,7 @@ func parseFlags() (string, CLIOptions) {
 	app := buildCLIApp(&action, &opts)
 	err := app.Execute(normArgs)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
+		fatalError("Error: %v\n", err)
 	}
 
 	if action == "" {

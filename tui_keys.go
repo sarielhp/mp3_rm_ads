@@ -90,7 +90,6 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Handle error screen keys
 	if m.loadErr != "" {
 		switch s {
 		case "r", "R":

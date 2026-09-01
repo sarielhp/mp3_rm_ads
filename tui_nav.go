@@ -76,7 +76,6 @@ func (m *tuiModel) renderTopNavBar() string {
 
 	out.WriteString("  " + strings.Join(tabStrs, "  ") + "\n")
 
-	// Breadcrumb path
 	var pathParts []string
 	pathParts = append(pathParts, "Podcasts")
 	if m.podIdx >= 0 && m.podIdx < len(m.podcasts) && m.screen != screenPodcasts && m.screen != screenLatestEpisodes && m.screen != screenDownloadQueue {

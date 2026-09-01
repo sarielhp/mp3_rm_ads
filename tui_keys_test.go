@@ -119,7 +119,6 @@ func TestTUIViewEpisodeDetail(t *testing.T) {
 		t.Error("should show F4 Show Player legend by default")
 	}
 
-	// Toggle player pane on
 	m.showEpisodePlayerPane = true
 	viewWithPlayer := m.View()
 	if !strings.Contains(viewWithPlayer, "AUDIO PLAYER") {
@@ -331,13 +330,11 @@ func TestTUISearchFilterEpisodes(t *testing.T) {
 func TestTUISearchModeKeyHandling(t *testing.T) {
 	m := makeTestModel()
 
-	// Enter search mode
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("/")})
 	if !m.searchMode {
 		t.Error("should be in search mode after /")
 	}
 
-	// Type characters
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("e")})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("s")})
@@ -345,13 +342,11 @@ func TestTUISearchModeKeyHandling(t *testing.T) {
 		t.Errorf("search query should be 'tes', got %q", m.searchQuery)
 	}
 
-	// Backspace
 	m.handleKey(tea.KeyMsg{Type: tea.KeyBackspace})
 	if m.searchQuery != "te" {
 		t.Errorf("search query should be 'te' after backspace, got %q", m.searchQuery)
 	}
 
-	// Escape clears and exits search
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
 	if m.searchMode {
 		t.Error("should exit search mode on escape")
@@ -376,19 +371,16 @@ func TestTUISortToggle(t *testing.T) {
 	m := makeTestModel()
 	m.screen = screenPodcastDetail
 
-	// Check initial order: ep101, ep102, ep103 (by modTime)
 	if m.podcasts[0].episodes[0].filename != "ep101.mp3" {
 		t.Errorf("expected ep101 first, got %s", m.podcasts[0].episodes[0].filename)
 	}
 
 	m.handleSortToggle()
 
-	// After toggle, order should be reversed
 	if m.podcasts[0].episodes[0].filename != "ep103.mp3" {
 		t.Errorf("expected ep103 first after sort toggle, got %s", m.podcasts[0].episodes[0].filename)
 	}
 
-	// Toggle again
 	m.handleSortToggle()
 	if m.podcasts[0].episodes[0].filename != "ep101.mp3" {
 		t.Errorf("expected ep101 first after second toggle, got %s", m.podcasts[0].episodes[0].filename)

@@ -93,17 +93,17 @@ func detectScriptLanguage(text string) string {
 
 func isLetter(r rune) bool {
 	return (r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') ||
-		(r >= 0x00C0 && r <= 0x024F) || // Latin Extended
-		(r >= 0x0400 && r <= 0x04FF) || // Cyrillic
-		(r >= 0x0590 && r <= 0x05FF) || // Hebrew
-		(r >= 0x0600 && r <= 0x06FF) || // Arabic
-		(r >= 0x0750 && r <= 0x077F) || // Arabic Supplement
-		(r >= 0x0370 && r <= 0x03FF) || // Greek
-		(r >= 0x1E00 && r <= 0x1EFF) || // Latin Extended Additional
-		(r >= 0x2C00 && r <= 0x2C5F) || // Glagolitic
-		(r >= 0x3040 && r <= 0x309F) || // Hiragana
-		(r >= 0x30A0 && r <= 0x30FF) || // Katakana
-		(r >= 0x4E00 && r <= 0x9FFF) // CJK
+		(r >= 0x00C0 && r <= 0x024F) ||
+		(r >= 0x0400 && r <= 0x04FF) ||
+		(r >= 0x0590 && r <= 0x05FF) ||
+		(r >= 0x0600 && r <= 0x06FF) ||
+		(r >= 0x0750 && r <= 0x077F) ||
+		(r >= 0x0370 && r <= 0x03FF) ||
+		(r >= 0x1E00 && r <= 0x1EFF) ||
+		(r >= 0x2C00 && r <= 0x2C5F) ||
+		(r >= 0x3040 && r <= 0x309F) ||
+		(r >= 0x30A0 && r <= 0x30FF) ||
+		(r >= 0x4E00 && r <= 0x9FFF)
 }
 
 func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, quiet bool) bool {

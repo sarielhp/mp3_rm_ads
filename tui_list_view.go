@@ -70,12 +70,10 @@ func (m *tuiModel) drawPodcastsList() string {
 			}
 		}
 
-		// Build right pane for selected podcast with rich details
 		var rightLines []string
 		if m.podIdx < len(pods) {
 			selPod := pods[m.podIdx]
 
-			// 1. Cover Art (if available and enabled)
 			if isKittySupported() && m.showCover {
 				coverPath := selPod.coverPath
 				if coverPath == "" {
@@ -104,16 +102,13 @@ func (m *tuiModel) drawPodcastsList() string {
 				}
 			}
 
-			// 2. Podcast Title
 			title := displayName(selPod.name)
 			rightLines = append(rightLines, tuiTitleStyle.Render(truncate(title, rightW-2)))
 
-			// 3. Author
 			if author := selPod.displayAuthor(); author != "" {
 				rightLines = append(rightLines, tuiSubtitleStyle.Render(truncate("by "+displayName(author), rightW-2)))
 			}
 
-			// 4. Detailed Stats & Timeline
 			selDone := 0
 			var totalDurSec float64
 			var newestDate, oldestDate time.Time
@@ -166,7 +161,6 @@ func (m *tuiModel) drawPodcastsList() string {
 				rightLines = append(rightLines, tuiSubtextStyle.Render(truncate(dateInfo, rightW-2)))
 			}
 
-			// 5. Description (rich multi-line wrapped text)
 			if desc := selPod.displayDescription(); desc != "" {
 				clean := strings.TrimSpace(renderHTML(desc))
 				if len(clean) > 0 {
@@ -194,7 +188,6 @@ func (m *tuiModel) drawPodcastsList() string {
 				}
 			}
 
-			// 6. Recent Episodes preview
 			if len(selPod.episodes) > 0 && len(rightLines) < maxVis-2 {
 				rightLines = append(rightLines, "")
 				rightLines = append(rightLines, tuiSectionTitle.Render("Recent Episodes:"))
@@ -224,7 +217,6 @@ func (m *tuiModel) drawPodcastsList() string {
 			}
 		}
 
-		// Join columns
 		totalLines := max(len(leftLines), len(rightLines))
 		for k := 0; k < totalLines; k++ {
 			leftPart := ""

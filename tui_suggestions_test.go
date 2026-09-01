@@ -35,13 +35,11 @@ func TestPersistentMiniPlayerBar(t *testing.T) {
 	m.screen = screenPodcasts
 	m.width = 80
 
-	// When no player is active, mini player is empty
 	globalPlayer.Current = nil
 	if bar := m.renderMiniPlayerBar(); bar != "" {
 		t.Errorf("expected empty mini player when stopped, got: %s", bar)
 	}
 
-	// When track is playing
 	globalPlayer.Current = &PlayerTrack{
 		Title:   "Ep 101 Test",
 		Podcast: "Tech Talks",
@@ -72,7 +70,6 @@ func TestInteractiveHelpModal(t *testing.T) {
 		t.Errorf("expected View() to show help modal, got:\n%s", view)
 	}
 
-	// Pressing ? closes help modal
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'?'}})
 	if m.showHelpModal {
 		t.Errorf("expected help modal to close on ?, got true")
@@ -96,7 +93,6 @@ func TestInteractivePolicyModal(t *testing.T) {
 		t.Errorf("expected policy modal contents, got:\n%s", modal)
 	}
 
-	// Press 2 to select latest
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'2'}})
 	if m.showPolicyModal {
 		t.Errorf("expected policy modal to close after selection")
@@ -136,7 +132,6 @@ func TestVisualAdCutTimeline(t *testing.T) {
 		t.Errorf("expected timeline bar with cut indicators, got:\n%s", timeline)
 	}
 
-	// Zero duration safety
 	empty := renderVisualAdCutTimeline(0, cuts, 40)
 	if empty != "" {
 		t.Errorf("expected empty string for zero duration, got: %s", empty)
@@ -167,7 +162,6 @@ func TestMultiSelectAndBatchOperations(t *testing.T) {
 		t.Errorf("expected 2 selected episodes, got %d", len(m.selectedEpisodes))
 	}
 
-	// Batch ad removal queue
 	m.batchQueueAdRemoval()
 	if len(m.selectedEpisodes) != 0 {
 		t.Errorf("expected selection cleared after batch action, got %d", len(m.selectedEpisodes))
@@ -186,7 +180,6 @@ func TestToastNotifications(t *testing.T) {
 		t.Errorf("expected toast output to contain message, got: %s", toastView)
 	}
 
-	// Test expiration
 	m.toast.ExpiresAt = time.Now().Add(-1 * time.Second)
 	if expired := m.renderToastNotification(); expired != "" {
 		t.Errorf("expected expired toast to return empty string, got: %s", expired)
@@ -198,13 +191,11 @@ func TestMouseWheelScrolling(t *testing.T) {
 	m.screen = screenPodcasts
 	m.podIdx = 0
 
-	// MouseWheelDown scrolls down
 	m.handleMouse(tea.MouseMsg{Type: tea.MouseWheelDown})
 	if m.podIdx != 1 {
 		t.Errorf("expected podIdx to increment to 1 on wheel down, got %d", m.podIdx)
 	}
 
-	// MouseWheelUp scrolls up
 	m.handleMouse(tea.MouseMsg{Type: tea.MouseWheelUp})
 	if m.podIdx != 0 {
 		t.Errorf("expected podIdx to decrement to 0 on wheel up, got %d", m.podIdx)

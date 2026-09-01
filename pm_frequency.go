@@ -91,8 +91,7 @@ func handleServerFrequency(config Config, cli CLIOptions) {
 				if matched := matchPodcast(podcasts, cli.Podcast); matched != nil {
 					targetItems = append(targetItems, *matched)
 				} else {
-					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-					os.Exit(1)
+					fatalError("%s\n", fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				}
 			} else {
 				targetItems = podcasts

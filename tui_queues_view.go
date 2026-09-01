@@ -14,7 +14,6 @@ func (m *tuiModel) drawPlayerScreen() string {
 	dividerWidth := max(20, m.width-4)
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n\n")
 
-	// 1. Now Playing Section
 	if globalPlayer.Current != nil {
 		statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
 		if globalPlayer.IsPaused {
@@ -30,7 +29,6 @@ func (m *tuiModel) drawPlayerScreen() string {
 		out.WriteString("    " + tuiDimStyle.Render("[────────────────────────] 00:00 / 00:00") + "\n\n")
 	}
 
-	// 2. Output Device & Volume
 	out.WriteString(tuiSectionTitle.Render("  Audio Output & Volume") + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 	speaker := globalPlayer.CurrentSpeaker
@@ -40,7 +38,6 @@ func (m *tuiModel) drawPlayerScreen() string {
 	out.WriteString(fmt.Sprintf("    Speaker: %s %s\n", tuiYellowStyle.Render(speaker), tuiDimStyle.Render("('s' to cycle)")))
 	out.WriteString(fmt.Sprintf("    Volume:  %s %s\n\n", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(30)), tuiDimStyle.Render("(+/- volume, 'm' mute)")))
 
-	// 3. Up Next in Play Queue
 	qLen := len(globalPlayer.Queue)
 	out.WriteString(tuiSectionTitle.Render(fmt.Sprintf("  Up Next in Queue (%d queued)", qLen)) + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")

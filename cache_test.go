@@ -199,7 +199,6 @@ func TestCoverImageDiskAndMemoryCache(t *testing.T) {
 	os.Setenv("XDG_CACHE_HOME", tempCache)
 	defer os.Setenv("XDG_CACHE_HOME", origXDG)
 
-	// Create a dummy PNG image
 	imgPath := filepath.Join(tempCache, "cover.png")
 	img := image.NewRGBA(image.Rect(0, 0, 20, 20))
 	for y := 0; y < 20; y++ {
@@ -217,13 +216,11 @@ func TestCoverImageDiskAndMemoryCache(t *testing.T) {
 	}
 	f.Close()
 
-	// 1. First call: processes and stores in L1 and L2
 	res1, err := encodeKittyGraphicsFile(imgPath, 10, 10)
 	if err != nil || res1 == "" {
 		t.Fatalf("encodeKittyGraphicsFile failed: %v", err)
 	}
 
-	// Verify disk file was created in podcast's cache directory
 	cDir := podcastCacheDirForImage(imgPath)
 	files, err := os.ReadDir(cDir)
 	if err != nil || len(files) == 0 {
@@ -240,7 +237,6 @@ func TestCoverImageDiskAndMemoryCache(t *testing.T) {
 		t.Fatalf("expected .esc file in %s, got files: %+v", cDir, files)
 	}
 
-	// 2. Clear L1 memory cache and verify it loads from L2 disk cache
 	coverGraphicsCacheMu.Lock()
 	coverGraphicsCache = make(map[string]string)
 	coverGraphicsCacheMu.Unlock()

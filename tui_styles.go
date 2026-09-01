@@ -5,7 +5,6 @@ import (
 )
 
 var (
-	// Base Palette (Cyberpunk / Nord / Catppuccin inspired vibrant tones)
 	colorCyan     = lipgloss.Color("#00f5d4")
 	colorPurple   = lipgloss.Color("#7b2cbf")
 	colorMagenta  = lipgloss.Color("#f72585")
@@ -21,7 +20,6 @@ var (
 	colorSubtext  = lipgloss.Color("#a9b1d6")
 	colorDim      = lipgloss.Color("#565f89")
 
-	// Text & Header Styles
 	tuiTitleStyle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorCyan)
@@ -99,7 +97,6 @@ var (
 			Background(colorPurple).
 			Padding(0, 1)
 
-	// Status Badges & Pills
 	tuiBadgeAdFree = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorDarkBg).
@@ -162,7 +159,6 @@ var (
 				Background(lipgloss.Color("#1f2335")).
 				Padding(0, 1)
 
-	// Section Boxes / Cards
 	tuiSectionTitle = lipgloss.NewStyle().
 			Bold(true).
 			Foreground(colorMagenta)

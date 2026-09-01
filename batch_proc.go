@@ -12,8 +12,7 @@ import (
 func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	if cli.ProcSubcmd == "collect" {
 		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
-			fmt.Fprintf(os.Stderr, "Error collecting from remote %s: %v\n", cli.RemoteHost, err)
-			os.Exit(1)
+			fatalError("Error collecting from remote %s: %v\n", cli.RemoteHost, err)
 		}
 		return
 	}
@@ -200,8 +199,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			return
 		}
 		if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
-			fmt.Fprintf(os.Stderr, "Error pushing batch to remote %s: %v\n", targetHost, err)
-			os.Exit(1)
+			fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
 		}
 		return
 	}

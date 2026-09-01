@@ -241,8 +241,7 @@ func RunCleanOrphans(client Backend, opts CleanOrphansOptions) (CleanOrphansResu
 func handleServerCleanOrphans(config Config, cli CLIOptions) {
 	b, err := getBackend(config, cli.Quiet)
 	if err != nil {
-		printError(fmt.Sprintf("Error connecting to backend: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error connecting to backend: %v", err))
 	}
 
 	opts := CleanOrphansOptions{
@@ -256,10 +255,9 @@ func handleServerCleanOrphans(config Config, cli CLIOptions) {
 
 	res, err := RunCleanOrphans(b, opts)
 	if err != nil {
-		printError(fmt.Sprintf("Error cleaning orphans: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error cleaning orphans: %v", err))
 	}
 	if res.FailedCount > 0 && !cli.DryRun {
-		os.Exit(1)
+		fatalError("Some orphans failed to be deleted\n")
 	}
 }

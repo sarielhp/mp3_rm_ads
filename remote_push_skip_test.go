@@ -38,7 +38,6 @@ func TestRemotePushSkipInFlight(t *testing.T) {
 		PodcastsDir:   podcastsDir,
 	}
 
-	// Scanning directory when all files are in-flight or done should do nothing
 	err := runRemotePush(cfg, nil, "push-box", mock, 0, true, false)
 	if err != nil {
 		t.Fatalf("expected runRemotePush to return nil, got: %v", err)

@@ -162,14 +162,12 @@ func TestRunCleanOrphansInteractive(t *testing.T) {
 		podcasts: []PodcastItem{makeTestPod("pod-fake", "Fake", "", 0)},
 	}
 
-	// Case 1: User says 'y'
 	var bufY bytes.Buffer
 	resY, err := RunCleanOrphans(mb, CleanOrphansOptions{In: strings.NewReader("y\n"), Out: &bufY})
 	if err != nil || resY.DeletedCount != 1 {
 		t.Errorf("expected deletion on 'y', got res=%+v err=%v", resY, err)
 	}
 
-	// Case 2: User says 'n'
 	mb.deletedIDs = nil
 	var bufN bytes.Buffer
 	resN, err := RunCleanOrphans(mb, CleanOrphansOptions{In: strings.NewReader("n\n"), Out: &bufN})

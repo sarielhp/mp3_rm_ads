@@ -177,7 +177,6 @@ func TestTUILoadAllQueues(t *testing.T) {
 		t.Errorf("pod2 queue contents wrong: %v", q[pods[1].dir])
 	}
 
-	// Verify pod2 queue.json on disk was cleaned
 	cleanBytes, err := os.ReadFile(d + "/pod2/queue.json")
 	if err != nil || strings.Contains(string(cleanBytes), "ad_free_ep.mp3") || strings.Contains(string(cleanBytes), "note.txt") {
 		t.Errorf("expected pod2 queue.json to be cleaned on disk, got: %s", string(cleanBytes))
@@ -347,7 +346,6 @@ func TestTUINavigationEscape(t *testing.T) {
 }
 
 func TestTUIKeyQuit(t *testing.T) {
-	// Root screen: q should quit
 	m := makeTestModel()
 	m.screen = screenPodcasts
 	m.done = false
@@ -356,7 +354,6 @@ func TestTUIKeyQuit(t *testing.T) {
 		t.Errorf("q at screenPodcasts should trigger quit and set done")
 	}
 
-	// Sub-screens: q should behave as escape (back to parent/prev)
 	subscreens := []tuiScreen{
 		screenPodcastDetail,
 		screenEpisodeDetail,

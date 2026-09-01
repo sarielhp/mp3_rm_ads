@@ -143,19 +143,16 @@ func TestProcessJSONFileNoFile(t *testing.T) {
 }
 
 func TestDisplayNameBidi(t *testing.T) {
-	// ASCII string remains unchanged
 	if got := displayName("Podcast 123"); got != "Podcast 123" {
 		t.Errorf("expected 'Podcast 123', got %q", got)
 	}
 
-	// Hebrew string gets reordered for visual LTR display
 	heb := "שלום"
 	got := displayName(heb)
 	if got != "םולש" {
 		t.Errorf("expected 'םולש', got %q", got)
 	}
 
-	// Mixed English/Hebrew string
 	mixed := "Ep 1 - שלום עולם"
 	gotMixed := displayName(mixed)
 	if !containsStr(gotMixed, "Ep 1 - ") {

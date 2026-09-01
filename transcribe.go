@@ -29,7 +29,7 @@ func buildWavHeader(dataSize int) []byte {
 	copy(header[8:12], []byte("WAVE"))
 	copy(header[12:16], []byte("fmt "))
 	putUint32(header[16:20], 16)
-	putUint16(header[20:22], 1) // PCM
+	putUint16(header[20:22], 1)
 	putUint16(header[22:24], channels)
 	putUint32(header[24:28], sampleRate)
 	putUint32(header[28:32], byteRate)
@@ -97,10 +97,9 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 	maxRetries := 5
 	retryDelay := 5
 
-	// Set generous timeout so client never aborts just before server finishes
 	readTimeout := int(totalDuration*1.5) + 600
 	if readTimeout < 1800 {
-		readTimeout = 1800 // Minimum 30 minutes
+		readTimeout = 1800
 	}
 
 	var progressDone chan struct{}

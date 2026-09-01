@@ -168,13 +168,11 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 	switch cmd {
 	case "set":
 		if value == "" {
-			printError("Error: missing program for 'config processor set <program>'")
-			os.Exit(1)
+			fatalError("%s\n", "Error: missing program for 'config processor set <program>'")
 		}
 		fullPath, err := resolveProcessorPath(value)
 		if err != nil {
-			printError(fmt.Sprintf("Error: failed to resolve post-processor program: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: failed to resolve post-processor program: %v", err))
 		}
 		exists := false
 		for _, p := range cfg.PostProcessors {
@@ -201,13 +199,11 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 
 	case "del":
 		if value == "" {
-			printError("Error: missing number for 'config processor del <number>'")
-			os.Exit(1)
+			fatalError("%s\n", "Error: missing number for 'config processor del <number>'")
 		}
 		idx, err := strconv.Atoi(value)
 		if err != nil || idx < 1 || idx > len(cfg.PostProcessors) {
-			printError(fmt.Sprintf("Error: invalid post-processor number '%s'. Must be between 1 and %d.", value, len(cfg.PostProcessors)))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: invalid post-processor number '%s'. Must be between 1 and %d.", value, len(cfg.PostProcessors)))
 		}
 		removed := cfg.PostProcessors[idx-1]
 		cfg.PostProcessors = append(cfg.PostProcessors[:idx-1], cfg.PostProcessors[idx:]...)
@@ -215,8 +211,7 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 		fmt.Printf("Deleted post-processor #%d: %s\n", idx, removed)
 
 	default:
-		printError(fmt.Sprintf("Error: unknown processor command '%s'", cmd))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error: unknown processor command '%s'", cmd))
 	}
 }
 

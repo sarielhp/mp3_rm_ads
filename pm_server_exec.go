@@ -25,21 +25,18 @@ func handleServerCommand(config Config, cli CLIOptions) {
 		case "import":
 			if targetFile == "" {
 				showOPMLImportUsage()
-				printError("Error: missing required <file> argument for 'abs opml import <file>'.")
-				os.Exit(1)
+				fatalError("%s\n", "Error: missing required <file> argument for 'abs opml import <file>'.")
 			}
 			importOPML(config, targetFile, cli.Quiet, cli.Verbose)
 		case "export":
 			if targetFile == "" {
 				showOPMLExportUsage()
-				printError("Error: missing required <file> argument for 'abs opml export <file>'.")
-				os.Exit(1)
+				fatalError("%s\n", "Error: missing required <file> argument for 'abs opml export <file>'.")
 			}
 			exportOPML(config, targetFile, cli.Quiet, cli.Verbose)
 		default:
 			showOPMLUsage()
-			printError("Error: must specify 'import <file>' or 'export <file>'.")
-			os.Exit(1)
+			fatalError("%s\n", "Error: must specify 'import <file>' or 'export <file>'.")
 		}
 		return
 
@@ -49,8 +46,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			targetDir = cli.Args[0]
 		}
 		if targetDir == "" {
-			fmt.Println("ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
-			os.Exit(1)
+			fatalError("%s\n", "ERROR: podcasts_dir is not configured. Specify it as an argument or in config.")
 		}
 		config.PodcastsDir = targetDir
 
@@ -61,13 +57,11 @@ func handleServerCommand(config Config, cli CLIOptions) {
 		if !cli.PodcastsOnly {
 			client, err := getABSClient(config, cli.Quiet)
 			if err != nil {
-				printError(fmt.Sprintf("Error: %v", err))
-				os.Exit(1)
+				fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 			}
 			podcasts, err := client.PodcastItems()
 			if err != nil {
-				printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-				os.Exit(1)
+				fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts: %v", err))
 			}
 
 			var activePodcasts []PodcastItem
@@ -86,8 +80,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 			if cli.Podcast != "" {
 				targetItem := matchPodcast(podcasts, cli.Podcast)
 				if targetItem == nil {
-					printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-					os.Exit(1)
+					fatalError("%s\n", fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 				}
 				dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, false, cli.CountGiven, true, true, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 				if !cli.DryRun {
@@ -166,13 +159,11 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "list":
 		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
-			printError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 		}
 		podcasts, err := client.PodcastItems()
 		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts: %v", err))
 		}
 		printPodcastList(client, podcasts, cli.Verbose, cli.Quiet)
 		return
@@ -180,21 +171,18 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "download":
 		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
-			printError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 		}
 		podcasts, err := client.PodcastItems()
 		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts: %v", err))
 		}
 
 		totalNewlyDownloaded := 0
 		if cli.Podcast != "" {
 			targetItem := matchPodcast(podcasts, cli.Podcast)
 			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-				os.Exit(1)
+				fatalError("%s\n", fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 			}
 			dlCount := downloadPodcastEpisodes(client, *targetItem, cli.Count, cli.Oldest, cli.DryRun, cli.NoWait, cli.Fill, cli.CountGiven, cli.CheckNew, false, cli.DownloadAll, cli.KeepCount, cli.Verbose, cli.Quiet)
 			if !cli.DryRun {
@@ -232,20 +220,17 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "keep":
 		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
-			printError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 		}
 		podcasts, err := client.PodcastItems()
 		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts: %v", err))
 		}
 
 		if cli.Podcast != "" {
 			targetItem := matchPodcast(podcasts, cli.Podcast)
 			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-				os.Exit(1)
+				fatalError("%s\n", fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 			}
 			title := targetItem.Media.Metadata.Title
 			if title == "" {
@@ -266,13 +251,11 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "rescan":
 		client, err := getABSClient(config, cli.Quiet)
 		if err != nil {
-			printError(fmt.Sprintf("Error: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Error: %v", err))
 		}
 		podcasts, err := client.PodcastItems()
 		if err != nil {
-			printError(fmt.Sprintf("Failed to fetch podcasts: %v", err))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts: %v", err))
 		}
 
 		totalRescanned := 0
@@ -296,8 +279,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 		if cli.Podcast != "" {
 			targetItem := matchPodcast(podcasts, cli.Podcast)
 			if targetItem == nil {
-				printError(fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
-				os.Exit(1)
+				fatalError("%s\n", fmt.Sprintf("Podcast matching %s not found.", cli.Podcast))
 			}
 			rCount, cCount := rescanPodcastEpisodes(client, *targetItem, cli.DryRun, db, config.PodcastsDir, cli.Verbose, cli.Quiet)
 			totalRescanned += rCount

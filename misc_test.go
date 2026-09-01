@@ -191,7 +191,6 @@ func TestABSNoAuthServerError(t *testing.T) {
 }
 
 func TestPrintUsage(t *testing.T) {
-	// These methods don't exist in clihelp, so we skip them
 }
 
 func TestHandleRecutNoCutsFile(t *testing.T) {
@@ -463,10 +462,8 @@ func TestHandleProcDryRun(t *testing.T) {
 	os.WriteFile(ep2, []byte("audio2"), 0644)
 	os.WriteFile(ep3, []byte("audio3"), 0644)
 
-	// ep2 has transcript, needs LLM
 	os.WriteFile(filepath.Join(dir, "ep2.transcript.json"), []byte("{}"), 0644)
 
-	// ep3 has transcript and cuts
 	os.WriteFile(filepath.Join(dir, "ep3.transcript.json"), []byte("{}"), 0644)
 	os.WriteFile(filepath.Join(dir, "ep3.cuts.json"), []byte(`{"cut_intervals":[]}`), 0644)
 

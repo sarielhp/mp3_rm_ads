@@ -48,8 +48,7 @@ func setDefaultProfile(cfg *Config, targetID int) {
 			return
 		}
 	}
-	fmt.Fprintf(os.Stderr, "Error: Profile ID [%d] not found in configuration.\n", targetID)
-	os.Exit(1)
+	fatalError("Error: Profile ID [%d] not found in configuration.\n", targetID)
 }
 
 func selectProfile(cfg Config, useLLM string) LLMProfile {
@@ -65,7 +64,6 @@ func selectProfile(cfg Config, useLLM string) LLMProfile {
 		return LLMProfile{}
 	}
 
-	// Try numeric ID first
 	id := 0
 	fmt.Sscanf(useLLM, "%d", &id)
 	if id > 0 {
@@ -76,7 +74,6 @@ func selectProfile(cfg Config, useLLM string) LLMProfile {
 		}
 	}
 
-	// Try name/model match
 	lowerQuery := strings.ToLower(useLLM)
 	for _, p := range cfg.Profiles {
 		if strings.Contains(strings.ToLower(p.Name), lowerQuery) || strings.Contains(strings.ToLower(p.Model), lowerQuery) {
@@ -86,7 +83,7 @@ func selectProfile(cfg Config, useLLM string) LLMProfile {
 
 	fmt.Fprintf(os.Stderr, "Error: Profile '%s' not found.\n", useLLM)
 	listProfiles(cfg)
-	os.Exit(1)
+	fatalError("")
 	return LLMProfile{}
 }
 
@@ -108,8 +105,7 @@ func resolveAudioFiles(inputFile string, cli CLIOptions) (mainMP3File, precutFil
 	} else if fileExists(mainMP3File) {
 		sourceAudioFile = mainMP3File
 	} else {
-		fmt.Fprintf(os.Stderr, "Error: Input audio file '%s' (or '%s') not found.\n", inputFile, precutFile)
-		os.Exit(1)
+		fatalError("Error: Input audio file '%s' (or '%s') not found.\n", inputFile, precutFile)
 	}
 	return
 }
@@ -239,15 +235,13 @@ func listWhispers(cfg Config) {
 func addWhisperProfile(cfg *Config, spec string) {
 	parts := strings.Split(spec, "|")
 	if len(parts) < 2 {
-		fmt.Fprintf(os.Stderr, "Error: Invalid Whisper server spec. Format: Name|URL|[SpeedFactor]|[DockerContainer]|[Language]|[Prompt]|[WakeCommand]\n")
-		os.Exit(1)
+		fatalError("Error: Invalid Whisper server spec. Format: Name|URL|[SpeedFactor]|[DockerContainer]|[Language]|[Prompt]|[WakeCommand]\n")
 	}
 
 	name := strings.TrimSpace(parts[0])
 	url := strings.TrimSpace(parts[1])
 	if name == "" || url == "" {
-		fmt.Fprintf(os.Stderr, "Error: Name and URL cannot be empty in Whisper server spec.\n")
-		os.Exit(1)
+		fatalError("Error: Name and URL cannot be empty in Whisper server spec.\n")
 	}
 
 	speedFactor := 7.0
@@ -309,8 +303,7 @@ func removeWhisperProfile(cfg *Config, targetID int) {
 	}
 
 	if foundIndex == -1 {
-		fmt.Fprintf(os.Stderr, "Error: Whisper server profile [%d] not found in configuration.\n", targetID)
-		os.Exit(1)
+		fatalError("Error: Whisper server profile [%d] not found in configuration.\n", targetID)
 	}
 
 	profileName := cfg.WhisperProfiles[foundIndex].Name
@@ -343,6 +336,5 @@ func setDefaultWhisperProfile(cfg *Config, targetID int) {
 			return
 		}
 	}
-	fmt.Fprintf(os.Stderr, "Error: Whisper server profile [%d] not found in configuration.\n", targetID)
-	os.Exit(1)
+	fatalError("Error: Whisper server profile [%d] not found in configuration.\n", targetID)
 }

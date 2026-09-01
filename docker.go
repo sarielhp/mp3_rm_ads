@@ -171,7 +171,6 @@ func detectWhisperDockerContainer(whisperURL string) string {
 }
 
 func extractHost(url string) string {
-	// simple URL host extraction
 	protoEnd := -1
 	for i := 0; i < len(url)-2; i++ {
 		if url[i:i+3] == "://" {
@@ -293,7 +292,6 @@ func matchProgressHMS(line string) (h, m, s int, ok bool) {
 	if err == nil {
 		return h, m, s, true
 	}
-	// try with different format
 	for i := 0; i < len(line)-10; i++ {
 		if line[i:i+10] == "processing" {
 			_, err := fmt.Sscanf(line[i:], "processing audio (%d:%d:%d", &h, &m, &s)

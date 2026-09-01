@@ -72,7 +72,6 @@ func TestPlayerQueueManagement(t *testing.T) {
 		t.Error("expected tracks to be added")
 	}
 
-	// Try adding duplicates: currently playing track1 and queued track2
 	dup1 := p.EnqueueAndPlay(track1)
 	dup2 := p.EnqueueAndPlay(track2)
 	if dup1 || dup2 {
@@ -106,12 +105,12 @@ func TestPlayerSeekBoundaries(t *testing.T) {
 		t.Errorf("expected position 80, got %.1f", p.Position)
 	}
 
-	p.Seek(50) // exceeds duration
+	p.Seek(50)
 	if p.Position != 100 {
 		t.Errorf("expected position clamped to 100, got %.1f", p.Position)
 	}
 
-	p.Seek(-200) // below 0
+	p.Seek(-200)
 	if p.Position != 0 {
 		t.Errorf("expected position clamped to 0, got %.1f", p.Position)
 	}

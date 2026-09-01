@@ -225,7 +225,6 @@ func moveAdQueueItem(items []AdQueueItem, from, to int, q map[string][]string, s
 	if from < 0 || from >= len(items) || to < 0 || to >= len(items) || from == to {
 		return
 	}
-	// For each podcast, update its order based on the new relative order in items
 	item := items[from]
 	targetItem := items[to]
 	if item.PodcastDir == targetItem.PodcastDir {

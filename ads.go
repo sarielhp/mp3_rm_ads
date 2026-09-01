@@ -222,7 +222,6 @@ func extractKeywordsLLM(transcriptText string, profile LLMProfile, quiet bool) s
 }
 
 func envOr(key, defaultVal string) string {
-	// We'll use os.Getenv but we need to import os
 	return osGetenv(key, defaultVal)
 }
 

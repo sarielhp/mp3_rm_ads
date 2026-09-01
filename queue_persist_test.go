@@ -24,13 +24,11 @@ func TestPlayQueuePersistence(t *testing.T) {
 
 	p.SaveQueueToFile()
 
-	// Verify file was written
 	queueFile := filepath.Join(tempDir, ".config", "abs", "play_queue.json")
 	if _, err := os.Stat(queueFile); err != nil {
 		t.Fatalf("expected play_queue.json at %s, got error: %v", queueFile, err)
 	}
 
-	// Create new player and load
 	p2 := &AudioPlayer{}
 	p2.LoadQueueFromFile()
 
@@ -50,19 +48,16 @@ func TestPlayQueueMoveAndRemove(t *testing.T) {
 
 	p.Queue = []PlayerTrack{track1, track2, track3}
 
-	// Move item 0 to 2 -> [B, C, A]
 	ok := p.MoveUnifiedItem(0, 2)
 	if !ok || len(p.Queue) != 3 || p.Queue[0].Title != "B" || p.Queue[2].Title != "A" {
 		t.Fatalf("unexpected queue after MoveUnifiedItem(0, 2): %+v", p.Queue)
 	}
 
-	// Remove item 1 (C) -> [B, A]
 	ok = p.RemoveUnifiedItem(1)
 	if !ok || len(p.Queue) != 2 || p.Queue[0].Title != "B" || p.Queue[1].Title != "A" {
 		t.Fatalf("unexpected queue after RemoveUnifiedItem(1): %+v", p.Queue)
 	}
 
-	// Test with current track at top (index 0)
 	current := PlayerTrack{Title: "Now Playing", Path: "now.mp3"}
 	p.Current = &current
 	unified := p.GetUnifiedQueue()
@@ -70,7 +65,6 @@ func TestPlayQueueMoveAndRemove(t *testing.T) {
 		t.Fatalf("unexpected GetUnifiedQueue: %+v", unified)
 	}
 
-	// Remove unified item 1 (B) -> leaves current and A
 	ok = p.RemoveUnifiedItem(1)
 	if !ok || len(p.Queue) != 1 || p.Queue[0].Title != "A" {
 		t.Fatalf("unexpected queue after RemoveUnifiedItem(1) with current: %+v", p.Queue)
@@ -93,7 +87,6 @@ func TestAdQueueHelpers(t *testing.T) {
 		"/podcasts/tech": {"ep1.mp3", "ep2.mp3", "ep3.mp3"},
 	}
 
-	// ep1 has ads removed, so it should be excluded from getAllAdQueueItems
 	items := getAllAdQueueItems(pods, q)
 	if len(items) != 2 {
 		t.Fatalf("expected 2 ad queue items (ep1 excluded), got %d", len(items))
@@ -112,7 +105,6 @@ func TestAdQueueHelpers(t *testing.T) {
 		savedEntries = entries
 	}
 
-	// Remove ep2
 	removeAdQueueItem(items[0], q, saveFn)
 	if savedDir != "/podcasts/tech" || len(savedEntries) != 2 || savedEntries[0] != "ep1.mp3" || savedEntries[1] != "ep3.mp3" {
 		t.Errorf("unexpected saved after remove: %v, %v", savedDir, savedEntries)

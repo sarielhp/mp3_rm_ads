@@ -103,7 +103,6 @@ func (m *tuiModel) drawEpisodeDetail() string {
 
 	maxLines := max(10, m.height-6)
 
-	// Split pane mode (only if F4 toggled and width >= 70)
 	if m.showEpisodePlayerPane && m.width >= 70 {
 		leftW := (m.width - 5) / 2
 		rightW := m.width - 5 - leftW
@@ -111,10 +110,8 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		var leftLines []string
 		var rightLines []string
 
-		// Left Pane: Episode Header & Show Notes
 		leftLines = append(leftLines, tuiTitleStyle.Render(truncate(displayName(fullTitle), leftW-2)))
 
-		// Subheader with right-aligned release date if space permits
 		dateRender := ""
 		if dateStr != "" {
 			dateRender = tuiStatStyle.Render(dateStr)
@@ -150,7 +147,6 @@ func (m *tuiModel) drawEpisodeDetail() string {
 			leftLines = append(leftLines, descWrapped[idx])
 		}
 
-		// Right Pane: Audio Player
 		rightLines = append(rightLines, tuiSectionTitle.Render(" AUDIO PLAYER (F4 to hide) "))
 
 		if globalPlayer.Current != nil {
@@ -240,7 +236,6 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		return out.String()
 	}
 
-	// Full-width mode (Default, maximized reading area)
 	contentW := max(20, m.width-4)
 	out.WriteString("  " + tuiTitleStyle.Render(truncate(displayName(fullTitle), contentW)) + "\n")
 

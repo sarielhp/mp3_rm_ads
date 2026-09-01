@@ -413,7 +413,6 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	isKitty := isKittyTerminal()
 	key := fmt.Sprintf("%s:%d:%d:%d:%d:%v", filePath, mtime, size, cols, rows, isKitty)
 
-	// 1. Check L1 in-memory cache
 	coverGraphicsCacheMu.Lock()
 	if cached, ok := coverGraphicsCache[key]; ok {
 		coverGraphicsCacheMu.Unlock()
@@ -421,7 +420,6 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	}
 	coverGraphicsCacheMu.Unlock()
 
-	// 2. Check L2 on-disk cache in the podcast's cache directory
 	cDir := podcastCacheDirForImage(filePath)
 	modeStr := "ansi"
 	if isKitty {
@@ -441,7 +439,6 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 		}
 	}
 
-	// 3. Process image
 	var result string
 	var err error
 
@@ -468,12 +465,10 @@ func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	}
 
 	if err == nil && result != "" {
-		// Save to L1 memory cache
 		coverGraphicsCacheMu.Lock()
 		coverGraphicsCache[key] = result
 		coverGraphicsCacheMu.Unlock()
 
-		// Save to L2 disk cache inside the podcast's cache directory
 		_ = os.WriteFile(diskCachePath, []byte(result), 0644)
 	}
 
@@ -497,14 +492,12 @@ func testKittyImage(args []string) {
 		fmt.Println("Usage: abs test kitty <image-file>")
 		fmt.Println()
 		fmt.Println("Displays an image using ANSI true-color half-block rendering.")
-		fmt.Println("Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")
-		os.Exit(1)
+		fatalError("%s\n", "Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")
 	}
 
 	path := args[0]
 	if _, err := os.Stat(path); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: file not found: %s\n", path)
-		os.Exit(1)
+		fatalError("Error: file not found: %s\n", path)
 	}
 
 	termW, termH, err := term.GetSize(int(os.Stdout.Fd()))
@@ -514,8 +507,7 @@ func testKittyImage(args []string) {
 
 	ai, err := ansimage.NewScaledFromFile(path, termH, termW, color.Black, ansimage.ScaleModeFit, ansimage.NoDithering)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error rendering image: %v\n", err)
-		os.Exit(1)
+		fatalError("Error rendering image: %v\n", err)
 	}
 
 	ai.Draw()

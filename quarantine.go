@@ -92,15 +92,12 @@ func quarantineAbandonedDuplicates(podDir string, trackedEpisodes []absEpisode) 
 			continue
 		}
 
-		// If this exact filename is tracked by ABS, it's not abandoned
 		if trackedFiles[fn] {
 			continue
 		}
 
 		norm := normalizeEpisodeTitle(fn)
-		// If there is another tracked file with the same normalized title (e.g. one with GUID)
 		if trackedFn, exists := trackedByNormalized[norm]; exists && trackedFn != fn {
-			// Quarantine this bare/untracked duplicate
 			base := strings.TrimSuffix(mp3, ".mp3")
 
 			_ = quarantineFile(mp3)

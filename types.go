@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-	"os"
 	"path/filepath"
 	"regexp"
 )
@@ -20,13 +18,11 @@ func workDirFor(path string) string {
 func verifyTempFile(filePath string) {
 	abs, err := filepath.Abs(filePath)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: Temp file '%s' is not in .work/ directory. Aborting.\n", filePath)
-		os.Exit(1)
+		fatalError("ERROR: Temp file '%s' is not in .work/ directory. Aborting.\n", filePath)
 	}
 	matched, _ := regexp.MatchString(`/\.work/`, abs)
 	if !matched {
-		fmt.Fprintf(os.Stderr, "ERROR: Temp file '%s' is not in .work/ directory. Aborting.\n", filePath)
-		os.Exit(1)
+		fatalError("ERROR: Temp file '%s' is not in .work/ directory. Aborting.\n", filePath)
 	}
 }
 

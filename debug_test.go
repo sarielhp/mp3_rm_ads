@@ -46,7 +46,6 @@ func TestDebugLoggerAndSnapshots(t *testing.T) {
 		t.Errorf("expected screen name in snapshot, got: %s", string(snapContent))
 	}
 
-	// Test F12 key press triggers snapshot in handleKey
 	m2 := makeTestModel()
 	_, _ = m2.handleKey(tea.KeyMsg{Type: tea.KeyF12})
 	if m2.toast == nil && m2.popupMsg == "" {
@@ -55,7 +54,6 @@ func TestDebugLoggerAndSnapshots(t *testing.T) {
 }
 
 func TestQAndEscapeParity(t *testing.T) {
-	// Test on root screen (screenPodcasts): both q and esc quit
 	m1 := makeTestModel()
 	m1.screen = screenPodcasts
 	_, cmd1 := m1.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
@@ -70,7 +68,6 @@ func TestQAndEscapeParity(t *testing.T) {
 		t.Errorf("expected esc on root screen to quit")
 	}
 
-	// Test on sub-screen (screenPodcastDetail): both q and esc return to screenPodcasts
 	m3 := makeTestModel()
 	m3.screen = screenPodcastDetail
 	_, _ = m3.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})
@@ -85,7 +82,6 @@ func TestQAndEscapeParity(t *testing.T) {
 		t.Errorf("expected esc on screenPodcastDetail to return to screenPodcasts, got %v", m4.screen)
 	}
 
-	// Test on modal: both q and esc close help modal
 	m5 := makeTestModel()
 	m5.showHelpModal = true
 	_, _ = m5.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'q'}})

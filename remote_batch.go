@@ -290,7 +290,6 @@ func ensureRemoteEnvironmentAndWorker(cfg *Config, targetHost string, remoteWork
 		remoteWorkDir = "~/abs_remote"
 	}
 
-	// 1. Wake Remote Host / VM
 	if cfg != nil && cfg.WhisperWakeCommand != "" {
 		if !quiet {
 			fmt.Printf("[+] Ensuring remote host '%s' is awake and reachable...\n", targetHost)
@@ -298,12 +297,10 @@ func ensureRemoteEnvironmentAndWorker(cfg *Config, targetHost string, remoteWork
 		wakeWhisperServer(cfg.WhisperURL, cfg.WhisperWakeCommand, quiet)
 	}
 
-	// Verify SSH reachability
 	if !isRemoteHostReachable(targetHost, transport) {
 		return fmt.Errorf("remote host '%s' is unreachable via SSH", targetHost)
 	}
 
-	// 2. Ensure Docker & Whisper container are up and healthy on remote
 	if !quiet {
 		fmt.Printf("[+] Checking Faster-Whisper container on %s...\n", targetHost)
 	}
@@ -319,7 +316,6 @@ fi
 `
 	_, _ = transport.Exec(targetHost, startContainerCmd)
 
-	// Poll HTTP health check on remote whisper server (up to 30s)
 	whisperCheckURL := fmt.Sprintf("http://%s:8000/health", targetHost)
 	if cfg != nil && cfg.WhisperURL != "" {
 		whisperCheckURL = cfg.WhisperURL
@@ -355,7 +351,6 @@ fi
 		fmt.Printf("[✓] Faster-Whisper service is ready on %s.\n", targetHost)
 	}
 
-	// 3. Trigger remote worker
 	triggerFile := fmt.Sprintf("%s/.scan_trigger", remoteWorkDir)
 	_, _ = transport.Exec(targetHost, fmt.Sprintf("touch %s", triggerFile))
 
@@ -369,7 +364,6 @@ fi
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
 
-	// 4. Block and verify that the remote worker has actually started converting
 	if !quiet {
 		fmt.Printf("[+] Verifying remote conversion startup on %s...\n", targetHost)
 	}

@@ -37,7 +37,6 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 		t.Errorf("expected lock file to contain current PID %d, got %s", os.Getpid(), string(pidData))
 	}
 
-	// Second acquire on the same target must return (nil, nil)
 	lock2, err := acquireFileLock(targetFile)
 	if err != nil {
 		t.Fatalf("second acquire errored: %v", err)
@@ -47,14 +46,12 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 		t.Fatal("expected second lock acquire to fail (return nil)")
 	}
 
-	// Release lock1
 	lock1.Release()
 
 	if fileExists(lockPath) {
 		t.Errorf("expected lock file %s to be removed on release", lockPath)
 	}
 
-	// Now third acquire should succeed
 	lock3, err := acquireFileLock(targetFile)
 	if err != nil {
 		t.Fatalf("third acquire failed: %v", err)
@@ -67,5 +64,5 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 
 func TestNilFileLockRelease(t *testing.T) {
 	var l *fileLockWrapper
-	l.Release() // Should not panic
+	l.Release()
 }

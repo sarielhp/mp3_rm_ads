@@ -422,7 +422,7 @@ func (m *tuiModel) drawTranscriptScreen() string {
 		isCurrent := len(matches) > 0 && m.transcriptMatchIdx < len(matches) && i == matches[m.transcriptMatchIdx]
 
 		switch m.transcriptViewMode {
-		case 0: // Full time arrows
+		case 0:
 			ts := item.timeFull
 			availTextW := max(10, targetW-len(ts)-3)
 			truncText := truncate(item.text, availTextW)
@@ -444,7 +444,7 @@ func (m *tuiModel) drawTranscriptScreen() string {
 				out.WriteString(prefix + tuiYellowStyle.Render(ts) + " " + renderedText + "\n")
 			}
 
-		case 1: // Short start time
+		case 1:
 			ts := item.timeShort
 			if ts == "" {
 				ts = item.timeFull
@@ -469,7 +469,7 @@ func (m *tuiModel) drawTranscriptScreen() string {
 				out.WriteString(prefix + tuiYellowStyle.Render(ts) + " " + renderedText + "\n")
 			}
 
-		case 2: // Bat-style line numbers (no timestamps)
+		case 2:
 			lineNumPrefix := fmt.Sprintf("%*d │ ", digits, i+1)
 			availTextW := max(10, targetW-digits-6)
 			truncText := truncate(item.text, availTextW)

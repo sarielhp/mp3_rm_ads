@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"sync"
 	"time"
 )
@@ -10,14 +9,12 @@ import (
 func handleServerGetInfo(config Config, cli CLIOptions) {
 	client, err := getABSClient(config, cli.Quiet)
 	if err != nil {
-		printError(fmt.Sprintf("Error connecting to Audiobookshelf: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Error connecting to Audiobookshelf: %v", err))
 	}
 
 	podcasts, err := client.PodcastItems()
 	if err != nil {
-		printError(fmt.Sprintf("Failed to fetch podcasts from Audiobookshelf: %v", err))
-		os.Exit(1)
+		fatalError("%s\n", fmt.Sprintf("Failed to fetch podcasts from Audiobookshelf: %v", err))
 	}
 
 	limitK := cli.Count
@@ -29,8 +26,7 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 	if cli.Podcast != "" {
 		match := matchPodcast(podcasts, cli.Podcast)
 		if match == nil {
-			printError(fmt.Sprintf("Podcast matching '%s' not found in Audiobookshelf.", cli.Podcast))
-			os.Exit(1)
+			fatalError("%s\n", fmt.Sprintf("Podcast matching '%s' not found in Audiobookshelf.", cli.Podcast))
 		}
 		targetPodcasts = append(targetPodcasts, *match)
 	} else {

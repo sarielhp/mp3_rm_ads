@@ -133,8 +133,7 @@ func convertJSONToTXT(inputFile string, data *TranscriptionData, totalDuration f
 func checkPrecutSymlink(precutFile string) {
 	info, err := os.Lstat(precutFile)
 	if err == nil && info.Mode()&os.ModeSymlink != 0 {
-		fmt.Fprintf(os.Stderr, "ERROR: Pre-cut backup file '%s' is a symlink. Refusing to overwrite.\n", precutFile)
-		os.Exit(1)
+		fatalError("ERROR: Pre-cut backup file '%s' is a symlink. Refusing to overwrite.\n", precutFile)
 	}
 }
 

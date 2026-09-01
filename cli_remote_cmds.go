@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"os"
 
 	"github.com/sarielhp/clihelp"
@@ -321,8 +320,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 	}
 
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Remote error: %v\n", err)
-		os.Exit(1)
+		fatalError("Remote error: %v\n", err)
 	}
 }
 
@@ -332,7 +330,6 @@ func handleBatchWorkerCommand(config Config, cli CLIOptions) {
 		batchDir = cli.Args[0]
 	}
 	if err := runBatchWorker(batchDir, cli.Quiet, cli.Verbose); err != nil {
-		fmt.Fprintf(os.Stderr, "Worker error: %v\n", err)
-		os.Exit(1)
+		fatalError("Worker error: %v\n", err)
 	}
 }

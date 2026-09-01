@@ -257,22 +257,18 @@ func TestRemoteQueue24HourPolicy(t *testing.T) {
 		_ = os.WriteFile(p, []byte("audio"), 0644)
 	}
 
-	// Recent new: 2 hours ago, duration 50 mins
 	_ = saveEpisodeStatus(statusPathFor(epRecentNew), &EpisodeStatusFile{
 		MediaFile: "recent_new.mp3", PublishedAt: now.Add(-2 * time.Hour).Format(time.RFC3339),
 		Original: EpisodeAudioMeta{DurationSec: 3000.0},
 	})
-	// Recent old: 10 hours ago, duration 20 mins
 	_ = saveEpisodeStatus(statusPathFor(epRecentOld), &EpisodeStatusFile{
 		MediaFile: "recent_old.mp3", PublishedAt: now.Add(-10 * time.Hour).Format(time.RFC3339),
 		Original: EpisodeAudioMeta{DurationSec: 1200.0},
 	})
-	// Older short: 3 days ago, duration 5 mins
 	_ = saveEpisodeStatus(statusPathFor(epOlderShort), &EpisodeStatusFile{
 		MediaFile: "older_short.mp3", PublishedAt: now.Add(-72 * time.Hour).Format(time.RFC3339),
 		Original: EpisodeAudioMeta{DurationSec: 300.0},
 	})
-	// Older long: 4 days ago, duration 60 mins
 	_ = saveEpisodeStatus(statusPathFor(epOlderLong), &EpisodeStatusFile{
 		MediaFile: "older_long.mp3", PublishedAt: now.Add(-96 * time.Hour).Format(time.RFC3339),
 		Original: EpisodeAudioMeta{DurationSec: 3600.0},

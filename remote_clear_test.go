@@ -41,7 +41,6 @@ func TestRunRemoteClear(t *testing.T) {
 		t.Fatalf("runRemoteClear failed: %v", err)
 	}
 
-	// Verify local episode status reset to downloaded
 	stat := getOrCreateEpisodeStatus(localEp1)
 	if stat.Status != StateDownloaded {
 		t.Errorf("expected local status to be reset to downloaded, got: %s", stat.Status)

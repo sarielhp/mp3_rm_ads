@@ -141,7 +141,6 @@ func TestTranscribeRetryBuffer(t *testing.T) {
 func TestTUIFKeyScreens(t *testing.T) {
 	m := makeTestModel()
 
-	// Press F1 -> Player screen
 	m.handleKey(tea.KeyMsg{Type: tea.KeyF1})
 	if m.screen != screenPlayer {
 		t.Errorf("expected screenPlayer on F1, got %v", m.screen)
@@ -151,13 +150,11 @@ func TestTUIFKeyScreens(t *testing.T) {
 		t.Errorf("expected AUDIO PLAYER (F1) in view, got %q", viewF1)
 	}
 
-	// Press Esc -> returns to previous screen
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
 	if m.screen != screenPodcasts {
 		t.Errorf("expected screenPodcasts after Esc, got %v", m.screen)
 	}
 
-	// Press F2 -> Play Queue screen
 	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
 	if m.screen != screenPlayQueue {
 		t.Errorf("expected screenPlayQueue on F2, got %v", m.screen)
@@ -167,19 +164,16 @@ func TestTUIFKeyScreens(t *testing.T) {
 		t.Errorf("expected PLAYING QUEUE (F2) in view, got %q", viewF2)
 	}
 
-	// Press Space to grab/reorder
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	if !m.pqGrabbed {
 		t.Errorf("expected pqGrabbed to be true after space")
 	}
 
-	// Press Esc -> back
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
 	if m.screen != screenPodcasts {
 		t.Errorf("expected screenPodcasts after Esc, got %v", m.screen)
 	}
 
-	// Test multi-level F1 -> F2 -> F3 -> Esc from screenPodcastDetail
 	m.screen = screenPodcastDetail
 	m.handleKey(tea.KeyMsg{Type: tea.KeyF1})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyF2})
@@ -302,7 +296,6 @@ func TestTUITranscriptViewer(t *testing.T) {
 		t.Errorf("expected view to contain Tab Short Time help, got: %s", view)
 	}
 
-	// Test Tab toggle 1: Short Time (mode 1)
 	m.handleTranscriptKey("tab")
 	if m.transcriptViewMode != 1 {
 		t.Errorf("expected transcriptViewMode to be 1 after 1st tab, got %d", m.transcriptViewMode)
@@ -312,7 +305,6 @@ func TestTUITranscriptViewer(t *testing.T) {
 		t.Errorf("expected view to contain Tab Line Nums help, got: %s", viewShort)
 	}
 
-	// Test Tab toggle 2: Line Nums (mode 2)
 	m.handleTranscriptKey("tab")
 	if m.transcriptViewMode != 2 {
 		t.Errorf("expected transcriptViewMode to be 2 after 2nd tab, got %d", m.transcriptViewMode)
@@ -322,7 +314,6 @@ func TestTUITranscriptViewer(t *testing.T) {
 		t.Errorf("expected view to contain Tab Time Arrows help and line separator, got: %s", viewLines)
 	}
 
-	// Test Tab toggle 3: Back to full arrows (mode 0)
 	m.handleTranscriptKey("tab")
 	if m.transcriptViewMode != 0 {
 		t.Errorf("expected transcriptViewMode to be 0 after 3rd tab, got %d", m.transcriptViewMode)

@@ -99,7 +99,6 @@ func TestFeedCacheManager(t *testing.T) {
 		t.Fatalf("failed to save cache: %v", err)
 	}
 
-	// Reload in new manager
 	mgr2 := &FeedCacheManager{
 		cacheFile: cachePath,
 		entries:   make(map[string]*FeedCacheEntry),
@@ -128,7 +127,6 @@ func TestFetchFeedDirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	// 1. Cold fetch (200 OK)
 	eps, etag, lastMod, notMod, err := fetchFeedDirect(ts.URL, "", "")
 	if err != nil {
 		t.Fatalf("cold fetch failed: %v", err)
@@ -137,7 +135,6 @@ func TestFetchFeedDirect(t *testing.T) {
 		t.Errorf("unexpected cold fetch: eps=%d, etag=%s, notMod=%v", len(eps), etag, notMod)
 	}
 
-	// 2. Conditional fetch (304 Not Modified)
 	_, _, _, notMod2, err2 := fetchFeedDirect(ts.URL, "\"etag-abc\"", lastMod)
 	if err2 != nil {
 		t.Fatalf("conditional fetch failed: %v", err2)

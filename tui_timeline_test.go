@@ -37,7 +37,6 @@ func TestGetPodcastLastEpisodesOnlineTimeline(t *testing.T) {
 		t.Fatalf("expected 2 releases, got %d", len(releases))
 	}
 
-	// Should be sorted newest first
 	if releases[0].Title != "Episode One" {
 		t.Errorf("expected newest episode first, got %q", releases[0].Title)
 	}
