@@ -242,6 +242,7 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 					Parameters: []clihelp.Param{
 						{Name: "<file>", Description: "Path to the OPML file to import"},
 					},
+					Args: clihelp.ExactArgs(1),
 					Options: []clihelp.Option{
 						clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 						clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
@@ -263,6 +264,7 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 					Parameters: []clihelp.Param{
 						{Name: "<file>", Description: "Path to write the exported OPML file"},
 					},
+					Args: clihelp.ExactArgs(1),
 					Options: []clihelp.Option{
 						clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 						clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),

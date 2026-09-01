@@ -247,15 +247,6 @@ func (c *AudiobookshelfBackend) Request(endpoint, method string, data interface{
 			return nil, err
 		}
 
-		if res.StatusCode == http.StatusUnauthorized {
-			if attempt < maxAttempts && c.User != "" && c.Pass != "" {
-				c.Login()
-				time.Sleep(retryDelay)
-				continue
-			}
-			return nil, fmt.Errorf("HTTP Error 401 Unauthorized")
-		}
-
 		if res.StatusCode >= 500 || res.StatusCode == 429 || res.StatusCode == 408 {
 			lastStatusCode = res.StatusCode
 			if attempt < maxAttempts {

@@ -1,9 +1,7 @@
 package main
 
 import (
-	"encoding/json"
 	"fmt"
-	"os"
 	"regexp"
 	"strings"
 
@@ -37,133 +35,6 @@ func parseTimestampSec(s string) float64 {
 		return h*3600 + m*60 + sec
 	}
 	return 0
-}
-
-func loadEpisodeAdIntervals(epPath string) [][2]float64 {
-	base := strings.TrimSuffix(epPath, ".mp3")
-	cutsFile := base + ".cuts.json"
-	data, err := os.ReadFile(cutsFile)
-	if err != nil {
-		return nil
-	}
-	var cuts CutsData
-	if err := json.Unmarshal(data, &cuts); err != nil {
-		return nil
-	}
-	var intervals [][2]float64
-	for _, mc := range cuts.MergedCutIntervals {
-		if mc.End > mc.Start {
-			intervals = append(intervals, [2]float64{mc.Start, mc.End})
-		}
-	}
-	if len(intervals) == 0 {
-		for _, ci := range cuts.CutIntervals {
-			if ci.EndSec > ci.StartSec {
-				intervals = append(intervals, [2]float64{ci.StartSec, ci.EndSec})
-			}
-		}
-	}
-	return intervals
-}
-
-func isSegmentInAd(st, en float64, adIntervals [][2]float64) bool {
-	if len(adIntervals) == 0 {
-		return false
-	}
-	for _, r := range adIntervals {
-		if st < r[1] && en > r[0] {
-			return true
-		}
-	}
-	return false
-}
-
-func loadEpisodeTranscriptData(epPath string) ([]transcriptItem, []string, error) {
-	base := strings.TrimSuffix(epPath, ".mp3")
-	adIntervals := loadEpisodeAdIntervals(epPath)
-
-	jsonFile := base + ".transcript.json"
-	if data, err := os.ReadFile(jsonFile); err == nil {
-		var td TranscriptionData
-		if err := json.Unmarshal(data, &td); err == nil && len(td.Segments) > 0 {
-			var items []transcriptItem
-			var lines []string
-			for _, seg := range td.Segments {
-				st := formatTime(seg.Start)
-				en := formatTime(seg.End)
-				stShort := formatClock(seg.Start)
-				tFull := fmt.Sprintf("[%s -> %s]", st, en)
-				tShort := fmt.Sprintf("[%s]", stShort)
-				txt := strings.TrimSpace(seg.Text)
-				isAd := isSegmentInAd(seg.Start, seg.End, adIntervals)
-				items = append(items, transcriptItem{
-					startSec:  seg.Start,
-					endSec:    seg.End,
-					timeFull:  tFull,
-					timeShort: tShort,
-					text:      txt,
-					isAd:      isAd,
-				})
-				lines = append(lines, fmt.Sprintf("%s %s", tFull, txt))
-			}
-			return items, lines, nil
-		}
-	}
-
-	txtFile := base + ".transcript.txt"
-	if data, err := os.ReadFile(txtFile); err == nil {
-		text := strings.TrimSpace(string(data))
-		rawLines := strings.Split(text, "\n")
-		var items []transcriptItem
-		var lines []string
-		for _, l := range rawLines {
-			trimmed := strings.TrimSpace(l)
-			if trimmed == "" {
-				continue
-			}
-			lines = append(lines, trimmed)
-			if matches := timestampLineRegex.FindStringSubmatch(trimmed); len(matches) == 3 {
-				tFull := matches[1]
-				txt := matches[2]
-				inner := strings.Trim(tFull, "[] ")
-				parts := strings.Split(inner, "->")
-				stSec := 0.0
-				enSec := 0.0
-				stShort := ""
-				if len(parts) == 2 {
-					stSec = parseTimestampSec(strings.TrimSpace(parts[0]))
-					enSec = parseTimestampSec(strings.TrimSpace(parts[1]))
-					stShort = fmt.Sprintf("[%s]", strings.TrimSpace(parts[0]))
-				} else {
-					stShort = tFull
-				}
-				isAd := isSegmentInAd(stSec, enSec, adIntervals)
-				items = append(items, transcriptItem{
-					startSec:  stSec,
-					endSec:    enSec,
-					timeFull:  tFull,
-					timeShort: stShort,
-					text:      txt,
-					isAd:      isAd,
-				})
-			} else {
-				items = append(items, transcriptItem{
-					text: trimmed,
-				})
-			}
-		}
-		return items, lines, nil
-	}
-
-	return nil, nil, fmt.Errorf("no transcript found")
-}
-
-func loadEpisodeTranscriptText(epPath string) (string, []string, error) {
-	_, lines, err := loadEpisodeTranscriptData(epPath)
-	if err != nil {
-		return "", nil, err
-	}
-	return strings.Join(lines, "\n"), lines, nil
 }
 
 func (m *tuiModel) openTranscriptViewer() {
