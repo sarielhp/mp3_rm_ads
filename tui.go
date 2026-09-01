@@ -9,119 +9,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-type tuiScreen int
-
-const (
-	screenPodcasts tuiScreen = iota
-	screenPodcastDetail
-	screenEpisodeDetail
-	screenPlayer
-	screenPlayQueue
-	screenAdQueue
-	screenDownloadQueue
-	screenLatestEpisodes
-	screenTranscript
-	screenTimeline
-)
-
-type tuiPodcast struct {
-	name        string
-	dir         string
-	author      string
-	description string
-	feedURL     string
-	coverPath   string
-	episodes    []tuiEpisode
-	absData     *absItem
-	config      PodcastConfig
-}
-
-func (p tuiPodcast) transcribedCount() int {
-	c := 0
-	for _, e := range p.episodes {
-		if e.hasTranscript {
-			c++
-		}
-	}
-	return c
-}
-
-func (p tuiPodcast) displayAuthor() string {
-	if p.absData != nil && p.absData.Media.Metadata.Author != "" {
-		return p.absData.Media.Metadata.Author
-	}
-	return p.author
-}
-
-func (p tuiPodcast) displayDescription() string {
-	if p.absData != nil && p.absData.Media.Metadata.Description != "" {
-		return p.absData.Media.Metadata.Description
-	}
-	return p.description
-}
-
-type tuiEpisode struct {
-	filename      string
-	path          string
-	title         string
-	hasAdsRemoved bool
-	hasTranscript bool
-	fileSize      int64
-	modTime       time.Time
-	publishedAt   int64
-	duration      float64
-	durationDone  bool
-	season        string
-	episode       string
-	absData       *absEpisode
-	isFeedOnly    bool
-	enclosureURL  string
-	guid          string
-	description   string
-}
-
-func (e tuiEpisode) displayDate() time.Time {
-	if e.publishedAt > 0 {
-		return time.UnixMilli(e.publishedAt)
-	}
-	if e.absData != nil {
-		if pub := parseABSEpisodePublishedAt(e.absData); pub > 0 {
-			return time.UnixMilli(pub)
-		}
-	}
-	return e.modTime
-}
-
-func (e tuiEpisode) displayTitle() string {
-	if e.title != "" {
-		return e.title
-	}
-	if e.absData != nil && e.absData.Title != "" {
-		return e.absData.Title
-	}
-	return e.filename
-}
-
-func (e tuiEpisode) displayEpisodeNum(index int) string {
-	if e.episode != "" {
-		return "#" + e.episode
-	}
-	if e.absData != nil && e.absData.Episode != "" {
-		return "#" + e.absData.Episode
-	}
-	if index > 0 {
-		return fmt.Sprintf("#%d", index)
-	}
-	return ""
-}
-
-type TuiBackend struct {
-	LoadPodcasts func(dir string) ([]tuiPodcast, error)
-	LoadQueues   func(pods []tuiPodcast) map[string][]string
-	SaveQueue    func(dir string, entries []string)
-	GetDuration  func(path string) float64
-}
-
 type tuiModel struct {
 	width                   int
 	height                  int
@@ -347,13 +234,6 @@ func (m *tuiModel) tickPopup() {
 	}
 }
 
-func (m *tuiModel) drawPopup() string {
-	if m.popupMsg == "" {
-		return ""
-	}
-	return tuiPopupStyle.Render("  " + m.popupMsg)
-}
-
 func (m *tuiModel) marqueeText(text string, maxWidth int) string {
 	if len(text) <= maxWidth {
 		return text
@@ -389,19 +269,6 @@ func (m *tuiModel) setTerminalTitle(title string) {
 	fmt.Printf("\033]0;%s\007", title)
 }
 
-func (m *tuiModel) drawErrorScreen() string {
-	out := &strings.Builder{}
-	out.WriteString(tuiTitleStyle.Render("  Connection Error"))
-	out.WriteByte('\n')
-	out.WriteByte('\n')
-	out.WriteString(tuiDimStyle.Render("  " + m.loadErr))
-	out.WriteByte('\n')
-	out.WriteByte('\n')
-	out.WriteString(tuiHelpStyle.Render("  R - Retry  Q - Quit"))
-	out.WriteByte('\n')
-	return out.String()
-}
-
 func (m *tuiModel) searchBar() string {
 	if !m.searchMode {
 		return ""
@@ -421,80 +288,4 @@ func truncate(s string, max int) string {
 		return s[:max]
 	}
 	return s[:max-3] + "..."
-}
-
-func (m *tuiModel) View() string {
-	if m.loading {
-		return "Loading podcasts..."
-	}
-	if m.loadErr != "" {
-		return m.drawErrorScreen()
-	}
-	if !m.ready {
-		return "Initializing..."
-	}
-
-	if m.screen == screenPodcastDetail && m.podIdx < len(m.podcasts) {
-		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].name)
-	} else if m.screen == screenEpisodeDetail && m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
-		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
-	} else {
-		m.setTerminalTitle("abs")
-	}
-
-	if m.showHelpModal {
-		return m.drawHelpModal()
-	}
-	if m.showPolicyModal {
-		return m.drawAdPolicyModal()
-	}
-	if m.showDownloadPolicyModal {
-		return m.drawDownloadPolicyModal()
-	}
-
-	var body strings.Builder
-	if isKittyTerminal() {
-		body.WriteString(kittyClearGraphics())
-	}
-	body.WriteString(m.renderTopNavBar())
-
-	switch m.screen {
-	case screenPodcasts:
-		body.WriteString(m.drawPodcastsList())
-	case screenPodcastDetail:
-		body.WriteString(m.drawPodcastDetail())
-	case screenEpisodeDetail:
-		body.WriteString(m.drawEpisodeDetail())
-	case screenPlayer:
-		body.WriteString(m.drawPlayerScreen())
-	case screenPlayQueue:
-		body.WriteString(m.drawPlayQueueScreen())
-	case screenAdQueue:
-		body.WriteString(m.drawAdQueueScreen())
-	case screenDownloadQueue:
-		body.WriteString(m.drawDownloadQueueScreen())
-	case screenLatestEpisodes:
-		body.WriteString(m.drawLatestEpisodesScreen())
-	case screenTranscript:
-		body.WriteString(m.drawTranscriptScreen())
-	case screenTimeline:
-		body.WriteString(m.drawTimelineScreen())
-	}
-
-	miniPlayer := m.renderMiniPlayerBar()
-	if miniPlayer != "" {
-		body.WriteString(miniPlayer)
-	}
-
-	toast := m.renderToastNotification()
-	if toast != "" {
-		body.WriteString(toast)
-	} else {
-		popup := m.drawPopup()
-		if popup != "" {
-			body.WriteString("\n" + popup)
-		}
-	}
-
-	return body.String()
 }

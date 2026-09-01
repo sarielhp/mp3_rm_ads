@@ -25,12 +25,12 @@ func TestParseFlagsDownloadAll(t *testing.T) {
 			downloadAll: true,
 		},
 		{
-			args:        []string{"abs", "scan", "--all"},
+			args:        []string{"abs", "server", "scan", "--all"},
 			expectedCmd: "server",
 			downloadAll: true,
 		},
 		{
-			args:        []string{"abs", "new", "--all"},
+			args:        []string{"abs", "server", "new", "--all"},
 			expectedCmd: "server",
 			downloadAll: true,
 		},

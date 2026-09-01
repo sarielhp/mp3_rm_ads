@@ -4,7 +4,6 @@ import (
 	_ "embed"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -60,42 +59,6 @@ func normalizeCLIArgs(args []string) []string {
 		return args
 	}
 
-	if _, err := strconv.Atoi(args[0]); err == nil {
-		return append([]string{"server", "download"}, args...)
-	}
-
-	hasMp3 := false
-	hasDir := false
-	var lastArgNum bool
-
-	for _, arg := range args {
-		if strings.HasPrefix(arg, "-") {
-			continue
-		}
-		if strings.HasSuffix(strings.ToLower(arg), ".mp3") || strings.HasSuffix(strings.ToLower(arg), ".json") {
-			hasMp3 = true
-			break
-		}
-		if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
-			hasDir = true
-			break
-		}
-	}
-
-	if len(args) > 0 {
-		last := args[len(args)-1]
-		if _, err := strconv.Atoi(last); err == nil {
-			lastArgNum = true
-		}
-	}
-
-	if hasMp3 || hasDir {
-		return append([]string{"proc"}, args...)
-	}
-	if lastArgNum {
-		return append([]string{"server", "download"}, args...)
-	}
-
 	return args
 }
 
@@ -136,76 +99,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			buildRecutCommand(opts, action),
 			buildExportCommand(opts, action),
 			{
-				Name:        "opml",
-				Description: "Import or export podcast subscriptions using OPML files",
-				UsageLine:   "abs opml <command> [args]",
-				Subcommands: []clihelp.Command{
-					{
-						Name:        "import",
-						Description: "Import podcast subscriptions from an OPML file into Audiobookshelf",
-						UsageLine:   "abs opml import <file> [options]",
-						Parameters: []clihelp.Param{
-							{Name: "<file>", Description: "Path to the OPML file to import"},
-						},
-						Options: []clihelp.Option{
-							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
-						},
-						Run: func(ctx *clihelp.Context) error {
-							*action = "server"
-							opts.ServerSubcmd = "opml"
-							opts.OPMLSubcmd = "import"
-							if len(ctx.Args) > 0 {
-								opts.OPMLFile = ctx.Args[0]
-							}
-							return nil
-						},
-					},
-					{
-						Name:        "export",
-						Description: "Export all Audiobookshelf podcast RSS feeds into an OPML file",
-						UsageLine:   "abs opml export <file> [options]",
-						Parameters: []clihelp.Param{
-							{Name: "<file>", Description: "Path to write the exported OPML file"},
-						},
-						Options: []clihelp.Option{
-							clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-							clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
-						},
-						Run: func(ctx *clihelp.Context) error {
-							*action = "server"
-							opts.ServerSubcmd = "opml"
-							opts.OPMLSubcmd = "export"
-							if len(ctx.Args) > 0 {
-								opts.OPMLFile = ctx.Args[0]
-							}
-							return nil
-						},
-					},
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "server"
-					opts.ServerSubcmd = "opml"
-					if len(ctx.Args) > 0 {
-						switch strings.ToLower(ctx.Args[0]) {
-						case "import":
-							opts.OPMLSubcmd = "import"
-							if len(ctx.Args) > 1 {
-								opts.OPMLFile = ctx.Args[1]
-							}
-						case "export":
-							opts.OPMLSubcmd = "export"
-							if len(ctx.Args) > 1 {
-								opts.OPMLFile = ctx.Args[1]
-							}
-						default:
-							opts.OPMLFile = ctx.Args[0]
-						}
-					}
-					return nil
-				},
-			},
-			{
 				Name:        "tui",
 				Description: "Interactive TUI browser for podcasts and episodes",
 				UsageLine:   "abs tui [directory]",
@@ -219,68 +112,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 				Run: func(ctx *clihelp.Context) error {
 					*action = "tui"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "scan",
-				Description: "Scan Audiobookshelf for new podcasts and check for new episodes",
-				UsageLine:   "abs scan [podcasts_dir] [options]",
-				Parameters: []clihelp.Param{
-					{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
-				},
-				Args:             clihelp.MaximumNArgs(1),
-				OptionsValidator: clihelp.MutuallyExclusive("--podcasts-only", "--episodes-only"),
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
-					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
-					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
-					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
-					clihelp.Bool(&opts.Remote, "--remote", false, "Offload post-download audio processing to remote host (e.g. cloud8)"),
-					clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing (skip remote host)"),
-					clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for new podcasts and create directories (skip episode downloads)"),
-					clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check and download new episodes (skip podcast folder scanning)"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "server"
-					opts.ServerSubcmd = "scan"
-					if opts.Count > 0 {
-						opts.CountGiven = true
-					}
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "new",
-				Description: "Check and download new podcast episodes based on download policies",
-				UsageLine:   "abs new [podcasts_dir] [options]",
-				Parameters: []clihelp.Param{
-					{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Options: []clihelp.Option{
-					clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID to check/download new episodes"),
-					clihelp.Int(&opts.Count, "-k, --count <number>", 0, "Explicit number of episodes to download (overrides policy)"),
-					clihelp.Bool(&opts.DownloadAll, "--all", false, "Download all episodes from entire feed catalog"),
-					clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
-					clihelp.Bool(&opts.Remote, "--remote", false, "Offload post-download audio processing to remote host (e.g. cloud8)"),
-					clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing (skip remote host)"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "server"
-					opts.ServerSubcmd = "scan"
-					opts.EpisodesOnly = true
-					if opts.Count > 0 {
-						opts.CountGiven = true
-					}
 					opts.Args = ctx.Args
 					return nil
 				},
@@ -300,24 +131,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				},
 			},
 
-			{
-				Name:        "clean-orphans",
-				Description: "Scan Audiobookshelf library and remove fake or orphaned podcast entries",
-				UsageLine:   "abs clean-orphans [options]",
-				Args:        clihelp.NoArgs,
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview orphaned items to be deleted without deleting"),
-					clihelp.Bool(&opts.ForceDelete, "-f, --force", false, "Delete orphaned items without interactive confirmation"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "server"
-					opts.ServerSubcmd = "clean-orphans"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
 			{
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",

@@ -172,13 +172,13 @@ func TestParseFlagsQuiet(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"abs", "-q", "file.mp3"}
+	os.Args = []string{"abs", "proc", "-q", "file.mp3"}
 	_, cli := parseFlags()
 	if !cli.Quiet {
 		t.Error("expected Quiet=true for -q")
 	}
 
-	os.Args = []string{"abs", "--quiet", "file.mp3"}
+	os.Args = []string{"abs", "proc", "--quiet", "file.mp3"}
 	_, cli = parseFlags()
 	if !cli.Quiet {
 		t.Error("expected Quiet=true for --quiet")

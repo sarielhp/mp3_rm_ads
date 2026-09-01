@@ -9,7 +9,7 @@ func TestCLIScanAndNewCommands(t *testing.T) {
 	var opts CLIOptions
 
 	app := buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"scan"}); err != nil {
+	if err := app.Execute([]string{"server", "scan"}); err != nil {
 		t.Fatalf("scan execution error: %v", err)
 	}
 	if action != "server" || opts.ServerSubcmd != "scan" {
@@ -22,7 +22,7 @@ func TestCLIScanAndNewCommands(t *testing.T) {
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"scan", "-k", "5"}); err != nil {
+	if err := app.Execute([]string{"server", "scan", "-k", "5"}); err != nil {
 		t.Fatalf("scan -k 5 error: %v", err)
 	}
 	if !opts.CountGiven || opts.Count != 5 {
@@ -32,7 +32,7 @@ func TestCLIScanAndNewCommands(t *testing.T) {
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"new"}); err != nil {
+	if err := app.Execute([]string{"server", "new"}); err != nil {
 		t.Fatalf("new execution error: %v", err)
 	}
 	if action != "server" || opts.ServerSubcmd != "scan" || !opts.EpisodesOnly {
@@ -42,7 +42,7 @@ func TestCLIScanAndNewCommands(t *testing.T) {
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"new", "-k", "2"}); err != nil {
+	if err := app.Execute([]string{"server", "new", "-k", "2"}); err != nil {
 		t.Fatalf("new -k 2 error: %v", err)
 	}
 	if !opts.CountGiven || opts.Count != 2 || !opts.EpisodesOnly {
