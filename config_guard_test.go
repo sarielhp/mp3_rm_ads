@@ -25,7 +25,7 @@ func TestCorruptConfigIsNotOverwrittenWithDefaults(t *testing.T) {
 	path := filepath.Join(dir, "config.json")
 	old := testConfigPath
 	testConfigPath = path
-	t.Cleanup(func() { testConfigPath = old; configLoadFailed = false })
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false) })
 
 	// One trailing comma: the realistic hand-edit mistake.
 	broken := strings.Replace(realUserConfig, `"model": "qwen2.5:32b"}`, `"model": "qwen2.5:32b"},`, 1)
@@ -52,7 +52,7 @@ func TestValidConfigStillSaves(t *testing.T) {
 	path := filepath.Join(dir, "config.json")
 	old := testConfigPath
 	testConfigPath = path
-	t.Cleanup(func() { testConfigPath = old; configLoadFailed = false })
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false) })
 
 	if err := os.WriteFile(path, []byte(realUserConfig), 0600); err != nil {
 		t.Fatal(err)

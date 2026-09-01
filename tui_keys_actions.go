@@ -30,35 +30,36 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 
 	case " ":
 		globalPlayer.TogglePause()
-		if globalPlayer.IsPaused {
+		kv := globalPlayer.View()
+		if kv.IsPaused {
 			m.showPopup("Paused")
-		} else if globalPlayer.IsPlaying {
+		} else if kv.IsPlaying {
 			m.showPopup("Resumed")
 		}
 
 	case "right", "l", ">":
-		if globalPlayer.IsPlaying {
+		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(30)
-			m.showPopup("+30s (" + formatPlayerTime(globalPlayer.Position) + ")")
+			m.showPopup("+30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
 		}
 
 	case "left", "h", "<":
-		if globalPlayer.IsPlaying {
+		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(-30)
-			m.showPopup("-30s (" + formatPlayerTime(globalPlayer.Position) + ")")
+			m.showPopup("-30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
 		}
 
 	case "+", "=", "]":
 		globalPlayer.VolumeUp()
-		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.Volume))
+		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.View().Volume))
 
 	case "-", "_", "[":
 		globalPlayer.VolumeDown()
-		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.Volume))
+		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.View().Volume))
 
 	case "m", "M":
 		globalPlayer.ToggleMute()
-		if globalPlayer.Muted {
+		if globalPlayer.View().Muted {
 			m.showPopup("Muted")
 		} else {
 			m.showPopup("Unmuted")
@@ -66,7 +67,7 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 
 	case "s", "S":
 		globalPlayer.CycleSpeaker()
-		m.showPopup("Speaker: " + globalPlayer.CurrentSpeaker)
+		m.showPopup("Speaker: " + globalPlayer.View().CurrentSpeaker)
 
 	case "n", "N":
 		globalPlayer.Next()

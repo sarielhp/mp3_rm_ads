@@ -147,13 +147,14 @@ func (m *tuiModel) drawEpisodeDetail() string {
 
 		rightLines = append(rightLines, tuiSectionTitle.Render(" AUDIO PLAYER (F4 to hide) "))
 
-		if globalPlayer.Current != nil {
+		pv := globalPlayer.View()
+		if pv.Has {
 			statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
-			if globalPlayer.IsPaused {
+			if pv.IsPaused {
 				statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
 			}
-			rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(displayName(globalPlayer.Current.Title), rightW-16)+" "))
-			rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+displayName(globalPlayer.Current.Podcast)))
+			rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(displayName(pv.Title), rightW-16)+" "))
+			rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+displayName(pv.Podcast)))
 			rightLines = append(rightLines, "  "+tuiCyanStyle.Render(globalPlayer.RenderProgressBar(rightW-4)))
 		} else {
 			rightLines = append(rightLines, tuiPlayerStopped.Render("⏹ STOPPED")+" "+tuiDimStyle.Render("Press 'p' or Enter to play"))
@@ -183,7 +184,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		}
 
 		rightLines = append(rightLines, tuiLabelStyle.Render("Audio Output & Volume:"))
-		speaker := globalPlayer.CurrentSpeaker
+		speaker := pv.CurrentSpeaker
 		if speaker == "" {
 			speaker = "Default Audio Sink"
 		}
@@ -192,12 +193,12 @@ func (m *tuiModel) drawEpisodeDetail() string {
 
 		rightLines = append(rightLines, "")
 
-		queueTitle := fmt.Sprintf("Playback Queue (%d queued)", len(globalPlayer.Queue))
+		queueTitle := fmt.Sprintf("Playback Queue (%d queued)", len(pv.Queue))
 		rightLines = append(rightLines, tuiLabelStyle.Render(queueTitle))
-		if len(globalPlayer.Queue) > 0 {
-			for qIdx, qTrack := range globalPlayer.Queue {
+		if len(pv.Queue) > 0 {
+			for qIdx, qTrack := range pv.Queue {
 				if qIdx >= 3 {
-					rightLines = append(rightLines, tuiDimStyle.Render(fmt.Sprintf("  ... and %d more", len(globalPlayer.Queue)-3)))
+					rightLines = append(rightLines, tuiDimStyle.Render(fmt.Sprintf("  ... and %d more", len(pv.Queue)-3)))
 					break
 				}
 				qStr := fmt.Sprintf("  %d. %s", qIdx+1, truncate(displayName(qTrack.Title), rightW-8))

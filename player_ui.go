@@ -77,3 +77,44 @@ func (p *AudioPlayer) RenderVolumeBar(width int) string {
 	}
 	return fmt.Sprintf("[%s%s] %s", strings.Repeat("█", filled), strings.Repeat("░", empty), status)
 }
+
+type PlayerView struct {
+	Has            bool
+	Title          string
+	Podcast        string
+	Path           string
+	IsPlaying      bool
+	IsPaused       bool
+	Position       float64
+	Duration       float64
+	Volume         int
+	Muted          bool
+	CurrentSpeaker string
+	LastError      string
+	Queue          []PlayerTrack
+}
+
+func (p *AudioPlayer) View() PlayerView {
+	p.UpdatePosition()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	v := PlayerView{
+		IsPlaying:      p.IsPlaying,
+		IsPaused:       p.IsPaused,
+		Position:       p.Position,
+		Duration:       p.Duration,
+		Volume:         p.Volume,
+		Muted:          p.Muted,
+		CurrentSpeaker: p.CurrentSpeaker,
+		LastError:      p.LastError,
+		Queue:          append([]PlayerTrack(nil), p.Queue...),
+	}
+	if p.Current != nil {
+		v.Has = true
+		v.Title = p.Current.Title
+		v.Podcast = p.Current.Podcast
+		v.Path = p.Current.Path
+	}
+	return v
+}

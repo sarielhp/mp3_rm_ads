@@ -42,9 +42,26 @@ def run_staticcheck
     puts stderr
     exit 1
   end
-  found = stdout.lines.map(&:chomp).reject(&:empty?).sort
+  found = stdout.lines.map(&:chomp).reject(&:empty?)
   baseline = File.exist?(BASELINE_PATH) ? File.readlines(BASELINE_PATH).map(&:chomp).reject(&:empty?) : []
-  new_findings = found - baseline
+
+  # Key on file + message, not file:line:col, so that editing a file does not
+  # turn every pre-existing finding below the edit into a spurious "new" one.
+  # Counts are compared, so a second instance of the same message is still caught.
+  tally = lambda do |lines|
+    lines.each_with_object(Hash.new(0)) do |l, h|
+      h[l.sub(/\A([^:]+):\d+:\d+:\s*/) { "#{Regexp.last_match(1)}: " }] += 1
+    end
+  end
+
+  found_t = tally.call(found)
+  base_t = tally.call(baseline)
+
+  new_findings = found_t.each_with_object([]) do |(k, n), acc|
+    extra = n - base_t.fetch(k, 0)
+    acc << (extra > 1 ? "#{k} (x#{extra} new)" : k) if extra > 0
+  end
+
   unless new_findings.empty?
     puts "\e[31m✗ Staticcheck found #{new_findings.length} new finding(s)!\e[0m"
     puts new_findings
@@ -52,8 +69,9 @@ def run_staticcheck
     puts "  staticcheck -checks '#{STATICCHECK_CHECKS}' ./... | sort > #{BASELINE_PATH}"
     exit 1
   end
-  fixed = baseline - found
-  puts "Staticcheck: #{found.length} baselined finding(s), 0 new#{fixed.empty? ? '' : ", #{fixed.length} resolved"}"
+
+  resolved = base_t.sum { |k, n| [n - found_t.fetch(k, 0), 0].max }
+  puts "Staticcheck: #{found.length} baselined finding(s), 0 new#{resolved.zero? ? '' : ", #{resolved} resolved"}"
 end
 
 run_staticcheck
@@ -75,7 +93,7 @@ if full_mode
     end
   end
 else
-  run_cmd("Go test", "go test -timeout 30s ./...")
+  run_cmd("Go test (race detector)", "go test -race -timeout 180s ./...")
 end
 
 # 6. Build

@@ -35,24 +35,23 @@ func TestPersistentMiniPlayerBar(t *testing.T) {
 	m.screen = screenPodcasts
 	m.width = 80
 
-	globalPlayer.Current = nil
+	globalPlayer.Stop()
 	if bar := m.renderMiniPlayerBar(); bar != "" {
 		t.Errorf("expected empty mini player when stopped, got: %s", bar)
 	}
 
-	globalPlayer.Current = &PlayerTrack{
-		Title:   "Ep 101 Test",
-		Podcast: "Tech Talks",
-	}
-	globalPlayer.Duration = 120
-	globalPlayer.Position = 30
-	globalPlayer.Volume = 80
+	globalPlayer.PlayTrack(PlayerTrack{
+		Title:    "Ep 101 Test",
+		Podcast:  "Tech Talks",
+		Duration: 120,
+	})
+	t.Cleanup(globalPlayer.Stop)
 
 	bar := m.renderMiniPlayerBar()
 	if !strings.Contains(bar, "Ep 101 Test") || !strings.Contains(bar, "Tech Talks") {
 		t.Errorf("expected mini player bar to contain track info, got:\n%s", bar)
 	}
-	globalPlayer.Current = nil
+	globalPlayer.Stop()
 }
 
 func TestInteractiveHelpModal(t *testing.T) {

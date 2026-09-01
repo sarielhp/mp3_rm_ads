@@ -14,13 +14,14 @@ func (m *tuiModel) drawPlayerScreen() string {
 	dividerWidth := max(20, m.width-4)
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n\n")
 
-	if globalPlayer.Current != nil {
+	pv := globalPlayer.View()
+	if pv.Has {
 		statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
-		if globalPlayer.IsPaused {
+		if pv.IsPaused {
 			statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
 		}
-		out.WriteString("  " + statusBadge + "  " + tuiTitleStyle.Render(displayName(globalPlayer.Current.Title)) + "\n")
-		out.WriteString("    " + tuiSubtitleStyle.Render("in "+displayName(globalPlayer.Current.Podcast)) + "\n\n")
+		out.WriteString("  " + statusBadge + "  " + tuiTitleStyle.Render(displayName(pv.Title)) + "\n")
+		out.WriteString("    " + tuiSubtitleStyle.Render("in "+displayName(pv.Podcast)) + "\n\n")
 
 		barW := max(20, m.width-8)
 		out.WriteString("    " + tuiCyanStyle.Render(globalPlayer.RenderProgressBar(barW)) + "\n\n")
@@ -31,19 +32,19 @@ func (m *tuiModel) drawPlayerScreen() string {
 
 	out.WriteString(tuiSectionTitle.Render("  Audio Output & Volume") + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	speaker := globalPlayer.CurrentSpeaker
+	speaker := pv.CurrentSpeaker
 	if speaker == "" {
 		speaker = "Default Audio Sink"
 	}
 	out.WriteString(fmt.Sprintf("    Speaker: %s %s\n", tuiYellowStyle.Render(speaker), tuiDimStyle.Render("('s' to cycle)")))
 	out.WriteString(fmt.Sprintf("    Volume:  %s %s\n\n", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(30)), tuiDimStyle.Render("(+/- volume, 'm' mute)")))
 
-	qLen := len(globalPlayer.Queue)
+	qLen := len(pv.Queue)
 	out.WriteString(tuiSectionTitle.Render(fmt.Sprintf("  Up Next in Queue (%d queued)", qLen)) + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	if qLen > 0 {
-		for i, track := range globalPlayer.Queue {
+		for i, track := range pv.Queue {
 			if i >= 5 {
 				out.WriteString(fmt.Sprintf("    %s\n", tuiDimStyle.Render(fmt.Sprintf("... and %d more (Press F2 to view full queue)", qLen-5))))
 				break

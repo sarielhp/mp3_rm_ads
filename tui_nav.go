@@ -115,7 +115,8 @@ func (m *tuiModel) renderTopNavBar() string {
 }
 
 func (m *tuiModel) renderMiniPlayerBar() string {
-	if globalPlayer.Current == nil || m.screen == screenPlayer {
+	pv := globalPlayer.View()
+	if !pv.Has || m.screen == screenPlayer {
 		return ""
 	}
 
@@ -124,24 +125,28 @@ func (m *tuiModel) renderMiniPlayerBar() string {
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	statusIcon := "▶"
-	if globalPlayer.IsPaused {
+	if pv.IsPaused {
 		statusIcon = "⏸"
 	}
 
-	curT := formatPlayerTime(globalPlayer.Position)
-	totT := formatPlayerTime(globalPlayer.Duration)
-	title := truncate(displayName(globalPlayer.Current.Title), max(10, m.width/3))
-	pod := truncate(displayName(globalPlayer.Current.Podcast), 20)
+	curT := formatPlayerTime(pv.Position)
+	totT := formatPlayerTime(pv.Duration)
+	title := truncate(displayName(pv.Title), max(10, m.width/3))
+	pod := truncate(displayName(pv.Podcast), 20)
 
 	trackInfo := fmt.Sprintf("%s [%s / %s] %s • %s [Vol: %d%%]",
-		statusIcon, curT, totT, title, pod, globalPlayer.Volume)
+		statusIcon, curT, totT, title, pod, pv.Volume)
 
 	statusLine := tuiPlayerPlaying.Render(" " + trackInfo + " ")
-	if globalPlayer.IsPaused {
+	if pv.IsPaused {
 		statusLine = tuiPlayerPaused.Render(" " + trackInfo + " ")
 	}
 
-	hintLine := tuiDimStyle.Render("  (Space: Pause, ←/→: ±30s, +/-: Vol, s: Spk, 2: Player)")
+	hint := "  (Space: Pause, ←/→: ±30s, +/-: Vol, s: Spk, 2: Player)"
+	if pv.LastError != "" {
+		hint = "  " + pv.LastError
+	}
+	hintLine := tuiDimStyle.Render(hint)
 	out.WriteString("  " + statusLine + hintLine + "\n")
 
 	return out.String()

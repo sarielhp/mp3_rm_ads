@@ -39,7 +39,7 @@ func (m *tuiModel) handleDown() {
 		if m.epIdx < len(eps)-1 {
 			m.epIdx++
 			overhead := 8
-			if globalPlayer.Current != nil {
+			if globalPlayer.View().Has {
 				overhead = 10
 			}
 			maxVis := max(3, m.height-overhead)

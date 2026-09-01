@@ -48,7 +48,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	overhead := 8
-	if globalPlayer.Current != nil {
+	if globalPlayer.View().Has {
 		overhead = 10
 	}
 	maxVis := max(3, m.height-overhead)
