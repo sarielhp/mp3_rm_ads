@@ -194,6 +194,22 @@ func configLoadDidFail() bool {
 
 var configFileSnapshot *Config
 
+func setConfigFileSnapshot(c Config) {
+	configLoadMu.Lock()
+	defer configLoadMu.Unlock()
+	snap := c
+	configFileSnapshot = &snap
+}
+
+func getConfigFileSnapshot() (Config, bool) {
+	configLoadMu.Lock()
+	defer configLoadMu.Unlock()
+	if configFileSnapshot == nil {
+		return Config{}, false
+	}
+	return *configFileSnapshot, true
+}
+
 // envOverriddenFields mirrors applyEnvOverrides. Each entry restores the value
 // that was on disk whenever the corresponding environment variable is set, so a
 // per-invocation override is never persisted by a later saveConfig.
@@ -316,8 +332,7 @@ func loadConfig() Config {
 		cfg.RemoteWorkDir = "~/abs_remote"
 	}
 	resolveActiveWhisperProfile(&cfg)
-	snapshot := cfg
-	configFileSnapshot = &snapshot
+	setConfigFileSnapshot(cfg)
 	applyEnvOverrides(&cfg)
 	return cfg
 }
@@ -332,8 +347,8 @@ func saveConfig(cfg Config) {
 	}
 	dir := configDir()
 	os.MkdirAll(dir, 0755)
-	if configFileSnapshot != nil {
-		restoreEnvOverriddenFields(&cfg, *configFileSnapshot)
+	if disk, ok := getConfigFileSnapshot(); ok {
+		restoreEnvOverriddenFields(&cfg, disk)
 	}
 
 	data, err := json.MarshalIndent(cfg, "", "  ")
@@ -440,4 +455,10 @@ func setAudiobookshelf(cfg *Config, url, user, pass string) {
 		cfg.AudiobookshelfPass = pass
 	}
 	saveConfig(*cfg)
+}
+
+func setConfigFileSnapshotNil() {
+	configLoadMu.Lock()
+	defer configLoadMu.Unlock()
+	configFileSnapshot = nil
 }

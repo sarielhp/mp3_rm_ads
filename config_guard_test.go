@@ -77,7 +77,7 @@ func TestEnvOverridesAreNotPersistedToDisk(t *testing.T) {
 	path := filepath.Join(dir, "config.json")
 	old := testConfigPath
 	testConfigPath = path
-	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); configFileSnapshot = nil })
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); setConfigFileSnapshotNil() })
 
 	onDisk := `{"podcasts_dir":"/srv/media/podcasts",` +
 		`"whisper_url":"http://real-whisper:8088/inference",` +
@@ -121,7 +121,7 @@ func TestConfigIsWrittenPrivately(t *testing.T) {
 	path := filepath.Join(dir, "config.json")
 	old := testConfigPath
 	testConfigPath = path
-	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); configFileSnapshot = nil })
+	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); setConfigFileSnapshotNil() })
 
 	if err := os.WriteFile(path, []byte(`{"podcasts_dir":"/x"}`), 0644); err != nil {
 		t.Fatal(err)
