@@ -166,7 +166,7 @@ func TestExtractJSONArray(t *testing.T) {
 }
 
 func TestWorkDirFor(t *testing.T) {
-	if got := workDirFor("/p/f.mp3"); got != "/p/.work" {
+	if got := workDirFor("/p/f.mp3"); got != "/p/.work/f.mp3" {
 		t.Errorf("got %q", got)
 	}
 }

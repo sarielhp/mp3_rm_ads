@@ -12,7 +12,7 @@ func workDirFor(path string) string {
 	if err != nil {
 		abs = path
 	}
-	return filepath.Join(filepath.Dir(abs), workDirName)
+	return filepath.Join(filepath.Dir(abs), workDirName, filepath.Base(abs))
 }
 
 func verifyTempFile(filePath string) {
