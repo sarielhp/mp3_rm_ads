@@ -237,6 +237,12 @@ func savePodcastConfig(dir string, cfg PodcastConfig) error {
 }
 
 func getEpisodePublicationTime(filePath string) time.Time {
+	statPath := statusPathFor(filePath)
+	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil && st.PublishedAt != "" {
+		if t, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !t.IsZero() {
+			return t
+		}
+	}
 	dir := filepath.Dir(filePath)
 	fn := filepath.Base(filePath)
 	if cached, _ := loadPodcastCache(dir); cached != nil {
@@ -245,11 +251,18 @@ func getEpisodePublicationTime(filePath string) time.Time {
 				return time.UnixMilli(ep.PublishedAt)
 			}
 		}
-	}
-	statPath := statusPathFor(filePath)
-	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil && st.PublishedAt != "" {
-		if t, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !t.IsZero() {
-			return t
+		basePrefix := stripExt(fn)
+		if idx := strings.LastIndex(basePrefix, " ("); idx != -1 && strings.HasSuffix(basePrefix, ")") {
+			basePrefix = strings.TrimSpace(basePrefix[:idx])
+		}
+		for _, ep := range cached.Episodes {
+			epPrefix := stripExt(ep.Filename)
+			if idx := strings.LastIndex(epPrefix, " ("); idx != -1 && strings.HasSuffix(epPrefix, ")") {
+				epPrefix = strings.TrimSpace(epPrefix[:idx])
+			}
+			if (epPrefix == basePrefix || strings.HasPrefix(ep.Filename, basePrefix) || strings.HasPrefix(fn, epPrefix)) && ep.PublishedAt > 0 {
+				return time.UnixMilli(ep.PublishedAt)
+			}
 		}
 	}
 	if !strings.Contains(filePath, "abs_remote") && !strings.Contains(filePath, "/.work/") {
