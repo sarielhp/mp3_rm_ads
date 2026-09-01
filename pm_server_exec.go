@@ -394,5 +394,9 @@ func handleServerCommand(config Config, cli CLIOptions) {
 	case "frequency", "disable_hourly":
 		handleServerFrequency(config, cli)
 		return
+
+	case "clean-orphans":
+		handleServerCleanOrphans(config, cli)
+		return
 	}
 }

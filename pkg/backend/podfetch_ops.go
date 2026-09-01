@@ -35,6 +35,29 @@ func (c *PodFetchBackend) ResetPodcastDateCheck(itemID, title string) error {
 	return nil
 }
 
+func (c *PodFetchBackend) DeletePodcast(id string) error {
+	return c.DeleteItem(id)
+}
+
+func (c *PodFetchBackend) DeleteItem(id string) error {
+	var errs []string
+	if c.DBPath != "" {
+		if err := deletePodFetchPodcastDB(c.DBPath, id); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if c.Host != "" {
+		_, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s", id), "DELETE", nil)
+		if err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if len(errs) > 0 && c.DBPath == "" && c.Host == "" {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
 func (c *PodFetchBackend) Scan(opts ScanOptions) (ScanResult, error) {
 	podcastsDir := opts.PodcastsDir
 	if podcastsDir == "" {

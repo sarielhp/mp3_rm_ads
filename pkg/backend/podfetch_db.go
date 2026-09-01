@@ -210,6 +210,18 @@ func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
 	return err
 }
 
+func deletePodFetchPodcastDB(dbPath, podcastID string) error {
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	_, _ = db.Exec("DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID)
+	_, err = db.Exec("DELETE FROM podcasts WHERE id = ? OR name = ? OR directory = ?", podcastID, podcastID, podcastID)
+	return err
+}
+
 func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) {
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {

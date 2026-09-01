@@ -139,3 +139,12 @@ func (c *AudiobookshelfBackend) CreatePodcast(libraryID, folderID, path, title, 
 	}
 	return &item, nil
 }
+
+func (c *AudiobookshelfBackend) DeletePodcast(id string) error {
+	return c.DeleteItem(id)
+}
+
+func (c *AudiobookshelfBackend) DeleteItem(id string) error {
+	_, err := c.Request(fmt.Sprintf("/api/items/%s", id), "DELETE", nil)
+	return err
+}

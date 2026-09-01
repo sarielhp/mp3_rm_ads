@@ -235,6 +235,7 @@ type CLIOptions struct {
 	ABSToken            string
 	Args                []string
 	ServerSubcmd        string
+	ForceDelete         bool
 	Refresh             bool
 	DisableHourly       bool
 	OPMLSubcmd          string

@@ -302,6 +302,24 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			},
 
 			{
+				Name:        "clean-orphans",
+				Description: "Scan Audiobookshelf library and remove fake or orphaned podcast entries",
+				UsageLine:   "abs clean-orphans [options]",
+				Args:        clihelp.NoArgs,
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview orphaned items to be deleted without deleting"),
+					clihelp.Bool(&opts.ForceDelete, "-f, --force", false, "Delete orphaned items without interactive confirmation"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "clean-orphans"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
 				Name:        "test",
 				Description: "Test external services like Whisper server or Audiobookshelf",
 				UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",

@@ -15,6 +15,8 @@ type Backend interface {
 	Podcasts() ([]Podcast, error)
 	GetPodcast(id string) (*Podcast, error)
 	CreatePodcast(libraryID, folderID, path, title, feedURL string) (*Podcast, error)
+	DeletePodcast(id string) error
+	DeleteItem(id string) error
 	PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, error)
 	DownloadEpisodes(podcastID string, episodes []FeedEpisode) error
 	DeletePodcastEpisode(podcastID, episodeID string) error

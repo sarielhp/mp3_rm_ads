@@ -354,6 +354,24 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 					return nil
 				},
 			},
+			{
+				Name:        "clean-orphans",
+				Description: "Scan Audiobookshelf library, identify fake or orphaned podcast entries (missing feed URL or duplicate feeds), and delete them",
+				UsageLine:   "abs server clean-orphans [options]",
+				Args:        clihelp.NoArgs,
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview orphaned items to be deleted without deleting"),
+					clihelp.Bool(&opts.ForceDelete, "-f, --force", false, "Delete orphaned items without interactive confirmation"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "server"
+					opts.ServerSubcmd = "clean-orphans"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
 		},
 	}
 }
