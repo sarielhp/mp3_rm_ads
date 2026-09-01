@@ -120,7 +120,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 
-	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
+	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.json 2>/dev/null", remoteWorkDir))
 	if strings.TrimSpace(queuedOut) != "" {
 		for _, qPath := range splitLines(strings.TrimSpace(queuedOut)) {
 			qPath = strings.TrimSpace(qPath)
@@ -141,7 +141,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 				var isRec bool
 				var pt time.Time
 				if cfg != nil && cfg.PodcastsDir != "" {
-					localAudio := filepath.Join(cfg.PodcastsDir, qTask)
+					localAudio := resolveLocalAudioPath(cfg.PodcastsDir, qTask)
 					dur = getEpisodeDurationForQueue(localAudio)
 					pri = getEpisodePriorityForQueue(localAudio)
 					isRec, pt = isEpisodeRecent24h(localAudio, now)
@@ -334,7 +334,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 			var isRec bool
 			var pt time.Time
 			if cfg != nil && cfg.PodcastsDir != "" {
-				localAudio := filepath.Join(cfg.PodcastsDir, task)
+				localAudio := resolveLocalAudioPath(cfg.PodcastsDir, task)
 				dur = getEpisodeDurationForQueue(localAudio)
 				pri = getEpisodePriorityForQueue(localAudio)
 				isRec, pt = isEpisodeRecent24h(localAudio, now)
@@ -348,7 +348,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 				prevTask := status.QueuedTasks[idx-1]
 				prevRec := false
 				if cfg != nil && cfg.PodcastsDir != "" {
-					prevAudio := filepath.Join(cfg.PodcastsDir, prevTask)
+					prevAudio := resolveLocalAudioPath(cfg.PodcastsDir, prevTask)
 					prevRec, _ = isEpisodeRecent24h(prevAudio, now)
 				}
 				if prevRec && !isRec {
@@ -474,4 +474,38 @@ func cleanRemoteRelPath(rawPath, remoteWorkDir string) string {
 		return rawPath[idx+len("abs_remote/"):]
 	}
 	return filepath.Base(rawPath)
+}
+
+func resolveLocalAudioPath(podcastsDir, relTask string) string {
+	exact := filepath.Join(podcastsDir, relTask)
+	if _, err := os.Stat(exact); err == nil {
+		return exact
+	}
+	podName := filepath.Dir(relTask)
+	baseName := filepath.Base(relTask)
+	podDir := filepath.Join(podcastsDir, podName)
+	if fi, err := os.Stat(podDir); err == nil && fi.IsDir() {
+		if entries, err := os.ReadDir(podDir); err == nil {
+			basePrefix := stripExt(baseName)
+			if idx := strings.LastIndex(basePrefix, " ("); idx != -1 && strings.HasSuffix(basePrefix, ")") {
+				basePrefix = strings.TrimSpace(basePrefix[:idx])
+			}
+			for _, e := range entries {
+				if e.IsDir() {
+					continue
+				}
+				en := e.Name()
+				if strings.HasSuffix(en, ".mp3") || strings.HasSuffix(en, ".m4a") {
+					enPrefix := stripExt(en)
+					if idx := strings.LastIndex(enPrefix, " ("); idx != -1 && strings.HasSuffix(enPrefix, ")") {
+						enPrefix = strings.TrimSpace(enPrefix[:idx])
+					}
+					if en == baseName || enPrefix == basePrefix || strings.HasPrefix(en, basePrefix) || strings.HasPrefix(basePrefix, enPrefix) {
+						return filepath.Join(podDir, en)
+					}
+				}
+			}
+		}
+	}
+	return exact
 }

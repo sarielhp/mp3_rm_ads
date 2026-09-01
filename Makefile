@@ -1,6 +1,9 @@
-.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual
+.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue
 
 all: check
+
+verify-queue:
+	@ruby ./tools/verify_remote_queue.rb $(ARGS)
 
 visual:
 	@ruby ./tools/visual_audit.rb
