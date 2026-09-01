@@ -84,7 +84,9 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		fi, err := os.Stat(arg)
 		if err == nil && fi.IsDir() {
 			printScanning(arg)
-			removeWorkDirs(arg)
+			if !cli.DryRun {
+				removeWorkDirs(arg)
+			}
 			rawMp3Files := findMP3Files(arg)
 			if len(rawMp3Files) == 0 {
 				if !cli.Quiet {
