@@ -109,8 +109,32 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 		_ = runRemoteAck(dir, rels)
 		return "", nil
 	}
-	if strings.Contains(cmd, "abs help") || strings.Contains(cmd, "abs version") {
+	if strings.Contains(cmd, "abs help") || strings.Contains(cmd, "abs version") || strings.Contains(cmd, "abs --version") {
 		return "abs version 0.1.26", nil
+	}
+	if strings.HasPrefix(cmd, "cat ") {
+		parts := strings.Fields(cmd)
+		if len(parts) >= 2 {
+			p := strings.Trim(parts[1], "\"")
+			local := m.resolveRemotePath(p)
+			if data, err := os.ReadFile(local); err == nil {
+				return string(data), nil
+			}
+		}
+		return "", nil
+	}
+	if strings.Contains(cmd, "rm -f ") {
+		fields := strings.Fields(cmd)
+		for _, f := range fields {
+			if f == "rm" || f == "-f" {
+				continue
+			}
+			if strings.HasPrefix(f, "-") {
+				continue
+			}
+			local := m.resolveRemotePath(strings.Trim(f, "\""))
+			_ = os.Remove(local)
+		}
 	}
 	if strings.HasPrefix(cmd, "pgrep") {
 		return "12345\n", nil

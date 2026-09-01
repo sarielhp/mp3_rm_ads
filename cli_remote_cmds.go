@@ -174,6 +174,27 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 			},
 			{
+				Name:        "stop",
+				Description: "Stop remote worker process and Whisper server on remote host",
+				UsageLine:   "abs remote stop [host] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "remote"
+					opts.RemoteSubcmd = "stop"
+					if len(ctx.Args) > 0 {
+						opts.RemoteHost = ctx.Args[0]
+					}
+					return nil
+				},
+			},
+			{
 				Name:        "cancel",
 				Description: "Cancel a remote batch job or all active workers",
 				UsageLine:   "abs remote cancel [host] [batch_id] [options]",
@@ -192,14 +213,6 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 					return nil
 				},
 			},
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
-			opts.RemoteSubcmd = "status"
-			if len(ctx.Args) > 0 {
-				opts.RemoteHost = ctx.Args[0]
-			}
-			return nil
 		},
 	}
 }
@@ -233,6 +246,8 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "clear", "empty", "purge":
 		err = runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
+	case "stop":
+		err = runRemoteStop(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "scan":
 		targetDir := ""
 		if len(cli.Args) > 0 {
@@ -267,7 +282,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		}
 		err = runRemoteCancel(&config, host, batchID, nil, cli.Quiet)
 	default:
-		err = runRemoteStatus(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		return
 	}
 
 	if err != nil {

@@ -33,11 +33,14 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		return nil
 	}
 
-	verOut, _ := transport.Exec(targetHost, "~/.local/bin/abs help 2>/dev/null || ~/abs_remote/bin/abs help 2>/dev/null || abs help 2>/dev/null")
+	verOut, _ := transport.Exec(targetHost, "~/.local/bin/abs --version 2>/dev/null || ~/abs_remote/bin/abs --version 2>/dev/null || abs --version 2>/dev/null || cat ~/abs_remote/VERSION 2>/dev/null || cat ~/.config/abs/VERSION 2>/dev/null || ~/.local/bin/abs help 2>/dev/null || ~/abs_remote/bin/abs help 2>/dev/null || abs help 2>/dev/null")
 	if verOut != "" {
 		lines := splitLines(verOut)
 		if len(lines) > 0 {
-			status.BinaryVersion = strings.TrimSpace(lines[0])
+			v := strings.TrimSpace(lines[0])
+			v = strings.TrimPrefix(v, "abs version ")
+			v = strings.TrimPrefix(v, "abs ")
+			status.BinaryVersion = strings.TrimSpace(v)
 		}
 	}
 
@@ -246,7 +249,7 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	fmt.Printf("\n=== Remote Server Status: %s ===\n", bold(targetHost))
 	fmt.Printf("  - Reachable:       %s\n", boldGreen("Yes"))
 	if status.BinaryVersion != "" {
-		fmt.Printf("  - Binary:          %s\n", status.BinaryVersion)
+		fmt.Printf("  - Version:         %s\n", status.BinaryVersion)
 	}
 	workerStatusStr := bold("Not running (idle)")
 	if status.WorkerRunning {

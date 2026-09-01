@@ -74,6 +74,7 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 	if !quiet {
 		fmt.Println()
 		fmt.Println("=== Local Library Status ===")
+		fmt.Printf("  - Version:           %s\n", getVersion())
 		fmt.Printf("  - Podcasts:          %d\n", podcastsCount)
 		fmt.Printf("  - Total Episodes:    %d\n", totalEpisodes)
 		if totalNeedsAd > 0 {
