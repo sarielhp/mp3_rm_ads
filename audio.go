@@ -77,12 +77,39 @@ func validateWavFile(filePath string) bool {
 	return dur > 0
 }
 
+const minKeepFraction = 0.25
+
+func keepFractionIsPlausible(inputFile string, keepSegments [][2]float64) bool {
+	sourceDuration := getAudioDuration(inputFile)
+	if sourceDuration <= 0 {
+		return true
+	}
+	kept := 0.0
+	for _, seg := range keepSegments {
+		if seg[1] > seg[0] {
+			kept += seg[1] - seg[0]
+		}
+	}
+	if kept >= sourceDuration*minKeepFraction {
+		return true
+	}
+	fmt.Fprintf(os.Stderr,
+		"Refusing to cut '%s': the requested cut would keep only %.1fs of %.1fs (%.1f%%, floor %.0f%%).\n"+
+			"This usually means the ad detector returned implausible timestamps. The file was left unchanged.\n",
+		inputFile, kept, sourceDuration, kept/sourceDuration*100, minKeepFraction*100)
+	return false
+}
+
 func cutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile string) bool {
 	return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 }
 
 func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputFile, remoteHost string) bool {
 	if len(keepSegments) == 0 {
+		return false
+	}
+
+	if !keepFractionIsPlausible(inputFile, keepSegments) {
 		return false
 	}
 

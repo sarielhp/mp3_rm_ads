@@ -1,5 +1,35 @@
 package main
 
+import "math"
+
+const maxAdSegments = 500
+
+func sanitizeAdSegments(ads []AdSegment, totalDuration float64) []AdSegment {
+	if totalDuration <= 0 {
+		return ads
+	}
+	var out []AdSegment
+	for _, a := range ads {
+		if math.IsNaN(a.Start) || math.IsNaN(a.End) || math.IsInf(a.Start, 0) || math.IsInf(a.End, 0) {
+			continue
+		}
+		if a.Start < 0 {
+			a.Start = 0
+		}
+		if a.End > totalDuration {
+			a.End = totalDuration
+		}
+		if a.End <= a.Start {
+			continue
+		}
+		out = append(out, a)
+		if len(out) >= maxAdSegments {
+			break
+		}
+	}
+	return out
+}
+
 func mergeIntervals(ads []AdSegment) []AdSegment {
 	if len(ads) == 0 {
 		return ads
@@ -62,6 +92,7 @@ func sortAds(ads []AdSegment) {
 }
 
 func calculateKeepSegments(totalDuration float64, ads []AdSegment) [][2]float64 {
+	ads = sanitizeAdSegments(ads, totalDuration)
 	sorted := make([]AdSegment, len(ads))
 	copy(sorted, ads)
 	sortAds(sorted)
