@@ -45,6 +45,8 @@ var globalPlayer = &AudioPlayer{
 	Volume: 70,
 }
 
+var playerSpawnEnabled = true
+
 func init() {
 	c := make(chan os.Signal, 1)
 	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
@@ -109,6 +111,14 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 	}()
 
 	p.killProcessLocked()
+
+	if !playerSpawnEnabled {
+		p.IsPlaying = true
+		p.IsPaused = false
+		p.startPlayTime = time.Now()
+		p.startOffsetSec = startSec
+		return
+	}
 
 	args := []string{"-nodisp", "-autoexit", "-loglevel", "quiet"}
 	if startSec > 0 {
