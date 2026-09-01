@@ -131,3 +131,17 @@ func ResolveProcessingHost(cfg *Config, requestedHost string, transport RemoteTr
 
 	return "local", false, nil
 }
+
+func shellQuote(s string) string {
+	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
+}
+
+func shellQuoteHomePath(s string) string {
+	if s == "~" {
+		return "$HOME"
+	}
+	if strings.HasPrefix(s, "~/") {
+		return "$HOME/" + shellQuote(strings.TrimPrefix(s, "~/"))
+	}
+	return shellQuote(s)
+}

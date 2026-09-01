@@ -14,7 +14,14 @@ func NewMockRemoteTransport(root string) *MockRemoteTransport {
 	}
 }
 
+func shellUnquote(tok string) string {
+	tok = strings.ReplaceAll(tok, `'\''`, "'")
+	tok = strings.NewReplacer("'", "", `"`, "").Replace(tok)
+	return strings.TrimPrefix(tok, "$HOME/")
+}
+
 func (m *MockRemoteTransport) resolveRemotePath(remPath string) string {
+	remPath = shellUnquote(remPath)
 	if strings.HasPrefix(remPath, m.RemoteRoot) {
 		return remPath
 	}
@@ -79,7 +86,11 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 	}
 	if strings.Contains(cmd, "remote ack") {
 		var rels []string
-		parts := strings.Split(cmd, "\"")
+		quote := "\""
+		if strings.Count(cmd, "'") >= 2 {
+			quote = "'"
+		}
+		parts := strings.Split(cmd, quote)
 		for i := 1; i < len(parts); i += 2 {
 			if strings.TrimSpace(parts[i]) != "" {
 				rels = append(rels, strings.TrimSpace(parts[i]))
@@ -124,7 +135,7 @@ func (m *MockRemoteTransport) Exec(host string, cmd string) (string, error) {
 			if strings.HasPrefix(f, "-") {
 				continue
 			}
-			local := m.resolveRemotePath(strings.Trim(f, "\""))
+			local := m.resolveRemotePath(f)
 			_ = os.Remove(local)
 		}
 	}

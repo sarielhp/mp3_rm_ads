@@ -88,7 +88,11 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 					continue
 				}
 
-				localDestAudio := filepath.Join(localPodcastsDir, relPath)
+				localDestAudio, relOK := safeRelUnder(localPodcastsDir, relPath)
+				if !relOK {
+					fmt.Fprintf(os.Stderr, "Refusing %q from the remote manifest: it escapes the podcasts directory.\n", relPath)
+					continue
+				}
 				localDestDir := filepath.Dir(localDestAudio)
 				_ = os.MkdirAll(localDestDir, 0755)
 
@@ -173,16 +177,14 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 			if len(verifiedRelPaths) > 0 {
 				var quotedArgs []string
 				for _, p := range verifiedRelPaths {
-					quotedArgs = append(quotedArgs, fmt.Sprintf("%q", p))
+					quotedArgs = append(quotedArgs, shellQuote(p))
 				}
 				ackArgs := strings.Join(quotedArgs, " ")
 				ackCmd := fmt.Sprintf("abs remote ack %s || ~/.local/bin/abs remote ack %s", ackArgs, ackArgs)
 				_, errAck := transport.Exec(targetHost, ackCmd)
 				if errAck != nil {
 					for _, p := range verifiedRelPaths {
-						remAudio := fmt.Sprintf("%s/%s", remoteWorkDir, p)
-						delCmd := fmt.Sprintf("rm -f %s %s.precut %s.tmp.mp3", remAudio, remAudio, remAudio)
-						_, _ = transport.Exec(targetHost, delCmd)
+						_, _ = transport.Exec(targetHost, remoteCleanupCommand(remoteWorkDir, p))
 					}
 				}
 			}
@@ -213,12 +215,16 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 						if item.Status != BatchStatusCompleted {
 							continue
 						}
-						srcAudio := filepath.Join(tempOutDir, item.AudioFileName)
-						baseName := stripExt(item.AudioFileName)
+						srcAudio := filepath.Join(tempOutDir, filepath.Base(item.AudioFileName))
+						baseName := stripExt(filepath.Base(item.AudioFileName))
 						srcCuts := filepath.Join(tempOutDir, baseName+".cuts.json")
 						srcTranscript := filepath.Join(tempOutDir, baseName+".transcript.json")
 
-						destMP3 := item.SourceFile
+						destMP3, destOK := resolveManifestDest(localPodcastsDir, item)
+						if !destOK {
+							fmt.Fprintf(os.Stderr, "Refusing manifest entry %q: it does not resolve inside the podcasts directory.\n", item.AudioFileName)
+							continue
+						}
 						destDir := filepath.Dir(destMP3)
 						_ = os.MkdirAll(destDir, 0755)
 
@@ -282,4 +288,50 @@ func triggerBackgroundCollect(cfg *Config) {
 	for _, h := range hosts {
 		_ = runRemotePull(cfg, h, nil, true, false)
 	}
+}
+
+func remoteCleanupCommand(remoteWorkDir, relPath string) string {
+	base := strings.TrimSuffix(remoteWorkDir, "/") + "/" + relPath
+	return fmt.Sprintf("rm -f %s %s %s",
+		shellQuoteHomePath(base),
+		shellQuoteHomePath(base+".precut"),
+		shellQuoteHomePath(base+".tmp.mp3"))
+}
+
+func safeRelUnder(base, rel string) (string, bool) {
+	if rel == "" || filepath.IsAbs(rel) {
+		return "", false
+	}
+	absBase, err := filepath.Abs(base)
+	if err != nil {
+		return "", false
+	}
+	joined := filepath.Join(absBase, rel)
+	if joined != absBase && !strings.HasPrefix(joined, absBase+string(os.PathSeparator)) {
+		return "", false
+	}
+	return joined, true
+}
+
+func resolveManifestDest(localPodcastsDir string, item RemoteBatchJobItem) (string, bool) {
+	if item.RelativePath != "" {
+		if p, ok := safeRelUnder(localPodcastsDir, item.RelativePath); ok {
+			return p, true
+		}
+	}
+	if item.SourceFile == "" {
+		return "", false
+	}
+	absBase, err := filepath.Abs(localPodcastsDir)
+	if err != nil {
+		return "", false
+	}
+	absSrc, err := filepath.Abs(item.SourceFile)
+	if err != nil {
+		return "", false
+	}
+	if absSrc != absBase && !strings.HasPrefix(absSrc, absBase+string(os.PathSeparator)) {
+		return "", false
+	}
+	return absSrc, true
 }
