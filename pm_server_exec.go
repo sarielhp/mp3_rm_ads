@@ -70,6 +70,16 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				os.Exit(1)
 			}
 
+			var activePodcasts []PodcastItem
+			for _, p := range podcasts {
+				if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
+					activePodcasts = append(activePodcasts, p)
+				}
+			}
+			if len(activePodcasts) > 0 {
+				podcasts = activePodcasts
+			}
+
 			totalNewlyDownloaded := 0
 			totalPodcastsChecked := 0
 
