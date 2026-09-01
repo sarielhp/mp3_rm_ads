@@ -66,7 +66,9 @@ push: bump
 
 install: build
 	@go install .
-	@if [ -d "$$HOME/bin" ]; then install -m 755 abs "$$HOME/bin/abs"; echo "Installed to $$HOME/bin/abs and $$(go env GOPATH)/bin/abs"; else echo "Installed to $$(go env GOPATH)/bin/abs"; fi
+	@if [ -d "$$HOME/bin" ]; then install -m 755 abs "$$HOME/bin/abs"; fi
+	@if [ -d "$$HOME/.local/bin" ]; then install -m 755 abs "$$HOME/.local/bin/abs"; fi
+	@echo "Installed to $$(go env GOPATH)/bin/abs, $$HOME/bin/abs, and $$HOME/.local/bin/abs"
 
 ci: check
 
