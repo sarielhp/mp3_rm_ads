@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"time"
 )
 
@@ -33,6 +34,30 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 
 	if !quiet {
 		fmt.Printf("Worker started processing batch %s (%d items)...\n", manifest.BatchID, len(manifest.Items))
+	}
+
+	if len(manifest.Items) > 1 {
+		sort.SliceStable(manifest.Items, func(i, j int) bool {
+			pi := manifest.Items[i].Priority
+			pj := manifest.Items[j].Priority
+			if pi != pj {
+				return pi > pj
+			}
+			di := manifest.Items[i].OriginalDurationSec
+			dj := manifest.Items[j].OriginalDurationSec
+			if di <= 0 {
+				inI := filepath.Join(batchDir, "in", manifest.Items[i].AudioFileName)
+				di = getEpisodeDurationForQueue(inI)
+			}
+			if dj <= 0 {
+				inJ := filepath.Join(batchDir, "in", manifest.Items[j].AudioFileName)
+				dj = getEpisodeDurationForQueue(inJ)
+			}
+			if di != dj {
+				return di < dj
+			}
+			return manifest.Items[i].AudioFileName < manifest.Items[j].AudioFileName
+		})
 	}
 
 	for i := range manifest.Items {

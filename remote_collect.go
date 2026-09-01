@@ -85,7 +85,7 @@ func runRemotePull(cfg *Config, host string, transport RemoteTransport, quiet, v
 		localPodcastsDir = "."
 	}
 
-	collectLock, err := acquireCollectLock("")
+	collectLock, err := acquireCollectLock(localPodcastsDir)
 	if err != nil || collectLock == nil {
 		if verbose {
 			fmt.Println("Another collect operation is currently in progress; skipping.")

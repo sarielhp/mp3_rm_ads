@@ -33,6 +33,7 @@ type RemoteBatchJobItem struct {
 	CleanedAudioFile    string            `json:"cleaned_audio_file,omitempty"`
 	CutsJSONFile        string            `json:"cuts_json_file,omitempty"`
 	TranscriptJSONFile  string            `json:"transcript_json_file,omitempty"`
+	Priority            int               `json:"priority,omitempty"`
 }
 
 type RemoteBatchManifest struct {
@@ -48,18 +49,19 @@ type RemoteBatchManifest struct {
 }
 
 type RemoteServerStatus struct {
-	Host          string                `json:"host"`
-	Reachable     bool                  `json:"reachable"`
-	BinaryVersion string                `json:"binary_version,omitempty"`
-	WhisperStatus string                `json:"whisper_status,omitempty"`
-	ActiveBatches []RemoteBatchManifest `json:"active_batches,omitempty"`
-	WorkerRunning bool                  `json:"worker_running"`
-	ActiveTask    string                `json:"active_task,omitempty"`
-	ActiveStage   string                `json:"active_stage,omitempty"`
-	ActiveElapsed string                `json:"active_elapsed,omitempty"`
-	ActiveETA     string                `json:"active_eta,omitempty"`
-	QueuedTasks   []string              `json:"queued_tasks,omitempty"`
-	Message       string                `json:"message,omitempty"`
+	Host           string                `json:"host"`
+	Reachable      bool                  `json:"reachable"`
+	BinaryVersion  string                `json:"binary_version,omitempty"`
+	WhisperStatus  string                `json:"whisper_status,omitempty"`
+	ActiveBatches  []RemoteBatchManifest `json:"active_batches,omitempty"`
+	WorkerRunning  bool                  `json:"worker_running"`
+	ActiveTask     string                `json:"active_task,omitempty"`
+	ActiveStage    string                `json:"active_stage,omitempty"`
+	ActiveElapsed  string                `json:"active_elapsed,omitempty"`
+	ActiveETA      string                `json:"active_eta,omitempty"`
+	ActiveDuration string                `json:"active_duration,omitempty"`
+	QueuedTasks    []string              `json:"queued_tasks,omitempty"`
+	Message        string                `json:"message,omitempty"`
 }
 
 func generateBatchID() string {

@@ -49,6 +49,9 @@ func userTmpDir() string {
 }
 
 func configDir() string {
+	if testConfigPath != "" {
+		return filepath.Dir(testConfigPath)
+	}
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return userTmpDir()

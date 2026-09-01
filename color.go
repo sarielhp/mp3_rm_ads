@@ -13,10 +13,12 @@ import (
 var (
 	bold      = color.New(color.Bold).Sprint
 	cyan      = color.New(color.FgCyan).Sprint
+	blue      = color.New(color.FgBlue).Sprint
 	green     = color.New(color.FgGreen).Sprint
 	yellow    = color.New(color.FgYellow).Sprint
 	red       = color.New(color.FgRed).Sprint
 	boldCyan  = color.New(color.FgCyan, color.Bold).Sprint
+	boldBlue  = color.New(color.FgBlue, color.Bold).Sprint
 	boldGreen = color.New(color.FgGreen, color.Bold).Sprint
 )
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -71,6 +72,9 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		if strings.TrimSpace(statContent) != "" {
 			var activeSt EpisodeStatusFile
 			if json.Unmarshal([]byte(statContent), &activeSt) == nil {
+				if activeSt.Original.DurationSec > 0 {
+					status.ActiveDuration = formatClock(activeSt.Original.DurationSec)
+				}
 				status.ActiveStage = activeSt.CurrentStep
 				if status.ActiveStage == "" {
 					if activeSt.Status == StateTranscribingRemotely {
@@ -105,6 +109,12 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 				}
 			}
 		}
+		if status.ActiveDuration == "" && cfg != nil && cfg.PodcastsDir != "" {
+			localAudio := filepath.Join(cfg.PodcastsDir, status.ActiveTask)
+			if dur := getEpisodeDurationForQueue(localAudio); dur > 0 {
+				status.ActiveDuration = formatClock(dur)
+			}
+		}
 	}
 
 	queuedOut, _ := transport.Exec(targetHost, fmt.Sprintf("grep -l '\"status\": \"awaiting_transcription\"' %s/*/*.mp3.json 2>/dev/null", remoteWorkDir))
@@ -115,6 +125,34 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 				continue
 			}
 			status.QueuedTasks = append(status.QueuedTasks, cleanRemoteRelPath(qPath, remoteWorkDir))
+		}
+		if len(status.QueuedTasks) > 1 {
+			durMap := make(map[string]float64, len(status.QueuedTasks))
+			priMap := make(map[string]int, len(status.QueuedTasks))
+			for _, qTask := range status.QueuedTasks {
+				var dur float64
+				var pri int
+				if cfg != nil && cfg.PodcastsDir != "" {
+					localAudio := filepath.Join(cfg.PodcastsDir, qTask)
+					dur = getEpisodeDurationForQueue(localAudio)
+					pri = getEpisodePriorityForQueue(localAudio)
+				}
+				durMap[qTask] = dur
+				priMap[qTask] = pri
+			}
+			sort.SliceStable(status.QueuedTasks, func(i, j int) bool {
+				pi := priMap[status.QueuedTasks[i]]
+				pj := priMap[status.QueuedTasks[j]]
+				if pi != pj {
+					return pi > pj
+				}
+				di := durMap[status.QueuedTasks[i]]
+				dj := durMap[status.QueuedTasks[j]]
+				if di != dj {
+					return di < dj
+				}
+				return status.QueuedTasks[i] < status.QueuedTasks[j]
+			})
 		}
 	}
 
@@ -221,6 +259,9 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 	fmt.Printf("  - Worker Process:  %s\n", workerStatusStr)
 	if status.WorkerRunning && status.ActiveTask != "" {
 		fmt.Printf("      • Task:        %s\n", bold(status.ActiveTask))
+		if status.ActiveDuration != "" {
+			fmt.Printf("      • Length:      %s\n", blue(status.ActiveDuration))
+		}
 		if status.ActiveStage != "" {
 			fmt.Printf("      • Stage:       %s\n", status.ActiveStage)
 		}
@@ -250,7 +291,22 @@ func runRemoteStatus(cfg *Config, host string, transport RemoteTransport, quiet,
 		fmt.Println()
 		fmt.Println(bold("Remote Queue (Scheduled Jobs):"))
 		for idx, task := range status.QueuedTasks {
-			fmt.Printf("  [%d] %s\n", idx+1, task)
+			var dur float64
+			var pri int
+			if cfg != nil && cfg.PodcastsDir != "" {
+				localAudio := filepath.Join(cfg.PodcastsDir, task)
+				dur = getEpisodeDurationForQueue(localAudio)
+				pri = getEpisodePriorityForQueue(localAudio)
+			}
+			durStr := "--:--"
+			if dur > 0 {
+				durStr = formatClock(dur)
+			}
+			if pri > 0 {
+				fmt.Printf("  [%d] %s  %s (priority: %d)\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task, pri)
+			} else {
+				fmt.Printf("  [%d] %s  %s\n", idx+1, blue(fmt.Sprintf("[%s]", durStr)), task)
+			}
 		}
 	}
 

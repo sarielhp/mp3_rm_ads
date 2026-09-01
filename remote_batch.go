@@ -4,9 +4,62 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
+
+func getEpisodeDurationForQueue(audioPath string) float64 {
+	statPath := statusPathFor(audioPath)
+	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil {
+		if st.Original.DurationSec > 0 {
+			return st.Original.DurationSec
+		}
+	}
+	dur := getAudioDuration(audioPath)
+	if dur <= 0 {
+		dur = getMP3DiskDuration(audioPath)
+	}
+	if dur <= 0 {
+		if fi, err := os.Stat(audioPath); err == nil && fi.Size() > 0 {
+			return float64(fi.Size()) / 16000.0
+		}
+	}
+	return dur
+}
+
+func getEpisodePriorityForQueue(audioPath string) int {
+	statPath := statusPathFor(audioPath)
+	if st, err := loadEpisodeStatus(statPath); err == nil && st != nil {
+		return st.Priority
+	}
+	return 0
+}
+
+func sortAudioFilesByDuration(files []string) {
+	if len(files) <= 1 {
+		return
+	}
+	durMap := make(map[string]float64, len(files))
+	priMap := make(map[string]int, len(files))
+	for _, f := range files {
+		durMap[f] = getEpisodeDurationForQueue(f)
+		priMap[f] = getEpisodePriorityForQueue(f)
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		pi := priMap[files[i]]
+		pj := priMap[files[j]]
+		if pi != pj {
+			return pi > pj
+		}
+		di := durMap[files[i]]
+		dj := durMap[files[j]]
+		if di != dj {
+			return di < dj
+		}
+		return files[i] < files[j]
+	})
+}
 
 func findAudioFilesForRemote(paths []string, defaultDir string) []string {
 	var targetPaths []string
@@ -48,7 +101,7 @@ func findAudioFilesForRemote(paths []string, defaultDir string) []string {
 	return results
 }
 
-func runRemotePush(cfg *Config, args []string, host string, transport RemoteTransport, quiet, verbose bool) error {
+func runRemotePush(cfg *Config, args []string, host string, transport RemoteTransport, priority int, quiet, verbose bool) error {
 	targetHost, _, err := ResolveProcessingHost(cfg, host, transport)
 	if err != nil {
 		return err
@@ -92,8 +145,22 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 		}
 	}
 
+	if priority > 0 {
+		for _, f := range toPush {
+			st := getOrCreateEpisodeStatus(f)
+			st.Priority = priority
+			_ = saveEpisodeStatus(statusPathFor(f), st)
+		}
+	}
+
+	sortAudioFilesByDuration(toPush)
+
 	if !quiet {
-		fmt.Printf("Pushing %d audio file(s) to mirror directory on %s:%s...\n", len(toPush), targetHost, remoteWorkDir)
+		if priority > 0 {
+			fmt.Printf("Pushing %d audio file(s) [priority: %d] to mirror directory on %s:%s...\n", len(toPush), priority, targetHost, remoteWorkDir)
+		} else {
+			fmt.Printf("Pushing %d audio file(s) to mirror directory on %s:%s...\n", len(toPush), targetHost, remoteWorkDir)
+		}
 	}
 
 	pushedCount := 0
@@ -109,11 +176,17 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 
 		localStat := getOrCreateEpisodeStatus(f)
 		localStat.Status = StateQueuedRemote
+		if priority > 0 {
+			localStat.Priority = priority
+		}
 		_ = saveEpisodeStatus(statusPathFor(f), localStat)
 
 		remoteStat := *localStat
 		remoteStat.Status = StateAwaitingTranscription
 		remoteStat.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+		if priority > 0 {
+			remoteStat.Priority = priority
+		}
 
 		tmpStatPath := filepath.Join(os.TempDir(), fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
 		_ = saveEpisodeStatus(tmpStatPath, &remoteStat)

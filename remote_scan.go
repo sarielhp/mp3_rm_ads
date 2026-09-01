@@ -76,6 +76,8 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		return nil
 	}
 
+	sortAudioFilesByDuration(files)
+
 	if cfg == nil {
 		c := loadConfig()
 		cfg = &c

@@ -52,6 +52,7 @@ type EpisodeStatusFile struct {
 	Cleaned       EpisodeAudioMeta `json:"cleaned,omitempty"`
 	Ads           []EpisodeAdCut   `json:"ads,omitempty"`
 	LastError     string           `json:"last_error,omitempty"`
+	Priority      int              `json:"priority,omitempty"`
 }
 
 func statusPathFor(audioPath string) string {

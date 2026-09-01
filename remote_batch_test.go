@@ -330,7 +330,7 @@ func TestRemotePush(t *testing.T) {
 		PodcastsDir:   podcastsDir,
 	}
 
-	err := runRemotePush(cfg, []string{ep1, ep2}, "push-box", mock, true, false)
+	err := runRemotePush(cfg, []string{ep1, ep2}, "push-box", mock, 0, true, false)
 	if err != nil {
 		t.Fatalf("runRemotePush failed: %v", err)
 	}

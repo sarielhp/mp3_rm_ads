@@ -248,6 +248,7 @@ type CLIOptions struct {
 	Daemon              bool
 	IfDirty             bool
 	BatchWorkerDir      string
+	Priority            int
 }
 
 type CostInfo struct {

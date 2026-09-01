@@ -385,6 +385,7 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.Bool(&opts.NoCollect, "--no-collect", false, "Skip automatic remote collection before push"),
 		clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview and count episodes needing transcription, learning, or cutting without modifying files"),
 		clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of untranscribed episodes to process"),
+		clihelp.Int(&opts.Priority, "-P, --priority <level>", 0, "Priority level for processing (higher priority processed first)"),
 		clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Target a specific podcast by short ID, index, or name"),
 	}
 }

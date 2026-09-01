@@ -183,6 +183,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			}
 			filesToPush = append(filesToPush, f)
 		}
+		sortAudioFilesByDuration(filesToPush)
 		if cli.Count > 0 && len(filesToPush) > cli.Count {
 			filesToPush = filesToPush[:cli.Count]
 		}
@@ -192,7 +193,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			}
 			return
 		}
-		if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
+		if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
 			fmt.Fprintf(os.Stderr, "Error pushing batch to remote %s: %v\n", targetHost, err)
 			os.Exit(1)
 		}

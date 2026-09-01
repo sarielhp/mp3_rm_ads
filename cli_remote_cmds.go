@@ -42,6 +42,7 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 				},
 				Options: []clihelp.Option{
 					clihelp.String(&opts.RemoteHost, "--host <host>", "", "Target remote SSH host"),
+					clihelp.Int(&opts.Priority, "-P, --priority <level>", 0, "Priority level for processing (higher priority processed first)"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 				},
@@ -227,7 +228,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 	case "deploy":
 		err = runRemoteDeploy(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "push":
-		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Priority, cli.Quiet, cli.Verbose)
 	case "pull":
 		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "clear", "empty", "purge":
