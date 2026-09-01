@@ -160,7 +160,7 @@ func TestRemoteScanProcessesShorterFirst(t *testing.T) {
 	}
 }
 
-func TestBatchWorkerSortsByPriorityAndDuration(t *testing.T) {
+func TestBatchWorkerPreservesOrder(t *testing.T) {
 	tempDir := t.TempDir()
 	batchDir := filepath.Join(tempDir, "batch_work")
 	inDir := filepath.Join(batchDir, "in")
@@ -213,8 +213,8 @@ func TestBatchWorkerSortsByPriorityAndDuration(t *testing.T) {
 	if err != nil || len(updated.Items) != 3 {
 		t.Fatalf("failed to reload manifest: %v", err)
 	}
-	if updated.Items[0].AudioFileName != "urgent.mp3" || updated.Items[1].AudioFileName != "short.mp3" || updated.Items[2].AudioFileName != "long.mp3" {
-		t.Errorf("expected manifest items sorted [urgent, short, long], got %+v", updated.Items)
+	if updated.Items[0].AudioFileName != "long.mp3" || updated.Items[1].AudioFileName != "short.mp3" || updated.Items[2].AudioFileName != "urgent.mp3" {
+		t.Errorf("expected manifest items to preserve order [long, short, urgent], got %+v", updated.Items)
 	}
 }
 

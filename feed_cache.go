@@ -151,6 +151,25 @@ func parseFeedDate(pubDate string) (int64, string) {
 	if pubDate == "" {
 		return 0, ""
 	}
+
+	tzMap := map[string]string{
+		" PDT": " -0700",
+		" PST": " -0800",
+		" EDT": " -0400",
+		" EST": " -0500",
+		" CDT": " -0500",
+		" CST": " -0600",
+		" MDT": " -0600",
+		" MST": " -0700",
+	}
+	normalizedPubDate := pubDate
+	for tz, offset := range tzMap {
+		if strings.HasSuffix(strings.ToUpper(normalizedPubDate), tz) {
+			normalizedPubDate = normalizedPubDate[:len(normalizedPubDate)-len(tz)] + offset
+			break
+		}
+	}
+
 	dateFormats := []string{
 		time.RFC1123Z,
 		time.RFC1123,
@@ -164,7 +183,7 @@ func parseFeedDate(pubDate string) (int64, string) {
 		"2006-01-02 15:04:05",
 	}
 	for _, layout := range dateFormats {
-		if t, err := time.Parse(layout, pubDate); err == nil {
+		if t, err := time.Parse(layout, normalizedPubDate); err == nil {
 			return t.UnixMilli(), pubDate
 		}
 	}
