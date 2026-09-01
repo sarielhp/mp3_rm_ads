@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"sync"
 	"time"
 )
 
@@ -48,7 +47,7 @@ func handleServerGetInfo(config Config, cli CLIOptions) {
 
 	results := make([]getInfoResult, len(targetPodcasts))
 	sem := make(chan struct{}, 15)
-	var wg sync.WaitGroup
+	var wg syncWG
 
 	for idx, pod := range targetPodcasts {
 		wg.Add(1)

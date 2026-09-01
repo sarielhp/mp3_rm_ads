@@ -7,7 +7,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 	"time"
 )
@@ -27,7 +26,7 @@ type AudioSink struct {
 }
 
 type AudioPlayer struct {
-	mu             sync.Mutex
+	mu             syncMutex
 	Current        *PlayerTrack
 	Queue          []PlayerTrack
 	IsPlaying      bool

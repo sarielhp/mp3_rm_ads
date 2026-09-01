@@ -5,11 +5,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
-	"sync"
 	"time"
 )
 
-var dockerMu sync.Mutex
+var dockerMu syncMutex
 
 type OpenRouterModel struct {
 	ID      string            `json:"id"`
@@ -26,7 +25,7 @@ type OpenRouterResponse struct {
 }
 
 var openRouterModelsCache []OpenRouterModel
-var openRouterCacheMu sync.Mutex
+var openRouterCacheMu syncMutex
 
 func fetchOpenRouterModels() []OpenRouterModel {
 	openRouterCacheMu.Lock()

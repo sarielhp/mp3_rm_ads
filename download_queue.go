@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -34,9 +33,9 @@ type DownloadQueuePersist struct {
 
 var (
 	testDownloadQueuePath string
-	downloadQueueMutex    sync.Mutex
+	downloadQueueMutex    syncMutex
 	downloadWorkerRunning bool
-	downloadWorkerMu      sync.Mutex
+	downloadWorkerMu      syncMutex
 )
 
 func getDownloadQueueFilePath() string {

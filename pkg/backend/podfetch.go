@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -25,7 +24,7 @@ type PodFetchBackend struct {
 	Quiet       bool
 	Verbose     bool
 	httpClient  *http.Client
-	reqMu       sync.Mutex
+	reqMu       syncMutex
 }
 
 func init() {

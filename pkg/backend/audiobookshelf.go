@@ -8,7 +8,6 @@ import (
 	"net/http"
 	"os"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -24,7 +23,7 @@ type AudiobookshelfBackend struct {
 	Quiet       bool
 	Verbose     bool
 	httpClient  *http.Client
-	reqMu       sync.Mutex
+	reqMu       syncMutex
 }
 
 func init() {

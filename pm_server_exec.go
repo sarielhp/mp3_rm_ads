@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -95,7 +94,7 @@ func handleServerCommand(config Config, cli CLIOptions) {
 				resChan := make(chan scanResult, len(podcasts))
 				sem := make(chan struct{}, 10)
 				var completedCount int
-				var countMu sync.Mutex
+				var countMu syncMutex
 
 				for _, item := range podcasts {
 					go func(it PodcastItem) {

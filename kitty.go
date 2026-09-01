@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/eliukblau/pixterm/pkg/ansimage"
 	"golang.org/x/image/draw"
@@ -42,11 +41,11 @@ func isKittySupported() bool {
 
 var (
 	podcastCoverPathCache   = make(map[string]string)
-	podcastCoverPathCacheMu sync.Mutex
+	podcastCoverPathCacheMu syncMutex
 	coverGraphicsCache      = make(map[string]string)
-	coverGraphicsCacheMu    sync.Mutex
+	coverGraphicsCacheMu    syncMutex
 	coverPngMemoryCache     = make(map[string][]byte)
-	coverPngMemoryCacheMu   sync.Mutex
+	coverPngMemoryCacheMu   syncMutex
 )
 
 func clearImageMemoryCache() {

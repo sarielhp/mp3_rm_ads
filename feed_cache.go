@@ -9,7 +9,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 )
 
@@ -35,7 +34,7 @@ func (e *FeedCacheEntry) IsExpired(ttl time.Duration) bool {
 }
 
 type FeedCacheManager struct {
-	mu        sync.RWMutex
+	mu        syncRWMutex
 	cacheFile string
 	entries   map[string]*FeedCacheEntry
 	dirty     bool

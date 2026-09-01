@@ -6,12 +6,11 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"sync"
 	"time"
 )
 
 var (
-	debugLoggerMu sync.Mutex
+	debugLoggerMu syncMutex
 	debugFile     *os.File
 	debugEnabled  bool
 	snapshotSeq   int
