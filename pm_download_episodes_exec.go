@@ -121,5 +121,5 @@ func executeEpisodeDownloads(client *ABSClient, item PodcastItem, episodesToDown
 		applyKeepPolicy(client, itemID, podcastTitle, *keep, dryRun, verbose, quiet)
 	}
 
-	return 0
+	return len(episodesToDownload)
 }
