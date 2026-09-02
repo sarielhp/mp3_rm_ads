@@ -16,7 +16,7 @@
 | `tools/check.rb` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
 | `tools/lint.rb` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
-| `tools/audit_lines.rb` | Audit Go source file lengths against 150-300 target (600 limit) |
+| `tools/audit_lines.rb` | Audit function lengths (80-line limit) and file lengths (800 warn / 1100 limit) |
 | `tools/outline_symbols.rb` | Index all Go types, structs, interfaces, and functions |
 | `tools/show_symbol.rb <sym>` | Display single symbol code block with line numbers |
 | `tools/suggest_split.rb` | Suggest logical file split boundaries for oversized files |
@@ -83,13 +83,42 @@ make checkpoint
 - Run `make bump` to bump, commit, and push version in one silent step
 - The version is not embedded in the Go binary (VERSION file is the source of truth)
 
-## File Sizing
+## Sizing
 
-- **Target**: 150–300 lines per file (~1.5k–3k tokens)
-- **Trigger**: Split into logical units when exceeding 600 lines
-- **Rationale**: Files under 300 lines keep AI agent context focused and reduce
-  diff-drift during AST-based edits. Files over 600 lines cause measurable
-  degradation in edit accuracy and token efficiency.
+Two limits, and they are not equally important. `tools/audit_lines.rb` checks both.
+
+### Functions — hard limit 80 lines
+
+No function may exceed **80 lines**. This is the limit that protects correctness, so
+when it conflicts with anything else, it wins.
+
+Extracting a function is a *semantic* edit: the extracted piece needs a name,
+parameters and return values, and the compiler checks every call site. A control-flow
+statement that goes missing during an extraction becomes a build error — a lost
+`return` fails to compile, and a lost `continue` has no loop left to sit in.
+
+### Files — warn over 800 lines, hard limit 1100
+
+Files should stay comfortably readable, but file length is a *comfort* metric, not a
+correctness one. Keep functions under 80 lines and files land in the 300–500 range on
+their own; the 800-line warning exists to catch the cases where they do not.
+
+### Never split a file through a function body
+
+Splitting a file is a *physical* edit — a byte range is moved to a new file, and
+nothing checks that the control flow survived. Two such splits in this repo's history
+did real damage and both compiled cleanly and passed the gate:
+
+- `c9b68f4` (code-review-002) dropped every `continue` from the batch loop, so a
+  single failing episode silently reprocessed the whole batch.
+- `1c49c7b` (code-review-010) replaced `return len(episodesToDownload)` with
+  `return 0`, so downloads reported that nothing was fetched.
+
+When a file grows past the warning threshold, **decompose its long functions in place**
+and let the file stay long until the decomposition makes a genuine module boundary
+obvious. A file that is only long because one function inside it is long is a function
+problem, not a file problem. `tools/suggest_split.rb` proposes file boundaries — treat
+its output as a hypothesis, and never accept a boundary that falls inside a function.
 
 ## Temp File Policy
 
@@ -118,7 +147,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 - `os/exec` for external commands (ffmpeg, ffprobe, docker)
 - Custom `syncMu` / `syncMutex` / `syncWG` for thread safety (no sync package)
 - All errors are returned; `os.Exit(1)` only in `main()` and fatal helpers
-- Files should be at most 300 lines; split into logical units when exceeding 600 lines
+- Functions must be at most 80 lines; files warn over 800 and are capped at 1100 (see **Sizing**)
 
 ## File Organization
 
@@ -187,8 +216,10 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 6. **Plan Before Build**: For multi-step refactoring or subtle bug fixes, always
    use `plan` mode / consult the `planner` subagent to formulate the exact steps
    before modifying code in `build` mode.
-7. **File Length**: Keep source files between 150-300 lines. Split large structs
-   across sibling files in the same package when exceeding 600 lines.
+7. **Function Length**: No function over 80 lines — decompose it in place, into
+   named helpers in the same file. Files warn at 800 lines and are capped at 1100.
+   Never split a file through a function body: that edit is unchecked by the
+   compiler and has silently dropped control flow here twice (see **Sizing**).
 8. **Commit Messages**: Use conventional commits format:
    `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
 9. **Subdirectory Isolation**: Under no circumstances modify files outside this

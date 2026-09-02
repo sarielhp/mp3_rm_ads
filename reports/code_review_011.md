@@ -668,3 +668,99 @@ onto one path (**H-15** — verified still reproducible on the final tree); `abs
 exits 0 on failure (**H-14** — the signal handler and `_ = hasError` are untouched); and
 the 55 ghost tests (**H-17**) are still not compiled in. `processSingleAudioFile` remains a
 ~320-line function with no seam for its five external effects.
+
+---
+
+## 10. Architecture assessment — sound; do not rewrite
+
+Asked directly whether the architecture is sound or should be rewritten, the answer is
+**sound**. Nothing found in this review argues for a rewrite. The two critical defects and
+most of the high ones were produced by the *file-splitting process*, not by the design, and
+that process is a rule in `AGENTS.md` — changeable in an afternoon, which is what §10.4
+records doing.
+
+### 10.1 What is genuinely good
+
+**`pkg/backend` is a real boundary.** A `Backend` interface with two implementations
+(Audiobookshelf and Podfetch), imported by exactly four files — `backend_client.go`,
+`pm_types.go`, `tui_data_abs.go`, `clean_orphans_test.go`. That is a well-drawn seam;
+adding a third backend would not ripple.
+
+**`RemoteTransport` is the other one.** Because SSH and rsync sit behind an interface with
+an injectable `currentTransport` (`remote_transport.go:84`), every remote code path in this
+review was testable without contacting `cloud8` — which was a hard Phase 0 constraint.
+Very little of this codebase's size is normally that testable.
+
+**The pipeline stages are separable.** download → transcribe → detect → cut are distinct
+functions with explicit inputs and outputs. That is why the ad-bounds sanitiser
+(`sanitizeAdSegments`) and the keep-fraction guard (`keepFractionIsPlausible`) each dropped
+in at a single choke point rather than needing to be threaded through call sites.
+
+**Coupling is lower than "185 files in one package" suggests.** 21 package-level mutable
+globals across ~33.4k lines, and only 13 non-test files reference config loading at all.
+
+### 10.2 What is actually wrong — none of it structural
+
+**1. The 600-line file cap was the most damaging rule in the repo.** It was enforced on
+*files*; `AGENTS.md` set no limit on functions at all, which is exactly backwards. Both
+critical defects came from it directly (`c9b68f4`, `1c49c7b` — see C-1 and H-1). Meanwhile
+`processSingleAudioFile` was 335 lines and 61 non-test functions exceed 80 lines — all
+fully compliant under the old rule. The file pairs it produced (`pm_download_episodes.go` +
+`pm_download_episodes_exec.go`, `pm_server_exec.go` + `pm_server_exec2.go`) are not modules;
+`_exec2` is a name that admits it.
+
+**2. Flat `main` means no compiler-enforced boundaries.** Nothing is unexported-by-package,
+so all 21 globals are reachable from all 185 files. That is exactly how the two data races
+introduced *during this fix pass* (`configLoadFailed`, `configFileSnapshot`) were possible
+to write; only the newly added `-race` gate caught them.
+
+**3. Presentation is welded to logic.** 48 non-test files write to stdout or stderr, and
+business functions print directly. This is why `updateEpisodeStatus` could swallow errors
+undetected for so long (fixed in this pass), and why `downloadPodcastEpisodes` needs 14
+parameters — two of which are `verbose` and `quiet`.
+
+**4. Housekeeping.** `pkg/backend/audiobookshelf.go.orig` is a tracked merge artifact,
+committed in `154ed58` ("squash changes from code-review-008") and never noticed since.
+
+### 10.3 What to do instead of a rewrite
+
+1. **Change the sizing rule from files to functions.** Done — see §10.4.
+2. **Extract 3–4 packages from `main`,** in order: `player`, `remote`, `pipeline`, `tui`.
+   Each already has a de-facto prefix namespace (`tui_*` alone is 27 non-test files), so
+   this converts a naming convention into a boundary the compiler enforces — and would have
+   made both of the races in §10.2 unwriteable.
+3. **Push printing to the edges** — return errors, format at the CLI and TUI layer.
+
+A rewrite would discard the two best things here (`Backend`, `RemoteTransport`), re-earn
+the defects this pass fixed, and leave the actual cause — mechanical file splitting under a
+length rule — entirely intact.
+
+### 10.4 The sizing rule, as changed
+
+`AGENTS.md` and `tools/audit_lines.rb` now enforce:
+
+| | Old | New |
+|---|---|---|
+| Function length | *no limit* | hard limit **80 lines** |
+| File length | target 150–300, "split" at 600 | warn at **800**, hard limit **1100** |
+
+The rationale, recorded in both files: splitting a file is a **physical** edit — a byte
+range moves and nothing verifies the control flow survived, which is how both critical
+defects shipped compiling and passing the gate. Extracting a function is a **semantic**
+edit — the piece needs a name, parameters and returns, and the compiler checks every call
+site, so a dropped `return` fails to build and a dropped `continue` has no loop to sit in.
+When the two limits conflict, the function limit wins: decompose in place, never cut a file
+through a function body.
+
+`audit_lines.rb` was rewritten accordingly. It now reports functions first, names each
+offender as `file:line func()`, and `--strict` fails on either a file or a function
+violation. Against the current tree: **0 files** over 800 (so the file limits are slack by
+design, per the request to keep files from growing without bound) and **61 non-test
+functions** over 80 lines — 73 including tests, visible with `--include-tests`.
+
+That 61-function backlog is real, but every item on it is a safe, compiler-checked
+refactor. The backlog the old rule produced was the opposite: already-completed *unsafe*
+edits, two of which shipped bugs. Note also that `tools/check.rb:80` and `tools/lint.rb:23`
+still invoke the audit with `--quiet` only, never `--strict` (H-11), so the new function
+limit reports but does not yet fail the gate — turning that on is a separate decision,
+since it would make the gate red until the backlog is worked down.
