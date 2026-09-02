@@ -46,11 +46,7 @@ func UpdateEpisodeInTx(tx *sql.Tx, episodeID string, diskDuration float64, hostP
 	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05.000 +00:00")
 	updateQuery := "UPDATE podcastEpisodes SET audioFile = ?, updatedAt = ? WHERE id = ?;"
 	_, err = tx.Exec(updateQuery, string(newJSON), nowStr, episodeID)
-	if err != nil {
-		return false
-	}
-
-	return true
+	return err == nil
 }
 
 func (c *AudiobookshelfBackend) Rescan(opts RescanOptions) (RescanResult, error) {

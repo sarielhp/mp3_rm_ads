@@ -148,7 +148,7 @@ func processSingleScannedAudio(audioFile, resolvedDir, hostname, donePath string
 
 	st.Ads = make([]EpisodeAdCut, 0, len(adSegments))
 	for _, ad := range adSegments {
-		st.Ads = append(st.Ads, EpisodeAdCut{Start: ad.Start, End: ad.End, Reason: ad.Reason})
+		st.Ads = append(st.Ads, EpisodeAdCut(ad))
 	}
 
 	cutsResult := saveCutsJSON(audioFile, origDuration, adSegments, &profile, quiet)

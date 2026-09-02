@@ -308,7 +308,7 @@ func updateEpisodeStatusAfterCut(mainMP3File, precutFile, outputFile string, adS
 		}
 		st.Ads = make([]EpisodeAdCut, 0, len(adSegments))
 		for _, ad := range adSegments {
-			st.Ads = append(st.Ads, EpisodeAdCut{Start: ad.Start, End: ad.End, Reason: ad.Reason})
+			st.Ads = append(st.Ads, EpisodeAdCut(ad))
 		}
 	})
 }
