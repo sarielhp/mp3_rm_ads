@@ -27,31 +27,15 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 	if cfg != nil {
 		defaultDir = cfg.PodcastsDir
 	}
-	files := findAudioFilesForRemote(args, defaultDir)
-	if len(files) == 0 {
-		return fmt.Errorf("no audio (.mp3) files found to push for batch processing")
+
+	toPush, err := resolveFilesToPush(args, defaultDir, quiet)
+	if err != nil || len(toPush) == 0 {
+		return err
 	}
 
 	remoteWorkDir := "~/abs_remote"
 	if cfg != nil && cfg.RemoteWorkDir != "" {
 		remoteWorkDir = cfg.RemoteWorkDir
-	}
-
-	var toPush []string
-	for _, f := range files {
-		if !isEpisodeCompleted(f) && !isEpisodeInRemoteFlight(f) {
-			toPush = append(toPush, f)
-		}
-	}
-	if len(toPush) == 0 {
-		if len(args) > 0 && len(files) > 0 {
-			toPush = files
-		} else {
-			if !quiet {
-				fmt.Println("All audio files are already completed or currently queued/processing remotely.")
-			}
-			return nil
-		}
 	}
 
 	if priority > 0 {
@@ -74,40 +58,9 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 
 	pushedCount := 0
 	for _, f := range toPush {
-		relPath, _ := computeRelativeMediaDir(defaultDir, f)
-		remoteDstDir := fmt.Sprintf("%s/%s", remoteWorkDir, filepath.Dir(relPath))
-		remoteDstFile := fmt.Sprintf("%s/%s", remoteWorkDir, relPath)
-		remoteDstStatus := fmt.Sprintf("%s/%s.json", remoteWorkDir, relPath)
-
-		mkdirCmd := fmt.Sprintf("mkdir -p %s", shellQuoteHomePath(remoteDstDir))
-		_, _ = transport.Exec(targetHost, mkdirCmd)
-
-		localStat := getOrCreateEpisodeStatus(f)
-		localStat.Status = StateQueuedRemote
-		if priority > 0 {
-			localStat.Priority = priority
+		if err := pushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost, priority, transport); err != nil {
+			return err
 		}
-		_ = saveEpisodeStatus(statusPathFor(f), localStat)
-
-		remoteStat := *localStat
-		remoteStat.Status = StateAwaitingTranscription
-		remoteStat.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-		if priority > 0 {
-			remoteStat.Priority = priority
-		}
-
-		tmpStatPath := filepath.Join(os.TempDir(), fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
-		_ = saveEpisodeStatus(tmpStatPath, &remoteStat)
-
-		if err := transport.Upload(targetHost, f, remoteDstFile); err != nil {
-			_ = os.Remove(tmpStatPath)
-			return fmt.Errorf("failed to upload audio %s to %s: %w", f, targetHost, err)
-		}
-		if err := transport.Upload(targetHost, tmpStatPath, remoteDstStatus); err != nil {
-			_ = os.Remove(tmpStatPath)
-			return fmt.Errorf("failed to upload status file for %s to %s: %w", f, targetHost, err)
-		}
-		_ = os.Remove(tmpStatPath)
 		pushedCount++
 	}
 
@@ -119,6 +72,69 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 	}
 
 	return ensureRemoteEnvironmentAndWorker(cfg, targetHost, remoteWorkDir, transport, quiet)
+}
+
+func resolveFilesToPush(args []string, defaultDir string, quiet bool) ([]string, error) {
+	files := findAudioFilesForRemote(args, defaultDir)
+	if len(files) == 0 {
+		return nil, fmt.Errorf("no audio (.mp3) files found to push for batch processing")
+	}
+
+	var toPush []string
+	for _, f := range files {
+		if !isEpisodeCompleted(f) && !isEpisodeInRemoteFlight(f) {
+			toPush = append(toPush, f)
+		}
+	}
+	if len(toPush) == 0 {
+		if len(args) > 0 && len(files) > 0 {
+			toPush = files
+		} else {
+			if !quiet {
+				fmt.Println("All audio files are already completed or currently queued/processing remotely.")
+			}
+			return nil, nil
+		}
+	}
+	return toPush, nil
+}
+
+func pushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priority int, transport RemoteTransport) error {
+	relPath, _ := computeRelativeMediaDir(defaultDir, f)
+	remoteDstDir := fmt.Sprintf("%s/%s", remoteWorkDir, filepath.Dir(relPath))
+	remoteDstFile := fmt.Sprintf("%s/%s", remoteWorkDir, relPath)
+	remoteDstStatus := fmt.Sprintf("%s/%s.json", remoteWorkDir, relPath)
+
+	mkdirCmd := fmt.Sprintf("mkdir -p %s", shellQuoteHomePath(remoteDstDir))
+	_, _ = transport.Exec(targetHost, mkdirCmd)
+
+	localStat := getOrCreateEpisodeStatus(f)
+	localStat.Status = StateQueuedRemote
+	if priority > 0 {
+		localStat.Priority = priority
+	}
+	_ = saveEpisodeStatus(statusPathFor(f), localStat)
+
+	remoteStat := *localStat
+	remoteStat.Status = StateAwaitingTranscription
+	remoteStat.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	if priority > 0 {
+		remoteStat.Priority = priority
+	}
+
+	tmpStatPath := filepath.Join(os.TempDir(), fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
+	_ = saveEpisodeStatus(tmpStatPath, &remoteStat)
+
+	if err := transport.Upload(targetHost, f, remoteDstFile); err != nil {
+		_ = os.Remove(tmpStatPath)
+		return fmt.Errorf("failed to upload audio %s to %s: %w", f, targetHost, err)
+	}
+	if err := transport.Upload(targetHost, tmpStatPath, remoteDstStatus); err != nil {
+		_ = os.Remove(tmpStatPath)
+		return fmt.Errorf("failed to upload status file for %s to %s: %w", f, targetHost, err)
+	}
+	_ = os.Remove(tmpStatPath)
+	return nil
 }
 
 func ensureRemoteEnvironmentAndWorker(cfg *Config, targetHost string, remoteWorkDir string, transport RemoteTransport, quiet bool) error {
@@ -149,6 +165,13 @@ func ensureRemoteEnvironmentAndWorker(cfg *Config, targetHost string, remoteWork
 		return fmt.Errorf("remote host '%s' is unreachable via SSH", targetHost)
 	}
 
+	checkWhisperServiceReadiness(cfg, targetHost, transport, quiet)
+	startRemoteWorkerProcess(targetHost, remoteWorkDir, transport, quiet)
+	verifyRemoteWorkerStartup(targetHost, remoteWorkDir, transport, quiet)
+	return nil
+}
+
+func checkWhisperServiceReadiness(cfg *Config, targetHost string, transport RemoteTransport, quiet bool) {
 	if !quiet {
 		fmt.Printf("[+] Checking Faster-Whisper container on %s...\n", targetHost)
 	}
@@ -198,7 +221,9 @@ fi
 	} else if !quiet {
 		fmt.Printf("[✓] Faster-Whisper service is ready on %s.\n", targetHost)
 	}
+}
 
+func startRemoteWorkerProcess(targetHost, remoteWorkDir string, transport RemoteTransport, quiet bool) {
 	triggerFile := fmt.Sprintf("%s/.scan_trigger", remoteWorkDir)
 	_, _ = transport.Exec(targetHost, fmt.Sprintf("touch %s", triggerFile))
 
@@ -211,7 +236,9 @@ fi
 		altCmd := fmt.Sprintf("nohup abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
+}
 
+func verifyRemoteWorkerStartup(targetHost, remoteWorkDir string, transport RemoteTransport, quiet bool) {
 	if !quiet {
 		fmt.Printf("[+] Verifying remote conversion startup on %s...\n", targetHost)
 	}
@@ -260,6 +287,4 @@ fi
 			fmt.Printf("[-] Notice: Remote worker was launched on %s (check status with: abs remote status %s).\n", targetHost, targetHost)
 		}
 	}
-
-	return nil
 }

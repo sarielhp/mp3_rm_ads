@@ -47,42 +47,27 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 		fmt.Println("ERROR: whisper_url is not configured in config file.")
 		return false
 	}
-
 	if !quiet {
 		fmt.Printf("Testing whisper server at: %s\n", whisperURL)
 	}
 
-	pcmData := make([]byte, 3200)
-	header := buildWavHeader(len(pcmData))
-	audioContent := append(header, pcmData...)
-
 	var lastErr error
 	var lastStatus int
 	var lastResponseBody string
-
 	client := &http.Client{Timeout: 10 * time.Second}
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
 		wakeWhisperServer(whisperURL, wakeCmd, true)
+		bodyData, contentType := buildTestWavPayload()
 
-		boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
-		var buf bytes.Buffer
-		w := multipart.NewWriter(&buf)
-		w.SetBoundary(boundary)
-		fw, _ := w.CreateFormFile("file", "test.wav")
-		fw.Write(audioContent)
-		w.WriteField("response_format", "verbose_json")
-		w.WriteField("temperature", "0.0")
-		w.Close()
-
-		req, err := http.NewRequest("POST", whisperURL, &buf)
+		req, err := http.NewRequest("POST", whisperURL, bytes.NewReader(bodyData))
 		if err != nil {
 			if !quiet {
 				fmt.Printf("ERROR: Failed to create request: %v\n", err)
 			}
 			return false
 		}
-		req.Header.Set("Content-Type", w.FormDataContentType())
+		req.Header.Set("Content-Type", contentType)
 
 		resp, err := client.Do(req)
 		if err != nil {
@@ -127,4 +112,22 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 		fmt.Printf("FAIL: Server at '%s' returned status %d after %d attempt(s): %s\n", whisperURL, lastStatus, maxRetries, lastResponseBody)
 	}
 	return false
+}
+
+func buildTestWavPayload() ([]byte, string) {
+	pcmData := make([]byte, 3200)
+	header := buildWavHeader(len(pcmData))
+	audioContent := append(header, pcmData...)
+
+	boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
+	var buf bytes.Buffer
+	w := multipart.NewWriter(&buf)
+	w.SetBoundary(boundary)
+	fw, _ := w.CreateFormFile("file", "test.wav")
+	fw.Write(audioContent)
+	w.WriteField("response_format", "verbose_json")
+	w.WriteField("temperature", "0.0")
+	w.Close()
+
+	return buf.Bytes(), w.FormDataContentType()
 }

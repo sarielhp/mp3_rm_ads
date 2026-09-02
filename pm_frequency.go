@@ -82,10 +82,40 @@ func loadCachedFeedEpisodes(podDir string) []FeedEpisode {
 }
 
 func handleServerFrequency(config Config, cli CLIOptions) {
-	client, err := getABSClient(config, cli.Quiet)
-	var targetItems []PodcastItem
+	client, _ := getABSClient(config, cli.Quiet)
+	targetItems := collectFrequencyTargetItems(config, cli, client)
 
-	if err == nil && client != nil {
+	if len(targetItems) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No podcasts found to analyze.")
+		}
+		return
+	}
+
+	shouldDisable := cli.ServerSubcmd == "disable_hourly" || cli.DisableHourly
+	if !cli.Quiet {
+		desc := "Analyzing podcast release frequency"
+		if shouldDisable {
+			desc = "Analyzing podcast frequency and updating hourly policies"
+		}
+		fmt.Printf("\n%s (%d podcast(s))...\n\n", desc, len(targetItems))
+	}
+
+	results := make([]podcastFreqResult, len(targetItems))
+	for i, item := range targetItems {
+		results[i] = processSingleFrequencyItem(client, item, config, cli, shouldDisable)
+	}
+
+	_ = globalFeedCache.Save()
+
+	if !cli.Quiet {
+		printFrequencyTable(results, cli.Verbose, shouldDisable)
+	}
+}
+
+func collectFrequencyTargetItems(config Config, cli CLIOptions, client *ABSClient) []PodcastItem {
+	var targetItems []PodcastItem
+	if client != nil {
 		if podcasts, pErr := client.PodcastItems(); pErr == nil {
 			if cli.Podcast != "" {
 				if matched := matchPodcast(podcasts, cli.Podcast); matched != nil {
@@ -122,66 +152,43 @@ func handleServerFrequency(config Config, cli CLIOptions) {
 			}
 		}
 	}
+	return targetItems
+}
 
-	if len(targetItems) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No podcasts found to analyze.")
-		}
-		return
+func processSingleFrequencyItem(client *ABSClient, item PodcastItem, config Config, cli CLIOptions, shouldDisable bool) podcastFreqResult {
+	title := item.Media.Metadata.Title
+	if title == "" {
+		title = item.ID
+	}
+	eps, epErr := getEpisodesForFrequency(client, item, config.PodcastsDir, cli.Refresh)
+	if epErr != nil {
+		return podcastFreqResult{title: title, item: item, err: epErr}
 	}
 
-	shouldDisable := cli.ServerSubcmd == "disable_hourly" || cli.DisableHourly
-	if !cli.Quiet {
-		desc := "Analyzing podcast release frequency"
-		if shouldDisable {
-			desc = "Analyzing podcast frequency and updating hourly policies"
-		}
-		fmt.Printf("\n%s (%d podcast(s))...\n\n", desc, len(targetItems))
-	}
+	freq := analyzePodcastFrequency(eps)
+	podDir := findPodcastDirForItem(item, config.PodcastsDir)
+	disabled, saved := false, false
 
-	results := make([]podcastFreqResult, len(targetItems))
-	for i, item := range targetItems {
-		title := item.Media.Metadata.Title
-		if title == "" {
-			title = item.ID
+	if podDir != "" {
+		cfg := loadPodcastConfig(podDir)
+		cfg.Frequency = &freq
+		if shouldDisable && freq.Type == string(CadenceHourly) {
+			cfg.DownloadPolicy = DownloadPolicyNone
+			cfg.AdRemoval = AdRemovalNone
+			disabled = true
 		}
-		eps, epErr := getEpisodesForFrequency(client, item, config.PodcastsDir, cli.Refresh)
-		if epErr != nil {
-			results[i] = podcastFreqResult{title: title, item: item, err: epErr}
-			continue
-		}
-
-		freq := analyzePodcastFrequency(eps)
-		podDir := findPodcastDirForItem(item, config.PodcastsDir)
-		disabled, saved := false, false
-
-		if podDir != "" {
-			cfg := loadPodcastConfig(podDir)
-			cfg.Frequency = &freq
-			if shouldDisable && freq.Type == string(CadenceHourly) {
-				cfg.DownloadPolicy = DownloadPolicyNone
-				cfg.AdRemoval = AdRemovalNone
-				disabled = true
-			}
-			if sErr := savePodcastConfig(podDir, cfg); sErr == nil {
-				saved = true
-			}
-		}
-
-		results[i] = podcastFreqResult{
-			title:       title,
-			item:        item,
-			freq:        freq,
-			podDir:      podDir,
-			disabled:    disabled,
-			policySaved: saved,
+		if sErr := savePodcastConfig(podDir, cfg); sErr == nil {
+			saved = true
 		}
 	}
 
-	_ = globalFeedCache.Save()
-
-	if !cli.Quiet {
-		printFrequencyTable(results, cli.Verbose, shouldDisable)
+	return podcastFreqResult{
+		title:       title,
+		item:        item,
+		freq:        freq,
+		podDir:      podDir,
+		disabled:    disabled,
+		policySaved: saved,
 	}
 }
 
@@ -222,7 +229,6 @@ func printFrequencyTable(results []podcastFreqResult, verbose bool, disableMode 
 	fmt.Printf("  %-3s │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
 		"#", "Podcast", "Analyzed", "Episodes/Wk", "Median Int", "Status")
 	doubleDivider := strings.Repeat("═", 98)
-	sectionDivider := strings.Repeat("─", 98)
 	fmt.Println("  " + doubleDivider)
 
 	globalIdx := 1
@@ -231,66 +237,11 @@ func printFrequencyTable(results []podcastFreqResult, verbose bool, disableMode 
 		if len(list) == 0 {
 			continue
 		}
-
-		headerTitle := fmt.Sprintf("─── %s (%d podcast%s) ", g.title, len(list), func() string {
-			if len(list) == 1 {
-				return ""
-			}
-			return "s"
-		}())
-		if len(headerTitle) < 98 {
-			headerTitle += strings.Repeat("─", 98-len(headerTitle))
-		}
-		fmt.Println("  " + headerTitle)
-
-		for _, r := range list {
-			status := "saved"
-			if r.disabled {
-				status = "disabled (none)"
-			} else if r.freq.Type == string(CadenceHourly) && !disableMode {
-				status = "hourly (active)"
-			}
-
-			epWk := fmt.Sprintf("%.1f/wk", r.freq.EpisodesPerWeek)
-			if r.freq.EpisodesPerWeek == 0 && r.freq.Type == string(CadenceIntermittent) {
-				epWk = "-"
-			}
-
-			medInt := fmt.Sprintf("%.1fh", r.freq.MedianHoursInterval)
-			if r.freq.MedianHoursInterval >= 48.0 {
-				medInt = fmt.Sprintf("%.1fd", r.freq.MedianHoursInterval/24.0)
-			} else if r.freq.MedianHoursInterval == 0 && r.freq.Type == string(CadenceIntermittent) {
-				medInt = "-"
-			}
-
-			epsStr := fmt.Sprintf("%d eps", r.freq.EpisodesAnalyzed)
-			fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
-				globalIdx, truncate(displayName(r.title), 38), epsStr, epWk, medInt, status)
-			globalIdx++
-
-			if verbose {
-				fmt.Printf("       ↳ Span: %.1fd | Avg Interval: %.1fd | Median: %.1fh | Analyzed: %s\n",
-					r.freq.AvgDaysInterval*float64(max(1, r.freq.EpisodesAnalyzed-1)),
-					r.freq.AvgDaysInterval,
-					r.freq.MedianHoursInterval,
-					r.freq.AnalyzedAt.Format("2006-01-02 15:04:05 UTC"))
-			}
-		}
-		fmt.Println("  " + sectionDivider)
+		printCadenceGroup(g.title, list, &globalIdx, verbose, disableMode)
 	}
 
 	if len(errors) > 0 {
-		headerTitle := fmt.Sprintf("─── ERRORS (%d) ", len(errors))
-		if len(headerTitle) < 98 {
-			headerTitle += strings.Repeat("─", 98-len(headerTitle))
-		}
-		fmt.Println("  " + headerTitle)
-		for _, r := range errors {
-			fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
-				globalIdx, truncate(displayName(r.title), 38), "-", "-", "-", r.err.Error())
-			globalIdx++
-		}
-		fmt.Println("  " + sectionDivider)
+		printFrequencyErrors(errors, &globalIdx)
 	}
 
 	fmt.Println("  " + doubleDivider)
@@ -300,4 +251,66 @@ func printFrequencyTable(results []podcastFreqResult, verbose bool, disableMode 
 	} else {
 		fmt.Println()
 	}
+}
+
+func printCadenceGroup(groupTitle string, list []podcastFreqResult, globalIdx *int, verbose, disableMode bool) {
+	headerTitle := fmt.Sprintf("─── %s (%d podcast%s) ", groupTitle, len(list), func() string {
+		if len(list) == 1 {
+			return ""
+		}
+		return "s"
+	}())
+	if len(headerTitle) < 98 {
+		headerTitle += strings.Repeat("─", 98-len(headerTitle))
+	}
+	fmt.Println("  " + headerTitle)
+
+	for _, r := range list {
+		status := "saved"
+		if r.disabled {
+			status = "disabled (none)"
+		} else if r.freq.Type == string(CadenceHourly) && !disableMode {
+			status = "hourly (active)"
+		}
+
+		epWk := fmt.Sprintf("%.1f/wk", r.freq.EpisodesPerWeek)
+		if r.freq.EpisodesPerWeek == 0 && r.freq.Type == string(CadenceIntermittent) {
+			epWk = "-"
+		}
+
+		medInt := fmt.Sprintf("%.1fh", r.freq.MedianHoursInterval)
+		if r.freq.MedianHoursInterval >= 48.0 {
+			medInt = fmt.Sprintf("%.1fd", r.freq.MedianHoursInterval/24.0)
+		} else if r.freq.MedianHoursInterval == 0 && r.freq.Type == string(CadenceIntermittent) {
+			medInt = "-"
+		}
+
+		epsStr := fmt.Sprintf("%d eps", r.freq.EpisodesAnalyzed)
+		fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
+			*globalIdx, truncate(displayName(r.title), 38), epsStr, epWk, medInt, status)
+		*globalIdx++
+
+		if verbose {
+			fmt.Printf("       ↳ Span: %.1fd | Avg Interval: %.1fd | Median: %.1fh | Analyzed: %s\n",
+				r.freq.AvgDaysInterval*float64(max(1, r.freq.EpisodesAnalyzed-1)),
+				r.freq.AvgDaysInterval,
+				r.freq.MedianHoursInterval,
+				r.freq.AnalyzedAt.Format("2006-01-02 15:04:05 UTC"))
+		}
+	}
+	fmt.Println("  " + strings.Repeat("─", 98))
+}
+
+func printFrequencyErrors(errors []podcastFreqResult, globalIdx *int) {
+	headerTitle := fmt.Sprintf("─── ERRORS (%d) ", len(errors))
+	if len(headerTitle) < 98 {
+		headerTitle += strings.Repeat("─", 98-len(headerTitle))
+	}
+	fmt.Println("  " + headerTitle)
+	for _, r := range errors {
+		fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
+			*globalIdx, truncate(displayName(r.title), 38), "-", "-", "-", r.err.Error())
+		*globalIdx++
+	}
+	fmt.Println("  " + strings.Repeat("─", 98))
 }

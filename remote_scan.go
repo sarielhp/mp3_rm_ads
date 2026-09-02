@@ -57,10 +57,8 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 	}
 
 	triggerPath := filepath.Join(resolvedDir, ".scan_trigger")
-	if ifDirty {
-		if !fileExists(triggerPath) {
-			return nil
-		}
+	if ifDirty && !fileExists(triggerPath) {
+		return nil
 	}
 	_ = os.Remove(triggerPath)
 
@@ -81,17 +79,7 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 	hostname, _ := os.Hostname()
 
 	for {
-		files := scanAudioFiles(resolvedDir)
-		var pendingFiles []string
-		for _, audioFile := range files {
-			statPath := statusPathFor(audioFile)
-			st, _ := loadEpisodeStatus(statPath)
-			if st != nil && (st.Status == StateReadyForCopyBack || st.Status == StateDone || st.Status == StateArchived || st.Status == StateCopiedBack || st.Status == StateFailed) {
-				continue
-			}
-			pendingFiles = append(pendingFiles, audioFile)
-		}
-
+		pendingFiles := collectPendingAudioFiles(resolvedDir)
 		if len(pendingFiles) == 0 {
 			if !quiet && processedCount == 0 {
 				fmt.Printf("Scan complete: No pending audio files found in %s.\n", resolvedDir)
@@ -102,161 +90,8 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		sortAudioFilesByDuration(pendingFiles)
 		audioFile := pendingFiles[0]
 
-		statPath := statusPathFor(audioFile)
-		st, _ := loadEpisodeStatus(statPath)
-
-		relPath, _ := filepath.Rel(resolvedDir, audioFile)
-		if relPath == "" || strings.HasPrefix(relPath, "..") {
-			relPath = filepath.Base(audioFile)
-		}
-
-		origDuration := getAudioDuration(audioFile)
-		if origDuration <= 0 {
-			origDuration = getMP3DiskDuration(audioFile)
-		}
-		origSize := int64(0)
-		if fi, err := os.Stat(audioFile); err == nil {
-			origSize = fi.Size()
-		}
-
-		if st == nil {
-			st = &EpisodeStatusFile{
-				Version:   1,
-				MediaFile: filepath.Base(audioFile),
-				Status:    StateAwaitingTranscription,
-				CreatedAt: time.Now().UTC().Format(time.RFC3339),
-				UpdatedAt: time.Now().UTC().Format(time.RFC3339),
-				Original: EpisodeAudioMeta{
-					Filename:    filepath.Base(audioFile),
-					DurationSec: origDuration,
-					SizeBytes:   origSize,
-				},
-			}
-		}
-
-		st.Status = StateTranscribingRemotely
-		st.CurrentStep = "Step 1/3: Whisper Transcription"
-		st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
-		st.WorkerHost = hostname
-		st.Original.DurationSec = origDuration
-		_ = saveEpisodeStatus(statPath, st)
-
-		if !quiet {
-			fmt.Printf("Scanning & Processing: %s (Length: %s, %.1fs)\n", relPath, formatClock(origDuration), origDuration)
-		}
-
-		baseName := stripExt(audioFile)
-		transcriptJSON := baseName + ".transcript.json"
-		speedFactor := cfg.WhisperSpeedFactor
-		if speedFactor <= 0 {
-			speedFactor = 4.5
-		}
-
-		t0 := time.Now()
-		isNewlyTranscribed := false
-		cliOpts := CLIOptions{
-			SaveTranscript: true,
-			Quiet:          quiet,
-			Verbose:        verbose,
-		}
-
-		transData, err := loadOrTranscribe(audioFile, transcriptJSON, *cfg, cliOpts, profile, origDuration, speedFactor, cfg.WhisperLanguage, cfg.WhisperPrompt, map[string]string{}, &isNewlyTranscribed, &t0)
-		if err != nil {
-			st.Status = StateFailed
-			st.LastError = fmt.Sprintf("transcription error: %v", err)
-			_ = saveEpisodeStatus(statPath, st)
-			continue
-		}
-
-		saveJSONTranscript(audioFile, transData, transcriptJSON, quiet, map[string]string{})
-
-		st.CurrentStep = "Step 2/3: LLM Ad Detection"
-		st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
-		_ = saveEpisodeStatus(statPath, st)
-
-		formattedTranscript := formatTranscript(transData, origDuration)
-		adSegments := detectAdsLLM(formattedTranscript, profile)
-		if len(adSegments) > 0 {
-			adSegments = mergeIntervals(adSegments)
-		}
-
-		st.Ads = make([]EpisodeAdCut, 0, len(adSegments))
-		for _, ad := range adSegments {
-			st.Ads = append(st.Ads, EpisodeAdCut{
-				Start:  ad.Start,
-				End:    ad.End,
-				Reason: ad.Reason,
-			})
-		}
-
-		cutsResult := saveCutsJSON(audioFile, origDuration, adSegments, &profile, quiet)
-		keepSegments := cutsResult.KeepSegments
-
-		cleanDuration := origDuration
-		cleanSize := origSize
-
-		if len(adSegments) > 0 && len(keepSegments) > 0 {
-			st.Status = StateCuttingRemotely
-			st.CurrentStep = "Step 3/3: FFmpeg Audio Cutting"
-			st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
-			_ = saveEpisodeStatus(statPath, st)
-
-			workDir := workDirFor(audioFile)
-			_ = os.MkdirAll(workDir, 0755)
-			tempOut := filepath.Join(workDir, filepath.Base(audioFile)+".tmp.mp3")
-			verifyTempFile(tempOut)
-
-			if cutAudioFFmpeg(audioFile, keepSegments, tempOut) {
-				precutPath := audioFile + ".precut"
-				installed := true
-				if !fileExists(precutPath) {
-					checkPrecutSymlink(precutPath)
-					if mvErr := safeMove(audioFile, precutPath); mvErr != nil {
-						fmt.Fprintf(os.Stderr, "Error: could not preserve the original for %s: %v\n", audioFile, mvErr)
-						installed = false
-					}
-				}
-				if installed {
-					if mvErr := safeMove(tempOut, audioFile); mvErr != nil {
-						fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", audioFile, mvErr)
-					} else {
-						cleanDuration = getAudioDuration(audioFile)
-						if fi, err := os.Stat(audioFile); err == nil {
-							cleanSize = fi.Size()
-						}
-						st.Original.Filename = filepath.Base(precutPath)
-					}
-				}
-			}
-			_ = os.RemoveAll(workDir)
-		}
-
-		st.Cleaned = EpisodeAudioMeta{
-			Filename:      filepath.Base(audioFile),
-			DurationSec:   cleanDuration,
-			SizeBytes:     cleanSize,
-			AdDurationSec: origDuration - cleanDuration,
-		}
-		st.Status = StateReadyForCopyBack
-		st.LastError = ""
-		_ = saveEpisodeStatus(statPath, st)
-
-		doneItem := RemoteDoneItem{
-			RelPath:             relPath,
-			Status:              StateReadyForCopyBack,
-			OriginalDurationSec: origDuration,
-			CleanedDurationSec:  cleanDuration,
-			CutDurationSec:      origDuration - cleanDuration,
-			OriginalSizeBytes:   origSize,
-			CleanedSizeBytes:    cleanSize,
-			CompletedAt:         time.Now().UTC().Format(time.RFC3339),
-			WorkerHost:          hostname,
-		}
-		_ = addDoneEpisode(donePath, doneItem)
-		processedCount++
-
-		if !quiet {
-			fmt.Printf("✓ Finished %s (Saved %.1fs, Ready for copy back)\n", relPath, origDuration-cleanDuration)
+		if processSingleScannedAudio(audioFile, resolvedDir, hostname, donePath, cfg, profile, quiet, verbose) {
+			processedCount++
 		}
 	}
 
@@ -264,6 +99,182 @@ func runRemoteScan(cfg *Config, targetDir string, ifDirty bool, quiet, verbose b
 		fmt.Printf("\nScan completed. Processed and queued %d episode(s) in %s/done.json.\n", processedCount, resolvedDir)
 	}
 	return nil
+}
+
+func collectPendingAudioFiles(resolvedDir string) []string {
+	files := scanAudioFiles(resolvedDir)
+	var pendingFiles []string
+	for _, audioFile := range files {
+		statPath := statusPathFor(audioFile)
+		st, _ := loadEpisodeStatus(statPath)
+		if st != nil && (st.Status == StateReadyForCopyBack || st.Status == StateDone || st.Status == StateArchived || st.Status == StateCopiedBack || st.Status == StateFailed) {
+			continue
+		}
+		pendingFiles = append(pendingFiles, audioFile)
+	}
+	return pendingFiles
+}
+
+func processSingleScannedAudio(audioFile, resolvedDir, hostname, donePath string, cfg *Config, profile LLMProfile, quiet, verbose bool) bool {
+	statPath := statusPathFor(audioFile)
+	st, _ := loadEpisodeStatus(statPath)
+
+	relPath, _ := filepath.Rel(resolvedDir, audioFile)
+	if relPath == "" || strings.HasPrefix(relPath, "..") {
+		relPath = filepath.Base(audioFile)
+	}
+
+	origDuration := getAudioDuration(audioFile)
+	if origDuration <= 0 {
+		origDuration = getMP3DiskDuration(audioFile)
+	}
+	origSize := int64(0)
+	if fi, err := os.Stat(audioFile); err == nil {
+		origSize = fi.Size()
+	}
+
+	st = initRemoteScanStatus(audioFile, hostname, origDuration, origSize, st, statPath)
+	if !quiet {
+		fmt.Printf("Scanning & Processing: %s (Length: %s, %.1fs)\n", relPath, formatClock(origDuration), origDuration)
+	}
+
+	_, adSegments, err := transcribeAndDetectAdsRemoteScan(audioFile, origDuration, cfg, profile, quiet, verbose)
+	if err != nil {
+		st.Status = StateFailed
+		st.LastError = fmt.Sprintf("transcription error: %v", err)
+		_ = saveEpisodeStatus(statPath, st)
+		return false
+	}
+
+	st.Ads = make([]EpisodeAdCut, 0, len(adSegments))
+	for _, ad := range adSegments {
+		st.Ads = append(st.Ads, EpisodeAdCut{Start: ad.Start, End: ad.End, Reason: ad.Reason})
+	}
+
+	cutsResult := saveCutsJSON(audioFile, origDuration, adSegments, &profile, quiet)
+	cleanDuration, cleanSize := applyRemoteScanAudioCut(audioFile, cutsResult.KeepSegments, origDuration, origSize, st, statPath)
+
+	st.Cleaned = EpisodeAudioMeta{
+		Filename:      filepath.Base(audioFile),
+		DurationSec:   cleanDuration,
+		SizeBytes:     cleanSize,
+		AdDurationSec: origDuration - cleanDuration,
+	}
+	st.Status = StateReadyForCopyBack
+	st.LastError = ""
+	_ = saveEpisodeStatus(statPath, st)
+
+	doneItem := RemoteDoneItem{
+		RelPath:             relPath,
+		Status:              StateReadyForCopyBack,
+		OriginalDurationSec: origDuration,
+		CleanedDurationSec:  cleanDuration,
+		CutDurationSec:      origDuration - cleanDuration,
+		OriginalSizeBytes:   origSize,
+		CleanedSizeBytes:    cleanSize,
+		CompletedAt:         time.Now().UTC().Format(time.RFC3339),
+		WorkerHost:          hostname,
+	}
+	_ = addDoneEpisode(donePath, doneItem)
+
+	if !quiet {
+		fmt.Printf("✓ Finished %s (Saved %.1fs, Ready for copy back)\n", relPath, origDuration-cleanDuration)
+	}
+	return true
+}
+
+func initRemoteScanStatus(audioFile, hostname string, origDuration float64, origSize int64, st *EpisodeStatusFile, statPath string) *EpisodeStatusFile {
+	if st == nil {
+		st = &EpisodeStatusFile{
+			Version:   1,
+			MediaFile: filepath.Base(audioFile),
+			Status:    StateAwaitingTranscription,
+			CreatedAt: time.Now().UTC().Format(time.RFC3339),
+			UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+			Original: EpisodeAudioMeta{
+				Filename:    filepath.Base(audioFile),
+				DurationSec: origDuration,
+				SizeBytes:   origSize,
+			},
+		}
+	}
+	st.Status = StateTranscribingRemotely
+	st.CurrentStep = "Step 1/3: Whisper Transcription"
+	st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
+	st.WorkerHost = hostname
+	st.Original.DurationSec = origDuration
+	_ = saveEpisodeStatus(statPath, st)
+	return st
+}
+
+func transcribeAndDetectAdsRemoteScan(audioFile string, origDuration float64, cfg *Config, profile LLMProfile, quiet, verbose bool) (*TranscriptionData, []AdSegment, error) {
+	transcriptJSON := stripExt(audioFile) + ".transcript.json"
+	speedFactor := cfg.WhisperSpeedFactor
+	if speedFactor <= 0 {
+		speedFactor = 4.5
+	}
+
+	t0 := time.Now()
+	isNewlyTranscribed := false
+	cliOpts := CLIOptions{SaveTranscript: true, Quiet: quiet, Verbose: verbose}
+
+	transData, err := loadOrTranscribe(audioFile, transcriptJSON, *cfg, cliOpts, profile, origDuration, speedFactor, cfg.WhisperLanguage, cfg.WhisperPrompt, map[string]string{}, &isNewlyTranscribed, &t0)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	saveJSONTranscript(audioFile, transData, transcriptJSON, quiet, map[string]string{})
+
+	formattedTranscript := formatTranscript(transData, origDuration)
+	adSegments := detectAdsLLM(formattedTranscript, profile)
+	if len(adSegments) > 0 {
+		adSegments = mergeIntervals(adSegments)
+	}
+	return transData, adSegments, nil
+}
+
+func applyRemoteScanAudioCut(audioFile string, keepSegments [][2]float64, origDuration float64, origSize int64, st *EpisodeStatusFile, statPath string) (float64, int64) {
+	cleanDuration := origDuration
+	cleanSize := origSize
+
+	if len(keepSegments) == 0 {
+		return cleanDuration, cleanSize
+	}
+
+	st.Status = StateCuttingRemotely
+	st.CurrentStep = "Step 3/3: FFmpeg Audio Cutting"
+	st.StepStartedAt = time.Now().UTC().Format(time.RFC3339)
+	_ = saveEpisodeStatus(statPath, st)
+
+	workDir := workDirFor(audioFile)
+	_ = os.MkdirAll(workDir, 0755)
+	tempOut := filepath.Join(workDir, filepath.Base(audioFile)+".tmp.mp3")
+	verifyTempFile(tempOut)
+
+	if cutAudioFFmpeg(audioFile, keepSegments, tempOut) {
+		precutPath := audioFile + ".precut"
+		installed := true
+		if !fileExists(precutPath) {
+			checkPrecutSymlink(precutPath)
+			if mvErr := safeMove(audioFile, precutPath); mvErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not preserve the original for %s: %v\n", audioFile, mvErr)
+				installed = false
+			}
+		}
+		if installed {
+			if mvErr := safeMove(tempOut, audioFile); mvErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", audioFile, mvErr)
+			} else {
+				cleanDuration = getAudioDuration(audioFile)
+				if fi, err := os.Stat(audioFile); err == nil {
+					cleanSize = fi.Size()
+				}
+				st.Original.Filename = filepath.Base(precutPath)
+			}
+		}
+	}
+	_ = os.RemoveAll(workDir)
+	return cleanDuration, cleanSize
 }
 
 func runRemoteWorkerLoop(cfg *Config, targetDir string, daemon bool, quiet, verbose bool) error {

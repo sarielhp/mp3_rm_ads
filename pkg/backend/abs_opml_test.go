@@ -9,27 +9,19 @@ import (
 	"testing"
 )
 
-func TestAudiobookshelfOPMLExportAndImport(t *testing.T) {
-	var createdPodcastTitle string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func setupMockABSOPMLServer(createdPodcastTitle *string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/libraries":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"libraries": []Library{
-					{
-						ID:        "lib-1",
-						Name:      "Podcasts",
-						MediaType: "podcast",
-						Folders:   []LibraryFolder{{ID: "f-1", FullPath: "/podcasts"}},
-					},
+					{ID: "lib-1", Name: "Podcasts", MediaType: "podcast", Folders: []LibraryFolder{{ID: "f-1", FullPath: "/podcasts"}}},
 				},
 			})
 		case r.URL.Path == "/api/libraries/lib-1/items":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"results": []map[string]string{
-					{"id": "pod-1"},
-				},
+				"results": []map[string]string{{"id": "pod-1"}},
 			})
 		case r.URL.Path == "/api/items/pod-1":
 			var p Podcast
@@ -39,16 +31,14 @@ func TestAudiobookshelfOPMLExportAndImport(t *testing.T) {
 			_ = json.NewEncoder(w).Encode(p)
 		case r.URL.Path == "/api/feeds":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"feeds": []map[string]string{
-					{"entityId": "pod-1", "slug": "exported-slug"},
-				},
+				"feeds": []map[string]string{{"entityId": "pod-1", "slug": "exported-slug"}},
 			})
 		case r.URL.Path == "/api/podcasts" && r.Method == "POST":
 			var body map[string]interface{}
 			_ = json.NewDecoder(r.Body).Decode(&body)
 			if media, ok := body["media"].(map[string]interface{}); ok {
 				if meta, ok := media["metadata"].(map[string]interface{}); ok {
-					createdPodcastTitle, _ = meta["title"].(string)
+					*createdPodcastTitle, _ = meta["title"].(string)
 				}
 			}
 			w.WriteHeader(http.StatusOK)
@@ -57,12 +47,14 @@ func TestAudiobookshelfOPMLExportAndImport(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+}
+
+func TestAudiobookshelfOPMLExportAndImport(t *testing.T) {
+	var createdPodcastTitle string
+	srv := setupMockABSOPMLServer(&createdPodcastTitle)
 	defer srv.Close()
 
-	be := NewAudiobookshelf(Config{
-		Host:  srv.URL,
-		Token: "tok",
-	})
+	be := NewAudiobookshelf(Config{Host: srv.URL, Token: "tok"})
 
 	opmlBytes, err := be.ExportOPML(OPMLExportOptions{Quiet: true})
 	if err != nil {

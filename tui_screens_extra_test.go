@@ -148,29 +148,7 @@ func TestTUITranscriptScreenExportKeys(t *testing.T) {
 	}
 }
 
-func TestInteractiveDownloadPolicyModal(t *testing.T) {
-	tempDir := t.TempDir()
-	m := makeTestModel()
-	m.podcasts[0].dir = tempDir
-	m.podIdx = 0
-	m.width = 80
-	m.screen = screenPodcasts
-
-	m.openDownloadPolicyModal()
-	if !m.showDownloadPolicyModal {
-		t.Fatalf("expected showDownloadPolicyModal to be true")
-	}
-
-	modal := m.drawDownloadPolicyModal()
-	if !strings.Contains(modal, "DOWNLOAD POLICY") || !strings.Contains(modal, "Latest Episode Only") || !strings.Contains(modal, "Latest K Episodes") {
-		t.Errorf("expected download policy modal contents, got:\n%s", modal)
-	}
-
-	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
-	if m.downloadPolicyModalIdx != 2 {
-		t.Errorf("expected downloadPolicyModalIdx 2, got %d", m.downloadPolicyModalIdx)
-	}
-
+func testDownloadPolicyModalKeys(t *testing.T, m *tuiModel, tempDir string) {
 	kBefore := m.downloadPolicyModalK
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
 	if m.downloadPolicyModalK != kBefore+1 {
@@ -198,17 +176,40 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	if m.showDownloadPolicyModal {
 		t.Errorf("expected modal to close after pressing Enter")
 	}
-	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
-		t.Errorf("expected DownloadPolicyLatestK, got %s", m.podcasts[0].config.DownloadPolicy)
-	}
-	if m.podcasts[0].config.DownloadK != kBefore+2 {
-		t.Errorf("expected DownloadK %d, got %d", kBefore+2, m.podcasts[0].config.DownloadK)
+	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK || m.podcasts[0].config.DownloadK != kBefore+2 {
+		t.Errorf("expected policy LatestK with K %d, got %+v", kBefore+2, m.podcasts[0].config)
 	}
 
 	diskCfg := loadPodcastConfig(tempDir)
 	if diskCfg.DownloadPolicy != DownloadPolicyLatestK || diskCfg.DownloadK != kBefore+2 {
 		t.Errorf("expected saved config on disk to match, got %+v", diskCfg)
 	}
+}
+
+func TestInteractiveDownloadPolicyModal(t *testing.T) {
+	tempDir := t.TempDir()
+	m := makeTestModel()
+	m.podcasts[0].dir = tempDir
+	m.podIdx = 0
+	m.width = 80
+	m.screen = screenPodcasts
+
+	m.openDownloadPolicyModal()
+	if !m.showDownloadPolicyModal {
+		t.Fatalf("expected showDownloadPolicyModal to be true")
+	}
+
+	modal := m.drawDownloadPolicyModal()
+	if !strings.Contains(modal, "DOWNLOAD POLICY") || !strings.Contains(modal, "Latest Episode Only") || !strings.Contains(modal, "Latest K Episodes") {
+		t.Errorf("expected download policy modal contents, got:\n%s", modal)
+	}
+
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'3'}})
+	if m.downloadPolicyModalIdx != 2 {
+		t.Errorf("expected downloadPolicyModalIdx 2, got %d", m.downloadPolicyModalIdx)
+	}
+
+	testDownloadPolicyModalKeys(t, m, tempDir)
 
 	m.screen = screenPodcasts
 	m.openDownloadPolicyModal()
@@ -217,11 +218,8 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
-	if m.showDownloadPolicyModal {
-		t.Errorf("expected modal to close after Esc")
-	}
-	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
-		t.Errorf("expected policy to remain LatestK after Esc, got %s", m.podcasts[0].config.DownloadPolicy)
+	if m.showDownloadPolicyModal || m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
+		t.Errorf("expected modal closed and policy preserved after Esc")
 	}
 
 	m.screen = screenPodcastDetail

@@ -131,6 +131,38 @@ func TestDownloadQueueStrictDeduplication(t *testing.T) {
 	}
 }
 
+func setupMockABSDownloadServer(downloadedItems *[]string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/api/podcasts" && r.Method == "GET" {
+			res := struct {
+				Podcasts []PodcastItem `json:"podcasts"`
+			}{
+				Podcasts: []PodcastItem{
+					{
+						ID:    "pod-123",
+						Media: PodcastMedia{Metadata: PodcastMetadata{Title: "Test Podcast"}},
+					},
+				},
+			}
+			data, _ := json.Marshal(res)
+			w.Header().Set("Content-Type", "application/json")
+			w.Write(data)
+			return
+		}
+		if r.URL.Path == "/api/podcasts/pod-123/download-episodes" && r.Method == "POST" {
+			var eps []FeedEpisode
+			_ = json.NewDecoder(r.Body).Decode(&eps)
+			for _, ep := range eps {
+				*downloadedItems = append(*downloadedItems, ep.Title)
+			}
+			w.WriteHeader(http.StatusOK)
+			w.Write([]byte(`{"success":true}`))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+	}))
+}
+
 func TestDownloadQueueFIFOOrderAndWorker(t *testing.T) {
 	tempDir := t.TempDir()
 	queueFile := filepath.Join(tempDir, "download_queue.json")
@@ -140,99 +172,45 @@ func TestDownloadQueueFIFOOrderAndWorker(t *testing.T) {
 	ClearDownloadQueue()
 
 	var downloadedItems []string
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/api/podcasts" && r.Method == "GET" {
-			res := struct {
-				Podcasts []PodcastItem `json:"podcasts"`
-			}{
-				Podcasts: []PodcastItem{
-					{
-						ID: "pod-123",
-						Media: PodcastMedia{
-							Metadata: PodcastMetadata{Title: "Test Podcast"},
-						},
-					},
-				},
-			}
-			data, _ := json.Marshal(res)
-			w.Header().Set("Content-Type", "application/json")
-			w.Write(data)
-			return
-		}
-
-		if r.URL.Path == "/api/podcasts/pod-123/download-episodes" && r.Method == "POST" {
-			var eps []FeedEpisode
-			_ = json.NewDecoder(r.Body).Decode(&eps)
-			for _, ep := range eps {
-				downloadedItems = append(downloadedItems, ep.Title)
-			}
-			w.WriteHeader(http.StatusOK)
-			w.Write([]byte(`{"success":true}`))
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
-	}))
+	server := setupMockABSDownloadServer(&downloadedItems)
 	defer server.Close()
 
 	client := NewABSClient(server.URL, "test-token")
 
-	EnqueueDownload(DownloadQueueItem{
-		PodcastTitle: "Test Podcast",
-		PodcastID:    "pod-123",
-		EpisodeTitle: "First Enqueued Episode",
-		GUID:         "guid-first",
-	}, nil)
-
-	EnqueueDownload(DownloadQueueItem{
-		PodcastTitle: "Test Podcast",
-		PodcastID:    "pod-123",
-		EpisodeTitle: "Second Enqueued Episode",
-		GUID:         "guid-second",
-	}, nil)
-
-	EnqueueDownload(DownloadQueueItem{
-		PodcastTitle: "Test Podcast",
-		PodcastID:    "pod-123",
-		EpisodeTitle: "Third Enqueued Episode",
-		GUID:         "guid-third",
-	}, nil)
+	titles := []string{"First Enqueued Episode", "Second Enqueued Episode", "Third Enqueued Episode"}
+	guids := []string{"guid-first", "guid-second", "guid-third"}
+	for i := range titles {
+		EnqueueDownload(DownloadQueueItem{
+			PodcastTitle: "Test Podcast",
+			PodcastID:    "pod-123",
+			EpisodeTitle: titles[i],
+			GUID:         guids[i],
+		}, nil)
+	}
 
 	items := GetDownloadQueueItems()
 	if len(items) != 3 {
 		t.Fatalf("expected 3 items in queue, got %d", len(items))
 	}
-	if items[0].EpisodeTitle != "First Enqueued Episode" || items[1].EpisodeTitle != "Second Enqueued Episode" || items[2].EpisodeTitle != "Third Enqueued Episode" {
-		t.Errorf("items not in FIFO order: %+v", items)
+	for i, title := range titles {
+		if items[i].EpisodeTitle != title {
+			t.Errorf("items not in FIFO order: %+v", items)
+		}
+	}
+
+	for i, title := range titles {
+		processed, err := ProcessNextDownloadQueueItem(client)
+		if !processed || err != nil {
+			t.Errorf("ProcessNextDownloadQueueItem failed for item %d: %v", i, err)
+		}
+		if len(downloadedItems) != i+1 || downloadedItems[i] != title {
+			t.Errorf("expected item %d downloaded in order, got: %v", i, downloadedItems)
+		}
 	}
 
 	processed, err := ProcessNextDownloadQueueItem(client)
-	if !processed || err != nil {
-		t.Errorf("ProcessNextDownloadQueueItem failed for first: %v", err)
-	}
-	if len(downloadedItems) != 1 || downloadedItems[0] != "First Enqueued Episode" {
-		t.Errorf("expected first item downloaded first, got: %v", downloadedItems)
-	}
-
-	processed, err = ProcessNextDownloadQueueItem(client)
-	if !processed || err != nil {
-		t.Errorf("ProcessNextDownloadQueueItem failed for second: %v", err)
-	}
-	if len(downloadedItems) != 2 || downloadedItems[1] != "Second Enqueued Episode" {
-		t.Errorf("expected second item downloaded second, got: %v", downloadedItems)
-	}
-
-	processed, err = ProcessNextDownloadQueueItem(client)
-	if !processed || err != nil {
-		t.Errorf("ProcessNextDownloadQueueItem failed for third: %v", err)
-	}
-	if len(downloadedItems) != 3 || downloadedItems[2] != "Third Enqueued Episode" {
-		t.Errorf("expected third item downloaded third, got: %v", downloadedItems)
-	}
-
-	processed, err = ProcessNextDownloadQueueItem(client)
-	if processed {
-		t.Errorf("expected no more items to process, got true")
+	if processed || err != nil {
+		t.Errorf("expected no more items to process, got processed=%v, err=%v", processed, err)
 	}
 }
 

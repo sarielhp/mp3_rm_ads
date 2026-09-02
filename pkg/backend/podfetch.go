@@ -161,7 +161,6 @@ func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]
 	defer c.reqMu.Unlock()
 
 	reqURL := fmt.Sprintf("%s%s", c.Host, endpoint)
-
 	var jsonData []byte
 	var err error
 	if data != nil {
@@ -181,27 +180,9 @@ func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]
 
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		retryDelay := c.getRetryDelay(attempt)
-
-		var req *http.Request
-		if jsonData != nil {
-			req, err = http.NewRequest(method, reqURL, bytes.NewBuffer(jsonData))
-			if err == nil {
-				req.Header.Set("Content-Type", "application/json")
-			}
-		} else {
-			req, err = http.NewRequest(method, reqURL, nil)
-		}
+		req, err := buildPodFetchRequest(method, reqURL, jsonData, c.APIKey, c.Token, c.User, c.Pass)
 		if err != nil {
 			return nil, err
-		}
-
-		if c.APIKey != "" {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.APIKey))
-			req.Header.Set("x-api-key", c.APIKey)
-		} else if c.Token != "" {
-			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", c.Token))
-		} else if c.User != "" && c.Pass != "" {
-			req.SetBasicAuth(c.User, c.Pass)
 		}
 
 		res, err := c.httpClient.Do(req)
@@ -225,17 +206,13 @@ func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]
 			return nil, err
 		}
 
-		if res.StatusCode >= 500 || res.StatusCode == 429 || res.StatusCode == 408 {
-			lastStatusCode = res.StatusCode
-			if attempt < maxAttempts {
-				time.Sleep(retryDelay)
-				continue
-			}
-			return nil, fmt.Errorf("HTTP Error %d", res.StatusCode)
+		shouldRetry, err := checkPodFetchStatus(res.StatusCode, attempt, maxAttempts, retryDelay)
+		if err != nil {
+			return nil, err
 		}
-
-		if res.StatusCode < 200 || res.StatusCode >= 300 {
-			return nil, fmt.Errorf("HTTP Error %d", res.StatusCode)
+		if shouldRetry {
+			lastStatusCode = res.StatusCode
+			continue
 		}
 
 		return body, nil
@@ -245,6 +222,46 @@ func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]
 		return nil, lastErr
 	}
 	return nil, fmt.Errorf("HTTP Error %d", lastStatusCode)
+}
+
+func buildPodFetchRequest(method, reqURL string, jsonData []byte, apiKey, token, user, pass string) (*http.Request, error) {
+	var req *http.Request
+	var err error
+	if jsonData != nil {
+		req, err = http.NewRequest(method, reqURL, bytes.NewBuffer(jsonData))
+		if err == nil {
+			req.Header.Set("Content-Type", "application/json")
+		}
+	} else {
+		req, err = http.NewRequest(method, reqURL, nil)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	if apiKey != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+		req.Header.Set("x-api-key", apiKey)
+	} else if token != "" {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
+	} else if user != "" && pass != "" {
+		req.SetBasicAuth(user, pass)
+	}
+	return req, nil
+}
+
+func checkPodFetchStatus(statusCode int, attempt, maxAttempts int, retryDelay time.Duration) (bool, error) {
+	if statusCode >= 500 || statusCode == 429 || statusCode == 408 {
+		if attempt < maxAttempts {
+			time.Sleep(retryDelay)
+			return true, nil
+		}
+		return false, fmt.Errorf("HTTP Error %d", statusCode)
+	}
+	if statusCode < 200 || statusCode >= 300 {
+		return false, fmt.Errorf("HTTP Error %d", statusCode)
+	}
+	return false, nil
 }
 
 func (c *PodFetchBackend) Libraries() ([]Library, error) {

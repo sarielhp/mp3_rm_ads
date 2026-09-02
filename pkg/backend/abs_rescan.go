@@ -91,17 +91,38 @@ func (c *AudiobookshelfBackend) Rescan(opts RescanOptions) (RescanResult, error)
 }
 
 func (c *AudiobookshelfBackend) RescanPodcastEpisodes(item Podcast, dryRun bool, db *sql.DB, podcastsDir string, verbose bool, quiet bool) (int, int) {
-	podcastTitle := item.Media.Metadata.Title
-	if podcastTitle == "" {
-		podcastTitle = "Untitled Podcast"
-	}
-	itemID := item.ID
 	episodes := item.Media.Episodes
-
 	if len(episodes) == 0 {
 		return 0, 0
 	}
 
+	diskDurations := collectEpisodeDiskDurations(episodes, podcastsDir)
+	episodesToUpdate, episodeDurations, episodeHostPaths, checkedCount := identifyEpisodesToUpdate(episodes, diskDurations, podcastsDir)
+
+	var tx *sql.Tx
+	if db != nil && !dryRun {
+		var err error
+		tx, err = db.Begin()
+		if err == nil {
+			defer tx.Rollback()
+		} else {
+			tx = nil
+		}
+	}
+
+	rescanCount := applyRescanUpdates(tx, episodesToUpdate, episodeDurations, episodeHostPaths)
+	if tx != nil {
+		tx.Commit()
+	}
+
+	if rescanCount > 0 && !dryRun {
+		_, _ = c.Request(fmt.Sprintf("/api/items/%s/scan", item.ID), "POST", nil)
+	}
+
+	return rescanCount, checkedCount
+}
+
+func collectEpisodeDiskDurations(episodes []Episode, podcastsDir string) map[int]float64 {
 	numWorkers := 4
 	if len(episodes) < numWorkers {
 		numWorkers = len(episodes)
@@ -136,7 +157,6 @@ func (c *AudiobookshelfBackend) RescanPodcastEpisodes(item Podcast, dryRun bool,
 		if ep.AudioFile == nil || ep.AudioFile.Metadata == nil {
 			continue
 		}
-
 		path := ep.AudioFile.Metadata.Path
 		hostPath := resolveHostPathLocal(path, podcastsDir)
 		if hostPath == "" {
@@ -145,7 +165,6 @@ func (c *AudiobookshelfBackend) RescanPodcastEpisodes(item Podcast, dryRun bool,
 		if fi, err := os.Stat(hostPath); err != nil || fi.IsDir() {
 			continue
 		}
-
 		jobs <- durationJob{epIndex: idx, hostPath: hostPath}
 		activeJobs++
 	}
@@ -157,23 +176,14 @@ func (c *AudiobookshelfBackend) RescanPodcastEpisodes(item Podcast, dryRun bool,
 		diskDurations[res.epIndex] = res.diskDuration
 	}
 	close(results)
+	return diskDurations
+}
 
-	var tx *sql.Tx
-	var err error
-	if db != nil && !dryRun {
-		tx, err = db.Begin()
-		if err == nil {
-			defer tx.Rollback()
-		} else {
-			tx = nil
-		}
-	}
-
+func identifyEpisodesToUpdate(episodes []Episode, diskDurations map[int]float64, podcastsDir string) ([]Episode, map[string]float64, map[string]string, int) {
 	var episodesToUpdate []Episode
 	episodeDurations := make(map[string]float64)
 	episodeHostPaths := make(map[string]string)
 	checkedCount := 0
-	rescanCount := 0
 
 	for idx, ep := range episodes {
 		if ep.AudioFile == nil || ep.AudioFile.Metadata == nil {
@@ -201,25 +211,19 @@ func (c *AudiobookshelfBackend) RescanPodcastEpisodes(item Podcast, dryRun bool,
 			episodeHostPaths[ep.ID] = resolveHostPathLocal(path, podcastsDir)
 		}
 	}
+	return episodesToUpdate, episodeDurations, episodeHostPaths, checkedCount
+}
 
-	if len(episodesToUpdate) > 0 {
-		for _, ep := range episodesToUpdate {
-			rescanCount++
-			diskDuration := episodeDurations[ep.ID]
-			if tx != nil {
-				UpdateEpisodeInTx(tx, ep.ID, diskDuration, episodeHostPaths[ep.ID])
-			}
+func applyRescanUpdates(tx *sql.Tx, episodesToUpdate []Episode, episodeDurations map[string]float64, episodeHostPaths map[string]string) int {
+	rescanCount := 0
+	for _, ep := range episodesToUpdate {
+		rescanCount++
+		diskDuration := episodeDurations[ep.ID]
+		if tx != nil {
+			UpdateEpisodeInTx(tx, ep.ID, diskDuration, episodeHostPaths[ep.ID])
 		}
 	}
-	if tx != nil {
-		tx.Commit()
-	}
-
-	if rescanCount > 0 && !dryRun {
-		_, _ = c.Request(fmt.Sprintf("/api/items/%s/scan", itemID), "POST", nil)
-	}
-
-	return rescanCount, checkedCount
+	return rescanCount
 }
 
 func (c *AudiobookshelfBackend) SyncDuration(filePath string, duration float64) error {

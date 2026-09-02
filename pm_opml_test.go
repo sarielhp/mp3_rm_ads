@@ -62,71 +62,48 @@ func TestBuildOPMLXMLEmpty(t *testing.T) {
 	}
 }
 
-func TestFetchPodcastFeedsAndOpenFeed(t *testing.T) {
-	feedOpened := false
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func setupMockPodcastFeedsServer(feedOpened *bool) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
 		case "/api/libraries":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"libraries": []map[string]interface{}{
 					{"id": "lib-1", "name": "Podcasts", "mediaType": "podcast"},
 					{"id": "lib-2", "name": "Audiobooks", "mediaType": "book"},
 				},
 			})
 		case "/api/libraries/lib-1/items":
-			json.NewEncoder(w).Encode(map[string]interface{}{
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"results": []map[string]interface{}{
-					{
-						"id": "item-1",
-						"media": map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"title": "Open Feed Podcast",
-							},
-						},
-					},
-					{
-						"id": "item-2",
-						"media": map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"title": "Closed Feed Podcast",
-							},
-						},
-					},
+					{"id": "item-1", "media": map[string]interface{}{"metadata": map[string]interface{}{"title": "Open Feed Podcast"}}},
+					{"id": "item-2", "media": map[string]interface{}{"metadata": map[string]interface{}{"title": "Closed Feed Podcast"}}},
 				},
 			})
 		case "/api/items/item-1":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": "item-1",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"title": "Open Feed Podcast",
-					},
-				},
-				"rssFeed": map[string]interface{}{
-					"id":   "feed-1",
-					"slug": "open-slug",
-				},
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":      "item-1",
+				"media":   map[string]interface{}{"metadata": map[string]interface{}{"title": "Open Feed Podcast"}},
+				"rssFeed": map[string]interface{}{"id": "feed-1", "slug": "open-slug"},
 			})
 		case "/api/items/item-2":
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": "item-2",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"title": "Closed Feed Podcast",
-					},
-				},
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id":      "item-2",
+				"media":   map[string]interface{}{"metadata": map[string]interface{}{"title": "Closed Feed Podcast"}},
 				"rssFeed": nil,
 			})
 		case "/api/feeds/item/item-2/open":
-			feedOpened = true
-			json.NewEncoder(w).Encode(map[string]interface{}{
-				"slug": "dynamically-opened-slug",
-			})
+			*feedOpened = true
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"slug": "dynamically-opened-slug"})
 		default:
 			http.NotFound(w, r)
 		}
 	}))
+}
+
+func TestFetchPodcastFeedsAndOpenFeed(t *testing.T) {
+	feedOpened := false
+	server := setupMockPodcastFeedsServer(&feedOpened)
 	defer server.Close()
 
 	client := NewABSClient(server.URL, "test-token")
@@ -138,11 +115,8 @@ func TestFetchPodcastFeedsAndOpenFeed(t *testing.T) {
 		t.Fatalf("fetchPodcastFeeds failed: %v", err)
 	}
 
-	if len(feeds) != 2 {
-		t.Fatalf("expected 2 feeds, got %d", len(feeds))
-	}
-	if !feedOpened {
-		t.Errorf("expected closed feed to be dynamically opened via API")
+	if len(feeds) != 2 || !feedOpened {
+		t.Fatalf("expected 2 feeds and opened feed: count=%d, opened=%v", len(feeds), feedOpened)
 	}
 	if feeds[0].URL != server.URL+"/feed/open-slug" {
 		t.Errorf("expected open feed URL %q, got %q", server.URL+"/feed/open-slug", feeds[0].URL)

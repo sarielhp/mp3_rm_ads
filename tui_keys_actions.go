@@ -7,27 +7,17 @@ import (
 )
 
 func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
+	if handlePlayerControlKey(m, s) {
+		return m, nil
+	}
+	if handleActionModalOrTriggerKey(m, s) {
+		return m, nil
+	}
+	return handleNavigationAndSearchKey(m, s)
+}
+
+func handlePlayerControlKey(m *tuiModel, s string) bool {
 	switch s {
-	case "p", "P":
-		if m.screen == screenPodcastDetail && len(m.selectedEpisodes) > 0 {
-			m.batchQueuePlayback()
-		} else if m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
-			m.playSelectedEpisode()
-		}
-
-	case "v", "V":
-		if m.screen == screenPodcastDetail {
-			eps := m.filteredEpisodes()
-			if m.epIdx >= 0 && m.epIdx < len(eps) {
-				m.toggleEpisodeSelection(eps[m.epIdx].path)
-			}
-		}
-
-	case "a", "A":
-		if m.screen == screenPodcastDetail && len(m.selectedEpisodes) > 0 {
-			m.batchQueueAdRemoval()
-		}
-
 	case " ":
 		globalPlayer.TogglePause()
 		kv := globalPlayer.View()
@@ -36,27 +26,27 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 		} else if kv.IsPlaying {
 			m.showPopup("Resumed")
 		}
-
+		return true
 	case "right", "l", ">":
 		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(30)
 			m.showPopup("+30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
 		}
-
+		return true
 	case "left", "h", "<":
 		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(-30)
 			m.showPopup("-30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
 		}
-
+		return true
 	case "+", "=", "]":
 		globalPlayer.VolumeUp()
 		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.View().Volume))
-
+		return true
 	case "-", "_", "[":
 		globalPlayer.VolumeDown()
 		m.showPopup(fmt.Sprintf("Volume: %d%%", globalPlayer.View().Volume))
-
+		return true
 	case "m", "M":
 		globalPlayer.ToggleMute()
 		if globalPlayer.View().Muted {
@@ -64,15 +54,41 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 		} else {
 			m.showPopup("Unmuted")
 		}
-
+		return true
 	case "s", "S":
 		globalPlayer.CycleSpeaker()
 		m.showPopup("Speaker: " + globalPlayer.View().CurrentSpeaker)
-
+		return true
 	case "n", "N":
 		globalPlayer.Next()
 		m.showPopup("Next track")
+		return true
+	}
+	return false
+}
 
+func handleActionModalOrTriggerKey(m *tuiModel, s string) bool {
+	switch s {
+	case "p", "P":
+		if m.screen == screenPodcastDetail && len(m.selectedEpisodes) > 0 {
+			m.batchQueuePlayback()
+		} else if m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
+			m.playSelectedEpisode()
+		}
+		return true
+	case "v", "V":
+		if m.screen == screenPodcastDetail {
+			eps := m.filteredEpisodes()
+			if m.epIdx >= 0 && m.epIdx < len(eps) {
+				m.toggleEpisodeSelection(eps[m.epIdx].path)
+			}
+		}
+		return true
+	case "a", "A":
+		if m.screen == screenPodcastDetail && len(m.selectedEpisodes) > 0 {
+			m.batchQueueAdRemoval()
+		}
+		return true
 	case "c", "C":
 		if m.screen == screenPodcasts || m.screen == screenPodcastDetail {
 			m.openPolicyModal()
@@ -80,12 +96,12 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 			globalPlayer.ClearQueue()
 			m.showPopup("Queue cleared")
 		}
-
+		return true
 	case "f", "F":
 		if m.screen == screenPodcasts || m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
 			m.fetchPodcastFullFeed()
 		}
-
+		return true
 	case "d", "D":
 		if m.screen == screenPodcasts {
 			m.downloadAllForSelectedPodcast()
@@ -98,17 +114,23 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 		} else if m.screen == screenEpisodeDetail {
 			m.enqueueCurrentEpisodeDownload()
 		}
-
+		return true
 	case "t", "T":
 		if m.screen == screenPodcastDetail || m.screen == screenEpisodeDetail {
 			m.openTranscriptViewer()
 		}
-
+		return true
 	case "e", "E", "o", "O":
 		if m.screen == screenPodcasts || m.screen == screenPodcastDetail {
 			m.openTimelineViewer()
 		}
+		return true
+	}
+	return false
+}
 
+func handleNavigationAndSearchKey(m *tuiModel, s string) (tea.Model, tea.Cmd) {
+	switch s {
 	case "up", "k":
 		if m.screen == screenEpisodeDetail {
 			if m.descScroll > 0 {
@@ -117,38 +139,28 @@ func (m *tuiModel) handleKeyPart2(s string) (tea.Model, tea.Cmd) {
 		} else {
 			m.handleUp()
 		}
-
 	case "down", "j":
 		if m.screen == screenEpisodeDetail {
 			m.descScroll++
 		} else {
 			m.handleDown()
 		}
-
 	case "enter":
 		return m.handleEnter()
-
 	case "esc":
 		m.handleEscape()
-
 	case "r", "R":
 		m.handleQueueToggle()
-
 	case "i", "I":
 		m.showCover = !m.showCover
-
 	case "b", "B":
 		m.showHelp = !m.showHelp
-
 	case "/":
 		m.searchMode = true
 		m.searchQuery = ""
-		return m, nil
-
 	case "ctrl+s":
 		m.handleSortToggle()
 	}
-
 	return m, nil
 }
 

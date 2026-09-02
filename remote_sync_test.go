@@ -9,14 +9,7 @@ import (
 	"time"
 )
 
-func TestDownloadIntegrityVerification(t *testing.T) {
-	tempDir := t.TempDir()
-	mock := NewMockRemoteTransport(tempDir)
-
-	localPodcasts := filepath.Join(tempDir, "local_podcasts")
-	_ = os.MkdirAll(localPodcasts, 0755)
-
-	remoteWorkDir := filepath.Join(tempDir, "remote_root")
+func setupDownloadIntegrityTestEnv(tempDir, remoteWorkDir, localPodcasts string) string {
 	remotePodDir := filepath.Join(remoteWorkDir, "Show")
 	_ = os.MkdirAll(remotePodDir, 0755)
 
@@ -52,6 +45,18 @@ func TestDownloadIntegrityVerification(t *testing.T) {
 		Status:           StateReadyForCopyBack,
 		CleanedSizeBytes: 0,
 	})
+	return donePath
+}
+
+func TestDownloadIntegrityVerification(t *testing.T) {
+	tempDir := t.TempDir()
+	mock := NewMockRemoteTransport(tempDir)
+
+	localPodcasts := filepath.Join(tempDir, "local_podcasts")
+	_ = os.MkdirAll(localPodcasts, 0755)
+
+	remoteWorkDir := filepath.Join(tempDir, "remote_root")
+	donePath := setupDownloadIntegrityTestEnv(tempDir, remoteWorkDir, localPodcasts)
 
 	cfg := &Config{
 		RemoteHost:    "mock-box",
@@ -63,18 +68,13 @@ func TestDownloadIntegrityVerification(t *testing.T) {
 		t.Fatalf("runRemotePull failed: %v", err)
 	}
 
-	localGood := filepath.Join(localPodcasts, "Show", "good.mp3")
-	if !fileExists(localGood) {
+	if !fileExists(filepath.Join(localPodcasts, "Show", "good.mp3")) {
 		t.Errorf("expected good.mp3 to be pulled locally")
 	}
-
-	localBad := filepath.Join(localPodcasts, "Show", "bad.mp3")
-	if fileExists(localBad) {
+	if fileExists(filepath.Join(localPodcasts, "Show", "bad.mp3")) {
 		t.Errorf("expected bad.mp3 with mismatched size to NOT be pulled locally")
 	}
-
-	localEmpty := filepath.Join(localPodcasts, "Show", "empty.mp3")
-	if fileExists(localEmpty) {
+	if fileExists(filepath.Join(localPodcasts, "Show", "empty.mp3")) {
 		t.Errorf("expected empty.mp3 to NOT be pulled locally")
 	}
 

@@ -100,9 +100,7 @@ func TestLoadCachedFeedEpisodes(t *testing.T) {
 	}
 }
 
-func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
-	rootTmp := t.TempDir()
-
+func setupFrequencyTestPodcasts(rootTmp string) (string, string) {
 	hourlyDir := filepath.Join(rootTmp, "Hourly Podcast")
 	_ = os.MkdirAll(hourlyDir, 0755)
 	_ = savePodcastConfig(hourlyDir, PodcastConfig{
@@ -146,6 +144,12 @@ func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
 		PodcastDir:  dailyDir,
 		Episodes:    dailyEpisodes,
 	})
+	return hourlyDir, dailyDir
+}
+
+func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
+	rootTmp := t.TempDir()
+	hourlyDir, dailyDir := setupFrequencyTestPodcasts(rootTmp)
 
 	config := Config{PodcastsDir: rootTmp}
 	cli := CLIOptions{
@@ -157,30 +161,18 @@ func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
 	handleServerFrequency(config, cli)
 
 	hourlyCfg := loadPodcastConfig(hourlyDir)
-	if hourlyCfg.Frequency == nil {
-		t.Fatal("expected hourly frequency to be set")
+	if hourlyCfg.Frequency == nil || hourlyCfg.Frequency.Type != string(CadenceHourly) {
+		t.Fatalf("expected hourly frequency: %+v", hourlyCfg.Frequency)
 	}
-	if hourlyCfg.Frequency.Type != string(CadenceHourly) {
-		t.Errorf("expected cadence hourly, got %s", hourlyCfg.Frequency.Type)
-	}
-	if hourlyCfg.DownloadPolicy != DownloadPolicyNone {
-		t.Errorf("expected download_policy none, got %s", hourlyCfg.DownloadPolicy)
-	}
-	if hourlyCfg.AdRemoval != AdRemovalNone {
-		t.Errorf("expected ad_removal none, got %s", hourlyCfg.AdRemoval)
+	if hourlyCfg.DownloadPolicy != DownloadPolicyNone || hourlyCfg.AdRemoval != AdRemovalNone {
+		t.Errorf("expected disabled hourly policies: %+v", hourlyCfg)
 	}
 
 	dailyCfg := loadPodcastConfig(dailyDir)
-	if dailyCfg.Frequency == nil {
-		t.Fatal("expected daily frequency to be set")
+	if dailyCfg.Frequency == nil || dailyCfg.Frequency.Type != string(CadenceDaily) {
+		t.Fatalf("expected daily frequency: %+v", dailyCfg.Frequency)
 	}
-	if dailyCfg.Frequency.Type != string(CadenceDaily) {
-		t.Errorf("expected cadence daily, got %s", dailyCfg.Frequency.Type)
-	}
-	if dailyCfg.DownloadPolicy != DownloadPolicyLatestK {
-		t.Errorf("expected download_policy latest_k unchanged, got %s", dailyCfg.DownloadPolicy)
-	}
-	if dailyCfg.AdRemoval != AdRemovalLatest {
-		t.Errorf("expected ad_removal latest unchanged, got %s", dailyCfg.AdRemoval)
+	if dailyCfg.DownloadPolicy != DownloadPolicyLatestK || dailyCfg.AdRemoval != AdRemovalLatest {
+		t.Errorf("expected daily policies unchanged: %+v", dailyCfg)
 	}
 }

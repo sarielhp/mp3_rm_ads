@@ -20,6 +20,24 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 		transport = getRemoteTransport()
 	}
 
+	exePath, err := findDeployableBinary()
+	if err != nil {
+		return err
+	}
+
+	remoteWorkDir := "~/abs_remote"
+	if cfg != nil && cfg.RemoteWorkDir != "" {
+		remoteWorkDir = cfg.RemoteWorkDir
+	}
+
+	if err := uploadBinaryAndConfig(targetHost, exePath, remoteWorkDir, transport, quiet, verbose); err != nil {
+		return err
+	}
+
+	return verifyRemoteDeployment(targetHost, transport, quiet, verbose)
+}
+
+func findDeployableBinary() (string, error) {
 	home, _ := os.UserHomeDir()
 	exePath := filepath.Join(home, "bin", "abs")
 	if !fileExists(exePath) {
@@ -32,14 +50,12 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 		}
 	}
 	if !fileExists(exePath) {
-		return fmt.Errorf("failed to locate abs executable at %s", exePath)
+		return "", fmt.Errorf("failed to locate abs executable at %s", exePath)
 	}
+	return exePath, nil
+}
 
-	remoteWorkDir := "~/abs_remote"
-	if cfg != nil && cfg.RemoteWorkDir != "" {
-		remoteWorkDir = cfg.RemoteWorkDir
-	}
-
+func uploadBinaryAndConfig(targetHost, exePath, remoteWorkDir string, transport RemoteTransport, quiet, verbose bool) error {
 	if !quiet {
 		fmt.Printf("Preparing deployment directories on %s...\n", targetHost)
 	}
@@ -75,7 +91,10 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 			}
 		}
 	}
+	return nil
+}
 
+func verifyRemoteDeployment(targetHost string, transport RemoteTransport, quiet, verbose bool) error {
 	if !quiet {
 		fmt.Printf("Verifying remote deployment on %s...\n", targetHost)
 	}
@@ -93,6 +112,5 @@ func runRemoteDeploy(cfg *Config, host string, transport RemoteTransport, quiet,
 			fmt.Printf("Remote response: %s\n", firstLine)
 		}
 	}
-
 	return nil
 }

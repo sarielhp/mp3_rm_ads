@@ -29,63 +29,12 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.showPolicyModal {
-		switch s {
-		case "up", "k":
-			if m.policyModalIdx > 0 {
-				m.policyModalIdx--
-			}
-		case "down", "j":
-			if m.policyModalIdx < 2 {
-				m.policyModalIdx++
-			}
-		case "1":
-			m.policyModalIdx = 0
-			m.applyPolicyModal()
-		case "2":
-			m.policyModalIdx = 1
-			m.applyPolicyModal()
-		case "3":
-			m.policyModalIdx = 2
-			m.applyPolicyModal()
-		case "enter":
-			m.applyPolicyModal()
-		case "esc", "q", "Q", "c", "C":
-			m.showPolicyModal = false
-		}
+		handlePolicyModalKey(m, s)
 		return m, nil
 	}
 
 	if m.showDownloadPolicyModal {
-		switch s {
-		case "up", "k":
-			if m.downloadPolicyModalIdx > 0 {
-				m.downloadPolicyModalIdx--
-			}
-		case "down", "j":
-			if m.downloadPolicyModalIdx < 3 {
-				m.downloadPolicyModalIdx++
-			}
-		case "1":
-			m.downloadPolicyModalIdx = 0
-		case "2":
-			m.downloadPolicyModalIdx = 1
-		case "3":
-			m.downloadPolicyModalIdx = 2
-		case "4":
-			m.downloadPolicyModalIdx = 3
-		case "+", "=", "right", "l":
-			if m.downloadPolicyModalK < 99 {
-				m.downloadPolicyModalK++
-			}
-		case "-", "_", "left", "h":
-			if m.downloadPolicyModalK > 1 {
-				m.downloadPolicyModalK--
-			}
-		case "enter":
-			m.applyDownloadPolicyModal()
-		case "esc", "q", "d", "D":
-			m.showDownloadPolicyModal = false
-		}
+		handleDownloadPolicyModalKey(m, s)
 		return m, nil
 	}
 
@@ -102,65 +51,138 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	if model, cmd, handled := handleGlobalScreenSwitchKey(m, s); handled {
+		return model, cmd
+	}
+
+	if m.screen == screenPlayer && (s == "esc" || s == "q" || s == "Q") {
+		m.handleEscape()
+		return m, nil
+	}
+	if m.screen == screenLatestEpisodes {
+		return m.handleLatestViewKey(s)
+	}
+	if m.screen == screenDownloadQueue {
+		return m.handleDownloadQueueKey(s)
+	}
+	if m.screen == screenTranscript {
+		return m.handleTranscriptKey(s)
+	}
+	if m.screen == screenTimeline {
+		return m.handleTimelineKey(s)
+	}
+	if m.screen == screenPlayQueue {
+		return m.handlePlayQueueKey(s)
+	}
+	if m.screen == screenAdQueue {
+		return m.handleAdQueueKey(s)
+	}
+
+	return m.handleKeyPart2(s)
+}
+
+func handlePolicyModalKey(m *tuiModel, s string) {
+	switch s {
+	case "up", "k":
+		if m.policyModalIdx > 0 {
+			m.policyModalIdx--
+		}
+	case "down", "j":
+		if m.policyModalIdx < 2 {
+			m.policyModalIdx++
+		}
+	case "1":
+		m.policyModalIdx = 0
+		m.applyPolicyModal()
+	case "2":
+		m.policyModalIdx = 1
+		m.applyPolicyModal()
+	case "3":
+		m.policyModalIdx = 2
+		m.applyPolicyModal()
+	case "enter":
+		m.applyPolicyModal()
+	case "esc", "q", "Q", "c", "C":
+		m.showPolicyModal = false
+	}
+}
+
+func handleDownloadPolicyModalKey(m *tuiModel, s string) {
+	switch s {
+	case "up", "k":
+		if m.downloadPolicyModalIdx > 0 {
+			m.downloadPolicyModalIdx--
+		}
+	case "down", "j":
+		if m.downloadPolicyModalIdx < 3 {
+			m.downloadPolicyModalIdx++
+		}
+	case "1":
+		m.downloadPolicyModalIdx = 0
+	case "2":
+		m.downloadPolicyModalIdx = 1
+	case "3":
+		m.downloadPolicyModalIdx = 2
+	case "4":
+		m.downloadPolicyModalIdx = 3
+	case "+", "=", "right", "l":
+		if m.downloadPolicyModalK < 99 {
+			m.downloadPolicyModalK++
+		}
+	case "-", "_", "left", "h":
+		if m.downloadPolicyModalK > 1 {
+			m.downloadPolicyModalK--
+		}
+	case "enter":
+		m.applyDownloadPolicyModal()
+	case "esc", "q", "d", "D":
+		m.showDownloadPolicyModal = false
+	}
+}
+
+func handleGlobalScreenSwitchKey(m *tuiModel, s string) (tea.Model, tea.Cmd, bool) {
 	switch s {
 	case "ctrl+c", "ctrl+d":
 		globalPlayer.Stop()
 		m.done = true
-		return m, tea.Quit
-
+		return m, tea.Quit, true
 	case "esc", "q", "Q":
 		if m.screen == screenPodcasts {
 			globalPlayer.Stop()
 			m.done = true
-			return m, tea.Quit
+			return m, tea.Quit, true
 		}
 		m.handleEscape()
-		return m, nil
-
+		return m, nil, true
 	case "1":
 		m.screen = screenPodcasts
-		return m, nil
-
+		return m, nil, true
 	case "2", "f1", "F1":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
-			m.prevScreen = m.screen
-		}
+		savePrevScreenForSwitch(m)
 		m.screen = screenPlayer
-		return m, nil
-
+		return m, nil, true
 	case "3", "f2", "F2":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
-			m.prevScreen = m.screen
-		}
+		savePrevScreenForSwitch(m)
 		m.screen = screenPlayQueue
 		m.pqGrabbed = false
-		return m, nil
-
+		return m, nil, true
 	case "4", "f3", "F3":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
-			m.prevScreen = m.screen
-		}
+		savePrevScreenForSwitch(m)
 		m.screen = screenAdQueue
 		m.adqGrabbed = false
-		return m, nil
-
+		return m, nil, true
 	case "5", "f5", "F5":
-		if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
-			m.prevScreen = m.screen
-		}
+		savePrevScreenForSwitch(m)
 		m.screen = screenDownloadQueue
-		return m, nil
-
+		return m, nil, true
 	case "f4", "F4":
 		if m.screen == screenEpisodeDetail {
 			m.showEpisodePlayerPane = !m.showEpisodePlayerPane
 		}
-		return m, nil
-
+		return m, nil, true
 	case "6":
 		m.openTimelineViewer()
-		return m, nil
-
+		return m, nil, true
 	case "l", "L":
 		if m.screen != screenLatestEpisodes {
 			m.prevScreen = m.screen
@@ -170,51 +192,18 @@ func (m *tuiModel) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.handleEscape()
 		}
-		return m, nil
-
+		return m, nil, true
 	case "?", "h", "H":
 		if m.screen != screenTranscript {
 			m.showHelpModal = !m.showHelpModal
-			return m, nil
+			return m, nil, true
 		}
 	}
+	return nil, nil, false
+}
 
-	if m.screen == screenPlayer {
-		switch s {
-		case "esc", "q", "Q":
-			m.handleEscape()
-			return m, nil
-		}
+func savePrevScreenForSwitch(m *tuiModel) {
+	if m.screen != screenPlayer && m.screen != screenPlayQueue && m.screen != screenAdQueue && m.screen != screenDownloadQueue {
+		m.prevScreen = m.screen
 	}
-
-	if m.screen == screenLatestEpisodes {
-		return m.handleLatestViewKey(s)
-	}
-
-	if m.screen == screenDownloadQueue {
-		return m.handleDownloadQueueKey(s)
-	}
-
-	if m.screen == screenTranscript {
-		return m.handleTranscriptKey(s)
-	}
-
-	if m.screen == screenTimeline {
-		return m.handleTimelineKey(s)
-	}
-
-	if m.screen == screenPlayQueue {
-		return m.handlePlayQueueKey(s)
-	}
-
-	if m.screen == screenAdQueue {
-		return m.handleAdQueueKey(s)
-	}
-
-	switch s {
-
-	default:
-		return m.handleKeyPart2(s)
-	}
-
 }

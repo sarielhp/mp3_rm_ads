@@ -24,6 +24,26 @@ func generatePodcastShortID(title string) string {
 		return hex.EncodeToString(h[:])[:5]
 	}
 
+	cleanWords := extractCleanAlphanumericWords(t)
+	if len(cleanWords) >= 3 {
+		if id, ok := shortIDFromManyWords(cleanWords); ok {
+			return id
+		}
+	} else if len(cleanWords) == 2 {
+		if id, ok := shortIDFromTwoWords(cleanWords[0], cleanWords[1]); ok {
+			return id
+		}
+	} else if len(cleanWords) == 1 {
+		if id, ok := shortIDFromOneWord(cleanWords[0]); ok {
+			return id
+		}
+	}
+
+	h := sha256.Sum256([]byte(t))
+	return hex.EncodeToString(h[:])[:5]
+}
+
+func extractCleanAlphanumericWords(t string) []string {
 	fields := strings.FieldsFunc(t, func(r rune) bool {
 		return r == ' ' || r == '-' || r == '_' || r == ':' || r == ',' || r == '.' || r == '\'' || r == '"'
 	})
@@ -42,72 +62,75 @@ func generatePodcastShortID(title string) string {
 			cleanWords = append(cleanWords, b.String())
 		}
 	}
+	return cleanWords
+}
 
-	if len(cleanWords) >= 3 {
-		var initials strings.Builder
-		for _, w := range cleanWords {
-			initials.WriteByte(w[0])
-		}
-		if initials.Len() >= 5 {
-			return initials.String()[:5]
-		}
-		var b strings.Builder
-		for _, w := range cleanWords {
-			b.WriteByte(w[0])
-			for i := 1; i < len(w); i++ {
-				c := w[i]
-				if c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' {
-					b.WriteByte(c)
-					if b.Len() == 5 {
-						return b.String()
-					}
+func shortIDFromManyWords(cleanWords []string) (string, bool) {
+	var initials strings.Builder
+	for _, w := range cleanWords {
+		initials.WriteByte(w[0])
+	}
+	if initials.Len() >= 5 {
+		return initials.String()[:5], true
+	}
+	var b strings.Builder
+	for _, w := range cleanWords {
+		b.WriteByte(w[0])
+		for i := 1; i < len(w); i++ {
+			c := w[i]
+			if c != 'a' && c != 'e' && c != 'i' && c != 'o' && c != 'u' {
+				b.WriteByte(c)
+				if b.Len() == 5 {
+					return b.String(), true
 				}
 			}
 		}
-		if b.Len() >= 5 {
-			return b.String()[:5]
-		}
-	} else if len(cleanWords) == 2 {
-		w1, w2 := cleanWords[0], cleanWords[1]
-		var b strings.Builder
-		b.WriteByte(w1[0])
-		for i := 1; i < len(w1); i++ {
-			if w1[i] != 'a' && w1[i] != 'e' && w1[i] != 'i' && w1[i] != 'o' && w1[i] != 'u' {
-				b.WriteByte(w1[i])
-			}
-		}
-		b.WriteByte(w2[0])
-		for i := 1; i < len(w2); i++ {
-			if w2[i] != 'a' && w2[i] != 'e' && w2[i] != 'i' && w2[i] != 'o' && w2[i] != 'u' {
-				b.WriteByte(w2[i])
-			}
-		}
-		if b.Len() >= 5 {
-			return b.String()[:5]
-		}
-		comb := w1 + w2
-		if len(comb) >= 5 {
-			return comb[:5]
-		}
-	} else if len(cleanWords) == 1 {
-		w := cleanWords[0]
-		var b strings.Builder
-		b.WriteByte(w[0])
-		for i := 1; i < len(w); i++ {
-			if w[i] != 'a' && w[i] != 'e' && w[i] != 'i' && w[i] != 'o' && w[i] != 'u' {
-				b.WriteByte(w[i])
-			}
-		}
-		if b.Len() >= 5 {
-			return b.String()[:5]
-		}
-		if len(w) >= 5 {
-			return w[:5]
+	}
+	if b.Len() >= 5 {
+		return b.String()[:5], true
+	}
+	return "", false
+}
+
+func shortIDFromTwoWords(w1, w2 string) (string, bool) {
+	var b strings.Builder
+	b.WriteByte(w1[0])
+	for i := 1; i < len(w1); i++ {
+		if w1[i] != 'a' && w1[i] != 'e' && w1[i] != 'i' && w1[i] != 'o' && w1[i] != 'u' {
+			b.WriteByte(w1[i])
 		}
 	}
+	b.WriteByte(w2[0])
+	for i := 1; i < len(w2); i++ {
+		if w2[i] != 'a' && w2[i] != 'e' && w2[i] != 'i' && w2[i] != 'o' && w2[i] != 'u' {
+			b.WriteByte(w2[i])
+		}
+	}
+	if b.Len() >= 5 {
+		return b.String()[:5], true
+	}
+	comb := w1 + w2
+	if len(comb) >= 5 {
+		return comb[:5], true
+	}
+	return "", false
+}
 
-	h := sha256.Sum256([]byte(t))
-	return hex.EncodeToString(h[:])[:5]
+func shortIDFromOneWord(w string) (string, bool) {
+	var b strings.Builder
+	b.WriteByte(w[0])
+	for i := 1; i < len(w); i++ {
+		if w[i] != 'a' && w[i] != 'e' && w[i] != 'i' && w[i] != 'o' && w[i] != 'u' {
+			b.WriteByte(w[i])
+		}
+	}
+	if b.Len() >= 5 {
+		return b.String()[:5], true
+	}
+	if len(w) >= 5 {
+		return w[:5], true
+	}
+	return "", false
 }
 
 func getOrSetPodcastShortID(podDir, title string) string {

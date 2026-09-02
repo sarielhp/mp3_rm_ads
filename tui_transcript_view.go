@@ -177,24 +177,9 @@ func (m *tuiModel) drawTranscriptScreen() string {
 	if durStr != "" {
 		subInfo += " • " + durStr
 	}
+	ensureTranscriptItemsLoaded(m)
 	subInfo += fmt.Sprintf(" • %d lines", len(m.transcriptItems))
 	out.WriteString("    " + tuiSubtitleStyle.Render(subInfo) + "\n")
-
-	if len(m.transcriptItems) == 0 && len(m.transcriptLines) > 0 {
-		for _, l := range m.transcriptLines {
-			if sub := timestampLineRegex.FindStringSubmatch(l); len(sub) == 3 {
-				m.transcriptItems = append(m.transcriptItems, transcriptItem{
-					timeFull:  sub[1],
-					timeShort: sub[1],
-					text:      sub[2],
-				})
-			} else {
-				m.transcriptItems = append(m.transcriptItems, transcriptItem{
-					text: l,
-				})
-			}
-		}
-	}
 
 	dividerWidth := max(20, m.width-4)
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
@@ -221,81 +206,75 @@ func (m *tuiModel) drawTranscriptScreen() string {
 	digits := max(3, len(fmt.Sprintf("%d", total)))
 
 	for i := m.transcriptScroll; i < end; i++ {
-		item := m.transcriptItems[i]
 		isCurrent := len(matches) > 0 && m.transcriptMatchIdx < len(matches) && i == matches[m.transcriptMatchIdx]
+		out.WriteString(renderSingleTranscriptLine(m.transcriptItems[i], m.transcriptViewMode, i, digits, targetW, m.searchQuery, isCurrent))
+	}
 
-		switch m.transcriptViewMode {
-		case 0:
-			ts := item.timeFull
-			availTextW := max(10, targetW-len(ts)-3)
-			truncText := truncate(item.text, availTextW)
-			renderedText := ""
-			if m.searchQuery != "" {
-				renderedText = highlightTranscriptText(truncText, m.searchQuery, isCurrent)
-			} else if item.isAd {
-				renderedText = tuiAdStrikeStyle.Render(truncText)
-			} else {
-				renderedText = tuiTranscriptTextStyle.Render(truncText)
-			}
-			prefix := "  "
-			if isCurrent {
-				prefix = "▶ "
-			}
-			if item.isAd {
-				out.WriteString(prefix + tuiAdStrikeStyle.Render(ts) + " " + renderedText + "\n")
-			} else {
-				out.WriteString(prefix + tuiYellowStyle.Render(ts) + " " + renderedText + "\n")
-			}
+	renderTranscriptFooter(m, total, end, dividerWidth, matches, out)
+	return out.String()
+}
 
-		case 1:
-			ts := item.timeShort
-			if ts == "" {
-				ts = item.timeFull
-			}
-			availTextW := max(10, targetW-len(ts)-3)
-			truncText := truncate(item.text, availTextW)
-			renderedText := ""
-			if m.searchQuery != "" {
-				renderedText = highlightTranscriptText(truncText, m.searchQuery, isCurrent)
-			} else if item.isAd {
-				renderedText = tuiAdStrikeStyle.Render(truncText)
+func ensureTranscriptItemsLoaded(m *tuiModel) {
+	if len(m.transcriptItems) == 0 && len(m.transcriptLines) > 0 {
+		for _, l := range m.transcriptLines {
+			if sub := timestampLineRegex.FindStringSubmatch(l); len(sub) == 3 {
+				m.transcriptItems = append(m.transcriptItems, transcriptItem{
+					timeFull:  sub[1],
+					timeShort: sub[1],
+					text:      sub[2],
+				})
 			} else {
-				renderedText = tuiTranscriptTextStyle.Render(truncText)
-			}
-			prefix := "  "
-			if isCurrent {
-				prefix = "▶ "
-			}
-			if item.isAd {
-				out.WriteString(prefix + tuiAdStrikeStyle.Render(ts) + " " + renderedText + "\n")
-			} else {
-				out.WriteString(prefix + tuiYellowStyle.Render(ts) + " " + renderedText + "\n")
-			}
-
-		case 2:
-			lineNumPrefix := fmt.Sprintf("%*d │ ", digits, i+1)
-			availTextW := max(10, targetW-digits-6)
-			truncText := truncate(item.text, availTextW)
-			renderedText := ""
-			if m.searchQuery != "" {
-				renderedText = highlightTranscriptText(truncText, m.searchQuery, isCurrent)
-			} else if item.isAd {
-				renderedText = tuiAdStrikeStyle.Render(truncText)
-			} else {
-				renderedText = tuiTranscriptTextStyle.Render(truncText)
-			}
-			prefix := "  "
-			if isCurrent {
-				prefix = "▶ "
-			}
-			if item.isAd {
-				out.WriteString(prefix + tuiDimStyle.Render(lineNumPrefix) + renderedText + "\n")
-			} else {
-				out.WriteString(prefix + tuiDimStyle.Render(lineNumPrefix) + renderedText + "\n")
+				m.transcriptItems = append(m.transcriptItems, transcriptItem{text: l})
 			}
 		}
 	}
+}
 
+func renderSingleTranscriptLine(item transcriptItem, mode, i, digits, targetW int, searchQuery string, isCurrent bool) string {
+	prefix := "  "
+	if isCurrent {
+		prefix = "▶ "
+	}
+
+	switch mode {
+	case 0, 1:
+		ts := item.timeFull
+		if mode == 1 && item.timeShort != "" {
+			ts = item.timeShort
+		}
+		availTextW := max(10, targetW-len(ts)-3)
+		truncText := truncate(item.text, availTextW)
+		renderedText := ""
+		if searchQuery != "" {
+			renderedText = highlightTranscriptText(truncText, searchQuery, isCurrent)
+		} else if item.isAd {
+			renderedText = tuiAdStrikeStyle.Render(truncText)
+		} else {
+			renderedText = tuiTranscriptTextStyle.Render(truncText)
+		}
+		if item.isAd {
+			return prefix + tuiAdStrikeStyle.Render(ts) + " " + renderedText + "\n"
+		}
+		return prefix + tuiYellowStyle.Render(ts) + " " + renderedText + "\n"
+
+	case 2:
+		lineNumPrefix := fmt.Sprintf("%*d │ ", digits, i+1)
+		availTextW := max(10, targetW-digits-6)
+		truncText := truncate(item.text, availTextW)
+		renderedText := ""
+		if searchQuery != "" {
+			renderedText = highlightTranscriptText(truncText, searchQuery, isCurrent)
+		} else if item.isAd {
+			renderedText = tuiAdStrikeStyle.Render(truncText)
+		} else {
+			renderedText = tuiTranscriptTextStyle.Render(truncText)
+		}
+		return prefix + tuiDimStyle.Render(lineNumPrefix) + renderedText + "\n"
+	}
+	return ""
+}
+
+func renderTranscriptFooter(m *tuiModel, total, end, dividerWidth int, matches []int, out *strings.Builder) {
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	scrollPct := 0
@@ -321,6 +300,4 @@ func (m *tuiModel) drawTranscriptScreen() string {
 		helpText = fmt.Sprintf("↑/↓ Scroll │ %s │ / Search │ s/e Export │ Esc/q/t Back │ [%d%%]", arrowHelp, scrollPct)
 	}
 	out.WriteString(tuiDimStyle.Render("  " + helpText + "\n"))
-
-	return out.String()
 }

@@ -25,20 +25,11 @@ func (c *AudiobookshelfBackend) Scan(opts ScanOptions) (ScanResult, error) {
 		CheckedPodcasts: len(podcasts),
 		Podcasts:        podcasts,
 	}
-
 	if opts.EpisodesOnly {
 		return res, nil
 	}
 
-	existing := make(map[string]bool)
-	if dirEntries, err := os.ReadDir(podcastsDir); err == nil {
-		for _, e := range dirEntries {
-			if e.IsDir() {
-				existing[strings.ToLower(e.Name())] = true
-			}
-		}
-	}
-
+	existing := scanLocalPodcastsDir(podcastsDir)
 	if !opts.Quiet {
 		fmt.Printf("Connected to Audiobookshelf. Found %d podcasts in database.\n", len(podcasts))
 		fmt.Println("Scanning for new podcasts not present locally...")
@@ -47,45 +38,11 @@ func (c *AudiobookshelfBackend) Scan(opts ScanOptions) (ScanResult, error) {
 	for _, item := range podcasts {
 		title := item.Media.Metadata.Title
 		relBase := filepath.Base(item.RelPath)
-
-		isNew := true
 		if existing[strings.ToLower(title)] || existing[strings.ToLower(relBase)] {
-			isNew = false
+			continue
 		}
-
-		if isNew {
-			res.NewPodcasts++
-			if !opts.Quiet {
-				fmt.Printf("\n[+] Found new podcast: '%s' (RelPath: %s)\n", title, item.RelPath)
-			}
-
-			safeName := sanitizePodcastName(title)
-			if safeName == "" {
-				safeName = sanitizePodcastName(relBase)
-			}
-			if safeName == "" {
-				safeName = "podcast_" + item.ID
-			}
-
-			podDir := filepath.Join(podcastsDir, safeName)
-			if err := os.MkdirAll(podDir, 0755); err != nil {
-				if !opts.Quiet {
-					fmt.Fprintf(os.Stderr, "  ERROR: Failed to create directory '%s': %v\n", podDir, err)
-				}
-				continue
-			}
-
-			detailsDir := filepath.Join(podDir, ".cache", "details")
-			_ = os.MkdirAll(detailsDir, 0755)
-			coverDest := filepath.Join(detailsDir, "cover.jpg")
-			if err := c.DownloadCover(item.ID, coverDest); err != nil {
-				if !opts.Quiet {
-					fmt.Printf("  Warning: Failed to download cover image: %v\n", err)
-				}
-			} else if !opts.Quiet {
-				fmt.Printf("  ✓ Downloaded cover to %s\n", coverDest)
-			}
-		}
+		res.NewPodcasts++
+		_ = c.initNewPodcastDir(podcastsDir, item, opts.Quiet)
 	}
 
 	if !opts.Quiet {
@@ -95,8 +52,55 @@ func (c *AudiobookshelfBackend) Scan(opts ScanOptions) (ScanResult, error) {
 			fmt.Printf("\nScan complete. Added and initialized %d new podcast(s).\n", res.NewPodcasts)
 		}
 	}
-
 	return res, nil
+}
+
+func scanLocalPodcastsDir(podcastsDir string) map[string]bool {
+	existing := make(map[string]bool)
+	if dirEntries, err := os.ReadDir(podcastsDir); err == nil {
+		for _, e := range dirEntries {
+			if e.IsDir() {
+				existing[strings.ToLower(e.Name())] = true
+			}
+		}
+	}
+	return existing
+}
+
+func (c *AudiobookshelfBackend) initNewPodcastDir(podcastsDir string, item Podcast, quiet bool) error {
+	title := item.Media.Metadata.Title
+	relBase := filepath.Base(item.RelPath)
+	if !quiet {
+		fmt.Printf("\n[+] Found new podcast: '%s' (RelPath: %s)\n", title, item.RelPath)
+	}
+
+	safeName := sanitizePodcastName(title)
+	if safeName == "" {
+		safeName = sanitizePodcastName(relBase)
+	}
+	if safeName == "" {
+		safeName = "podcast_" + item.ID
+	}
+
+	podDir := filepath.Join(podcastsDir, safeName)
+	if err := os.MkdirAll(podDir, 0755); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "  ERROR: Failed to create directory '%s': %v\n", podDir, err)
+		}
+		return err
+	}
+
+	detailsDir := filepath.Join(podDir, ".cache", "details")
+	_ = os.MkdirAll(detailsDir, 0755)
+	coverDest := filepath.Join(detailsDir, "cover.jpg")
+	if err := c.DownloadCover(item.ID, coverDest); err != nil {
+		if !quiet {
+			fmt.Printf("  Warning: Failed to download cover image: %v\n", err)
+		}
+	} else if !quiet {
+		fmt.Printf("  ✓ Downloaded cover to %s\n", coverDest)
+	}
+	return nil
 }
 
 func sanitizePodcastName(s string) string {

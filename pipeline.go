@@ -15,60 +15,9 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		return
 	}
 
-	if !cli.Quiet {
-		fmt.Printf("Recutting audio using existing cut metadata: '%s'\n", cutsFile)
-	}
-
-	data, err := readFile(cutsFile)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error reading cuts file: %v\n", err)
+	keepSegments, _, ok := loadRecutKeepSegments(cutsFile, mainMP3File, totalDuration, selectedProfile, cli)
+	if !ok || len(keepSegments) == 0 {
 		return
-	}
-	var cutsData CutsData
-	if err := jsonUnmarshal(data, &cutsData); err != nil {
-		fmt.Fprintf(os.Stderr, "Error parsing cuts file: %v\n", err)
-		return
-	}
-
-	var existingAds []AdSegment
-	for _, c := range cutsData.CutIntervals {
-		st := c.StartSec
-		en := c.EndSec
-		existingAds = append(existingAds, AdSegment{Start: st, End: en, Reason: c.Reason})
-	}
-
-	if len(existingAds) > 0 {
-		existingAds = mergeIntervals(existingAds)
-	}
-
-	cutsResult := saveCutsJSON(mainMP3File, totalDuration, existingAds, &selectedProfile, cli.Quiet)
-	keepSegments := cutsResult.KeepSegments
-
-	if len(keepSegments) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No keep segments found in cut metadata.")
-		}
-		return
-	}
-
-	if cli.Verbose && !cli.Quiet {
-		mergedIntervals := cutsData.MergedCutIntervals
-		if len(mergedIntervals) == 0 {
-			fmt.Println("No cut intervals specified in metadata!")
-		} else {
-			fmt.Println()
-			fmt.Println("CUT INTERVALS TO REMOVE:")
-			for _, m := range mergedIntervals {
-				duration := m.End - m.Start
-				fmt.Printf("  - [%s -> %s] (%.1fs)\n", formatTime(m.Start), formatTime(m.End), duration)
-			}
-			fmt.Println()
-		}
-	}
-
-	t0Recut := time.Now()
-	if !cli.Quiet {
-		fmt.Printf("Cutting ads with ffmpeg (%d non-ad clips)...\n", len(keepSegments))
 	}
 
 	workDir := workDirFor(outputFile)
@@ -79,75 +28,126 @@ func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 	tempOutputFile := filepath.Join(workDir, filepath.Base(outputFile)+".tmp"+filepath.Ext(outputFile))
 	verifyTempFile(tempOutputFile)
 
+	executeRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir, keepSegments, totalDuration, config, cli, fileStartTime)
+}
+
+func loadRecutKeepSegments(cutsFile, mainMP3File string, totalDuration float64, selectedProfile LLMProfile, cli CLIOptions) ([][2]float64, CutsData, bool) {
+	if !cli.Quiet {
+		fmt.Printf("Recutting audio using existing cut metadata: '%s'\n", cutsFile)
+	}
+
+	data, err := readFile(cutsFile)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error reading cuts file: %v\n", err)
+		return nil, CutsData{}, false
+	}
+	var cutsData CutsData
+	if err := jsonUnmarshal(data, &cutsData); err != nil {
+		fmt.Fprintf(os.Stderr, "Error parsing cuts file: %v\n", err)
+		return nil, CutsData{}, false
+	}
+
+	var existingAds []AdSegment
+	for _, c := range cutsData.CutIntervals {
+		existingAds = append(existingAds, AdSegment{Start: c.StartSec, End: c.EndSec, Reason: c.Reason})
+	}
+	if len(existingAds) > 0 {
+		existingAds = mergeIntervals(existingAds)
+	}
+
+	cutsResult := saveCutsJSON(mainMP3File, totalDuration, existingAds, &selectedProfile, cli.Quiet)
+	keepSegments := cutsResult.KeepSegments
+	if len(keepSegments) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No keep segments found in cut metadata.")
+		}
+		return nil, cutsData, false
+	}
+
+	if cli.Verbose && !cli.Quiet && len(cutsData.MergedCutIntervals) > 0 {
+		fmt.Println("\nCUT INTERVALS TO REMOVE:")
+		for _, m := range cutsData.MergedCutIntervals {
+			fmt.Printf("  - [%s -> %s] (%.1fs)\n", formatTime(m.Start), formatTime(m.End), m.End-m.Start)
+		}
+		fmt.Println()
+	}
+	return keepSegments, cutsData, true
+}
+
+func executeRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir string, keepSegments [][2]float64, totalDuration float64, config Config, cli CLIOptions, fileStartTime time.Time) {
+	t0Recut := time.Now()
+	if !cli.Quiet {
+		fmt.Printf("Cutting ads with ffmpeg (%d non-ad clips)...\n", len(keepSegments))
+	}
+
 	remoteHost := config.RemoteFFmpegHost
 	if cli.RemoteFFmpegHost != "" {
 		remoteHost = cli.RemoteFFmpegHost
 	}
-	if cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
-		recutDuration := time.Since(t0Recut)
-		if !cli.Quiet && cli.Verbose {
-			fmt.Printf("Audio Recutting finished in %s\n", formatClock(recutDuration.Seconds()))
-		}
-
-		if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
-			checkPrecutSymlink(precutFile)
-			if mvErr := safeMove(mainMP3File, precutFile); mvErr != nil {
-				fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", mvErr)
-				fmt.Fprintf(os.Stderr, "The episode was left unchanged; the recut audio is in %s\n", workDir)
-				return
-			}
-			if !cli.Quiet {
-				fmt.Printf("Original file preserved at: '%s'\n", precutFile)
-			}
-		}
-
-		if mvErr := safeMove(tempOutputFile, outputFile); mvErr != nil {
-			fmt.Fprintf(os.Stderr, "Error: could not install the recut audio: %v\n", mvErr)
-			fmt.Fprintf(os.Stderr, "The original is at %s and the recut audio is in %s; neither was deleted.\n", precutFile, workDir)
-			return
-		}
-		os.RemoveAll(workDir)
-
-		newDuration := getAudioDuration(outputFile)
-		actualCut := totalDuration - newDuration
-		pctCut := 0.0
-		if totalDuration > 0 {
-			pctCut = actualCut / totalDuration * 100
-		}
-		fileTotalDuration := time.Since(fileStartTime)
-
-		if stErr := updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
-			st.Status = StateDone
-			if fileExists(precutFile) {
-				st.Original.Filename = filepath.Base(precutFile)
-				if fi, err := os.Stat(precutFile); err == nil {
-					st.Original.SizeBytes = fi.Size()
-				}
-			}
-			st.Cleaned.Filename = filepath.Base(outputFile)
-			st.Cleaned.DurationSec = newDuration
-			st.Cleaned.AdDurationSec = actualCut
-			if fi, err := os.Stat(outputFile); err == nil {
-				st.Cleaned.SizeBytes = fi.Size()
-			}
-		}); stErr != nil {
-			fmt.Fprintf(os.Stderr, "Warning: %v\n", stErr)
-		}
-		syncAudiobookshelfDuration(&config, outputFile, newDuration)
-
-		if !cli.Quiet {
-			fmt.Println()
-			fmt.Println("DURATION & TIME SAVED SUMMARY (RECUT):")
-			fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
-			fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs)\n", formatTime(actualCut), actualCut)
-			fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
-			fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
-			fmt.Printf("  - Total Recut Time:        %s\n", formatClock(fileTotalDuration.Seconds()))
-			fmt.Printf("Success! Recut ad-free episode saved to: '%s'\n", outputFile)
-		}
-	} else {
+	if !cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
 		os.Remove(tempOutputFile)
 		os.RemoveAll(workDir)
+		return
+	}
+
+	if !cli.Quiet && cli.Verbose {
+		fmt.Printf("Audio Recutting finished in %s\n", formatClock(time.Since(t0Recut).Seconds()))
+	}
+
+	if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
+		checkPrecutSymlink(precutFile)
+		if mvErr := safeMove(mainMP3File, precutFile); mvErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", mvErr)
+			return
+		}
+		if !cli.Quiet {
+			fmt.Printf("Original file preserved at: '%s'\n", precutFile)
+		}
+	}
+
+	if mvErr := safeMove(tempOutputFile, outputFile); mvErr != nil {
+		fmt.Fprintf(os.Stderr, "Error: could not install the recut audio: %v\n", mvErr)
+		return
+	}
+	os.RemoveAll(workDir)
+
+	finishRecutStatusAndSummary(mainMP3File, precutFile, outputFile, totalDuration, config, cli, fileStartTime)
+}
+
+func finishRecutStatusAndSummary(mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, fileStartTime time.Time) {
+	newDuration := getAudioDuration(outputFile)
+	actualCut := totalDuration - newDuration
+	pctCut := 0.0
+	if totalDuration > 0 {
+		pctCut = actualCut / totalDuration * 100
+	}
+
+	_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+		st.Status = StateDone
+		if fileExists(precutFile) {
+			st.Original.Filename = filepath.Base(precutFile)
+			if fi, err := os.Stat(precutFile); err == nil {
+				st.Original.SizeBytes = fi.Size()
+			}
+		}
+		st.Cleaned.Filename = filepath.Base(outputFile)
+		st.Cleaned.DurationSec = newDuration
+		st.Cleaned.AdDurationSec = actualCut
+		if fi, err := os.Stat(outputFile); err == nil {
+			st.Cleaned.SizeBytes = fi.Size()
+		}
+	})
+	syncAudiobookshelfDuration(&config, outputFile, newDuration)
+
+	if !cli.Quiet {
+		fmt.Println()
+		fmt.Println("DURATION & TIME SAVED SUMMARY (RECUT):")
+		fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
+		fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs)\n", formatTime(actualCut), actualCut)
+		fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
+		fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
+		fmt.Printf("  - Total Recut Time:        %s\n", formatClock(time.Since(fileStartTime).Seconds()))
+		fmt.Printf("Success! Recut ad-free episode saved to: '%s'\n", outputFile)
 	}
 }
 
@@ -164,10 +164,8 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 		if err := jsonUnmarshal(data, &td); err != nil {
 			return nil, fmt.Errorf("failed to parse transcript JSON: %w", err)
 		}
-		step1Duration := time.Since(*t0Step1)
 		if !cli.Quiet && cli.Verbose {
-			fmt.Println()
-			fmt.Printf("Step 1/3 (Transcript Loaded) finished in %s\n", formatClock(step1Duration.Seconds()))
+			fmt.Printf("\nStep 1/3 (Transcript Loaded) finished in %s\n", formatClock(time.Since(*t0Step1).Seconds()))
 		}
 		return &td, nil
 	}
@@ -178,42 +176,8 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 	}
 
 	if whisperPrompt == "" {
-		id3Tags := extractID3Tags(sourceAudioFile)
-		for k, v := range id3Tags {
-			id3TagsOut[k] = v
-		}
-		var tagTexts []string
-		for _, key := range []string{"title", "artist", "album", "genre", "comment", "description", "synopsis", "purl", "encodedby", "copyright"} {
-			if val, ok := id3TagsOut[key]; ok && val != "" {
-				tagTexts = append(tagTexts, val)
-			}
-		}
-		tagText := strings.Join(tagTexts, "\n")
-		if tagText != "" {
-			if !cli.Quiet {
-				if cli.Verbose {
-					keys := make([]string, 0, len(id3Tags))
-					for k := range id3Tags {
-						keys = append(keys, k)
-					}
-					fmt.Printf("   Extracted ID3 metadata: %s\n", strings.Join(keys, ", "))
-				}
-				fmt.Println("   Extracting keywords from metadata to improve transcription accuracy...")
-			}
-			extracted := extractKeywordsLLM(tagText, selectedProfile, cli.Quiet)
-			if extracted != "" {
-				whisperPrompt = extracted
-				if cli.Verbose {
-					fmt.Printf("   Using keywords: %s\n", whisperPrompt)
-				}
-			}
-		} else if !cli.Quiet {
-			fmt.Println("   No ID3 metadata found in file for keyword extraction.")
-		}
+		whisperPrompt = extractMetadataPrompt(sourceAudioFile, id3TagsOut, selectedProfile, cli)
 	}
-
-	chunkDuration := config.ChunkDurationSec
-	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 
 	dockerContainer := config.WhisperDockerContainer
 	if dockerContainer == "" {
@@ -223,14 +187,57 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 		}
 	}
 
-	whisperLangArg := whisperLanguage
-	whisperPromptArg := whisperPrompt
-	if whisperPromptArg == "" {
-		whisperPromptArg = ""
+	transcriptionData, err := runWhisperTranscription(sourceAudioFile, config, cli, totalDuration, speedFactor, whisperPrompt, whisperLanguage, dockerContainer)
+	if err != nil {
+		return nil, err
 	}
 
-	var transcriptionData *TranscriptionData
-	var err error
+	if !cli.Quiet && cli.Verbose {
+		fmt.Printf("Step 1/3 (Transcription) finished in %s\n", formatClock(time.Since(*t0Step1).Seconds()))
+	}
+	*isNewlyTranscribed = true
+	return transcriptionData, nil
+}
+
+func extractMetadataPrompt(sourceAudioFile string, id3TagsOut map[string]string, selectedProfile LLMProfile, cli CLIOptions) string {
+	id3Tags := extractID3Tags(sourceAudioFile)
+	for k, v := range id3Tags {
+		id3TagsOut[k] = v
+	}
+	var tagTexts []string
+	for _, key := range []string{"title", "artist", "album", "genre", "comment", "description", "synopsis", "purl", "encodedby", "copyright"} {
+		if val, ok := id3TagsOut[key]; ok && val != "" {
+			tagTexts = append(tagTexts, val)
+		}
+	}
+	tagText := strings.Join(tagTexts, "\n")
+	if tagText == "" {
+		if !cli.Quiet {
+			fmt.Println("   No ID3 metadata found in file for keyword extraction.")
+		}
+		return ""
+	}
+
+	if !cli.Quiet {
+		if cli.Verbose {
+			keys := make([]string, 0, len(id3Tags))
+			for k := range id3Tags {
+				keys = append(keys, k)
+			}
+			fmt.Printf("   Extracted ID3 metadata: %s\n", strings.Join(keys, ", "))
+		}
+		fmt.Println("   Extracting keywords from metadata to improve transcription accuracy...")
+	}
+	extracted := extractKeywordsLLM(tagText, selectedProfile, cli.Quiet)
+	if extracted != "" && cli.Verbose {
+		fmt.Printf("   Using keywords: %s\n", extracted)
+	}
+	return extracted
+}
+
+func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
+	chunkDuration := config.ChunkDurationSec
+	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 
 	if useChunks {
 		if !cli.Quiet {
@@ -241,43 +248,33 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, config Config, cli CLIOp
 			fmt.Printf("   Audio is %s long - splitting into %d chunks of %s for reliability...\n",
 				formatTime(totalDuration), numChunks, formatTime(float64(chunkDuration)))
 		}
-		transcriptionData, err = transcribeChunks(
+		return transcribeChunks(
 			sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
 			totalDuration, speedFactor, chunkDuration,
-			dockerContainer, whisperPromptArg, whisperLangArg,
+			dockerContainer, whisperPrompt, whisperLang,
 		)
-	} else {
-		transcriptionData, err = transcribeWhisper(
-			sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
-			totalDuration, speedFactor, dockerContainer,
-			whisperPromptArg, whisperLangArg, nil,
-		)
-		if err != nil && strings.Contains(err.Error(), "failed to") && totalDuration > 300 {
-			if !cli.Quiet {
-				fmt.Println("\nFull-file transcription failed - retrying in chunks...")
-			}
-			chunkDur := config.ChunkDurationSec
-			if chunkDur <= 0 {
-				chunkDur = 900
-			}
-			transcriptionData, err = transcribeChunks(
-				sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
-				totalDuration, speedFactor, chunkDur,
-				dockerContainer, whisperPromptArg, whisperLangArg,
-			)
+	}
+
+	data, err := transcribeWhisper(
+		sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
+		totalDuration, speedFactor, dockerContainer,
+		whisperPrompt, whisperLang, nil,
+	)
+	if err != nil && strings.Contains(err.Error(), "failed to") && totalDuration > 300 {
+		if !cli.Quiet {
+			fmt.Println("\nFull-file transcription failed - retrying in chunks...")
 		}
+		chunkDur := config.ChunkDurationSec
+		if chunkDur <= 0 {
+			chunkDur = 900
+		}
+		return transcribeChunks(
+			sourceAudioFile, config.WhisperURL, cli.Quiet, cli.Verbose,
+			totalDuration, speedFactor, chunkDur,
+			dockerContainer, whisperPrompt, whisperLang,
+		)
 	}
-
-	if err != nil {
-		return nil, err
-	}
-
-	step1Duration := time.Since(*t0Step1)
-	if !cli.Quiet && cli.Verbose {
-		fmt.Printf("Step 1/3 (Transcription) finished in %s\n", formatClock(step1Duration.Seconds()))
-	}
-	*isNewlyTranscribed = true
-	return transcriptionData, nil
+	return data, err
 }
 
 func formatTranscript(data *TranscriptionData, totalDuration float64) string {

@@ -92,8 +92,22 @@ func (m *tuiModel) drawLatestEpisodesScreen() string {
 		return out.String()
 	}
 
-	if m.latestIdx >= len(items) {
-		m.latestIdx = len(items) - 1
+	adjustLatestEpisodesScroll(m, len(items), maxVis)
+
+	start := m.latestScroll
+	end := min(len(items), start+maxVis)
+
+	for i := start; i < end; i++ {
+		out.WriteString(renderLatestEpisodeRow(items[i], i == m.latestIdx, m.width))
+	}
+
+	renderLatestEpisodesFooter(m, len(items), maxVis, dividerWidth, out)
+	return out.String()
+}
+
+func adjustLatestEpisodesScroll(m *tuiModel, totalItems, maxVis int) {
+	if m.latestIdx >= totalItems {
+		m.latestIdx = totalItems - 1
 	}
 	if m.latestIdx < 0 {
 		m.latestIdx = 0
@@ -104,87 +118,84 @@ func (m *tuiModel) drawLatestEpisodesScreen() string {
 	if m.latestIdx >= m.latestScroll+maxVis {
 		m.latestScroll = m.latestIdx - maxVis + 1
 	}
-	if m.latestScroll > max(0, len(items)-maxVis) {
-		m.latestScroll = max(0, len(items)-maxVis)
+	if m.latestScroll > max(0, totalItems-maxVis) {
+		m.latestScroll = max(0, totalItems-maxVis)
 	}
 	if m.latestScroll < 0 {
 		m.latestScroll = 0
 	}
+}
 
-	start := m.latestScroll
-	end := min(len(items), start+maxVis)
-
-	for i := start; i < end; i++ {
-		item := items[i]
-		ep := item.episode
-		displayNameStr := ep.displayTitle()
-		d := ep.displayDate()
-		dateStr := strings.Repeat(" ", 10)
-		if !d.IsZero() {
-			dateStr = d.Format("2006-01-02")
-		}
-
-		epGUID := ""
-		if ep.absData != nil {
-			epGUID = ep.absData.ID
-		}
-		inQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
-
-		podTag := fmt.Sprintf("[%s]", truncate(displayName(item.podcastName), 18))
-		availWidth := m.width - 2
-		isSelected := (i == m.latestIdx)
-
-		badgeStr := ""
-		if inQueue {
-			badgeStr = " [⏳ Queued]"
-		} else if ep.hasAdsRemoved {
-			badgeStr = " [✓ Ad-Free]"
-		}
-
-		txStr := ""
-		if ep.hasTranscript {
-			txStr = " [TX]"
-		}
-
-		durStr := ""
-		if ep.duration > 0 {
-			durStr = " (" + formatPlayerTime(ep.duration) + ")"
-		}
-
-		rowContent := fmt.Sprintf("%s %-20s %s%s%s%s", dateStr, podTag, displayNameStr, durStr, txStr, badgeStr)
-		truncRow := truncate(rowContent, availWidth-4)
-
-		if isSelected {
-			fullPad := max(0, availWidth-visibleRuneCount(truncRow)-2)
-			out.WriteString("  " + tuiSelectedStyle.Render(truncRow+strings.Repeat(" ", fullPad)) + "\n")
-		} else {
-			pTagRender := tuiPurpleStyle.Render(fmt.Sprintf("%-20s", podTag))
-			dRender := tuiSubtextStyle.Render(dateStr)
-			badgeRender := ""
-			if inQueue {
-				badgeRender = " " + tuiBadgeQueued.Render("[⏳ Queued]")
-			} else if ep.hasAdsRemoved {
-				badgeRender = " " + tuiGreenStyle.Render("[✓ Ad-Free]")
-			}
-			txRender := ""
-			if ep.hasTranscript {
-				txRender = " " + tuiCyanStyle.Render("[TX]")
-			}
-			durRender := ""
-			if ep.duration > 0 {
-				durRender = tuiDimStyle.Render(durStr)
-			}
-			titleRender := truncate(displayName(displayNameStr), max(10, availWidth-42-visibleRuneCount(durStr)-visibleRuneCount(badgeStr)-visibleRuneCount(txStr)))
-			out.WriteString(fmt.Sprintf("  %s %s %s%s%s%s\n", dRender, pTagRender, titleRender, durRender, txRender, badgeRender))
-		}
+func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) string {
+	ep := item.episode
+	displayNameStr := ep.displayTitle()
+	d := ep.displayDate()
+	dateStr := strings.Repeat(" ", 10)
+	if !d.IsZero() {
+		dateStr = d.Format("2006-01-02")
 	}
 
+	epGUID := ""
+	if ep.absData != nil {
+		epGUID = ep.absData.ID
+	}
+	inQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+
+	podTag := fmt.Sprintf("[%s]", truncate(displayName(item.podcastName), 18))
+	availWidth := width - 2
+
+	badgeStr := ""
+	if inQueue {
+		badgeStr = " [⏳ Queued]"
+	} else if ep.hasAdsRemoved {
+		badgeStr = " [✓ Ad-Free]"
+	}
+
+	txStr := ""
+	if ep.hasTranscript {
+		txStr = " [TX]"
+	}
+
+	durStr := ""
+	if ep.duration > 0 {
+		durStr = " (" + formatPlayerTime(ep.duration) + ")"
+	}
+
+	rowContent := fmt.Sprintf("%s %-20s %s%s%s%s", dateStr, podTag, displayNameStr, durStr, txStr, badgeStr)
+	truncRow := truncate(rowContent, availWidth-4)
+
+	if isSelected {
+		fullPad := max(0, availWidth-visibleRuneCount(truncRow)-2)
+		return "  " + tuiSelectedStyle.Render(truncRow+strings.Repeat(" ", fullPad)) + "\n"
+	}
+
+	pTagRender := tuiPurpleStyle.Render(fmt.Sprintf("%-20s", podTag))
+	dRender := tuiSubtextStyle.Render(dateStr)
+	badgeRender := ""
+	if inQueue {
+		badgeRender = " " + tuiBadgeQueued.Render("[⏳ Queued]")
+	} else if ep.hasAdsRemoved {
+		badgeRender = " " + tuiGreenStyle.Render("[✓ Ad-Free]")
+	}
+	txRender := ""
+	if ep.hasTranscript {
+		txRender = " " + tuiCyanStyle.Render("[TX]")
+	}
+	durRender := ""
+	if ep.duration > 0 {
+		durRender = tuiDimStyle.Render(durStr)
+	}
+	titleRender := truncate(displayName(displayNameStr), max(10, availWidth-42-visibleRuneCount(durStr)-visibleRuneCount(badgeStr)-visibleRuneCount(txStr)))
+	return fmt.Sprintf("  %s %s %s%s%s%s\n", dRender, pTagRender, titleRender, durRender, txRender, badgeRender)
+}
+
+func renderLatestEpisodesFooter(m *tuiModel, totalItems, maxVis, dividerWidth int, out *strings.Builder) {
 	helpText := "↑/↓ navigate │ Enter details │ D download │ p play │ r ad-queue │ / search │ Esc/q back"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█ (Enter: Apply, Esc: Cancel)", m.searchQuery)
-	} else if len(items) > maxVis {
-		pct := int(float64(m.latestIdx+1) / float64(len(items)) * 100)
-		helpText += fmt.Sprintf(" │ [%d/%d (%d%%)]", m.latestIdx+1, len(items), pct)
+	} else if totalItems > maxVis {
+		pct := int(float64(m.latestIdx+1) / float64(totalItems) * 100)
+		helpText += fmt.Sprintf(" │ [%d/%d (%d%%)]", m.latestIdx+1, totalItems, pct)
 	}
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 	if m.searchMode {
@@ -192,8 +203,6 @@ func (m *tuiModel) drawLatestEpisodesScreen() string {
 	} else {
 		out.WriteString(tuiDimStyle.Render("  "+helpText) + "\n")
 	}
-
-	return out.String()
 }
 
 func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {

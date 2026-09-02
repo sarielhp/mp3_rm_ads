@@ -20,8 +20,41 @@ import (
 
 func generateGenericCover(title string) image.Image {
 	const imgDim = 256
-	dst := image.NewRGBA(image.Rect(0, 0, imgDim, imgDim))
+	dst := initGenericCoverBackground(imgDim)
+	lines := wrapTitleLines(title)
 
+	const lineH = 14
+	srcBuf, maxLineW, rawH := renderTextBuffer(lines, lineH)
+
+	targetW := float64(imgDim) * 0.80
+	targetH := float64(imgDim) * 0.80
+
+	scaleX := targetW / float64(maxLineW)
+	scaleY := targetH / float64(rawH)
+	scale := scaleX
+	if scale*float64(rawH) > targetH {
+		scale = scaleY
+	}
+
+	scaledW := int(float64(maxLineW) * scale)
+	scaledH := int(float64(rawH) * scale)
+	if scaledW <= 0 {
+		scaledW = 1
+	}
+	if scaledH <= 0 {
+		scaledH = 1
+	}
+
+	dstX := (imgDim - scaledW) / 2
+	dstY := (imgDim - scaledH) / 2
+	dstRect := image.Rect(dstX, dstY, dstX+scaledW, dstY+scaledH)
+
+	draw.ApproxBiLinear.Scale(dst, dstRect, srcBuf, srcBuf.Bounds(), draw.Over, nil)
+	return dst
+}
+
+func initGenericCoverBackground(imgDim int) *image.RGBA {
+	dst := image.NewRGBA(image.Rect(0, 0, imgDim, imgDim))
 	bg := color.RGBA{R: 248, G: 249, B: 250, A: 255}
 	border := color.RGBA{R: 220, G: 224, B: 230, A: 255}
 	accent := color.RGBA{R: 70, G: 130, B: 180, A: 255}
@@ -37,7 +70,10 @@ func generateGenericCover(title string) image.Image {
 			}
 		}
 	}
+	return dst
+}
 
+func wrapTitleLines(title string) []string {
 	words := strings.Fields(title)
 	var lines []string
 	var cur string
@@ -64,8 +100,10 @@ func generateGenericCover(title string) image.Image {
 	if len(lines) == 0 {
 		lines = []string{"Podcast"}
 	}
+	return lines
+}
 
-	lineH := 14
+func renderTextBuffer(lines []string, lineH int) (*image.RGBA, int, int) {
 	rawH := len(lines) * lineH
 	maxLineW := 0
 	for _, l := range lines {
@@ -94,33 +132,7 @@ func generateGenericCover(title string) image.Image {
 		d.Dot = fixed.P(startX, i*lineH+11)
 		d.DrawString(l)
 	}
-
-	targetW := float64(imgDim) * 0.80
-	targetH := float64(imgDim) * 0.80
-
-	scaleX := targetW / float64(maxLineW)
-	scaleY := targetH / float64(rawH)
-	scale := scaleX
-	if scale*float64(rawH) > targetH {
-		scale = scaleY
-	}
-
-	scaledW := int(float64(maxLineW) * scale)
-	scaledH := int(float64(rawH) * scale)
-	if scaledW <= 0 {
-		scaledW = 1
-	}
-	if scaledH <= 0 {
-		scaledH = 1
-	}
-
-	dstX := (imgDim - scaledW) / 2
-	dstY := (imgDim - scaledH) / 2
-	dstRect := image.Rect(dstX, dstY, dstX+scaledW, dstY+scaledH)
-
-	draw.ApproxBiLinear.Scale(dst, dstRect, srcBuf, srcBuf.Bounds(), draw.Over, nil)
-
-	return dst
+	return srcBuf, maxLineW, rawH
 }
 
 func scaleImageThumbnail(img image.Image, targetW, targetH int) image.Image {

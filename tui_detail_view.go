@@ -18,34 +18,10 @@ func (m *tuiModel) drawPodcastDetail() string {
 	}
 
 	pod := m.podcasts[m.podIdx]
-
-	title := tuiTitleStyle.Render("  " + displayName(pod.name))
-	out.WriteString(title + "\n")
-
 	eps := m.filteredEpisodes()
-
-	total := len(eps)
-	done := 0
-	for _, e := range eps {
-		if e.hasAdsRemoved {
-			done++
-		}
-	}
-	queued := len(m.queue[pod.dir])
-
-	txCount := pod.transcribedCount()
-	policyLabel := adRemovalModeLabel(pod.config.AdRemoval)
-	dlPolicyLabel := downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
-	selCount := len(m.selectedEpisodes)
-	selInfo := ""
-	if selCount > 0 {
-		selInfo = fmt.Sprintf(" • %d selected ('a' queue ads, 'p' play)", selCount)
-	}
-	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • Ads: %s • DL: %s%s", total, done, txCount, queued, policyLabel, dlPolicyLabel, selInfo))
-	out.WriteString(statPill + "\n")
-
 	dividerWidth := max(0, m.width-4)
-	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+
+	renderPodcastDetailHeader(pod, eps, len(m.queue[pod.dir]), len(m.selectedEpisodes), dividerWidth, out)
 
 	overhead := 8
 	if globalPlayer.View().Has {
@@ -53,9 +29,63 @@ func (m *tuiModel) drawPodcastDetail() string {
 	}
 	maxVis := max(3, m.height-overhead)
 
-	if len(eps) > 0 {
-		if m.epIdx >= len(eps) {
-			m.epIdx = len(eps) - 1
+	adjustPodcastDetailScroll(m, len(eps), maxVis)
+
+	start := m.epScroll
+	end := min(len(eps), start+maxVis)
+	queueEntries := m.queue[pod.dir]
+
+	for i := start; i < end; i++ {
+		ep := eps[i]
+		epGUID := ""
+		if ep.absData != nil {
+			epGUID = ep.absData.ID
+		}
+		inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+		isQueued := isFileInQueue(ep.filename, queueEntries)
+		out.WriteString(renderPodcastDetailEpisodeRow(m, ep, i == m.epIdx, m.isEpisodeSelected(ep.path), inDLQueue, isQueued))
+		out.WriteByte('\n')
+	}
+
+	renderPodcastDetailFooter(m, len(eps), maxVis, dividerWidth, out)
+	return out.String()
+}
+
+func isFileInQueue(filename string, queueEntries []string) bool {
+	for _, q := range queueEntries {
+		if q == filename {
+			return true
+		}
+	}
+	return false
+}
+
+func renderPodcastDetailHeader(pod tuiPodcast, eps []tuiEpisode, queuedCount, selCount, dividerWidth int, out *strings.Builder) {
+	out.WriteString(tuiTitleStyle.Render("  "+displayName(pod.name)) + "\n")
+
+	done := 0
+	for _, e := range eps {
+		if e.hasAdsRemoved {
+			done++
+		}
+	}
+
+	txCount := pod.transcribedCount()
+	policyLabel := adRemovalModeLabel(pod.config.AdRemoval)
+	dlPolicyLabel := downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
+	selInfo := ""
+	if selCount > 0 {
+		selInfo = fmt.Sprintf(" • %d selected ('a' queue ads, 'p' play)", selCount)
+	}
+	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • Ads: %s • DL: %s%s", len(eps), done, txCount, queuedCount, policyLabel, dlPolicyLabel, selInfo))
+	out.WriteString(statPill + "\n")
+	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+}
+
+func adjustPodcastDetailScroll(m *tuiModel, totalEps, maxVis int) {
+	if totalEps > 0 {
+		if m.epIdx >= totalEps {
+			m.epIdx = totalEps - 1
 		}
 		if m.epIdx < 0 {
 			m.epIdx = 0
@@ -66,177 +96,136 @@ func (m *tuiModel) drawPodcastDetail() string {
 		if m.epIdx >= m.epScroll+maxVis {
 			m.epScroll = m.epIdx - maxVis + 1
 		}
-		if m.epScroll > max(0, len(eps)-maxVis) {
-			m.epScroll = max(0, len(eps)-maxVis)
+		if m.epScroll > max(0, totalEps-maxVis) {
+			m.epScroll = max(0, totalEps-maxVis)
 		}
 		if m.epScroll < 0 {
 			m.epScroll = 0
 		}
 	}
+}
 
-	start := m.epScroll
-	end := min(len(eps), start+maxVis)
-
-	queueEntries := m.queue[pod.dir]
-	isQueued := func(filename string) bool {
-		for _, q := range queueEntries {
-			if q == filename {
-				return true
-			}
-		}
-		return false
+func renderPodcastDetailEpisodeRow(m *tuiModel, ep tuiEpisode, isSelected, isBatchSelected, inDLQueue, isQueued bool) string {
+	displayNameStr := ep.displayTitle()
+	d := ep.displayDate()
+	dateStr := strings.Repeat(" ", 10)
+	if !d.IsZero() {
+		dateStr = d.Format("2006-01-02")
 	}
 
-	renderEpRow := func(i int) {
-		ep := eps[i]
-		displayNameStr := ep.displayTitle()
-		d := ep.displayDate()
-		dateStr := strings.Repeat(" ", 10)
-		if !d.IsZero() {
-			dateStr = d.Format("2006-01-02")
-		}
-
-		availWidth := m.width - 2
-		isSelected := (i == m.epIdx)
-		isBatchSelected := m.isEpisodeSelected(ep.path)
-
-		selPrefix := ""
-		if len(m.selectedEpisodes) > 0 {
-			if isBatchSelected {
-				selPrefix = "[x] "
-			} else {
-				selPrefix = "[ ] "
-			}
-		}
-
-		epGUID := ""
-		if ep.absData != nil {
-			epGUID = ep.absData.ID
-		}
-		inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
-
-		if availWidth >= 40 {
-			qBadgeWidth := 0
-			if isQueued(ep.filename) {
-				qBadgeWidth = 4
-			}
-			dlBadgeWidth := 0
-			if inDLQueue {
-				dlBadgeWidth = 11
-			}
-			txBadgeWidth := 0
-			if ep.hasTranscript {
-				txBadgeWidth = 5
-			}
-			selWidth := len([]rune(selPrefix))
-			titleWidth := availWidth - 16 - qBadgeWidth - dlBadgeWidth - txBadgeWidth - selWidth
-			if titleWidth < 10 {
-				titleWidth = 10
-			}
-			truncTitle := truncate(displayName(displayNameStr), titleWidth)
-			padLen := max(0, titleWidth-len([]rune(truncTitle)))
-			padding := strings.Repeat(" ", padLen)
-
-			if isSelected {
-				chk := "  "
-				if ep.isFeedOnly {
-					chk = "☁ "
-				} else if ep.hasAdsRemoved {
-					chk = "✓ "
-				}
-				txBadge := ""
-				if ep.hasTranscript {
-					txBadge = "[TX] "
-				}
-				qBadge := ""
-				if isQueued(ep.filename) {
-					qBadge = " [Q]"
-				}
-				dlBadge := ""
-				if inDLQueue {
-					dlBadge = " [⏳ Queued]"
-				}
-				plainLine := "  " + selPrefix + dateStr + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
-				fullPad := max(0, availWidth-len([]rune(plainLine)))
-				fullRow := plainLine + strings.Repeat(" ", fullPad)
-				out.WriteString(tuiSelectedStyle.Render(fullRow))
-			} else {
-				chk := "  "
-				if ep.isFeedOnly {
-					chk = tuiYellowStyle.Render("☁") + " "
-				} else if ep.hasAdsRemoved {
-					chk = tuiGreenStyle.Render("✓") + " "
-				}
-				txBadge := ""
-				if ep.hasTranscript {
-					txBadge = tuiCyanStyle.Render("[TX]") + " "
-				}
-				qBadge := ""
-				if isQueued(ep.filename) {
-					qBadge = " " + tuiBadgeQueued.Render("[Q]")
-				}
-				dlBadge := ""
-				if inDLQueue {
-					dlBadge = " " + tuiBadgeQueued.Render("[⏳ Queued]")
-				}
-				selRender := selPrefix
-				if isBatchSelected {
-					selRender = tuiYellowStyle.Render("[x] ")
-				}
-				line := "  " + selRender + tuiSubtextStyle.Render(dateStr) + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
-				out.WriteString(line)
-			}
+	availWidth := m.width - 2
+	selPrefix := ""
+	if len(m.selectedEpisodes) > 0 {
+		if isBatchSelected {
+			selPrefix = "[x] "
 		} else {
-			if isSelected {
-				chk := " "
-				if ep.isFeedOnly {
-					chk = "☁"
-				} else if ep.hasAdsRemoved {
-					chk = "✓"
-				}
-				txBadge := ""
-				if ep.hasTranscript {
-					txBadge = "[TX]"
-				}
-				qBadge := ""
-				if isQueued(ep.filename) {
-					qBadge = " [Q]"
-				}
-				line := selPrefix + dateStr + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
-				truncLine := truncate(line, max(1, m.width-1))
-				fullPad := max(0, (m.width-1)-len([]rune(truncLine)))
-				out.WriteString(tuiSelectedStyle.Render(truncLine + strings.Repeat(" ", fullPad)))
-			} else {
-				chk := " "
-				if ep.isFeedOnly {
-					chk = tuiYellowStyle.Render("☁")
-				} else if ep.hasAdsRemoved {
-					chk = tuiGreenStyle.Render("✓")
-				}
-				txBadge := ""
-				if ep.hasTranscript {
-					txBadge = tuiCyanStyle.Render("[TX]")
-				}
-				qBadge := ""
-				if isQueued(ep.filename) {
-					qBadge = " " + tuiBadgeQueued.Render("[Q]")
-				}
-				line := selPrefix + tuiSubtextStyle.Render(dateStr) + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
-				out.WriteString(truncate(line, max(1, m.width-1)))
-			}
+			selPrefix = "[ ] "
 		}
-		out.WriteByte('\n')
 	}
 
-	for i := start; i < end; i++ {
-		renderEpRow(i)
+	if availWidth >= 40 {
+		return renderWideDetailEpisodeRow(ep, displayNameStr, dateStr, selPrefix, availWidth, isSelected, isBatchSelected, inDLQueue, isQueued)
+	}
+	return renderNarrowDetailEpisodeRow(ep, displayNameStr, dateStr, selPrefix, m.width, isSelected, inDLQueue, isQueued)
+}
+
+func renderWideDetailEpisodeRow(ep tuiEpisode, displayNameStr, dateStr, selPrefix string, availWidth int, isSelected, isBatchSelected, inDLQueue, isQueued bool) string {
+	qBadgeWidth, dlBadgeWidth, txBadgeWidth := 0, 0, 0
+	if isQueued {
+		qBadgeWidth = 4
+	}
+	if inDLQueue {
+		dlBadgeWidth = 11
+	}
+	if ep.hasTranscript {
+		txBadgeWidth = 5
+	}
+	titleWidth := max(10, availWidth-16-qBadgeWidth-dlBadgeWidth-txBadgeWidth-len([]rune(selPrefix)))
+	truncTitle := truncate(displayName(displayNameStr), titleWidth)
+	padding := strings.Repeat(" ", max(0, titleWidth-len([]rune(truncTitle))))
+
+	chk, txBadge, qBadge, dlBadge := "  ", "", "", ""
+	if isSelected {
+		if ep.isFeedOnly {
+			chk = "☁ "
+		} else if ep.hasAdsRemoved {
+			chk = "✓ "
+		}
+		if ep.hasTranscript {
+			txBadge = "[TX] "
+		}
+		if isQueued {
+			qBadge = " [Q]"
+		}
+		if inDLQueue {
+			dlBadge = " [⏳ Queued]"
+		}
+		plainLine := "  " + selPrefix + dateStr + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
+		fullPad := max(0, availWidth-len([]rune(plainLine)))
+		return tuiSelectedStyle.Render(plainLine + strings.Repeat(" ", fullPad))
 	}
 
+	if ep.isFeedOnly {
+		chk = tuiYellowStyle.Render("☁") + " "
+	} else if ep.hasAdsRemoved {
+		chk = tuiGreenStyle.Render("✓") + " "
+	}
+	if ep.hasTranscript {
+		txBadge = tuiCyanStyle.Render("[TX]") + " "
+	}
+	if isQueued {
+		qBadge = " " + tuiBadgeQueued.Render("[Q]")
+	}
+	if inDLQueue {
+		dlBadge = " " + tuiBadgeQueued.Render("[⏳ Queued]")
+	}
+	selRender := selPrefix
+	if isBatchSelected {
+		selRender = tuiYellowStyle.Render("[x] ")
+	}
+	return "  " + selRender + tuiSubtextStyle.Render(dateStr) + "  " + chk + txBadge + truncTitle + padding + qBadge + dlBadge
+}
+
+func renderNarrowDetailEpisodeRow(ep tuiEpisode, displayNameStr, dateStr, selPrefix string, width int, isSelected, inDLQueue, isQueued bool) string {
+	chk, txBadge, qBadge := " ", "", ""
+	if isSelected {
+		if ep.isFeedOnly {
+			chk = "☁"
+		} else if ep.hasAdsRemoved {
+			chk = "✓"
+		}
+		if ep.hasTranscript {
+			txBadge = "[TX]"
+		}
+		if isQueued {
+			qBadge = " [Q]"
+		}
+		line := selPrefix + dateStr + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
+		truncLine := truncate(line, max(1, width-1))
+		return tuiSelectedStyle.Render(truncLine + strings.Repeat(" ", max(0, (width-1)-len([]rune(truncLine)))))
+	}
+
+	if ep.isFeedOnly {
+		chk = tuiYellowStyle.Render("☁")
+	} else if ep.hasAdsRemoved {
+		chk = tuiGreenStyle.Render("✓")
+	}
+	if ep.hasTranscript {
+		txBadge = tuiCyanStyle.Render("[TX]")
+	}
+	if isQueued {
+		qBadge = " " + tuiBadgeQueued.Render("[Q]")
+	}
+	line := selPrefix + tuiSubtextStyle.Render(dateStr) + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
+	return truncate(line, max(1, width-1))
+}
+
+func renderPodcastDetailFooter(m *tuiModel, totalEps, maxVis, dividerWidth int, out *strings.Builder) {
 	helpText := "↑↓ navigate │ Enter details │ p play │ F fetch-feed │ D download │ v select │ a batch-queue │ t transcript │ ? help"
 	if m.searchMode {
 		helpText = fmt.Sprintf("Search: %s█  (Enter: Apply, Esc: Cancel)", m.searchQuery)
-	} else if len(eps) > maxVis {
-		helpText += fmt.Sprintf(" │ [%d/%d]", m.epIdx+1, len(eps))
+	} else if totalEps > maxVis {
+		helpText += fmt.Sprintf(" │ [%d/%d]", m.epIdx+1, totalEps)
 	}
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 	if m.searchMode {
@@ -244,6 +233,4 @@ func (m *tuiModel) drawPodcastDetail() string {
 	} else {
 		out.WriteString(tuiDimStyle.Render("  "+helpText) + "\n")
 	}
-
-	return out.String()
 }

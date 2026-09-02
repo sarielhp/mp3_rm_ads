@@ -192,64 +192,11 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 	base := stripExt(mainFile)
 	cutsFile := base + ".cuts.json"
 
-	existingRaw := []AdSegment{}
-	existingMerged := []MergedCutInterval{}
-	var existingCutsData *CutsData
+	existingRaw, existingMerged, existingCutsData := loadExistingCuts(cutsFile)
+	combined := append(existingRaw, adSegments...)
 
-	if fileExists(cutsFile) {
-		data, err := readFile(cutsFile)
-		if err == nil {
-			var existing CutsData
-			if jsonUnmarshal(data, &existing) == nil {
-				existingCutsData = &existing
-				existingMerged = append(existingMerged, existing.MergedCutIntervals...)
-				for _, c := range existing.CutIntervals {
-					st := c.StartSec
-					en := c.EndSec
-					existingRaw = append(existingRaw, AdSegment{Start: st, End: en, Reason: c.Reason})
-				}
-			}
-		}
-	}
-
-	combined := existingRaw
-	combined = append(combined, adSegments...)
-
-	formattedRaw := make([]CutEntry, 0, len(combined))
-	for _, ad := range combined {
-		dur := roundFloat(ad.End-ad.Start, 2)
-		entry := CutEntry{
-			StartSec:       roundFloat(ad.Start, 2),
-			EndSec:         roundFloat(ad.End, 2),
-			DurationSec:    dur,
-			StartFormatted: formatClock(ad.Start),
-			EndFormatted:   formatClock(ad.End),
-		}
-		if ad.Reason != "" {
-			entry.Reason = ad.Reason
-		}
-		formattedRaw = append(formattedRaw, entry)
-	}
-
-	allBounds := make([][2]float64, 0, len(combined))
-	for _, ad := range combined {
-		allBounds = append(allBounds, [2]float64{ad.Start, ad.End})
-	}
-	sortBounds(allBounds)
-
-	newMerged := mergeBounds(allBounds)
-
-	formattedMerged := make([]MergedCutInterval, 0, len(newMerged))
-	for _, b := range newMerged {
-		formattedMerged = append(formattedMerged, MergedCutInterval{Start: roundFloat(b[0], 2), End: roundFloat(b[1], 2)})
-	}
-
-	keep := calculateKeepSegments(totalDuration, combined)
-
-	keepIntervals := make([]KeepSegment, 0, len(keep))
-	for _, k := range keep {
-		keepIntervals = append(keepIntervals, KeepSegment{Start: roundFloat(k[0], 2), End: roundFloat(k[1], 2)})
-	}
+	formattedRaw := buildCutEntries(combined)
+	formattedMerged, keep, keepIntervals := buildMergedAndKeepIntervals(totalDuration, combined)
 
 	if existingCutsData != nil && equalMergedIntervals(existingMerged, formattedMerged) {
 		if !quiet {
@@ -273,11 +220,9 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 		llmInfo = fmt.Sprintf("%s (%s)", profile.Name, profile.Model)
 	}
 
-	generatorName := "abs"
-
 	cutsData := CutsData{
 		Version:             1,
-		Generator:           generatorName,
+		Generator:           "abs",
 		LLMUsed:             llmInfo,
 		TargetFile:          filepathBase(mainFile),
 		OriginalDurationSec: roundFloat(totalDuration, 2),
@@ -299,6 +244,66 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 		KeepSegments: keep,
 		Changed:      true,
 	}
+}
+
+func loadExistingCuts(cutsFile string) ([]AdSegment, []MergedCutInterval, *CutsData) {
+	var existingRaw []AdSegment
+	var existingMerged []MergedCutInterval
+	var existingCutsData *CutsData
+
+	if fileExists(cutsFile) {
+		data, err := readFile(cutsFile)
+		if err == nil {
+			var existing CutsData
+			if jsonUnmarshal(data, &existing) == nil {
+				existingCutsData = &existing
+				existingMerged = append(existingMerged, existing.MergedCutIntervals...)
+				for _, c := range existing.CutIntervals {
+					existingRaw = append(existingRaw, AdSegment{Start: c.StartSec, End: c.EndSec, Reason: c.Reason})
+				}
+			}
+		}
+	}
+	return existingRaw, existingMerged, existingCutsData
+}
+
+func buildCutEntries(combined []AdSegment) []CutEntry {
+	formattedRaw := make([]CutEntry, 0, len(combined))
+	for _, ad := range combined {
+		entry := CutEntry{
+			StartSec:       roundFloat(ad.Start, 2),
+			EndSec:         roundFloat(ad.End, 2),
+			DurationSec:    roundFloat(ad.End-ad.Start, 2),
+			StartFormatted: formatClock(ad.Start),
+			EndFormatted:   formatClock(ad.End),
+		}
+		if ad.Reason != "" {
+			entry.Reason = ad.Reason
+		}
+		formattedRaw = append(formattedRaw, entry)
+	}
+	return formattedRaw
+}
+
+func buildMergedAndKeepIntervals(totalDuration float64, combined []AdSegment) ([]MergedCutInterval, [][2]float64, []KeepSegment) {
+	allBounds := make([][2]float64, 0, len(combined))
+	for _, ad := range combined {
+		allBounds = append(allBounds, [2]float64{ad.Start, ad.End})
+	}
+	sortBounds(allBounds)
+
+	newMerged := mergeBounds(allBounds)
+	formattedMerged := make([]MergedCutInterval, 0, len(newMerged))
+	for _, b := range newMerged {
+		formattedMerged = append(formattedMerged, MergedCutInterval{Start: roundFloat(b[0], 2), End: roundFloat(b[1], 2)})
+	}
+
+	keep := calculateKeepSegments(totalDuration, combined)
+	keepIntervals := make([]KeepSegment, 0, len(keep))
+	for _, k := range keep {
+		keepIntervals = append(keepIntervals, KeepSegment{Start: roundFloat(k[0], 2), End: roundFloat(k[1], 2)})
+	}
+	return formattedMerged, keep, keepIntervals
 }
 
 func stripExt(path string) string {

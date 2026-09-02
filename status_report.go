@@ -118,7 +118,6 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 	if err != nil {
 		return err
 	}
-
 	libs, err := b.PodcastLibraries()
 	if err != nil {
 		return err
@@ -126,7 +125,6 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 	if len(libs) == 0 {
 		return fmt.Errorf("no podcast libraries found in ABS")
 	}
-
 	allItems, err := b.Podcasts()
 	if err != nil {
 		return err
@@ -135,13 +133,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		return fmt.Errorf("no podcasts found in ABS")
 	}
 
-	localPodcasts, _ := loadTUIPodcasts(podcastsDir)
-	localByName := make(map[string]tuiPodcast)
-	for _, lp := range localPodcasts {
-		localByName[strings.ToLower(lp.name)] = lp
-		localByName[strings.ToLower(filepath.Base(lp.dir))] = lp
-	}
-
+	localByName, podIDByDir := buildPodcastMapsForStatus(podcastsDir)
 	if !quiet {
 		fmt.Printf("\n%s\n", strings.Repeat("=", 90))
 		fmt.Println("AUDIOBOOKSHELF DATABASE STATUS REPORT (DRY RUN)")
@@ -153,53 +145,14 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
 
-	podEntries := scanPodcastDirs(podcastsDir)
-	podIDByDir := make(map[string]string)
-	for _, p := range podEntries {
-		podIDByDir[p.dir] = p.shortID
-		podIDByDir[strings.ToLower(p.title)] = p.shortID
-		podIDByDir[strings.ToLower(p.folderName)] = p.shortID
-	}
-
 	for idx, item := range allItems {
 		title := item.Media.Metadata.Title
-		relBase := filepath.Base(item.RelPath)
-
 		dName := displayName(title)
 		if len(dName) > 48 {
 			dName = dName[:45] + "..."
 		}
-
 		absEpisodeCount := len(item.Media.Episodes)
-		needsAdRemoval := 0
-		lp, ok := localByName[strings.ToLower(title)]
-		if !ok {
-			lp, ok = localByName[strings.ToLower(relBase)]
-		}
-
-		shortID := ""
-		if ok {
-			shortID = podIDByDir[lp.dir]
-			if shortID == "" {
-				shortID = getOrSetPodcastShortID(lp.dir, title)
-			}
-			mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
-			podCfg := loadPodcastConfig(lp.dir)
-			if podCfg.AdRemoval != AdRemovalNone {
-				filtered := filterMP3FilesByPodcastConfig(mp3Files, lp.dir, podCfg)
-				for _, mp3 := range filtered {
-					_ = getOrCreateEpisodeStatus(mp3)
-					if !isEpisodeCompleted(mp3) {
-						needsAdRemoval++
-					}
-				}
-			}
-		} else {
-			shortID = podIDByDir[strings.ToLower(title)]
-			if shortID == "" {
-				shortID = generatePodcastShortID(title)
-			}
-		}
+		shortID, needsAdRemoval := calculateItemAdRemovalCount(item, localByName, podIDByDir)
 
 		totalEpisodes += absEpisodeCount
 		totalNeedsAdRemoval += needsAdRemoval
@@ -214,8 +167,60 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
 		fmt.Printf("%s\n\n", strings.Repeat("=", 90))
 	}
-
 	return nil
+}
+
+func buildPodcastMapsForStatus(podcastsDir string) (map[string]tuiPodcast, map[string]string) {
+	localPodcasts, _ := loadTUIPodcasts(podcastsDir)
+	localByName := make(map[string]tuiPodcast)
+	for _, lp := range localPodcasts {
+		localByName[strings.ToLower(lp.name)] = lp
+		localByName[strings.ToLower(filepath.Base(lp.dir))] = lp
+	}
+
+	podEntries := scanPodcastDirs(podcastsDir)
+	podIDByDir := make(map[string]string)
+	for _, p := range podEntries {
+		podIDByDir[p.dir] = p.shortID
+		podIDByDir[strings.ToLower(p.title)] = p.shortID
+		podIDByDir[strings.ToLower(p.folderName)] = p.shortID
+	}
+	return localByName, podIDByDir
+}
+
+func calculateItemAdRemovalCount(item Podcast, localByName map[string]tuiPodcast, podIDByDir map[string]string) (string, int) {
+	title := item.Media.Metadata.Title
+	relBase := filepath.Base(item.RelPath)
+	lp, ok := localByName[strings.ToLower(title)]
+	if !ok {
+		lp, ok = localByName[strings.ToLower(relBase)]
+	}
+
+	needsAdRemoval := 0
+	shortID := ""
+	if ok {
+		shortID = podIDByDir[lp.dir]
+		if shortID == "" {
+			shortID = getOrSetPodcastShortID(lp.dir, title)
+		}
+		mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
+		podCfg := loadPodcastConfig(lp.dir)
+		if podCfg.AdRemoval != AdRemovalNone {
+			filtered := filterMP3FilesByPodcastConfig(mp3Files, lp.dir, podCfg)
+			for _, mp3 := range filtered {
+				_ = getOrCreateEpisodeStatus(mp3)
+				if !isEpisodeCompleted(mp3) {
+					needsAdRemoval++
+				}
+			}
+		}
+	} else {
+		shortID = podIDByDir[strings.ToLower(title)]
+		if shortID == "" {
+			shortID = generatePodcastShortID(title)
+		}
+	}
+	return shortID, needsAdRemoval
 }
 
 func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {

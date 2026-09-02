@@ -7,22 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 )
 
-func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
-	tempDir := t.TempDir()
-	m := makeTestModel()
-	m.podcasts[0].dir = tempDir
-	m.podIdx = 0
-	m.width = 80
-	m.screen = screenPodcasts
-
-	m.openDownloadPolicyModal()
-	if !m.showDownloadPolicyModal {
-		t.Fatalf("expected modal open after openDownloadPolicyModal()")
-	}
-	if m.downloadPolicyModalIdx != 0 {
-		t.Errorf("expected initial modal idx 0 for default none, got %d", m.downloadPolicyModalIdx)
-	}
-
+func testDownloadPolicyIndexNavigation(t *testing.T, m *tuiModel) {
 	m.handleKey(tea.KeyMsg{Type: tea.KeyDown})
 	if m.downloadPolicyModalIdx != 1 {
 		t.Errorf("expected idx 1 after Down, got %d", m.downloadPolicyModalIdx)
@@ -39,7 +24,6 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	if m.downloadPolicyModalIdx != 3 {
 		t.Errorf("expected idx to remain 3 at bottom, got %d", m.downloadPolicyModalIdx)
 	}
-
 	m.handleKey(tea.KeyMsg{Type: tea.KeyUp})
 	if m.downloadPolicyModalIdx != 2 {
 		t.Errorf("expected idx 2 after Up, got %d", m.downloadPolicyModalIdx)
@@ -48,7 +32,6 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	if m.downloadPolicyModalIdx != 1 {
 		t.Errorf("expected idx 1 after k, got %d", m.downloadPolicyModalIdx)
 	}
-
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	if m.downloadPolicyModalIdx != 3 {
 		t.Errorf("expected idx 3 after pressing '4', got %d", m.downloadPolicyModalIdx)
@@ -61,7 +44,9 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	if m.downloadPolicyModalIdx != 2 {
 		t.Errorf("expected idx 2 after pressing '3', got %d", m.downloadPolicyModalIdx)
 	}
+}
 
+func testDownloadPolicyKAdjustment(t *testing.T, m *tuiModel) {
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
 	if m.downloadPolicyModalK != 4 {
 		t.Errorf("expected K 4 after '=', got %d", m.downloadPolicyModalK)
@@ -78,16 +63,30 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	if m.downloadPolicyModalK != 3 {
 		t.Errorf("expected K 3 after 'h', got %d", m.downloadPolicyModalK)
 	}
+}
+
+func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
+	tempDir := t.TempDir()
+	m := makeTestModel()
+	m.podcasts[0].dir = tempDir
+	m.podIdx = 0
+	m.width = 80
+	m.screen = screenPodcasts
+
+	m.openDownloadPolicyModal()
+	if !m.showDownloadPolicyModal || m.downloadPolicyModalIdx != 0 {
+		t.Fatalf("expected modal open with idx 0, got show=%v idx=%d", m.showDownloadPolicyModal, m.downloadPolicyModalIdx)
+	}
+
+	testDownloadPolicyIndexNavigation(t, m)
+	testDownloadPolicyKAdjustment(t, m)
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.showDownloadPolicyModal {
 		t.Errorf("expected modal to close after Enter")
 	}
-	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
-		t.Errorf("expected policy latest_k, got %s", m.podcasts[0].config.DownloadPolicy)
-	}
-	if m.podcasts[0].config.DownloadK != 3 {
-		t.Errorf("expected K 3, got %d", m.podcasts[0].config.DownloadK)
+	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK || m.podcasts[0].config.DownloadK != 3 {
+		t.Errorf("expected policy latest_k 3, got %s %d", m.podcasts[0].config.DownloadPolicy, m.podcasts[0].config.DownloadK)
 	}
 
 	saved := loadPodcastConfig(tempDir)

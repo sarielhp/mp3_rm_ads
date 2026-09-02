@@ -130,6 +130,14 @@ func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {
 		},
 	}
 
+	populatePrecutOrCutsMeta(st, audioPath, fname, dur, sz)
+	populateAdsFromCutsFile(st, stripExt(audioPath)+".cuts.json")
+
+	_ = saveEpisodeStatus(statPath, st)
+	return st
+}
+
+func populatePrecutOrCutsMeta(st *EpisodeStatusFile, audioPath, fname string, dur float64, sz int64) {
 	base := stripExt(audioPath)
 	cutsFile := base + ".cuts.json"
 	transcriptFile := base + ".transcript.json"
@@ -165,24 +173,27 @@ func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {
 			}
 		}
 	}
+}
 
-	if fileExists(cutsFile) {
-		if data, err := os.ReadFile(cutsFile); err == nil {
-			var cd CutsData
-			if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
-				for _, c := range cd.CutIntervals {
-					st.Ads = append(st.Ads, EpisodeAdCut{
-						Start:  c.StartSec,
-						End:    c.EndSec,
-						Reason: c.Reason,
-					})
-				}
-			}
-		}
+func populateAdsFromCutsFile(st *EpisodeStatusFile, cutsFile string) {
+	if !fileExists(cutsFile) {
+		return
 	}
-
-	_ = saveEpisodeStatus(statPath, st)
-	return st
+	data, err := os.ReadFile(cutsFile)
+	if err != nil {
+		return
+	}
+	var cd CutsData
+	if json.Unmarshal(data, &cd) != nil || len(cd.CutIntervals) == 0 {
+		return
+	}
+	for _, c := range cd.CutIntervals {
+		st.Ads = append(st.Ads, EpisodeAdCut{
+			Start:  c.StartSec,
+			End:    c.EndSec,
+			Reason: c.Reason,
+		})
+	}
 }
 
 func updateEpisodeStatus(audioPath string, mutate func(*EpisodeStatusFile)) error {

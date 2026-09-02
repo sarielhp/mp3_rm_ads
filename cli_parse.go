@@ -85,7 +85,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	keepVal := -1
 	countVal := -1
 
-	app := &clihelp.App{
+	return &clihelp.App{
 		Name:                "abs",
 		Description:         "Automatic Ad Segment Remover & Podcast Manager",
 		Version:             getVersion(),
@@ -98,111 +98,129 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			buildLsCommand(opts, action),
 			buildRecutCommand(opts, action),
 			buildExportCommand(opts, action),
-			{
-				Name:        "tui",
-				Description: "Interactive TUI browser for podcasts and episodes",
-				UsageLine:   "abs tui [directory]",
-				Parameters: []clihelp.Param{
-					{Name: "[directory]", Description: "Optional path to podcasts directory (defaults to configured podcasts_dir)"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Options: []clihelp.Option{
-					clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),
-					clihelp.Bool(&opts.Debug, "-d, --debug", false, "Enable debug mode with key logging and screen snapshots (F12)"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "tui"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "status",
-				Description: "Show status overview of local library and remote worker (or 'status podcasts' for full table)",
-				UsageLine:   "abs status [podcasts|<podcasts_dir>]",
-				Parameters: []clihelp.Param{
-					{Name: "[podcasts]", Description: "Use 'podcasts' or directory path to show full detailed table"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "status"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-
-			{
-				Name:        "test",
-				Description: "Test external services like Whisper server or Audiobookshelf",
-				UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
-				Parameters: []clihelp.Param{
-					{Name: "<whisper|abs|kitty>", Description: "Target service/device to test ('whisper', 'abs', or 'kitty')"},
-					{Name: "[args]", Description: "Optional test arguments (e.g., 'map' or 'download' for abs, or path to an image file for kitty)"},
-				},
-				Args: clihelp.RangeArgs(0, 2),
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
-					clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
-					clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
-					clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
-					clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "test"
-					opts.Args = ctx.Args
-					if len(ctx.Args) > 0 {
-						switch ctx.Args[0] {
-						case "whisper", "whisper-server":
-							opts.TestWhisper = true
-						case "abs":
-							if len(ctx.Args) > 1 {
-								switch ctx.Args[1] {
-								case "map":
-									opts.TestABSMap = true
-								case "download":
-									opts.TestABSDownload = true
-								default:
-									opts.TestABS = true
-								}
-							} else {
-								opts.TestABS = true
-							}
-						case "kitty":
-							opts.TestKitty = true
-						}
-					}
-					if !opts.TestWhisper && !opts.TestABS && !opts.TestABSMap && !opts.TestABSDownload && !opts.TestKitty {
-						opts.TestWhisper = true
-					}
-					return nil
-				},
-			},
+			buildTUICommand(opts, action),
+			buildStatusCommand(opts, action),
+			buildTestCommand(opts, action),
 			buildServerCommand(opts, action, &countVal, &keepVal),
 			buildConfigCommand(opts, action),
 			buildRemoteCommand(opts, action),
 			buildBatchWorkerCommand(opts, action),
-			{
-				Name:        "help",
-				Description: "Display usage help message for abs or a specific command",
-				UsageLine:   "abs help [<command>]",
-				Run: func(ctx *clihelp.Context) error {
-					if len(ctx.Args) > 0 {
-						topic := strings.ToLower(ctx.Args[0])
-						if topic == "tree" || topic == "--tree" || topic == "t" {
-							ctx.App.RenderTree(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
-							os.Exit(0)
-						}
-						ctx.App.RenderCommand(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager}, ctx.Args...)
-					} else {
-						ctx.App.RenderGlobal(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
-					}
-					os.Exit(0)
-					return nil
-				},
-			},
+			buildHelpCommand(),
 		},
 	}
-	return app
+}
+
+func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "tui",
+		Description: "Interactive TUI browser for podcasts and episodes",
+		UsageLine:   "abs tui [directory]",
+		Parameters: []clihelp.Param{
+			{Name: "[directory]", Description: "Optional path to podcasts directory (defaults to configured podcasts_dir)"},
+		},
+		Args: clihelp.MaximumNArgs(1),
+		Options: []clihelp.Option{
+			clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),
+			clihelp.Bool(&opts.Debug, "-d, --debug", false, "Enable debug mode with key logging and screen snapshots (F12)"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "tui"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "status",
+		Description: "Show status overview of local library and remote worker (or 'status podcasts' for full table)",
+		UsageLine:   "abs status [podcasts|<podcasts_dir>]",
+		Parameters: []clihelp.Param{
+			{Name: "[podcasts]", Description: "Use 'podcasts' or directory path to show full detailed table"},
+		},
+		Args: clihelp.MaximumNArgs(1),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "status"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildTestCommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "test",
+		Description: "Test external services like Whisper server or Audiobookshelf",
+		UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
+		Parameters: []clihelp.Param{
+			{Name: "<whisper|abs|kitty>", Description: "Target service/device to test ('whisper', 'abs', or 'kitty')"},
+			{Name: "[args]", Description: "Optional test arguments (e.g., 'map' or 'download' for abs, or path to an image file for kitty)"},
+		},
+		Args: clihelp.RangeArgs(0, 2),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
+			clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
+			clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
+			clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
+			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "test"
+			opts.Args = ctx.Args
+			resolveTestCommandArgs(ctx.Args, opts)
+			return nil
+		},
+	}
+}
+
+func resolveTestCommandArgs(args []string, opts *CLIOptions) {
+	if len(args) > 0 {
+		switch args[0] {
+		case "whisper", "whisper-server":
+			opts.TestWhisper = true
+		case "abs":
+			if len(args) > 1 {
+				switch args[1] {
+				case "map":
+					opts.TestABSMap = true
+				case "download":
+					opts.TestABSDownload = true
+				default:
+					opts.TestABS = true
+				}
+			} else {
+				opts.TestABS = true
+			}
+		case "kitty":
+			opts.TestKitty = true
+		}
+	}
+	if !opts.TestWhisper && !opts.TestABS && !opts.TestABSMap && !opts.TestABSDownload && !opts.TestKitty {
+		opts.TestWhisper = true
+	}
+}
+
+func buildHelpCommand() clihelp.Command {
+	return clihelp.Command{
+		Name:        "help",
+		Description: "Display usage help message for abs or a specific command",
+		UsageLine:   "abs help [<command>]",
+		Run: func(ctx *clihelp.Context) error {
+			if len(ctx.Args) > 0 {
+				topic := strings.ToLower(ctx.Args[0])
+				if topic == "tree" || topic == "--tree" || topic == "t" {
+					ctx.App.RenderTree(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
+					os.Exit(0)
+				}
+				ctx.App.RenderCommand(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager}, ctx.Args...)
+			} else {
+				ctx.App.RenderGlobal(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
+			}
+			os.Exit(0)
+			return nil
+		},
+	}
 }
 
 func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {

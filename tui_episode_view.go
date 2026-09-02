@@ -23,9 +23,26 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	}
 
 	ep := eps[m.epIdx]
+	absEp := resolveABSEpisode(pod.dir, ep)
+
+	if isKittyTerminal() {
+		out.WriteString(kittyClearGraphics())
+	}
+
+	fullTitle, dateStr, totalDurStr, badgeLeft, descClean := formatEpisodeDetailFields(pod, ep, absEp, m.epIdx)
+	maxLines := max(10, m.height-6)
+
+	if m.showEpisodePlayerPane && m.width >= 70 {
+		return renderEpisodeDetailSplitView(m, ep, fullTitle, dateStr, badgeLeft, descClean, totalDurStr, maxLines)
+	}
+
+	return renderEpisodeDetailFullView(m, fullTitle, dateStr, badgeLeft, descClean, maxLines)
+}
+
+func resolveABSEpisode(podDir string, ep tuiEpisode) *absEpisode {
 	absEp := ep.absData
 	if absEp == nil {
-		if cachedDet, err := loadEpisodeDetails(pod.dir, ep.filename); err == nil && cachedDet != nil {
+		if cachedDet, err := loadEpisodeDetails(podDir, ep.filename); err == nil && cachedDet != nil {
 			absEp = cachedDet.RawABS
 			if absEp == nil && (cachedDet.Description != "" || cachedDet.Subtitle != "") {
 				absEp = &absEpisode{
@@ -37,14 +54,12 @@ func (m *tuiModel) drawEpisodeDetail() string {
 			}
 		}
 	}
+	return absEp
+}
 
-	if isKittyTerminal() {
-		out.WriteString(kittyClearGraphics())
-	}
-
-	epNum := ep.displayEpisodeNum(m.epIdx + 1)
+func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode, epIdx int) (string, string, string, string, string) {
+	epNum := ep.displayEpisodeNum(epIdx + 1)
 	displayHeader := ep.displayTitle()
-
 	d := ep.displayDate()
 	dateStr := ""
 	if !d.IsZero() {
@@ -98,143 +113,149 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		descRaw = ep.description
 	}
 	descClean := strings.TrimSpace(renderHTML(descRaw))
+	return fullTitle, dateStr, totalDurStr, badgeLeft, descClean
+}
 
-	maxLines := max(10, m.height-6)
+func renderEpisodeDetailSplitView(m *tuiModel, ep tuiEpisode, fullTitle, dateStr, badgeLeft, descClean, totalDurStr string, maxLines int) string {
+	out := &strings.Builder{}
+	leftW := (m.width - 5) / 2
+	rightW := m.width - 5 - leftW
 
-	if m.showEpisodePlayerPane && m.width >= 70 {
-		leftW := (m.width - 5) / 2
-		rightW := m.width - 5 - leftW
+	leftLines := renderEpisodeDetailLeftPane(m, fullTitle, dateStr, badgeLeft, descClean, leftW, maxLines)
+	rightLines := renderEpisodeDetailPlayerPane(ep, totalDurStr, rightW)
 
-		var leftLines []string
-		var rightLines []string
+	totalRows := max(len(leftLines), len(rightLines))
+	for k := 0; k < totalRows; k++ {
+		lPart := ""
+		if k < len(leftLines) {
+			lPart = leftLines[k]
+		}
+		lPad := max(0, leftW-visibleRuneCount(lPart))
+		fullL := lPart + strings.Repeat(" ", lPad)
 
-		leftLines = append(leftLines, tuiTitleStyle.Render(truncate(displayName(fullTitle), leftW-2)))
+		rPart := ""
+		if k < len(rightLines) {
+			rPart = rightLines[k]
+		}
+		out.WriteString(fullL + tuiDividerStyle.Render(" │ ") + rPart + "\n")
+	}
+	return out.String()
+}
 
-		dateRender := ""
+func renderEpisodeDetailLeftPane(m *tuiModel, fullTitle, dateStr, badgeLeft, descClean string, leftW, maxLines int) []string {
+	var leftLines []string
+	leftLines = append(leftLines, tuiTitleStyle.Render(truncate(displayName(fullTitle), leftW-2)))
+
+	dateRender := ""
+	if dateStr != "" {
+		dateRender = tuiStatStyle.Render(dateStr)
+	}
+	if dateRender != "" && leftW >= 50 {
+		availGap := max(1, leftW-2-visibleRuneCount(badgeLeft)-visibleRuneCount(dateRender))
+		leftLines = append(leftLines, truncate(badgeLeft, leftW-visibleRuneCount(dateRender)-4)+strings.Repeat(" ", availGap)+dateRender)
+	} else {
+		leftLines = append(leftLines, truncate(badgeLeft, leftW-2))
 		if dateStr != "" {
-			dateRender = tuiStatStyle.Render(dateStr)
+			leftLines = append(leftLines, tuiStatStyle.Render("Released: "+dateStr))
 		}
-		if dateRender != "" && leftW >= 50 {
-			availGap := max(1, leftW-2-visibleRuneCount(badgeLeft)-visibleRuneCount(dateRender))
-			leftLines = append(leftLines, truncate(badgeLeft, leftW-visibleRuneCount(dateRender)-4)+strings.Repeat(" ", availGap)+dateRender)
-		} else {
-			leftLines = append(leftLines, truncate(badgeLeft, leftW-2))
-			if dateStr != "" {
-				leftLines = append(leftLines, tuiStatStyle.Render("Released: "+dateStr))
-			}
-		}
-		leftLines = append(leftLines, tuiDividerStyle.Render(strings.Repeat("─", leftW-2)))
+	}
+	leftLines = append(leftLines, tuiDividerStyle.Render(strings.Repeat("─", leftW-2)))
 
-		descWrapped := wrapDescription(descClean, leftW-4)
-		availDescLines := max(3, maxLines-len(leftLines)-2)
-		if m.descScroll > len(descWrapped)-availDescLines {
-			m.descScroll = max(0, len(descWrapped)-availDescLines)
-		}
-		if m.descScroll < 0 {
-			m.descScroll = 0
-		}
-
-		descHeader := "Show Notes"
-		if len(descWrapped) > availDescLines {
-			descHeader += fmt.Sprintf(" [%d-%d of %d (Scroll: ↑/↓)]", m.descScroll+1, min(len(descWrapped), m.descScroll+availDescLines), len(descWrapped))
-		}
-		leftLines = append(leftLines, tuiLabelStyle.Render(descHeader))
-
-		endDesc := min(len(descWrapped), m.descScroll+availDescLines)
-		for idx := m.descScroll; idx < endDesc; idx++ {
-			leftLines = append(leftLines, descWrapped[idx])
-		}
-
-		rightLines = append(rightLines, tuiSectionTitle.Render(" AUDIO PLAYER (F4 to hide) "))
-
-		pv := globalPlayer.View()
-		if pv.Has {
-			statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
-			if pv.IsPaused {
-				statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
-			}
-			rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(displayName(pv.Title), rightW-16)+" "))
-			rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+displayName(pv.Podcast)))
-			rightLines = append(rightLines, "  "+tuiCyanStyle.Render(globalPlayer.RenderProgressBar(rightW-4)))
-		} else {
-			rightLines = append(rightLines, tuiPlayerStopped.Render("⏹ STOPPED")+" "+tuiDimStyle.Render("Press 'p' or Enter to play"))
-			rightLines = append(rightLines, tuiDimStyle.Render("  [────────────────────] 00:00 / "+totalDurStr))
-		}
-
-		rightLines = append(rightLines, "")
-
-		basePath := strings.TrimSuffix(ep.path, ".mp3")
-		cutsFile := basePath + ".cuts.json"
-		if data, err := os.ReadFile(cutsFile); err == nil {
-			var cd CutsData
-			if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
-				dur := ep.duration
-				if dur <= 0 {
-					dur = cd.OriginalDurationSec
-				}
-				if timelineStr := renderVisualAdCutTimeline(dur, cd.CutIntervals, rightW-4); timelineStr != "" {
-					for _, tl := range strings.Split(timelineStr, "\n") {
-						if strings.TrimSpace(tl) != "" {
-							rightLines = append(rightLines, tl)
-						}
-					}
-					rightLines = append(rightLines, "")
-				}
-			}
-		}
-
-		rightLines = append(rightLines, tuiLabelStyle.Render("Audio Output & Volume:"))
-		speaker := pv.CurrentSpeaker
-		if speaker == "" {
-			speaker = "Default Audio Sink"
-		}
-		rightLines = append(rightLines, fmt.Sprintf("  Speaker: %s %s", tuiYellowStyle.Render(speaker), tuiDimStyle.Render("('s' switch)")))
-		rightLines = append(rightLines, fmt.Sprintf("  Volume:  %s %s", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(rightW-20)), tuiDimStyle.Render("(+/- vol, 'm' mute)")))
-
-		rightLines = append(rightLines, "")
-
-		queueTitle := fmt.Sprintf("Playback Queue (%d queued)", len(pv.Queue))
-		rightLines = append(rightLines, tuiLabelStyle.Render(queueTitle))
-		if len(pv.Queue) > 0 {
-			for qIdx, qTrack := range pv.Queue {
-				if qIdx >= 3 {
-					rightLines = append(rightLines, tuiDimStyle.Render(fmt.Sprintf("  ... and %d more", len(pv.Queue)-3)))
-					break
-				}
-				qStr := fmt.Sprintf("  %d. %s", qIdx+1, truncate(displayName(qTrack.Title), rightW-8))
-				rightLines = append(rightLines, tuiSubtextStyle.Render(qStr))
-			}
-			rightLines = append(rightLines, tuiDimStyle.Render("  ('n' next track, 'c' clear queue)"))
-		} else {
-			rightLines = append(rightLines, tuiDimStyle.Render("  Queue is empty."))
-		}
-
-		rightLines = append(rightLines, "")
-		rightLines = append(rightLines, tuiDividerStyle.Render(strings.Repeat("─", rightW-2)))
-		rightLines = append(rightLines, tuiDimStyle.Render("Space Play/Pause │ p Play │ t Transcript │ F4 Hide Player │ Esc/q Back"))
-		rightLines = append(rightLines, tuiDimStyle.Render("←/→   -30s / +30s │ +/- Volume     │ s Speaker"))
-		rightLines = append(rightLines, tuiDimStyle.Render("↑/↓   Scroll Notes│ n Next in Queue│ m Mute"))
-
-		totalRows := max(len(leftLines), len(rightLines))
-		for k := 0; k < totalRows; k++ {
-			lPart := ""
-			if k < len(leftLines) {
-				lPart = leftLines[k]
-			}
-			lPad := max(0, leftW-visibleRuneCount(lPart))
-			fullL := lPart + strings.Repeat(" ", lPad)
-
-			rPart := ""
-			if k < len(rightLines) {
-				rPart = rightLines[k]
-			}
-
-			out.WriteString(fullL + tuiDividerStyle.Render(" │ ") + rPart + "\n")
-		}
-
-		return out.String()
+	descWrapped := wrapDescription(descClean, leftW-4)
+	availDescLines := max(3, maxLines-len(leftLines)-2)
+	if m.descScroll > len(descWrapped)-availDescLines {
+		m.descScroll = max(0, len(descWrapped)-availDescLines)
+	}
+	if m.descScroll < 0 {
+		m.descScroll = 0
 	}
 
+	descHeader := "Show Notes"
+	if len(descWrapped) > availDescLines {
+		descHeader += fmt.Sprintf(" [%d-%d of %d (Scroll: ↑/↓)]", m.descScroll+1, min(len(descWrapped), m.descScroll+availDescLines), len(descWrapped))
+	}
+	leftLines = append(leftLines, tuiLabelStyle.Render(descHeader))
+
+	endDesc := min(len(descWrapped), m.descScroll+availDescLines)
+	for idx := m.descScroll; idx < endDesc; idx++ {
+		leftLines = append(leftLines, descWrapped[idx])
+	}
+	return leftLines
+}
+
+func renderEpisodeDetailPlayerPane(ep tuiEpisode, totalDurStr string, rightW int) []string {
+	var rightLines []string
+	rightLines = append(rightLines, tuiSectionTitle.Render(" AUDIO PLAYER (F4 to hide) "))
+
+	pv := globalPlayer.View()
+	if pv.Has {
+		statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
+		if pv.IsPaused {
+			statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
+		}
+		rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(displayName(pv.Title), rightW-16)+" "))
+		rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+displayName(pv.Podcast)))
+		rightLines = append(rightLines, "  "+tuiCyanStyle.Render(globalPlayer.RenderProgressBar(rightW-4)))
+	} else {
+		rightLines = append(rightLines, tuiPlayerStopped.Render("⏹ STOPPED")+" "+tuiDimStyle.Render("Press 'p' or Enter to play"))
+		rightLines = append(rightLines, tuiDimStyle.Render("  [────────────────────] 00:00 / "+totalDurStr))
+	}
+	rightLines = append(rightLines, "")
+
+	basePath := strings.TrimSuffix(ep.path, ".mp3")
+	cutsFile := basePath + ".cuts.json"
+	if data, err := os.ReadFile(cutsFile); err == nil {
+		var cd CutsData
+		if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
+			dur := ep.duration
+			if dur <= 0 {
+				dur = cd.OriginalDurationSec
+			}
+			if timelineStr := renderVisualAdCutTimeline(dur, cd.CutIntervals, rightW-4); timelineStr != "" {
+				for _, tl := range strings.Split(timelineStr, "\n") {
+					if strings.TrimSpace(tl) != "" {
+						rightLines = append(rightLines, tl)
+					}
+				}
+				rightLines = append(rightLines, "")
+			}
+		}
+	}
+
+	speaker := pv.CurrentSpeaker
+	if speaker == "" {
+		speaker = "Default Audio Sink"
+	}
+	rightLines = append(rightLines, tuiLabelStyle.Render("Audio Output & Volume:"))
+	rightLines = append(rightLines, fmt.Sprintf("  Speaker: %s %s", tuiYellowStyle.Render(speaker), tuiDimStyle.Render("('s' switch)")))
+	rightLines = append(rightLines, fmt.Sprintf("  Volume:  %s %s", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(rightW-20)), tuiDimStyle.Render("(+/- vol, 'm' mute)")))
+	rightLines = append(rightLines, "")
+
+	queueTitle := fmt.Sprintf("Playback Queue (%d queued)", len(pv.Queue))
+	rightLines = append(rightLines, tuiLabelStyle.Render(queueTitle))
+	if len(pv.Queue) > 0 {
+		for qIdx, qTrack := range pv.Queue {
+			if qIdx >= 3 {
+				rightLines = append(rightLines, tuiDimStyle.Render(fmt.Sprintf("  ... and %d more", len(pv.Queue)-3)))
+				break
+			}
+			rightLines = append(rightLines, tuiSubtextStyle.Render(fmt.Sprintf("  %d. %s", qIdx+1, truncate(displayName(qTrack.Title), rightW-8))))
+		}
+		rightLines = append(rightLines, tuiDimStyle.Render("  ('n' next track, 'c' clear queue)"))
+	} else {
+		rightLines = append(rightLines, tuiDimStyle.Render("  Queue is empty."))
+	}
+
+	rightLines = append(rightLines, "")
+	rightLines = append(rightLines, tuiDividerStyle.Render(strings.Repeat("─", rightW-2)))
+	rightLines = append(rightLines, tuiDimStyle.Render("Space Play/Pause │ p Play │ t Transcript │ F4 Hide Player │ Esc/q Back"))
+	rightLines = append(rightLines, tuiDimStyle.Render("←/→   -30s / +30s │ +/- Volume     │ s Speaker"))
+	rightLines = append(rightLines, tuiDimStyle.Render("↑/↓   Scroll Notes│ n Next in Queue│ m Mute"))
+	return rightLines
+}
+
+func renderEpisodeDetailFullView(m *tuiModel, fullTitle, dateStr, badgeLeft, descClean string, maxLines int) string {
+	out := &strings.Builder{}
 	contentW := max(20, m.width-4)
 	out.WriteString("  " + tuiTitleStyle.Render(truncate(displayName(fullTitle), contentW)) + "\n")
 
@@ -272,6 +293,5 @@ func (m *tuiModel) drawEpisodeDetail() string {
 
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", contentW)) + "\n")
 	out.WriteString(tuiDimStyle.Render("  ↑/↓ Scroll Notes │ Space Play/Pause │ p Play │ D Download │ t Transcript │ F4 Show Player │ Esc/q Back") + "\n")
-
 	return out.String()
 }

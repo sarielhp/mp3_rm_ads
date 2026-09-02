@@ -68,43 +68,18 @@ func FindOrphanPodcasts(podcasts []PodcastItem) []OrphanPodcast {
 		}
 	}
 
+	dupOrphans := collectDuplicateFeedOrphans(feedGroups, orphanedIDs)
+	orphans = append(orphans, dupOrphans...)
+	return orphans
+}
+
+func collectDuplicateFeedOrphans(feedGroups map[string][]PodcastItem, orphanedIDs map[string]bool) []OrphanPodcast {
+	var orphans []OrphanPodcast
 	for _, group := range feedGroups {
 		if len(group) <= 1 {
 			continue
 		}
-
-		sort.SliceStable(group, func(i, j int) bool {
-			if len(group[i].Media.Episodes) != len(group[j].Media.Episodes) {
-				return len(group[i].Media.Episodes) > len(group[j].Media.Episodes)
-			}
-			scoreI := 0
-			if group[i].Media.CoverPath != "" {
-				scoreI++
-			}
-			if group[i].Media.Metadata.Author != "" {
-				scoreI++
-			}
-			if group[i].Media.Metadata.Description != "" {
-				scoreI++
-			}
-
-			scoreJ := 0
-			if group[j].Media.CoverPath != "" {
-				scoreJ++
-			}
-			if group[j].Media.Metadata.Author != "" {
-				scoreJ++
-			}
-			if group[j].Media.Metadata.Description != "" {
-				scoreJ++
-			}
-
-			if scoreI != scoreJ {
-				return scoreI > scoreJ
-			}
-			return group[i].ID < group[j].ID
-		})
-
+		sortFeedGroup(group)
 		primary := group[0]
 		primaryTitle := primary.Media.Metadata.Title
 		if primaryTitle == "" {
@@ -125,8 +100,35 @@ func FindOrphanPodcasts(podcasts []PodcastItem) []OrphanPodcast {
 			orphanedIDs[dup.ID] = true
 		}
 	}
-
 	return orphans
+}
+
+func sortFeedGroup(group []PodcastItem) {
+	sort.SliceStable(group, func(i, j int) bool {
+		if len(group[i].Media.Episodes) != len(group[j].Media.Episodes) {
+			return len(group[i].Media.Episodes) > len(group[j].Media.Episodes)
+		}
+		scoreI := podcastItemScore(group[i])
+		scoreJ := podcastItemScore(group[j])
+		if scoreI != scoreJ {
+			return scoreI > scoreJ
+		}
+		return group[i].ID < group[j].ID
+	})
+}
+
+func podcastItemScore(item PodcastItem) int {
+	score := 0
+	if item.Media.CoverPath != "" {
+		score++
+	}
+	if item.Media.Metadata.Author != "" {
+		score++
+	}
+	if item.Media.Metadata.Description != "" {
+		score++
+	}
+	return score
 }
 
 func RunCleanOrphans(client Backend, opts CleanOrphansOptions) (CleanOrphansResult, error) {
@@ -164,20 +166,7 @@ func RunCleanOrphans(client Backend, opts CleanOrphansOptions) (CleanOrphansResu
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintf(opts.Out, "\nFound %d orphaned / fake podcast entry(ies) (out of %d scanned):\n", len(orphans), len(podcasts))
-		for idx, o := range orphans {
-			title := o.Item.Media.Metadata.Title
-			if title == "" {
-				title = "Untitled Podcast"
-			}
-			fmt.Fprintf(opts.Out, "  %d. %s\n", idx+1, title)
-			fmt.Fprintf(opts.Out, "     ID: %s | Episodes: %d\n", o.Item.ID, o.EpisodeCount)
-			fmt.Fprintf(opts.Out, "     Reason: %s\n", o.Reason)
-			if opts.Verbose && o.Item.RelPath != "" {
-				fmt.Fprintf(opts.Out, "     Path: %s\n", o.Item.RelPath)
-			}
-		}
-		fmt.Fprintln(opts.Out)
+		printOrphansList(opts.Out, orphans, opts.Verbose, len(podcasts))
 	}
 
 	if opts.DryRun {
@@ -188,21 +177,51 @@ func RunCleanOrphans(client Backend, opts CleanOrphansOptions) (CleanOrphansResu
 	}
 
 	if !opts.Force {
-		fmt.Fprintf(opts.Out, "Are you sure you want to delete these %d orphaned podcast(s) from Audiobookshelf? [y/N]: ", len(orphans))
-		reader := bufio.NewReader(opts.In)
-		input, err := reader.ReadString('\n')
-		if err != nil && err != io.EOF {
-			return res, fmt.Errorf("failed to read confirmation: %w", err)
-		}
-		input = strings.TrimSpace(strings.ToLower(input))
-		if input != "y" && input != "yes" {
-			if !opts.Quiet {
-				fmt.Fprintln(opts.Out, "Aborted. No podcasts were deleted.")
-			}
-			return res, nil
+		confirmed, err := confirmOrphanDeletion(opts.In, opts.Out, len(orphans), opts.Quiet)
+		if err != nil || !confirmed {
+			return res, err
 		}
 	}
 
+	executeOrphanDeletions(client, orphans, opts, &res)
+	return res, nil
+}
+
+func printOrphansList(out io.Writer, orphans []OrphanPodcast, verbose bool, scannedCount int) {
+	fmt.Fprintf(out, "\nFound %d orphaned / fake podcast entry(ies) (out of %d scanned):\n", len(orphans), scannedCount)
+	for idx, o := range orphans {
+		title := o.Item.Media.Metadata.Title
+		if title == "" {
+			title = "Untitled Podcast"
+		}
+		fmt.Fprintf(out, "  %d. %s\n", idx+1, title)
+		fmt.Fprintf(out, "     ID: %s | Episodes: %d\n", o.Item.ID, o.EpisodeCount)
+		fmt.Fprintf(out, "     Reason: %s\n", o.Reason)
+		if verbose && o.Item.RelPath != "" {
+			fmt.Fprintf(out, "     Path: %s\n", o.Item.RelPath)
+		}
+	}
+	fmt.Fprintln(out)
+}
+
+func confirmOrphanDeletion(in io.Reader, out io.Writer, count int, quiet bool) (bool, error) {
+	fmt.Fprintf(out, "Are you sure you want to delete these %d orphaned podcast(s) from Audiobookshelf? [y/N]: ", count)
+	reader := bufio.NewReader(in)
+	input, err := reader.ReadString('\n')
+	if err != nil && err != io.EOF {
+		return false, fmt.Errorf("failed to read confirmation: %w", err)
+	}
+	input = strings.TrimSpace(strings.ToLower(input))
+	if input != "y" && input != "yes" {
+		if !quiet {
+			fmt.Fprintln(out, "Aborted. No podcasts were deleted.")
+		}
+		return false, nil
+	}
+	return true, nil
+}
+
+func executeOrphanDeletions(client Backend, orphans []OrphanPodcast, opts CleanOrphansOptions, res *CleanOrphansResult) {
 	if !opts.Quiet {
 		fmt.Fprintln(opts.Out, "Deleting orphaned podcasts from Audiobookshelf...")
 	}
@@ -234,8 +253,6 @@ func RunCleanOrphans(client Backend, opts CleanOrphansOptions) (CleanOrphansResu
 			fmt.Fprintf(opts.Out, "\nDeleted %d orphaned podcast(s), %d failed.\n", res.DeletedCount, res.FailedCount)
 		}
 	}
-
-	return res, nil
 }
 
 func handleServerCleanOrphans(config Config, cli CLIOptions) {

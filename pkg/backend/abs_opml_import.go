@@ -11,7 +11,6 @@ func (c *AudiobookshelfBackend) ImportOPML(data []byte, opts OPMLImportOptions) 
 	if err != nil {
 		return OPMLImportResult{}, err
 	}
-
 	libs, err := c.PodcastLibraries()
 	if err != nil {
 		return OPMLImportResult{}, fmt.Errorf("error fetching podcast libraries: %w", err)
@@ -19,7 +18,6 @@ func (c *AudiobookshelfBackend) ImportOPML(data []byte, opts OPMLImportOptions) 
 	if len(libs) == 0 {
 		return OPMLImportResult{}, fmt.Errorf("no podcast library found on server")
 	}
-
 	targetLib := libs[0]
 	if len(targetLib.Folders) == 0 {
 		return OPMLImportResult{}, fmt.Errorf("podcast library has no storage folders configured")
@@ -30,10 +28,19 @@ func (c *AudiobookshelfBackend) ImportOPML(data []byte, opts OPMLImportOptions) 
 	if err != nil {
 		return OPMLImportResult{}, fmt.Errorf("error fetching existing podcasts: %w", err)
 	}
+	existingFeeds, existingTitles := collectExistingFeedIndex(existingItems)
+	res := OPMLImportResult{TotalFeeds: len(feeds)}
 
+	for idx, f := range feeds {
+		c.importSingleFeed(f, targetLib, targetFolder, existingFeeds, existingTitles, opts.Quiet, idx, len(feeds), &res)
+	}
+	return res, nil
+}
+
+func collectExistingFeedIndex(items []Podcast) (map[string]bool, map[string]bool) {
 	existingFeeds := make(map[string]bool)
 	existingTitles := make(map[string]bool)
-	for _, it := range existingItems {
+	for _, it := range items {
 		u := strings.TrimSpace(it.Media.Metadata.FeedURL)
 		if u != "" {
 			existingFeeds[strings.ToLower(u)] = true
@@ -44,48 +51,43 @@ func (c *AudiobookshelfBackend) ImportOPML(data []byte, opts OPMLImportOptions) 
 			existingTitles[strings.ToLower(sanitizePodcastTitle(t))] = true
 		}
 	}
+	return existingFeeds, existingTitles
+}
 
-	res := OPMLImportResult{TotalFeeds: len(feeds)}
+func (c *AudiobookshelfBackend) importSingleFeed(f OPMLFeed, targetLib Library, targetFolder LibraryFolder, existingFeeds, existingTitles map[string]bool, quiet bool, idx, total int, res *OPMLImportResult) {
+	normURL := strings.ToLower(strings.TrimSpace(f.URL))
+	normTitle := strings.ToLower(strings.TrimSpace(f.Title))
+	safeTitle := sanitizePodcastTitle(f.Title)
+	normSafeTitle := strings.ToLower(safeTitle)
 
-	for idx, f := range feeds {
-		normURL := strings.ToLower(strings.TrimSpace(f.URL))
-		normTitle := strings.ToLower(strings.TrimSpace(f.Title))
-		safeTitle := sanitizePodcastTitle(f.Title)
-		normSafeTitle := strings.ToLower(safeTitle)
-
-		if isAudiobookshelfHostedFeed(f.URL, c.Host) || (existingFeeds[normURL] && strings.Contains(normURL, "/feed/")) {
-			res.SkippedSelfFeeds++
-			continue
-		}
-
-		if existingFeeds[normURL] || existingTitles[normTitle] || existingTitles[normSafeTitle] {
-			res.AlreadyExisted++
-			continue
-		}
-
-		containerPath := strings.TrimRight(targetFolder.FullPath, "/") + "/" + safeTitle
-		if !opts.Quiet {
-			fmt.Printf("  [%d/%d] Subscribing: %s...\n", idx+1, len(feeds), f.Title)
-		}
-
-		_, err := c.CreatePodcast(targetLib.ID, targetFolder.ID, containerPath, f.Title, f.URL)
-		if err != nil {
-			if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "400") {
-				res.AlreadyExisted++
-				existingTitles[normTitle] = true
-				existingTitles[normSafeTitle] = true
-				continue
-			}
-			continue
-		}
-
-		existingFeeds[normURL] = true
-		existingTitles[normTitle] = true
-		existingTitles[normSafeTitle] = true
-		res.Subscribed++
+	if isAudiobookshelfHostedFeed(f.URL, c.Host) || (existingFeeds[normURL] && strings.Contains(normURL, "/feed/")) {
+		res.SkippedSelfFeeds++
+		return
+	}
+	if existingFeeds[normURL] || existingTitles[normTitle] || existingTitles[normSafeTitle] {
+		res.AlreadyExisted++
+		return
 	}
 
-	return res, nil
+	containerPath := strings.TrimRight(targetFolder.FullPath, "/") + "/" + safeTitle
+	if !quiet {
+		fmt.Printf("  [%d/%d] Subscribing: %s...\n", idx+1, total, f.Title)
+	}
+
+	_, err := c.CreatePodcast(targetLib.ID, targetFolder.ID, containerPath, f.Title, f.URL)
+	if err != nil {
+		if strings.Contains(err.Error(), "already exists") || strings.Contains(err.Error(), "400") {
+			res.AlreadyExisted++
+			existingTitles[normTitle] = true
+			existingTitles[normSafeTitle] = true
+		}
+		return
+	}
+
+	existingFeeds[normURL] = true
+	existingTitles[normTitle] = true
+	existingTitles[normSafeTitle] = true
+	res.Subscribed++
 }
 
 func isAudiobookshelfHostedFeed(feedURL, absBaseURL string) bool {

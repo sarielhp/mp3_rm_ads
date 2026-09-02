@@ -17,19 +17,49 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		return
 	}
 
-	hasError := false
-	_ = hasError
-	if cli.Force != "" {
-		f := strings.ToLower(cli.Force)
-		if f == "all" || strings.Contains(f, "whisper") || strings.Contains(f, "transcribe") {
-			cli.ForceTranscribe = true
-		}
-		if f == "all" || strings.Contains(f, "llm") || strings.Contains(f, "ads") {
-			cli.ForceLLM = true
-		}
+	applyForceCLIOptions(&cli)
+
+	args, ok := resolveTargetAudioArgs(cli, config)
+	if !ok {
+		return
 	}
 
-	args := cli.Args
+	expandedArgs := expandDirectoryArgs(args, cli)
+	if len(expandedArgs) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No files or directories with audio found to process.")
+		}
+		return
+	}
+
+	if cli.DryRun {
+		handleProcDryRun(expandedArgs, cli, config)
+		return
+	}
+
+	targetHost := resolveRemoteProcessingTargetHost(cli, config)
+	if targetHost != "" {
+		handleRemoteBatchExecution(expandedArgs, cli, config, targetHost)
+		return
+	}
+
+	executeLocalBatchProcessing(expandedArgs, cli, config, action)
+}
+
+func applyForceCLIOptions(cli *CLIOptions) {
+	if cli.Force == "" {
+		return
+	}
+	f := strings.ToLower(cli.Force)
+	if f == "all" || strings.Contains(f, "whisper") || strings.Contains(f, "transcribe") {
+		cli.ForceTranscribe = true
+	}
+	if f == "all" || strings.Contains(f, "llm") || strings.Contains(f, "ads") {
+		cli.ForceLLM = true
+	}
+}
+
+func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 	podcastsDir := config.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
@@ -41,33 +71,40 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			if !cli.Quiet {
 				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
 			}
-			return
+			return nil, false
 		}
-		args = []string{targetDir}
-	} else if len(args) == 1 {
-		arg := args[0]
+		return []string{targetDir}, true
+	}
+
+	if len(cli.Args) == 1 {
+		arg := cli.Args[0]
 		if !strings.HasSuffix(strings.ToLower(arg), ".mp3") && !strings.HasSuffix(strings.ToLower(arg), ".json") {
 			if targetDir, _, found := resolvePodcastDirByIDOrName(podcastsDir, arg); found {
-				args = []string{targetDir}
-			} else if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
-				args = []string{arg}
-			} else {
-				if !cli.Quiet {
-					fmt.Printf("Podcast matching '%s' not found.\n", arg)
-				}
-				return
+				return []string{targetDir}, true
 			}
+			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
+				return []string{arg}, true
+			}
+			if !cli.Quiet {
+				fmt.Printf("Podcast matching '%s' not found.\n", arg)
+			}
+			return nil, false
 		}
-	} else if len(args) == 0 {
-		if config.PodcastsDir != "" {
-			args = []string{config.PodcastsDir}
-		} else {
-			fmt.Println("ERROR: No files or directories specified, and podcasts_dir is not configured.")
-			return
-		}
+		return cli.Args, true
 	}
-	var expandedArgs []string
 
+	if len(cli.Args) == 0 {
+		if config.PodcastsDir != "" {
+			return []string{config.PodcastsDir}, true
+		}
+		fmt.Println("ERROR: No files or directories specified, and podcasts_dir is not configured.")
+		return nil, false
+	}
+	return cli.Args, true
+}
+
+func expandDirectoryArgs(args []string, cli CLIOptions) []string {
+	var expandedArgs []string
 	hasPrintedScanning := false
 	printScanning := func(dir string) {
 		if cli.Quiet {
@@ -137,75 +174,68 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 			return ti.After(tj)
 		})
 	}
+	return expandedArgs
+}
 
-	if len(expandedArgs) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No files or directories with audio found to process.")
-		}
-		return
+func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
+	if cli.Local {
+		return ""
 	}
-
-	if cli.DryRun {
-		handleProcDryRun(expandedArgs, cli, config)
-		return
-	}
-
-	targetHost := ""
-	if !cli.Local {
-		reqHost := ""
-		if cli.Remote {
-			reqHost = config.RemoteHost
-			if reqHost == "" {
-				reqHost = "cloud8"
-			}
-		}
-		h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
-		if err == nil && isRem {
-			targetHost = h
+	reqHost := ""
+	if cli.Remote {
+		reqHost = config.RemoteHost
+		if reqHost == "" {
+			reqHost = "cloud8"
 		}
 	}
+	h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
+	if err == nil && isRem {
+		return h
+	}
+	return ""
+}
 
-	if targetHost != "" {
-		if !cli.NoCollect && !cli.DryRun {
-			if err := runRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
-				if !cli.Quiet {
-					fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
-				}
-			}
-		}
-
-		var filesToPush []string
-		for _, f := range expandedArgs {
-			if strings.HasSuffix(f, ".json") {
-				continue
-			}
-			mainMP3File, _, _ := resolveAudioFiles(f, cli)
-			if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (isEpisodeCompleted(mainMP3File) || isEpisodeInRemoteFlight(mainMP3File)) {
-				continue
-			}
-			filesToPush = append(filesToPush, f)
-		}
-		sortAudioFilesByDuration(filesToPush)
-		if cli.Count > 0 && len(filesToPush) > cli.Count {
-			filesToPush = filesToPush[:cli.Count]
-		}
-		if len(filesToPush) == 0 {
-			remoteWorkDir := config.RemoteWorkDir
-			if remoteWorkDir == "" {
-				remoteWorkDir = "~/abs_remote"
-			}
-			_ = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
+func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Config, targetHost string) {
+	if !cli.NoCollect && !cli.DryRun {
+		if err := runRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
 			if !cli.Quiet {
-				fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
+				fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
 			}
-			return
 		}
-		if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
-			fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
+	}
+
+	var filesToPush []string
+	for _, f := range expandedArgs {
+		if strings.HasSuffix(f, ".json") {
+			continue
+		}
+		mainMP3File, _, _ := resolveAudioFiles(f, cli)
+		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (isEpisodeCompleted(mainMP3File) || isEpisodeInRemoteFlight(mainMP3File)) {
+			continue
+		}
+		filesToPush = append(filesToPush, f)
+	}
+	sortAudioFilesByDuration(filesToPush)
+	if cli.Count > 0 && len(filesToPush) > cli.Count {
+		filesToPush = filesToPush[:cli.Count]
+	}
+	if len(filesToPush) == 0 {
+		remoteWorkDir := config.RemoteWorkDir
+		if remoteWorkDir == "" {
+			remoteWorkDir = "~/abs_remote"
+		}
+		_ = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
+		if !cli.Quiet {
+			fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 		}
 		return
 	}
+	if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
+		fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
+	}
+}
 
+func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config Config, action string) {
 	wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
@@ -215,12 +245,9 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	processedCount := 0
 
 	for idx, inputFile := range expandedArgs {
-		errFlag, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, cli, config, action, batchStartTime, selectedProfile)
+		_, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, cli, config, action, batchStartTime, selectedProfile)
 		if stopFlag {
 			break
-		}
-		if errFlag {
-			hasError = true
 		}
 		if processedFlag {
 			processedCount++

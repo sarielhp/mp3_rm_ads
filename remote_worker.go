@@ -45,96 +45,19 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 		manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		_ = saveManifest(manifestPath, manifest)
 
-		inputFile := filepath.Join(batchDir, "in", item.AudioFileName)
-		if !fileExists(inputFile) {
+		if err := processBatchItem(item, batchDir, outDir, config, selectedProfile, quiet, verbose); err != nil {
 			item.Status = BatchStatusFailed
-			item.Error = fmt.Sprintf("input file %s not found", inputFile)
-			recalculateManifestStats(manifest)
-			_ = saveManifest(manifestPath, manifest)
-			continue
-		}
-
-		baseName := stripExt(item.AudioFileName)
-		outMP3 := filepath.Join(outDir, item.AudioFileName)
-		outTranscriptJSON := filepath.Join(outDir, baseName+".transcript.json")
-
-		origDuration := getAudioDuration(inputFile)
-		if origDuration <= 0 {
-			origDuration = getMP3DiskDuration(inputFile)
-		}
-
-		whisperLanguage := config.WhisperLanguage
-		whisperPrompt := config.WhisperPrompt
-		id3Tags := map[string]string{}
-		speedFactor := config.WhisperSpeedFactor
-		if speedFactor <= 0 {
-			speedFactor = 7.0
-		}
-		t0 := time.Now()
-		isNewlyTranscribed := false
-		cliOpts := CLIOptions{
-			SaveTranscript: true,
-			Quiet:          quiet,
-			Verbose:        verbose,
-		}
-
-		transcriptionData, err := loadOrTranscribe(inputFile, outTranscriptJSON, config, cliOpts, selectedProfile, origDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0)
-		if err != nil {
-			item.Status = BatchStatusFailed
-			item.Error = fmt.Sprintf("transcription error: %v", err)
-			recalculateManifestStats(manifest)
-			_ = saveManifest(manifestPath, manifest)
-			continue
-		}
-
-		saveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
-
-		formattedTranscript := formatTranscript(transcriptionData, origDuration)
-		adSegments := detectAdsLLM(formattedTranscript, selectedProfile)
-		if len(adSegments) > 0 {
-			adSegments = mergeIntervals(adSegments)
-		}
-
-		cutsResult := saveCutsJSON(outMP3, origDuration, adSegments, &selectedProfile, quiet)
-		keepSegments := cutsResult.KeepSegments
-
-		cleanDuration := origDuration
-		if len(adSegments) > 0 && len(keepSegments) > 0 {
-			workDir := filepath.Join(batchDir, ".work")
-			_ = os.MkdirAll(workDir, 0755)
-			tempOut := filepath.Join(workDir, item.AudioFileName+".tmp.mp3")
-			verifyTempFile(tempOut)
-
-			if cutAudioFFmpeg(inputFile, keepSegments, tempOut) {
-				if mvErr := safeMove(tempOut, outMP3); mvErr != nil {
-					fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", outMP3, mvErr)
-					copyFile(inputFile, outMP3)
-				} else {
-					cleanDuration = getAudioDuration(outMP3)
-				}
-			} else {
-				copyFile(inputFile, outMP3)
-			}
-			_ = os.RemoveAll(workDir)
+			item.Error = err.Error()
 		} else {
-			copyFile(inputFile, outMP3)
+			item.Status = BatchStatusCompleted
+			item.Error = ""
+			if !quiet {
+				fmt.Printf("Completed item %s (%s, saved %.1fs)\n", item.ID, item.AudioFileName, item.CutDurationSec)
+			}
 		}
-
-		item.CleanedAudioFile = item.AudioFileName
-		item.CutsJSONFile = baseName + ".cuts.json"
-		item.TranscriptJSONFile = baseName + ".transcript.json"
-		item.OriginalDurationSec = origDuration
-		item.CleanedDurationSec = cleanDuration
-		item.CutDurationSec = origDuration - cleanDuration
-		item.Status = BatchStatusCompleted
-		item.Error = ""
 
 		recalculateManifestStats(manifest)
 		_ = saveManifest(manifestPath, manifest)
-
-		if !quiet {
-			fmt.Printf("Completed item %s (%s, saved %.1fs)\n", item.ID, item.AudioFileName, item.CutDurationSec)
-		}
 	}
 
 	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -146,6 +69,83 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 	if !quiet {
 		fmt.Printf("Batch %s worker finished: %d completed, %d failed.\n", manifest.BatchID, manifest.CompletedItems, manifest.FailedItems)
 	}
-
 	return nil
+}
+
+func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config Config, selectedProfile LLMProfile, quiet, verbose bool) error {
+	inputFile := filepath.Join(batchDir, "in", item.AudioFileName)
+	if !fileExists(inputFile) {
+		return fmt.Errorf("input file %s not found", inputFile)
+	}
+
+	baseName := stripExt(item.AudioFileName)
+	outMP3 := filepath.Join(outDir, item.AudioFileName)
+	outTranscriptJSON := filepath.Join(outDir, baseName+".transcript.json")
+
+	origDuration := getAudioDuration(inputFile)
+	if origDuration <= 0 {
+		origDuration = getMP3DiskDuration(inputFile)
+	}
+
+	whisperLanguage := config.WhisperLanguage
+	whisperPrompt := config.WhisperPrompt
+	id3Tags := map[string]string{}
+	speedFactor := config.WhisperSpeedFactor
+	if speedFactor <= 0 {
+		speedFactor = 7.0
+	}
+	t0 := time.Now()
+	isNewlyTranscribed := false
+	cliOpts := CLIOptions{SaveTranscript: true, Quiet: quiet, Verbose: verbose}
+
+	transcriptionData, err := loadOrTranscribe(inputFile, outTranscriptJSON, config, cliOpts, selectedProfile, origDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0)
+	if err != nil {
+		return fmt.Errorf("transcription error: %w", err)
+	}
+
+	saveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
+
+	formattedTranscript := formatTranscript(transcriptionData, origDuration)
+	adSegments := detectAdsLLM(formattedTranscript, selectedProfile)
+	if len(adSegments) > 0 {
+		adSegments = mergeIntervals(adSegments)
+	}
+
+	cleanDuration := executeItemAudioCut(item, inputFile, outMP3, batchDir, origDuration, adSegments, selectedProfile, quiet)
+
+	item.CleanedAudioFile = item.AudioFileName
+	item.CutsJSONFile = baseName + ".cuts.json"
+	item.TranscriptJSONFile = baseName + ".transcript.json"
+	item.OriginalDurationSec = origDuration
+	item.CleanedDurationSec = cleanDuration
+	item.CutDurationSec = origDuration - cleanDuration
+	return nil
+}
+
+func executeItemAudioCut(item *RemoteBatchJobItem, inputFile, outMP3, batchDir string, origDuration float64, adSegments []AdSegment, selectedProfile LLMProfile, quiet bool) float64 {
+	cutsResult := saveCutsJSON(outMP3, origDuration, adSegments, &selectedProfile, quiet)
+	keepSegments := cutsResult.KeepSegments
+
+	cleanDuration := origDuration
+	if len(adSegments) > 0 && len(keepSegments) > 0 {
+		workDir := filepath.Join(batchDir, ".work")
+		_ = os.MkdirAll(workDir, 0755)
+		tempOut := filepath.Join(workDir, item.AudioFileName+".tmp.mp3")
+		verifyTempFile(tempOut)
+
+		if cutAudioFFmpeg(inputFile, keepSegments, tempOut) {
+			if mvErr := safeMove(tempOut, outMP3); mvErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", outMP3, mvErr)
+				copyFile(inputFile, outMP3)
+			} else {
+				cleanDuration = getAudioDuration(outMP3)
+			}
+		} else {
+			copyFile(inputFile, outMP3)
+		}
+		_ = os.RemoveAll(workDir)
+	} else {
+		copyFile(inputFile, outMP3)
+	}
+	return cleanDuration
 }

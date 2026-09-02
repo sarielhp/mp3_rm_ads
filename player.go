@@ -123,27 +123,7 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 		return
 	}
 
-	args := []string{"-nodisp", "-autoexit", "-loglevel", "quiet"}
-	if startSec > 0 {
-		args = append(args, "-ss", fmt.Sprintf("%.2f", startSec))
-	}
-	args = append(args, p.Current.Path)
-
-	cmd := exec.Command("ffplay", args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	startErr := cmd.Start()
-	if startErr != nil {
-		mpgArgs := []string{"-q"}
-		if startSec > 0 {
-			mpgArgs = append(mpgArgs, "-k", fmt.Sprintf("%d", int(startSec*38.28)))
-		}
-		mpgArgs = append(mpgArgs, p.Current.Path)
-		cmd = exec.Command("mpg123", mpgArgs...)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		startErr = cmd.Start()
-	}
-
+	cmd, startErr := spawnAudioCommand(p.Current.Path, startSec)
 	if startErr != nil {
 		p.cmd = nil
 		p.IsPlaying = false
@@ -163,27 +143,56 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 	launchedAt := time.Now()
 	expectedRemaining := p.Duration - startSec
 
-	go func(targetCmd *exec.Cmd, startedAt time.Time, path string, expected float64) {
-		if targetCmd == nil {
-			return
-		}
-		_ = targetCmd.Wait()
-		p.mu.Lock()
-		defer p.mu.Unlock()
-		if p.cmd != targetCmd {
-			return
-		}
-		p.cmd = nil
+	go p.watchAudioProcess(cmd, launchedAt, trackPath, expectedRemaining)
+}
 
-		elapsed := time.Since(startedAt)
-		if elapsed < playerFailFastWindow && (expected <= 0 || expected > playerFailFastWindow.Seconds()) {
-			p.IsPlaying = false
-			p.IsPaused = false
-			p.LastError = fmt.Sprintf("could not play %s", filepathBase(path))
-			return
+func spawnAudioCommand(path string, startSec float64) (*exec.Cmd, error) {
+	args := []string{"-nodisp", "-autoexit", "-loglevel", "quiet"}
+	if startSec > 0 {
+		args = append(args, "-ss", fmt.Sprintf("%.2f", startSec))
+	}
+	args = append(args, path)
+
+	cmd := exec.Command("ffplay", args...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+
+	startErr := cmd.Start()
+	if startErr != nil {
+		mpgArgs := []string{"-q"}
+		if startSec > 0 {
+			mpgArgs = append(mpgArgs, "-k", fmt.Sprintf("%d", int(startSec*38.28)))
 		}
-		p.nextLocked()
-	}(cmd, launchedAt, trackPath, expectedRemaining)
+		mpgArgs = append(mpgArgs, path)
+		cmd = exec.Command("mpg123", mpgArgs...)
+		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+		startErr = cmd.Start()
+	}
+	if startErr != nil {
+		return nil, startErr
+	}
+	return cmd, nil
+}
+
+func (p *AudioPlayer) watchAudioProcess(targetCmd *exec.Cmd, startedAt time.Time, path string, expected float64) {
+	if targetCmd == nil {
+		return
+	}
+	_ = targetCmd.Wait()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	if p.cmd != targetCmd {
+		return
+	}
+	p.cmd = nil
+
+	elapsed := time.Since(startedAt)
+	if elapsed < playerFailFastWindow && (expected <= 0 || expected > playerFailFastWindow.Seconds()) {
+		p.IsPlaying = false
+		p.IsPaused = false
+		p.LastError = fmt.Sprintf("could not play %s", filepathBase(path))
+		return
+	}
+	p.nextLocked()
 }
 
 func (p *AudioPlayer) killProcessLocked() {

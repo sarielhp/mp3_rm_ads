@@ -171,9 +171,7 @@ func renderHTML(html string) string {
 	}
 
 	var result strings.Builder
-	inTag := false
-	inBold := false
-	inItalic := false
+	inTag, inBold, inItalic := false, false, false
 	var tagBuf strings.Builder
 	var textBuf strings.Builder
 
@@ -184,34 +182,12 @@ func renderHTML(html string) string {
 		text := textBuf.String()
 		textBuf.Reset()
 		if inBold {
-			result.WriteString("\033[1m")
-			result.WriteString(text)
-			result.WriteString("\033[22m")
+			result.WriteString("\033[1m" + text + "\033[22m")
 		} else if inItalic {
-			result.WriteString("\033[3m")
-			result.WriteString(text)
-			result.WriteString("\033[23m")
+			result.WriteString("\033[3m" + text + "\033[23m")
 		} else {
 			result.WriteString(text)
 		}
-	}
-
-	decodeEntity := func(entity string) string {
-		switch entity {
-		case "&amp;":
-			return "&"
-		case "&lt;":
-			return "<"
-		case "&gt;":
-			return ">"
-		case "&quot;":
-			return "\""
-		case "&apos;":
-			return "'"
-		case "&nbsp;":
-			return " "
-		}
-		return entity
 	}
 
 	for i := 0; i < len(html); i++ {
@@ -224,29 +200,7 @@ func renderHTML(html string) string {
 		}
 		if c == '>' && inTag {
 			inTag = false
-			tag := strings.ToLower(strings.TrimSpace(tagBuf.String()))
-			switch tag {
-			case "b", "strong":
-				inBold = true
-			case "/b", "/strong":
-				inBold = false
-			case "i", "em":
-				inItalic = true
-			case "/i", "/em":
-				inItalic = false
-			case "br", "br/", "br /":
-				result.WriteByte('\n')
-			case "p":
-				result.WriteByte('\n')
-			case "/p":
-				result.WriteByte('\n')
-			case "li":
-				result.WriteString("\n  - ")
-			case "/li":
-				result.WriteByte('\n')
-			case "/div":
-				result.WriteByte('\n')
-			}
+			applyHTMLTag(strings.ToLower(strings.TrimSpace(tagBuf.String())), &inBold, &inItalic, &result)
 			continue
 		}
 		if inTag {
@@ -257,8 +211,7 @@ func renderHTML(html string) string {
 			entityEnd := strings.IndexByte(html[i:], ';')
 			if entityEnd >= 0 {
 				entity := html[i : i+entityEnd+1]
-				decoded := decodeEntity(entity)
-				textBuf.WriteString(decoded)
+				textBuf.WriteString(decodeHTMLEntity(entity))
 				i += entityEnd
 				continue
 			}
@@ -268,4 +221,42 @@ func renderHTML(html string) string {
 	flushText()
 
 	return result.String()
+}
+
+func decodeHTMLEntity(entity string) string {
+	switch entity {
+	case "&amp;":
+		return "&"
+	case "&lt;":
+		return "<"
+	case "&gt;":
+		return ">"
+	case "&quot;":
+		return "\""
+	case "&apos;":
+		return "'"
+	case "&nbsp;":
+		return " "
+	default:
+		return entity
+	}
+}
+
+func applyHTMLTag(tag string, inBold, inItalic *bool, result *strings.Builder) {
+	switch tag {
+	case "b", "strong":
+		*inBold = true
+	case "/b", "/strong":
+		*inBold = false
+	case "i", "em":
+		*inItalic = true
+	case "/i", "/em":
+		*inItalic = false
+	case "br", "br/", "br /", "p", "/p", "/div":
+		result.WriteByte('\n')
+	case "li":
+		result.WriteString("\n  - ")
+	case "/li":
+		result.WriteByte('\n')
+	}
 }

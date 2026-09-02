@@ -51,6 +51,11 @@ func ensureConfigExists() {
 }
 
 func applyEnvOverrides(cfg *Config) {
+	applyBackendEnvOverrides(cfg)
+	applyWhisperAndRemoteEnvOverrides(cfg)
+}
+
+func applyBackendEnvOverrides(cfg *Config) {
 	if v := os.Getenv("WHISPER_URL"); v != "" {
 		cfg.WhisperURL = v
 	}
@@ -112,6 +117,9 @@ func applyEnvOverrides(cfg *Config) {
 	if v := os.Getenv("PODCASTS_DIR"); v != "" {
 		cfg.PodcastsDir = v
 	}
+}
+
+func applyWhisperAndRemoteEnvOverrides(cfg *Config) {
 	if v := os.Getenv("WHISPER_LANGUAGE"); v != "" {
 		cfg.WhisperLanguage = v
 	}

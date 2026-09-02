@@ -85,6 +85,21 @@ func (m *tuiModel) drawPlayQueueScreen() string {
 	}
 
 	maxVis := max(5, m.height-8)
+	adjustPlayQueueScroll(m, total, maxVis)
+
+	end := min(total, m.pqScroll+maxVis)
+	for i := m.pqScroll; i < end; i++ {
+		out.WriteString(renderPlayQueueItem(unified[i], i, m, max(20, m.width-6)))
+		out.WriteByte('\n')
+	}
+
+	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
+	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ Enter Play │ d/x Delete │ c Clear │ Esc/q Back") + "\n")
+
+	return out.String()
+}
+
+func adjustPlayQueueScroll(m *tuiModel, total, maxVis int) {
 	if m.pqIdx >= total {
 		m.pqIdx = total - 1
 	}
@@ -97,70 +112,56 @@ func (m *tuiModel) drawPlayQueueScreen() string {
 	if m.pqIdx-m.pqScroll >= maxVis {
 		m.pqScroll = m.pqIdx - maxVis + 1
 	}
+}
 
-	end := min(total, m.pqScroll+maxVis)
-	for i := m.pqScroll; i < end; i++ {
-		item := unified[i]
-		track := item.Track
-		titleStr := displayName(track.Title)
-		podStr := " [" + displayName(track.Podcast) + "]"
+func renderPlayQueueItem(item UnifiedQueueItem, i int, m *tuiModel, availW int) string {
+	track := item.Track
+	titleStr := displayName(track.Title)
+	podStr := " [" + displayName(track.Podcast) + "]"
 
-		durStr := ""
-		if item.IsCurrent {
-			curT := formatPlayerTime(item.Position)
-			totT := formatPlayerTime(item.Duration)
-			durStr = fmt.Sprintf(" (%s / %s)", curT, totT)
-		} else if track.Duration > 0 {
-			durStr = " (" + formatPlayerTime(track.Duration) + ")"
-		}
-
-		availW := max(20, m.width-6)
-
-		if item.IsCurrent {
-			badge := tuiPlayerPlaying.Render("▶ PLAYING")
-			if item.IsPaused {
-				badge = tuiPlayerPaused.Render("⏸ PAUSED")
-			}
-			rawRow := badge + "  " + titleStr + podStr + durStr
-			truncRow := truncate(rawRow, availW)
-
-			if i == m.pqIdx {
-				if m.pqGrabbed {
-					grabRow := "  ⚡ " + truncRow + "  [MOVING]"
-					fullPad := max(0, availW-len([]rune(grabRow)))
-					out.WriteString(tuiPopupStyle.Render(grabRow + strings.Repeat(" ", fullPad)))
-				} else {
-					fullPad := max(0, availW-visibleRuneCount(truncRow))
-					out.WriteString("  " + tuiSelectedStyle.Render(truncRow+strings.Repeat(" ", fullPad)))
-				}
-			} else {
-				out.WriteString("  " + truncRow)
-			}
-		} else {
-			idxPrefix := fmt.Sprintf("%2d. ", i+1)
-			rawRow := idxPrefix + titleStr + podStr + durStr
-			truncRow := truncate(rawRow, availW)
-			fullPad := max(0, availW-len([]rune(truncRow)))
-			fullRow := "  " + truncRow + strings.Repeat(" ", fullPad)
-
-			if i == m.pqIdx {
-				if m.pqGrabbed {
-					grabRow := "  ⚡ " + truncRow + strings.Repeat(" ", max(0, availW-len([]rune(truncRow))-2))
-					out.WriteString(tuiPopupStyle.Render(grabRow))
-				} else {
-					out.WriteString(tuiSelectedStyle.Render(fullRow))
-				}
-			} else {
-				out.WriteString(fullRow)
-			}
-		}
-		out.WriteByte('\n')
+	durStr := ""
+	if item.IsCurrent {
+		curT := formatPlayerTime(item.Position)
+		totT := formatPlayerTime(item.Duration)
+		durStr = fmt.Sprintf(" (%s / %s)", curT, totT)
+	} else if track.Duration > 0 {
+		durStr = " (" + formatPlayerTime(track.Duration) + ")"
 	}
 
-	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	out.WriteString(tuiDimStyle.Render("  ↑/↓ Navigate │ Space Grab/Drop (Reorder) │ Enter Play │ d/x Delete │ c Clear │ Esc/q Back") + "\n")
+	if item.IsCurrent {
+		badge := tuiPlayerPlaying.Render("▶ PLAYING")
+		if item.IsPaused {
+			badge = tuiPlayerPaused.Render("⏸ PAUSED")
+		}
+		rawRow := badge + "  " + titleStr + podStr + durStr
+		truncRow := truncate(rawRow, availW)
 
-	return out.String()
+		if i == m.pqIdx {
+			if m.pqGrabbed {
+				grabRow := "  ⚡ " + truncRow + "  [MOVING]"
+				fullPad := max(0, availW-len([]rune(grabRow)))
+				return tuiPopupStyle.Render(grabRow + strings.Repeat(" ", fullPad))
+			}
+			fullPad := max(0, availW-visibleRuneCount(truncRow))
+			return "  " + tuiSelectedStyle.Render(truncRow+strings.Repeat(" ", fullPad))
+		}
+		return "  " + truncRow
+	}
+
+	idxPrefix := fmt.Sprintf("%2d. ", i+1)
+	rawRow := idxPrefix + titleStr + podStr + durStr
+	truncRow := truncate(rawRow, availW)
+	fullPad := max(0, availW-len([]rune(truncRow)))
+	fullRow := "  " + truncRow + strings.Repeat(" ", fullPad)
+
+	if i == m.pqIdx {
+		if m.pqGrabbed {
+			grabRow := "  ⚡ " + truncRow + strings.Repeat(" ", max(0, availW-len([]rune(truncRow))-2))
+			return tuiPopupStyle.Render(grabRow)
+		}
+		return tuiSelectedStyle.Render(fullRow)
+	}
+	return fullRow
 }
 
 func (m *tuiModel) drawAdQueueScreen() string {

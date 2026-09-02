@@ -97,6 +97,28 @@ func listLatestEpisodes(podcastsDir string, limit int, quiet, verbose bool) erro
 		return nil
 	}
 
+	items := collectLatestEpisodeItems(allMp3s, podTitleMap, podIDMap)
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].modTime.After(items[j].modTime)
+	})
+
+	if limit > len(items) {
+		limit = len(items)
+	}
+	latest := items[:limit]
+
+	if quiet {
+		for _, item := range latest {
+			fmt.Println(item.path)
+		}
+		return nil
+	}
+
+	printLatestEpisodesTable(latest, limit)
+	return nil
+}
+
+func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[string]string) []lsEpisodeItem {
 	var items []lsEpisodeItem
 	for _, mp3 := range allMp3s {
 		fi, err := os.Stat(mp3)
@@ -128,23 +150,10 @@ func listLatestEpisodes(podcastsDir string, limit int, quiet, verbose bool) erro
 			statusColor:    statusColor,
 		})
 	}
+	return items
+}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].modTime.After(items[j].modTime)
-	})
-
-	if limit > len(items) {
-		limit = len(items)
-	}
-	latest := items[:limit]
-
-	if quiet {
-		for _, item := range latest {
-			fmt.Println(item.path)
-		}
-		return nil
-	}
-
+func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
 	fmt.Printf("%s\n", strings.Repeat("=", 95))
 	fmt.Printf("  %-16s │ %-6s │ %-24s │ %-18s │ %s\n", "Date / Time", "ID", "Podcast", "Status", "Episode Title")
@@ -169,8 +178,6 @@ func listLatestEpisodes(podcastsDir string, limit int, quiet, verbose bool) erro
 		fmt.Printf("  %-16s │ %-6s │ %-24s │ %-18s │ %s\n", dStr, item.podcastShortID, pName, coloredStatus, item.episodeName)
 	}
 	fmt.Printf("%s\n\n", strings.Repeat("=", 95))
-
-	return nil
 }
 
 func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose bool) error {
@@ -182,6 +189,23 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 		return nil
 	}
 
+	items := collectSinglePodcastEpisodes(mp3s, podDir, title, shortID)
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].modTime.After(items[j].modTime)
+	})
+
+	if quiet {
+		for _, item := range items {
+			fmt.Println(item.path)
+		}
+		return nil
+	}
+
+	printSinglePodcastEpisodesTable(items, title, shortID)
+	return nil
+}
+
+func collectSinglePodcastEpisodes(mp3s []string, podDir, title, shortID string) []lsEpisodeItem {
 	var items []lsEpisodeItem
 	for _, mp3 := range mp3s {
 		fi, err := os.Stat(mp3)
@@ -207,18 +231,10 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 			statusColor:    statusColor,
 		})
 	}
+	return items
+}
 
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].modTime.After(items[j].modTime)
-	})
-
-	if quiet {
-		for _, item := range items {
-			fmt.Println(item.path)
-		}
-		return nil
-	}
-
+func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID string) {
 	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(title), shortID, len(items))
 	fmt.Printf("%s\n", strings.Repeat("=", 80))
 	fmt.Printf("  %-3s │ %-8s │ %-8s │ %-7s │ %s\n", "#", "Orig", "Clean", "Status", "Episode Title")
@@ -265,8 +281,6 @@ func listSinglePodcastEpisodes(podDir, title, shortID string, quiet, verbose boo
 		fmt.Printf("  %-3d │ %-8s │ %-8s │ %-7s │ %s\n", idx+1, origStr, cleanStr, coloredStatus, t)
 	}
 	fmt.Printf("%s\n\n", strings.Repeat("=", 80))
-
-	return nil
 }
 
 func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float64) {

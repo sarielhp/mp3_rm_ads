@@ -112,80 +112,63 @@ func TestAudiobookshelfLibrariesAndPodcasts(t *testing.T) {
 	}
 }
 
-func TestAudiobookshelfEpisodesOperations(t *testing.T) {
-	var downloadedCount int
-	var deletedEpisode string
-
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func setupMockABSEpisodeOpsServer(downloadedCount *int, deletedEpisode *string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/podcasts/feed":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"podcast": map[string]interface{}{
-					"episodes": []FeedEpisode{
-						{Title: "Ep 1", GUID: "g-1"},
-					},
+					"episodes": []FeedEpisode{{Title: "Ep 1", GUID: "g-1"}},
 				},
 			})
 		case r.URL.Path == "/api/podcasts/pod-1/download-episodes":
 			var eps []FeedEpisode
 			_ = json.NewDecoder(r.Body).Decode(&eps)
-			downloadedCount = len(eps)
+			*downloadedCount = len(eps)
 			w.WriteHeader(http.StatusOK)
 		case strings.HasPrefix(r.URL.Path, "/api/podcasts/pod-1/episode/"):
-			deletedEpisode = filepath.Base(strings.TrimSuffix(r.URL.Path, "?hard=1"))
+			*deletedEpisode = filepath.Base(strings.TrimSuffix(r.URL.Path, "?hard=1"))
 			w.WriteHeader(http.StatusOK)
 		case r.URL.Path == "/api/podcasts/pod-1/downloads":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"downloads": []ActiveDownload{
-					{ID: "dl-1", Title: "Ep 1"},
-				},
+				"downloads": []ActiveDownload{{ID: "dl-1", Title: "Ep 1"}},
 			})
 		case r.URL.Path == "/api/feeds/item/pod-1/open":
-			_ = json.NewEncoder(w).Encode(map[string]string{
-				"slug": "pod-1-slug",
-			})
+			_ = json.NewEncoder(w).Encode(map[string]string{"slug": "pod-1-slug"})
 		case r.URL.Path == "/api/items/pod-1/cover":
 			w.Write([]byte("fake-cover-bytes"))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+}
+
+func TestAudiobookshelfEpisodesOperations(t *testing.T) {
+	var downloadedCount int
+	var deletedEpisode string
+
+	srv := setupMockABSEpisodeOpsServer(&downloadedCount, &deletedEpisode)
 	defer srv.Close()
 
-	be := NewAudiobookshelf(Config{
-		Host:  srv.URL,
-		Token: "test-token",
-	})
+	be := NewAudiobookshelf(Config{Host: srv.URL, Token: "test-token"})
 
 	eps, err := be.PodcastFeedEpisodes("https://example.com/feed.xml")
-	if err != nil {
-		t.Fatalf("PodcastFeedEpisodes failed: %v", err)
-	}
-	if len(eps) != 1 || eps[0].Title != "Ep 1" {
-		t.Errorf("unexpected feed episodes: %+v", eps)
+	if err != nil || len(eps) != 1 || eps[0].Title != "Ep 1" {
+		t.Fatalf("unexpected feed episodes: %+v, err: %v", eps, err)
 	}
 
-	if err := be.DownloadEpisodes("pod-1", eps); err != nil {
-		t.Fatalf("DownloadEpisodes failed: %v", err)
-	}
-	if downloadedCount != 1 {
-		t.Errorf("expected 1 downloaded episode, got %d", downloadedCount)
+	if err := be.DownloadEpisodes("pod-1", eps); err != nil || downloadedCount != 1 {
+		t.Fatalf("DownloadEpisodes failed (count %d): %v", downloadedCount, err)
 	}
 
-	if err := be.DeletePodcastEpisode("pod-1", "ep-99"); err != nil {
-		t.Fatalf("DeletePodcastEpisode failed: %v", err)
-	}
-	if deletedEpisode != "ep-99" {
-		t.Errorf("expected deleted episode ep-99, got %s", deletedEpisode)
+	if err := be.DeletePodcastEpisode("pod-1", "ep-99"); err != nil || deletedEpisode != "ep-99" {
+		t.Fatalf("DeletePodcastEpisode failed (deleted %s): %v", deletedEpisode, err)
 	}
 
 	dls, err := be.ActiveDownloads("pod-1")
-	if err != nil {
-		t.Fatalf("ActiveDownloads failed: %v", err)
-	}
-	if len(dls) != 1 || dls[0].ID != "dl-1" {
-		t.Errorf("unexpected active downloads: %+v", dls)
+	if err != nil || len(dls) != 1 || dls[0].ID != "dl-1" {
+		t.Fatalf("unexpected active downloads: %+v, err: %v", dls, err)
 	}
 
 	slug, err := be.OpenRSSFeed("pod-1", srv.URL)
@@ -193,13 +176,11 @@ func TestAudiobookshelfEpisodesOperations(t *testing.T) {
 		t.Errorf("unexpected open RSS feed slug: %s, err: %v", slug, err)
 	}
 
-	tempDir := t.TempDir()
-	coverFile := filepath.Join(tempDir, "cover.jpg")
+	coverFile := filepath.Join(t.TempDir(), "cover.jpg")
 	if err := be.DownloadCover("pod-1", coverFile); err != nil {
 		t.Fatalf("DownloadCover failed: %v", err)
 	}
-	data, _ := os.ReadFile(coverFile)
-	if string(data) != "fake-cover-bytes" {
+	if data, _ := os.ReadFile(coverFile); string(data) != "fake-cover-bytes" {
 		t.Errorf("unexpected cover file data: %s", string(data))
 	}
 }

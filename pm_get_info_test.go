@@ -34,60 +34,30 @@ func TestCLIServerGetInfoParsing(t *testing.T) {
 	}
 }
 
-func TestServerGetInfoExecution(t *testing.T) {
-	tempDir := t.TempDir()
-	podDir := filepath.Join(tempDir, "Test_Show")
-	_ = os.MkdirAll(podDir, 0755)
-
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+func setupMockGetInfoServer() *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.URL.Path == "/api/libraries":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"libraries": []map[string]interface{}{
-					{"id": "lib-1", "mediaType": "podcast"},
-				},
+				"libraries": []map[string]interface{}{{"id": "lib-1", "mediaType": "podcast"}},
 			})
-		case r.URL.Path == "/api/libraries/lib-1/items":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"results": []map[string]interface{}{
-					{
-						"id": "item-1",
-						"media": map[string]interface{}{
-							"metadata": map[string]interface{}{
-								"title":   "Test Show",
-								"feedUrl": "https://example.com/feed.xml",
-							},
-						},
-					},
-				},
-			})
-		case r.URL.Path == "/api/items/item-1":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"id": "item-1",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{
-						"title":   "Test Show",
-						"feedUrl": "https://example.com/feed.xml",
-					},
-				},
-			})
+		case r.URL.Path == "/api/libraries/lib-1/items", r.URL.Path == "/api/items/item-1":
+			itemMap := map[string]interface{}{
+				"id":    "item-1",
+				"media": map[string]interface{}{"metadata": map[string]interface{}{"title": "Test Show", "feedUrl": "https://example.com/feed.xml"}},
+			}
+			if r.URL.Path == "/api/items/item-1" {
+				_ = json.NewEncoder(w).Encode(itemMap)
+			} else {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"results": []map[string]interface{}{itemMap}})
+			}
 		case r.URL.Path == "/api/podcasts/feed":
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
 				"podcast": map[string]interface{}{
 					"episodes": []map[string]interface{}{
-						{
-							"title":       "Episode 100",
-							"pubDate":     "Mon, 31 Aug 2026 12:00:00 GMT",
-							"description": "Latest episode description",
-							"guid":        "guid-100",
-						},
-						{
-							"title":       "Episode 99",
-							"pubDate":     "Sun, 30 Aug 2026 12:00:00 GMT",
-							"description": "Previous episode description",
-							"guid":        "guid-99",
-						},
+						{"title": "Episode 100", "pubDate": "Mon, 31 Aug 2026 12:00:00 GMT", "description": "Latest episode description", "guid": "guid-100"},
+						{"title": "Episode 99", "pubDate": "Sun, 30 Aug 2026 12:00:00 GMT", "description": "Previous episode description", "guid": "guid-99"},
 					},
 				},
 			})
@@ -95,6 +65,14 @@ func TestServerGetInfoExecution(t *testing.T) {
 			w.WriteHeader(http.StatusNotFound)
 		}
 	}))
+}
+
+func TestServerGetInfoExecution(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "Test_Show")
+	_ = os.MkdirAll(podDir, 0755)
+
+	server := setupMockGetInfoServer()
 	defer server.Close()
 
 	cfg := Config{
@@ -102,7 +80,6 @@ func TestServerGetInfoExecution(t *testing.T) {
 		AudiobookshelfToken: "mock-token",
 		PodcastsDir:         tempDir,
 	}
-
 	cli := CLIOptions{
 		ServerSubcmd: "get_info",
 		Count:        50,
