@@ -48,6 +48,14 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		return false, processed, false
 	}
 
+	if isGeminiEngine(config, cli) {
+		success := runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
+		if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
+			os.Remove(sourceAudioFile)
+		}
+		return !success, processed, false
+	}
+
 	transData, t0Step1, ok, hasErr := runLocalTranscriptionStep(sourceAudioFile, jsonFile, mainMP3File, totalDuration, config, cli, selectedProfile, fileStartTime)
 	if hasErr || !ok {
 		return hasErr, processed, false

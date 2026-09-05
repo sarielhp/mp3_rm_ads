@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -246,6 +247,10 @@ func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptio
 
 	if wp.Engine == WhisperEngineLocal {
 		return runWhisperCLITranscription(sourceAudioFile, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
+	}
+	if wp.Engine == WhisperEngineGemini {
+		td, _, err := ProcessWithGeminiFlash(context.Background(), sourceAudioFile, config.GetGeminiProjectID(), config.GetGeminiStagingBucket())
+		return td, err
 	}
 
 	chunkDuration := config.ChunkDurationSec

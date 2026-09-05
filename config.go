@@ -41,6 +41,13 @@ var defaultWhisperProfiles = []WhisperProfile{
 		SpeedFactor: 7.0,
 		WakeCommand: "wake_cloud8",
 	},
+	{
+		ID:          4,
+		Name:        "Gemini 1.5 Flash (Google Cloud)",
+		Engine:      WhisperEngineGemini,
+		Model:       "gemini-1.5-flash",
+		SpeedFactor: 60.0,
+	},
 }
 
 var defaultConfig = Config{
@@ -62,6 +69,9 @@ var defaultConfig = Config{
 	WhisperProcessors:     4,
 	WhisperThreads:        4,
 	WhisperGreedy:         true,
+	GeminiProjectID:       "vm-on-cloud-sariel",
+	GeminiStagingBucket:   "abs-audio-staging-sariel",
+	GeminiLocation:        "us-central1",
 	Profiles: []LLMProfile{
 		{ID: 1, Name: "Ollama Local (llama3.1:8b)", Type: "ollama", URL: "http://192.168.1.230:11434/v1/chat/completions", Model: "llama3.1:8b"},
 		{ID: 2, Name: "OpenRouter - Claude 3.5 Sonnet", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "anthropic/claude-3.5-sonnet"},
@@ -97,6 +107,7 @@ func ensureConfigExists() {
 func applyEnvOverrides(cfg *Config) {
 	applyBackendEnvOverrides(cfg)
 	applyWhisperAndRemoteEnvOverrides(cfg)
+	applyGeminiEnvOverrides(cfg)
 }
 
 func applyBackendEnvOverrides(cfg *Config) {
@@ -208,6 +219,47 @@ func applyWhisperAndRemoteEnvOverrides(cfg *Config) {
 	}
 }
 
+func applyGeminiEnvOverrides(cfg *Config) {
+	if v := os.Getenv("GEMINI_PROJECT_ID"); v != "" {
+		cfg.GeminiProjectID = v
+	} else if v := os.Getenv("GCP_PROJECT"); v != "" {
+		cfg.GeminiProjectID = v
+	} else if v := os.Getenv("GOOGLE_CLOUD_PROJECT"); v != "" {
+		cfg.GeminiProjectID = v
+	}
+	if v := os.Getenv("GEMINI_STAGING_BUCKET"); v != "" {
+		cfg.GeminiStagingBucket = v
+	} else if v := os.Getenv("GCS_STAGING_BUCKET"); v != "" {
+		cfg.GeminiStagingBucket = v
+	}
+	if v := os.Getenv("GEMINI_LOCATION"); v != "" {
+		cfg.GeminiLocation = v
+	} else if v := os.Getenv("GCP_REGION"); v != "" {
+		cfg.GeminiLocation = v
+	}
+}
+
+func (c *Config) GetGeminiProjectID() string {
+	if c != nil && c.GeminiProjectID != "" {
+		return c.GeminiProjectID
+	}
+	return "vm-on-cloud-sariel"
+}
+
+func (c *Config) GetGeminiStagingBucket() string {
+	if c != nil && c.GeminiStagingBucket != "" {
+		return strings.TrimPrefix(c.GeminiStagingBucket, "gs://")
+	}
+	return "abs-audio-staging-sariel"
+}
+
+func (c *Config) GetGeminiLocation() string {
+	if c != nil && c.GeminiLocation != "" {
+		return c.GeminiLocation
+	}
+	return "us-central1"
+}
+
 func inferWhisperEngine(wp WhisperProfile) WhisperEngine {
 	if wp.Engine != "" {
 		return wp.Engine
@@ -223,6 +275,9 @@ func inferWhisperEngineFromURL(url string) WhisperEngine {
 		return WhisperEngineLocal
 	}
 	lower := strings.ToLower(url)
+	if strings.Contains(lower, "gemini") {
+		return WhisperEngineGemini
+	}
 	if strings.Contains(lower, ":8088") || strings.Contains(lower, "localhost") || strings.Contains(lower, "127.0.0.1") || strings.Contains(lower, "192.168.") {
 		return WhisperEngineDocker
 	}

@@ -240,7 +240,7 @@ func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config C
 	if cli.WhisperEngine != "" {
 		wp.Engine = WhisperEngine(cli.WhisperEngine)
 	}
-	if wp.Engine != WhisperEngineLocal {
+	if wp.Engine != WhisperEngineLocal && wp.Engine != WhisperEngineGemini {
 		wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 	}
 

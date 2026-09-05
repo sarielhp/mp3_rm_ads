@@ -104,6 +104,7 @@ const (
 	WhisperEngineLocal  WhisperEngine = "local"
 	WhisperEngineDocker WhisperEngine = "docker"
 	WhisperEngineRemote WhisperEngine = "remote"
+	WhisperEngineGemini WhisperEngine = "gemini"
 )
 
 type WhisperProfile struct {
@@ -162,6 +163,9 @@ type Config struct {
 	DefaultDownloadPolicy  string           `json:"default_download_policy,omitempty"`
 	DefaultDownloadK       int              `json:"default_download_k,omitempty"`
 	DefaultAdRemoval       string           `json:"default_ad_policy,omitempty"`
+	GeminiProjectID        string           `json:"gemini_project_id,omitempty"`
+	GeminiStagingBucket    string           `json:"gemini_staging_bucket,omitempty"`
+	GeminiLocation         string           `json:"gemini_location,omitempty"`
 	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 

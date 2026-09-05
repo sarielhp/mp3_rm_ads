@@ -14,6 +14,8 @@ func whisperEngineBadge(engine WhisperEngine) string {
 		return "[DOCKER]"
 	case WhisperEngineRemote:
 		return "[REMOTE]"
+	case WhisperEngineGemini:
+		return "[GEMINI]"
 	default:
 		return "[" + strings.ToUpper(string(engine)) + "]"
 	}
@@ -209,7 +211,7 @@ func parseWhisperProfileSpec(spec string, nextID int) WhisperProfile {
 		fatalError("Error: Name and engine/URL cannot be empty in Whisper server spec.\n")
 	}
 	lowerSec := strings.ToLower(sec)
-	if lowerSec == "local" || lowerSec == "docker" || lowerSec == "remote" {
+	if lowerSec == "local" || lowerSec == "docker" || lowerSec == "remote" || lowerSec == "gemini" {
 		return parseEngineFirstSpec(parts, nextID, name, WhisperEngine(lowerSec))
 	}
 	return parseURLFirstSpec(parts, nextID, name, sec)

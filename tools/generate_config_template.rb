@@ -44,12 +44,23 @@ template = {
       "speed_factor" => 7.0,
       "wake_command" => "wake_cloud8",
       "engine" => "remote"
+    },
+    {
+      "id" => 4,
+      "name" => "Gemini 1.5 Flash (Google Cloud)",
+      "url" => "",
+      "speed_factor" => 60.0,
+      "engine" => "gemini",
+      "model" => "gemini-1.5-flash"
     }
   ],
   "podcasts_dir" => "/path/to/podcasts",
   "remote_host" => "",
   "default_processing" => "local",
   "remote_work_dir" => "~/abs_remote",
+  "gemini_project_id" => "vm-on-cloud-sariel",
+  "gemini_staging_bucket" => "abs-audio-staging-sariel",
+  "gemini_location" => "us-central1",
   "audiobookshelf_url" => "http://127.0.0.1:8080",
   "audiobookshelf_user" => "admin",
   "audiobookshelf_pass" => "password",
