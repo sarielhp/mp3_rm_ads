@@ -1,0 +1,587 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'net/http'
+require 'uri'
+require 'json'
+require 'open3'
+require 'optparse'
+require 'fileutils'
+
+def detect_project_language(dir = Dir.pwd)
+  if File.exist?(File.join(dir, 'go.mod'))
+    :go
+  elsif File.exist?(File.join(dir, 'Cargo.toml'))
+    :rust
+  elsif Dir.glob(File.join(dir, '**', '*.go')).any?
+    :go
+  elsif Dir.glob(File.join(dir, '**', '*.rs')).any?
+    :rust
+  else
+    :generic
+  end
+end
+
+PROFILES_BY_LANG = {
+  rust: {
+    'systems' => {
+      name: 'Systems Architecture, Concurrency & Soundness',
+      description: 'Concurrency, deadlocks, race conditions, async task cancellation, atomic file replacement, slice panics, unsafe invariants.',
+      mandate: <<~MANDATE
+        Focus exclusively on Systems Architecture, Concurrency & Soundness (Rust):
+        1. Concurrency, Synchronization & Memory Ordering: Race conditions, deadlocks, lock inversions, holding locks across `.await`, atomic orderings.
+        2. Async & Runtime Safety: Leaked tasks on cancellation, missing `JoinSet` cleanup, blocking I/O on async worker threads without `spawn_blocking`.
+        3. Data Integrity & File Atomicity: Torn writes, non-atomic multi-file transitions, lost updates on concurrent CLI invocations.
+        4. Memory Safety & Panic Hazards: Slice indexing panics, out-of-bounds access, overflow in release mode, incomplete state transitions.
+      MANDATE
+    },
+    'security' => {
+      name: 'Application Security & Attack Surface',
+      description: 'Path traversal, arbitrary command execution, injection vulnerabilities, ReDoS, unsafe file permissions, untrusted stream bounds.',
+      mandate: <<~MANDATE
+        Focus exclusively on Application Security & Attack Surface (Rust):
+        1. Path Traversal & Filesystem Boundaries: Paths or input strings escaping target directories, symlink traversal attacks, TOCTOU.
+        2. Injection Vulnerabilities: Shell command injection (`Command::new`), untrusted input in macro/regex engines, ReDoS.
+        3. Permissions & Credential Handling: Insecure file creation modes (`0644` vs `0600` for config/cache with API keys), token exposure in logs/errors.
+        4. Resource Exhaustion & Denial of Service: Unbounded payload buffers from network streams, memory exhaustion from cyclic includes, file descriptor leaks.
+      MANDATE
+    },
+    'correctness' => {
+      name: 'Domain Correctness, Specifications & Data Integrity',
+      description: 'Specification conformance, edge cases, format idempotency, lossy field conversions, invariant preservation.',
+      mandate: <<~MANDATE
+        Focus exclusively on Domain Correctness, Specifications & Data Integrity (Rust):
+        1. Specification Conformance: Strict alignment with domain rules, key generation, and data representation models.
+        2. Format Idempotency & Reversibility: Idempotency invariants ($f(f(x)) == f(x)$), journal reversibility, state machine recovery.
+        3. Syntax & Character Fidelity: Accented character handling, macro escaping, balanced delimiters, preservation of raw fields.
+        4. Lossy Field Conversions: Ensuring unparsed or unrecognized fields, comments, and entries are preserved verbatim rather than silently dropped.
+      MANDATE
+    },
+    'resilience' => {
+      name: 'Network Resilience, Error Handling & Observability',
+      description: 'Network timeouts, HTTP 429/503 retry backoff with jitter, error swallowing (.ok()), contextual error tracing.',
+      mandate: <<~MANDATE
+        Focus exclusively on Network Resilience, Error Handling & Observability (Rust):
+        1. Network Degradation: HTTP 429 Rate Limiting, HTTP 503/504 backoff with jitter, missing per-request timeouts (indefinite hangs on stalled sockets).
+        2. Silent Error Swallowing: Anti-patterns like `.ok()`, `.unwrap_or_default()`, or `let _ = ...` that silently discard I/O, network, or authentication failures.
+        3. Partial Failure Recovery: Transactional rollbacks when multi-stage pipelines fail mid-execution.
+        4. Observability & Context: Missing context in error messages (`anyhow::Context` / `thiserror`), inability to trace which entry, file, or field failed.
+      MANDATE
+    },
+    'performance' => {
+      name: 'Algorithmic Complexity, Allocations & Resource Efficiency',
+      description: 'O(N^2) comparisons, excessive heap allocations in hot loops, missing buffered I/O, cache reuse.',
+      mandate: <<~MANDATE
+        Focus exclusively on Algorithmic Complexity, Allocations & Resource Efficiency (Rust):
+        1. Algorithmic Bottlenecks: $O(N^2)$ cross-entry comparisons without indexing or blocking, repeated full-file re-parsing in hot loops.
+        2. Allocation Hotspots: Redundant `.clone()`, `to_string()`, or intermediate `Vec` allocations in inner loops where zero-copy `&str` or `Cow<str>` would suffice.
+        3. I/O Efficiency: Missing buffered I/O (`BufReader` / `BufWriter`), repeated redundant stat/canonicalize syscalls.
+        4. Caching & Reuse: Missing caching for expensive network fetches or key transformations.
+      MANDATE
+    },
+    'cli' => {
+      name: 'Command-Line Interface, Ergonomics & Help System',
+      description: 'One canonical interface, anti-alias-bloat, concise -h (<= 20 lines), -h vs -E symmetry, visual styling, discoverability.',
+      mandate: <<~MANDATE
+        Focus exclusively on Command-Line Interface, Ergonomics & Help System:
+        1. One Canonical Interface (Anti-Alias Bloat): Every command and option must have exactly one obvious, canonical primary form. Discourage gratuitous synonym aliases.
+        2. Non-Breaking Evolution: When standardizing an inconsistent flag name, make the standard form canonical and retain the legacy form as a hidden alias.
+        3. Information Density & Brevity: Subcommand short help (-h) must be dense and concise (strictly <= 20 lines), keeping field and command summaries <= 45 characters.
+        4. Symmetry & Discoverability: Clean stdout/stderr stream separation and actionable error messages with hint suggestions.
+      MANDATE
+    }
+  },
+  go: {
+    'systems' => {
+      name: 'Systems Architecture, Concurrency & Soundness',
+      description: 'Data races, deadlocks, goroutine leaks, atomic file replacement, slice bounds panics, lock contention across I/O.',
+      mandate: <<~MANDATE
+        Focus exclusively on Systems Architecture, Concurrency & Soundness (Go):
+        1. Concurrency, Goroutines & Synchronization: Data races (shared map/slice mutations without sync.Mutex/RWMutex), goroutine leaks (blocked receives/sends on unbuffered channels, missing context cancellation), deadlocks, lock contention held across long I/O or network calls.
+        2. Memory, Pointer & Slice Safety: Nil pointer dereferences, slice bounds out-of-range panics, type assertion panics without the 2-value `ok` form, unexpected slice aliasing.
+        3. Data Integrity & File Atomicity: Torn writes, non-atomic file overwrites without tempfile+rename, missing file sync before close, corrupted state persistence across crashes.
+        4. Lifecycle & Runtime Safety: Missing sync.WaitGroup.Done() / missing defer unlock, unhandled signals, uncontrolled background goroutine lifetimes.
+      MANDATE
+    },
+    'security' => {
+      name: 'Application Security & Attack Surface',
+      description: 'Path traversal, command injection, insecure file permissions, ReDoS, unbounded stream reads, secret exposure.',
+      mandate: <<~MANDATE
+        Focus exclusively on Application Security & Attack Surface (Go):
+        1. Path Traversal & Filesystem Boundaries: Untrusted file paths escaping intended directories (missing filepath.Clean, `..` traversal), symlink traversal, TOCTOU in file validation.
+        2. Injection & Command Execution: Unsanitized shell execution (`exec.Command("sh", "-c", ...)` without quoting/containment), command argument injection, format string bugs.
+        3. Permissions & Credential Handling: Insecure file creation modes (`0666`/`0777` vs `0600`/`0700` for configs, cache, tokens), API token exposure in logs, errors, or JSON dumps.
+        4. Resource Exhaustion & Denial of Service: Unbounded `io.ReadAll` on untrusted network streams or HTTP requests without `io.LimitReader`, unbounded slice allocations from user inputs.
+      MANDATE
+    },
+    'correctness' => {
+      name: 'Domain Correctness, Specifications & Data Integrity',
+      description: 'State machine transitions, timestamp/interval calculations, zero-value pitfalls, format idempotency, lossy conversions.',
+      mandate: <<~MANDATE
+        Focus exclusively on Domain Correctness, Specifications & Data Integrity (Go):
+        1. Invariant & Contract Conformance: Strict adherence to domain invariants, interval merging logic, timestamp calculations, and state machine transition rules.
+        2. Edge Cases & Zero Values: Unhandled empty collections, nil interface checks (`var p *T; var i any = p; i != nil`), zero-value struct pitfalls, off-by-one errors.
+        3. Format & Protocol Fidelity: Lossy JSON/SRT/metadata transformations, timezone discrepancies in `time.Time` comparisons, precision loss in duration conversions.
+        4. Idempotency & Partial Failure Recovery: Operations where retrying causes duplicated records or corrupted persistent files, missing rollback on failure.
+      MANDATE
+    },
+    'resilience' => {
+      name: 'Network Resilience, Error Handling & Observability',
+      description: 'HTTP client timeouts, unclosed response bodies, error swallowing, goroutine panic recovery, error wrapping.',
+      mandate: <<~MANDATE
+        Focus exclusively on Network Resilience, Error Handling & Observability (Go):
+        1. Network & Socket Safety: Missing timeouts on `http.Client` / `http.Transport` (default `http.Client{}` has NO timeout and hangs indefinitely on stalled connections), unclosed `resp.Body` (connection leak), missing retry backoff with jitter on 429/503.
+        2. Silent Error Swallowing: Discarded errors (`_ = f()` or empty error checks), discarding error context instead of wrapping with `fmt.Errorf("...: %w", err)`.
+        3. Goroutine Panic Boundaries: Unrecovered panics in background goroutines crashing the entire process (missing `recover()` boundary).
+        4. Partial Failure Recovery & Resource Cleanup: Missing `defer` cleanup on file descriptors, subprocesses, or temporary directories (`.work/` cleanup) on error returns.
+      MANDATE
+    },
+    'performance' => {
+      name: 'Algorithmic Complexity, Allocations & Resource Efficiency',
+      description: 'O(N^2) bottlenecks, hot loop heap allocations, unbuffered I/O, regexp re-compilation, cache reuse.',
+      mandate: <<~MANDATE
+        Focus exclusively on Algorithmic Complexity, Allocations & Resource Efficiency (Go):
+        1. Algorithmic Bottlenecks: $O(N^2)$ loops over large collections without map/indexing lookups, redundant full-directory scans in hot paths.
+        2. Memory & Allocation Hotspots: Excessive allocations in hot loops (repeated string concatenation with `+` instead of `strings.Builder`, redundant `[]byte` <-> `string` copies, unbuffered channel contention).
+        3. I/O Efficiency: Missing buffered I/O (using raw `io.Reader`/`Writer` instead of `bufio.Reader`/`Writer`), repeated redundant `os.Stat`/`filepath.Walk` calls.
+        4. Caching & Reuse: Missing caching for expensive computations or network fetches, repeated `regexp.MustCompile` inside functions instead of package-level precompilation.
+      MANDATE
+    },
+    'cli' => {
+      name: 'Command-Line Interface, Ergonomics & Help System',
+      description: 'One canonical interface, anti-alias-bloat, concise help, clean stdout/stderr stream separation, exit code correctness.',
+      mandate: <<~MANDATE
+        Focus exclusively on Command-Line Interface, Ergonomics & Help System:
+        1. One Canonical Interface (Anti-Alias Bloat): Every command and option must have exactly one obvious, canonical primary form. Avoid gratuitous synonym aliases. Help text must never advertise aliases.
+        2. Non-Breaking Evolution: When standardizing an inconsistent flag name, make the standard form canonical and retain the legacy form as a hidden alias.
+        3. Information Density & Brevity: Subcommand short help (-h) must be dense and concise (strictly <= 20 lines), keeping field and command summaries <= 45 characters.
+        4. Symmetry & Discoverability: Clean stdout/stderr stream separation, actionable error messages with hint suggestions, exit status code correctness.
+      MANDATE
+    }
+  }
+}
+PROFILES_BY_LANG[:generic] = PROFILES_BY_LANG[:go]
+PROFILES_BY_LANG.freeze
+
+PROFILE_BACKEND_AFFINITY = {
+  'security' => :claude,
+  'correctness' => :claude,
+  'systems' => :codex,
+  'performance' => :codex,
+  'resilience' => :claude,
+  'cli' => :claude
+}.freeze
+
+def parse_cli_options
+  options = {
+    profile: 'systems',
+    backend: ENV.fetch('AUDIT_BACKEND', 'auto'),
+    tier: ENV.fetch('AUDIT_TIER', 'standard'),
+    model: ENV['AUDIT_MODEL'],
+    all_files: false,
+    include_tests: false,
+    target: nil
+  }
+
+  parser = OptionParser.new do |opts|
+    opts.banner = 'Usage: tools/audit [options] [files/directories...]'
+
+    opts.on('-p', '--profile PROFILE', 'Audit profile (systems|security|correctness|resilience|performance|cli|random, default: systems)') do |p|
+      options[:profile] = p
+    end
+
+    opts.on('-b', '--backend BACKEND', 'Execution backend (auto|gemini|claude|codex|openai_api, default: auto)') do |b|
+      options[:backend] = b.downcase
+    end
+
+    opts.on('-t', '--tier TIER', 'Model capability tier (tier0|standard|deep, default: standard)') do |t|
+      options[:tier] = t.downcase
+    end
+
+    opts.on('-m', '--model MODEL', 'Explicit model identifier override') do |m|
+      options[:model] = m
+    end
+
+    opts.on('--all-files', 'Audit all source files without profile-specific lens pruning') do
+      options[:all_files] = true
+    end
+
+    opts.on('--include-tests', 'Include test files/modules in audit payload (default: excluded)') do
+      options[:include_tests] = true
+    end
+
+    opts.on('-l', '--list-profiles', 'List available audit profiles and descriptions') do
+      puts "\nAvailable Audit Profiles:"
+      lang = detect_project_language
+      profiles = PROFILES_BY_LANG[lang] || PROFILES_BY_LANG[:generic]
+      profiles.each do |key, prof|
+        puts "  * #{key.ljust(12)} - #{prof[:name]}"
+        puts "    #{prof[:description]}"
+      end
+      puts "  * random       - Randomly pick one of the above profiles\n\n"
+      exit 0
+    end
+
+    opts.on('-h', '--help', 'Show this help message') do
+      puts opts
+      exit 0
+    end
+  end
+
+  remaining = parser.parse(ARGV)
+  options[:target] = remaining
+  options
+end
+
+def resolve_profile(requested, lang)
+  profiles = PROFILES_BY_LANG[lang] || PROFILES_BY_LANG[:generic]
+  if requested == 'random'
+    chosen = profiles.keys.sample
+    warn "Profile selected randomly: #{chosen} (#{profiles[chosen][:name]})"
+    [chosen, profiles[chosen]]
+  elsif profiles.key?(requested)
+    [requested, profiles[requested]]
+  else
+    warn "Unknown profile '#{requested}'. Falling back to 'systems'. Available: #{profiles.keys.join(', ')}"
+    ['systems', profiles['systems']]
+  end
+end
+
+def resolve_backend(backend_opt, tier_opt, profile_key)
+  has_claude = system('which claude > /dev/null 2>&1')
+  has_codex = system('which codex > /dev/null 2>&1')
+  has_api = !ENV['OPENAI_API_KEY'].to_s.strip.empty?
+  has_gemini = system('which bws > /dev/null 2>&1')
+
+  return :gemini if tier_opt == 'tier0' && (backend_opt == 'auto' || backend_opt == 'gemini' || backend_opt == 'flash')
+
+  case backend_opt
+  when 'gemini', 'flash'
+    abort_missing('gemini', '`bws` or `agy-run-wild` is not installed.') unless has_gemini
+    :gemini
+  when 'claude'
+    abort_missing('claude', 'Claude CLI (`claude`) is not installed or not in PATH.') unless has_claude
+    :claude
+  when 'codex'
+    abort_missing('codex', 'Codex CLI (`codex`) is not installed or not in PATH.') unless has_codex
+    :codex
+  when 'openai_api', 'api'
+    abort_missing('openai_api', 'OPENAI_API_KEY is not set in environment.') unless has_api
+    :openai_api
+  when 'auto'
+    select_auto_backend(profile_key, has_claude, has_codex, has_api, has_gemini)
+  else
+    warn "Unknown backend '#{backend_opt}'. Defaulting to auto selection."
+    resolve_backend('auto', tier_opt, profile_key)
+  end
+end
+
+def select_auto_backend(profile_key, has_claude, has_codex, has_api, has_gemini)
+  preferred = PROFILE_BACKEND_AFFINITY.fetch(profile_key, :claude)
+  if preferred == :claude && has_claude
+    :claude
+  elsif preferred == :codex && has_codex
+    :codex
+  elsif has_claude
+    :claude
+  elsif has_codex
+    :codex
+  elsif has_gemini
+    :gemini
+  elsif has_api
+    :openai_api
+  else
+    abort_missing('auto', 'Neither `claude`, `codex`, `bws`, nor OPENAI_API_KEY is available.')
+  end
+end
+
+def abort_missing(backend, msg)
+  warn "Error [backend: #{backend}]: #{msg}"
+  exit 1
+end
+
+def resolve_model(backend, tier, explicit_model)
+  return explicit_model if explicit_model && !explicit_model.strip.empty?
+
+  case backend
+  when :gemini
+    'gemini-3.8-flash-high'
+  when :claude
+    tier == 'deep' || tier == 'tier2' ? 'opus' : 'sonnet'
+  when :codex
+    ENV.fetch('CODEX_MODEL', 'gpt-5.6-sol')
+  when :openai_api
+    ENV.fetch('OPENAI_MODEL', (tier == 'deep' || tier == 'tier2') ? 'o3-mini' : 'gpt-4o')
+  end
+end
+
+def strip_test_code(code, lang)
+  if lang == :rust
+    idx = code.index(/\n\s*#\[cfg\(test\)\]/)
+    idx ? (code[0...idx] + "\n") : code
+  else
+    code
+  end
+end
+
+def filter_files_for_profile(files, profile_key, lang)
+  patterns = case profile_key
+             when 'cli' then /cli|cmd|tui|keys|flags|subcommand|command/i
+             when 'resilience' then /net|http|fetch|client|remote|worker|download|transport|cache/i
+             when 'security' then /auth|secret|token|perm|sanitize|exec|path|crypt|quarantine/i
+             when 'systems' then /lock|sync|proc|batch|queue|store|db|state|file|atomic/i
+             when 'performance' then /cache|buf|format|parse|chunk|transcribe|audio/i
+             else nil
+             end
+  return files unless patterns
+
+  scoped = files.select { |f| File.basename(f) =~ patterns }
+  scoped.empty? ? files : scoped
+end
+
+def resolve_target_files(args, profile_key, all_files, backend, lang, include_tests: false)
+  glob_pattern = case lang
+                 when :rust then '**/*.rs'
+                 when :go   then '**/*.go'
+                 else '**/*.*'
+                 end
+
+  files = args.flat_map do |path|
+    if File.directory?(path)
+      Dir.glob(File.join(path, glob_pattern))
+    elsif File.file?(path)
+      path
+    else
+      Dir.glob(path)
+    end
+  end.uniq.select { |f| File.file?(f) }
+
+  # Filter out internal/vendored/work directories
+  files = files.reject { |f| f.include?('/.work/') || f.include?('/vendor/') || f.include?('/target/') }
+
+  # Test file filtering for Go
+  if lang == :go && !include_tests
+    files = files.reject { |f| File.basename(f).end_with?('_test.go') }
+  end
+
+  # Gemini has 1M context: provide full codebase for cross-module traces.
+  # For expensive backends (Claude/Codex/OpenAI), prune to domain lens modules if codebase is large.
+  if !all_files && backend != :gemini && files.size > 20
+    files = filter_files_for_profile(files, profile_key, lang)
+  end
+
+  files
+end
+
+def default_search_path(lang)
+  if lang == :rust && Dir.exist?('src')
+    ['src']
+  else
+    ['.']
+  end
+end
+
+def collect_payload(args, profile_key: nil, backend: nil, all_files: false, include_tests: false, lang: :go)
+  effective_args = args.empty? ? default_search_path(lang) : args
+
+  if !args.empty? || (effective_args.any? && !$stdin.stat.pipe?)
+    files = resolve_target_files(effective_args, profile_key, all_files, backend, lang, include_tests: include_tests)
+    if files.empty?
+      puts 'NO CRITICAL DEFECTS FOUND (No matching files found).'
+      exit 0
+    end
+
+    payload = files.map do |file|
+      content = File.read(file)
+      content = strip_test_code(content, lang) unless include_tests
+      "// --- FILE: #{file} ---\n#{content}\n"
+    end.compact.join("\n")
+    ['source code', payload]
+  elsif $stdin.stat.pipe?
+    ['diff', $stdin.read]
+  else
+    ['diff', $stdin.read]
+  end
+end
+
+def developer_prompt(profile_key, profile_info, lang)
+  lang_label = lang == :go ? 'Go' : (lang == :rust ? 'Rust' : 'Systems')
+  linter_note = if lang == :go
+                  'Assume all code strictly compiles, passes standard type checking, and has 0 issues under `go vet ./...` and `staticcheck ./...`. Do not comment on formatting or trivial stylistic preferences.'
+                elsif lang == :rust
+                  'Assume all code strictly compiles, passes standard type checking, and has 0 warnings under `cargo clippy --all-targets -- -D warnings`. Do not comment on formatting, variable naming, or trivial style preferences.'
+                else
+                  'Assume all code strictly compiles, passes standard type checking, and linters pass cleanly.'
+                end
+
+  <<~PROMPT
+    You are a Principal Systems Engineer and #{lang_label} code auditor conducting a rigorous, adversarial code review.
+    Audit Lens: #{profile_info[:name]} (#{profile_key})
+
+    #{linter_note}
+
+    Your mandate is to detect deep architectural, domain, and systems defects within your specific focus area:
+    #{profile_info[:mandate]}
+
+    Review Format:
+    For every valid issue found, output:
+    [SEVERITY]: Critical, Major, or Moderate
+    [LOCATION]: File path and exact line/block reference
+    [ROOT CAUSE]: Technical explanation of invariant breakdown
+    [FAILURE TRACE]: Interleaving sequence, input pattern, or runtime conditions required to trigger the bug
+    [REMEDIATION]: Minimal, idiomatic code snippet resolving the defect
+
+    If no severe defects exist for this focus area, return: "NO CRITICAL DEFECTS FOUND." Do not manufacture non-issues.
+  PROMPT
+end
+
+def audit_via_claude(dev_prompt, input_payload, payload_type, profile_key, model, tier, lang)
+  warn "Auditing via Claude CLI (#{model}, tier: #{tier}) [Profile: #{profile_key}]..."
+  lang_str = lang.to_s.capitalize
+  prompt = "Review the following #{lang_str} #{payload_type}:"
+  cmd = [
+    'claude',
+    '-p', prompt,
+    '--system-prompt', dev_prompt,
+    '--tools', '',
+    '--no-session-persistence',
+    '--model', model
+  ]
+
+  stdout, stderr, status = Open3.capture3(*cmd, stdin_data: input_payload)
+  if status.success?
+    puts stdout
+  else
+    warn stderr unless stderr.strip.empty?
+    exit status.exitstatus || 1
+  end
+end
+
+def audit_via_codex(dev_prompt, input_payload, payload_type, profile_key, model, tier, lang)
+  warn "Auditing via Codex CLI (#{model}, tier: #{tier}) [Profile: #{profile_key}]..."
+  lang_str = lang.to_s.capitalize
+  prompt = "#{dev_prompt}\n\nReview the following #{lang_str} #{payload_type}:"
+  cmd = ['codex', 'exec', '-s', 'read-only', '--ephemeral', '--color', 'never']
+  cmd += ['-m', model] if model && model != 'default'
+  cmd << prompt
+
+  stdout, stderr, status = Open3.capture3(*cmd, stdin_data: input_payload)
+  if status.success?
+    puts stdout
+  else
+    warn stderr unless stderr.strip.empty?
+    exit status.exitstatus || 1
+  end
+end
+
+def audit_via_api(api_key, dev_prompt, input_payload, payload_type, profile_key, model, tier, lang)
+  reasoning_effort = ENV.fetch('REASONING_EFFORT', tier == 'deep' ? 'high' : 'medium')
+  warn "Auditing via OpenAI API (#{model}, tier: #{tier}, reasoning: #{reasoning_effort}) [Profile: #{profile_key}]...\n"
+
+  fence = lang == :go ? 'go' : (lang == :rust ? 'rust' : 'text')
+  user_prompt = "Review the following #{lang.to_s.capitalize} #{payload_type}:\n\n```#{fence}\n#{input_payload}\n```"
+  uri = URI.parse('https://api.openai.com/v1/chat/completions')
+  http = Net::HTTP.new(uri.host, uri.port)
+  http.use_ssl = true
+  http.read_timeout = 300
+
+  payload = {
+    model: model,
+    reasoning_effort: reasoning_effort,
+    messages: [
+      { role: 'developer', content: dev_prompt },
+      { role: 'user', content: user_prompt }
+    ]
+  }
+
+  request = Net::HTTP::Post.new(uri.request_uri, {
+    'Content-Type' => 'application/json',
+    'Authorization' => "Bearer #{api_key}"
+  })
+  request.body = payload.to_json
+
+  begin
+    response = http.request(request)
+  rescue StandardError => e
+    warn "Network error contacting OpenAI API: #{e.message}"
+    exit 1
+  end
+
+  if response.is_a?(Net::HTTPSuccess)
+    body = JSON.parse(response.body)
+    puts body.dig('choices', 0, 'message', 'content')
+  else
+    warn "API Error (#{response.code}): #{response.body}"
+    exit 1
+  end
+end
+
+def audit_via_gemini(dev_prompt, input_payload, payload_type, profile_key, _model, _tier, lang)
+  warn "Auditing via Gemini Flash (bws run) [Profile: #{profile_key}]..."
+  clean_prompt = dev_prompt
+    .gsub(/adversarial code review/i, 'rigorous reliability code review')
+    .gsub(/detect deep architectural, domain, and systems defects/i, 'detect software reliability, robustness, and invariant defects')
+
+  lang_str = lang.to_s.capitalize
+  fence = lang == :go ? 'go' : (lang == :rust ? 'rust' : 'text')
+  ext = lang == :go ? '.go' : (lang == :rust ? '.rs' : '.txt')
+
+  temp_payload = nil
+  prompt = if input_payload.bytesize > 32_000
+             temp_filename = ".audit_payload_#{Process.pid}_#{Time.now.to_i}#{ext}"
+             temp_payload = File.join(Dir.pwd, temp_filename)
+             File.write(temp_payload, input_payload)
+             "#{clean_prompt}\n\nReview the #{lang_str} #{payload_type} provided in #{temp_filename} (which contains source code with `// FILE: <path>` headers). Cite the original source file locations in findings, not #{temp_filename}."
+           else
+             "#{clean_prompt}\n\nReview the following #{lang_str} #{payload_type}:\n\n```#{fence}\n#{input_payload}\n```"
+           end
+
+  cmd = ['bws', 'run', '--', 'agy-run-wild', '-p', prompt]
+
+  stdout, stderr, status = Open3.capture3(*cmd)
+  if status.success?
+    clean_out = stdout.lines.reject { |l| l =~ /Successfully trusted workspace/ }.join
+    puts clean_out
+  else
+    warn stderr unless stderr.strip.empty?
+    exit status.exitstatus || 1
+  end
+ensure
+  FileUtils.rm_f(temp_payload) if temp_payload
+end
+
+def main
+  opts = parse_cli_options
+  lang = detect_project_language
+  profile_key, profile_info = resolve_profile(opts[:profile], lang)
+  backend = resolve_backend(opts[:backend], opts[:tier], profile_key)
+  model = resolve_model(backend, opts[:tier], opts[:model])
+
+  payload_type, input_payload = collect_payload(
+    opts[:target] || [],
+    profile_key: profile_key,
+    backend: backend,
+    all_files: opts[:all_files],
+    include_tests: opts[:include_tests],
+    lang: lang
+  )
+  if input_payload.nil? || input_payload.strip.empty?
+    puts 'NO CRITICAL DEFECTS FOUND (No input received).'
+    exit 0
+  end
+
+  dev_prompt = developer_prompt(profile_key, profile_info, lang)
+
+  case backend
+  when :gemini
+    audit_via_gemini(dev_prompt, input_payload, payload_type, profile_key, model, opts[:tier], lang)
+  when :claude
+    audit_via_claude(dev_prompt, input_payload, payload_type, profile_key, model, opts[:tier], lang)
+  when :codex
+    audit_via_codex(dev_prompt, input_payload, payload_type, profile_key, model, opts[:tier], lang)
+  when :openai_api
+    audit_via_api(ENV['OPENAI_API_KEY'], dev_prompt, input_payload, payload_type, profile_key, model, opts[:tier], lang)
+  end
+end
+
+main if __FILE__ == $PROGRAM_NAME
