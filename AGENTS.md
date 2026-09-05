@@ -100,8 +100,22 @@ statement that goes missing during an extraction becomes a build error — a los
 ### Files — warn over 800 lines, hard limit 1100
 
 Files should stay comfortably readable, but file length is a *comfort* metric, not a
-correctness one. Keep functions under 80 lines and files land in the 300–500 range on
+correctness one. Keep functions under 80 lines and files land in the 300–700 range on
 their own; the 800-line warning exists to catch the cases where they do not.
+
+### Validation Tool — `tools/audit_lines.rb`
+
+Line lengths are verified using `tools/audit_lines.rb` (run via `make audit` or as part of `make lint` / `make check`):
+- **Function verification**: Measures line counts of Go function declarations (matching `func` in column 0 to its closing `}`). Flags any function exceeding **80 lines**.
+- **File verification**: Scans all Go files (excluding `.work/` and vendor directories). Emits a warning if a file exceeds **800 lines** and reports a hard failure if it exceeds **1100 lines**.
+- **Key Flags**:
+  - `-f, --max-func LINES`: Configure function line limit (default: `80`).
+  - `-s, --soft LINES`: Configure file soft warning threshold (default: `800`).
+  - `-m, --max LINES`: Configure file hard limit (default: `1100`).
+  - `--strict`: Return a non-zero exit code if any hard limit is exceeded.
+  - `-q, --quiet`: Report only warnings and violations.
+  - `--include-tests`: Apply function limits to `*_test.go` files.
+
 
 ### Never split a file through a function body
 
