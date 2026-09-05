@@ -98,15 +98,29 @@ type LLMProfile struct {
 	APIKey string `json:"api_key"`
 }
 
+type WhisperEngine string
+
+const (
+	WhisperEngineLocal  WhisperEngine = "local"
+	WhisperEngineDocker WhisperEngine = "docker"
+	WhisperEngineRemote WhisperEngine = "remote"
+)
+
 type WhisperProfile struct {
-	ID              int     `json:"id"`
-	Name            string  `json:"name"`
-	URL             string  `json:"url"`
-	SpeedFactor     float64 `json:"speed_factor"`
-	DockerContainer string  `json:"docker_container,omitempty"`
-	Language        string  `json:"language,omitempty"`
-	Prompt          string  `json:"prompt,omitempty"`
-	WakeCommand     string  `json:"wake_command,omitempty"`
+	ID              int           `json:"id"`
+	Name            string        `json:"name"`
+	URL             string        `json:"url,omitempty"`
+	SpeedFactor     float64       `json:"speed_factor"`
+	DockerContainer string        `json:"docker_container,omitempty"`
+	Language        string        `json:"language,omitempty"`
+	Prompt          string        `json:"prompt,omitempty"`
+	WakeCommand     string        `json:"wake_command,omitempty"`
+	Engine          WhisperEngine `json:"engine"`
+	Model           string        `json:"model,omitempty"`
+	CliBinary       string        `json:"cli_binary,omitempty"`
+	Processors      int           `json:"processors,omitempty"`
+	Threads         int           `json:"threads,omitempty"`
+	Greedy          bool          `json:"greedy,omitempty"`
 }
 
 type Config struct {
@@ -118,6 +132,12 @@ type Config struct {
 	WhisperLanguage        string           `json:"whisper_language"`
 	WhisperPrompt          string           `json:"whisper_prompt"`
 	WhisperWakeCommand     string           `json:"whisper_wake_command,omitempty"`
+	WhisperEngine          WhisperEngine    `json:"whisper_engine,omitempty"`
+	WhisperModel           string           `json:"whisper_model,omitempty"`
+	WhisperCliBinary       string           `json:"whisper_cli_binary,omitempty"`
+	WhisperProcessors      int              `json:"whisper_processors,omitempty"`
+	WhisperThreads         int              `json:"whisper_threads,omitempty"`
+	WhisperGreedy          bool             `json:"whisper_greedy,omitempty"`
 	ChunkDurationSec       int              `json:"chunk_duration_sec"`
 	ActiveProfileID        int              `json:"active_profile_id"`
 	Profiles               []LLMProfile     `json:"profiles"`
@@ -213,6 +233,8 @@ type CLIOptions struct {
 	RemoveWhisper        int
 	SetDefaultWhisper    int
 	ListWhispers         bool
+	WhisperEngine        string
+	WhisperModel         string
 
 	Count               int
 	CountGiven          bool

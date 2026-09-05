@@ -236,6 +236,18 @@ func extractMetadataPrompt(sourceAudioFile string, id3TagsOut map[string]string,
 }
 
 func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
+	wp := getActiveWhisperProfile(config)
+	if cli.WhisperEngine != "" {
+		wp.Engine = WhisperEngine(cli.WhisperEngine)
+	}
+	if cli.WhisperModel != "" {
+		wp.Model = cli.WhisperModel
+	}
+
+	if wp.Engine == WhisperEngineLocal {
+		return runWhisperCLITranscription(sourceAudioFile, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
+	}
+
 	chunkDuration := config.ChunkDurationSec
 	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 

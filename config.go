@@ -5,12 +5,43 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 )
 
 const configDirName = ".config/abs"
 const legacyConfigDirName = ".config/mp3_rm_ads"
 const configFileName = "config.json"
 const opencodeConfigFile = ".config/opencode/opencode.json"
+
+var defaultWhisperProfiles = []WhisperProfile{
+	{
+		ID:          1,
+		Name:        "Local whisper-cli (tiny.en)",
+		Engine:      WhisperEngineLocal,
+		Model:       "tiny.en",
+		SpeedFactor: 70.0,
+		CliBinary:   "whisper-cli",
+		Processors:  4,
+		Threads:     4,
+		Greedy:      true,
+	},
+	{
+		ID:              2,
+		Name:            "Docker Daemon (localhost:8088)",
+		Engine:          WhisperEngineDocker,
+		URL:             "http://127.0.0.1:8088/inference",
+		SpeedFactor:     7.0,
+		DockerContainer: "whisper",
+	},
+	{
+		ID:          3,
+		Name:        "Remote cloud8 (faster-whisper)",
+		Engine:      WhisperEngineRemote,
+		URL:         "http://cloud8:8000/v1/audio/transcriptions",
+		SpeedFactor: 7.0,
+		WakeCommand: "wake_cloud8",
+	},
+}
 
 var defaultConfig = Config{
 	Instructions:          "Configuration file for abs. Select profiles by ID or set active_profile_id.",
@@ -19,10 +50,18 @@ var defaultConfig = Config{
 	DefaultAdRemoval:      "all",
 	DefaultProcessing:     "local",
 	RemoteWorkDir:         "~/abs_remote",
-	WhisperURL:            "http://192.168.1.230:8088/inference",
-	WhisperSpeedFactor:    7.0,
+	WhisperURL:            "http://127.0.0.1:8088/inference",
+	WhisperSpeedFactor:    70.0,
 	ChunkDurationSec:      0,
 	ActiveProfileID:       1,
+	ActiveWhisperID:       1,
+	WhisperProfiles:       defaultWhisperProfiles,
+	WhisperEngine:         WhisperEngineLocal,
+	WhisperModel:          "tiny.en",
+	WhisperCliBinary:      "whisper-cli",
+	WhisperProcessors:     4,
+	WhisperThreads:        4,
+	WhisperGreedy:         true,
 	Profiles: []LLMProfile{
 		{ID: 1, Name: "Ollama Local (llama3.1:8b)", Type: "ollama", URL: "http://192.168.1.230:11434/v1/chat/completions", Model: "llama3.1:8b"},
 		{ID: 2, Name: "OpenRouter - Claude 3.5 Sonnet", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "anthropic/claude-3.5-sonnet"},
@@ -43,6 +82,11 @@ func ensureConfigExists() {
 		cfg.WhisperURL = fmt.Sprintf("http://%s:8088/inference", ip)
 		for i := range cfg.Profiles {
 			cfg.Profiles[i].URL = replaceIP(cfg.Profiles[i].URL, ip)
+		}
+		for i := range cfg.WhisperProfiles {
+			if cfg.WhisperProfiles[i].Engine == WhisperEngineDocker {
+				cfg.WhisperProfiles[i].URL = replaceIP(cfg.WhisperProfiles[i].URL, ip)
+			}
 		}
 		data, _ := json.MarshalIndent(cfg, "", "  ")
 		_ = writeFileAtomic(configPath(), append(data, '\n'), 0600)
@@ -164,12 +208,43 @@ func applyWhisperAndRemoteEnvOverrides(cfg *Config) {
 	}
 }
 
+func inferWhisperEngine(wp WhisperProfile) WhisperEngine {
+	if wp.Engine != "" {
+		return wp.Engine
+	}
+	if wp.URL == "" || wp.CliBinary != "" || strings.Contains(strings.ToLower(wp.Name), "local") || (wp.Model != "" && wp.URL == "") {
+		return WhisperEngineLocal
+	}
+	return inferWhisperEngineFromURL(wp.URL)
+}
+
+func inferWhisperEngineFromURL(url string) WhisperEngine {
+	if url == "" || strings.Contains(url, "whisper-cli") {
+		return WhisperEngineLocal
+	}
+	lower := strings.ToLower(url)
+	if strings.Contains(lower, ":8088") || strings.Contains(lower, "localhost") || strings.Contains(lower, "127.0.0.1") || strings.Contains(lower, "192.168.") {
+		return WhisperEngineDocker
+	}
+	return WhisperEngineRemote
+}
+
 func resolveActiveWhisperProfile(cfg *Config) {
-	if cfg.ActiveWhisperID <= 0 {
-		return
+	if cfg.ActiveWhisperID <= 0 && len(cfg.WhisperProfiles) > 0 {
+		cfg.ActiveWhisperID = cfg.WhisperProfiles[0].ID
 	}
 	for _, wp := range cfg.WhisperProfiles {
 		if wp.ID == cfg.ActiveWhisperID {
+			engine := wp.Engine
+			if engine == "" {
+				engine = inferWhisperEngine(wp)
+			}
+			cfg.WhisperEngine = engine
+			cfg.WhisperModel = wp.Model
+			cfg.WhisperCliBinary = wp.CliBinary
+			cfg.WhisperProcessors = wp.Processors
+			cfg.WhisperThreads = wp.Threads
+			cfg.WhisperGreedy = wp.Greedy
 			if wp.URL != "" {
 				cfg.WhisperURL = wp.URL
 			}
@@ -182,6 +257,74 @@ func resolveActiveWhisperProfile(cfg *Config) {
 			cfg.WhisperWakeCommand = wp.WakeCommand
 			return
 		}
+	}
+	if cfg.WhisperEngine == "" {
+		cfg.WhisperEngine = inferWhisperEngineFromURL(cfg.WhisperURL)
+	}
+}
+
+func getActiveWhisperProfile(cfg Config) WhisperProfile {
+	for _, wp := range cfg.WhisperProfiles {
+		if wp.ID == cfg.ActiveWhisperID {
+			return normalizeWhisperProfile(wp)
+		}
+	}
+	if len(cfg.WhisperProfiles) > 0 {
+		return normalizeWhisperProfile(cfg.WhisperProfiles[0])
+	}
+	return fallbackWhisperProfile(cfg)
+}
+
+func normalizeWhisperProfile(wp WhisperProfile) WhisperProfile {
+	if wp.Engine == "" {
+		wp.Engine = inferWhisperEngine(wp)
+	}
+	if wp.Engine == WhisperEngineLocal {
+		if wp.Model == "" {
+			wp.Model = "tiny.en"
+		}
+		if wp.Processors <= 0 {
+			wp.Processors = 4
+		}
+		if wp.Threads <= 0 {
+			wp.Threads = 4
+		}
+	}
+	return wp
+}
+
+func fallbackWhisperProfile(cfg Config) WhisperProfile {
+	engine := cfg.WhisperEngine
+	if engine == "" {
+		engine = inferWhisperEngineFromURL(cfg.WhisperURL)
+	}
+	model := cfg.WhisperModel
+	if engine == WhisperEngineLocal && model == "" {
+		model = "tiny.en"
+	}
+	procs := cfg.WhisperProcessors
+	if engine == WhisperEngineLocal && procs <= 0 {
+		procs = 4
+	}
+	threads := cfg.WhisperThreads
+	if engine == WhisperEngineLocal && threads <= 0 {
+		threads = 4
+	}
+	return WhisperProfile{
+		ID:              0,
+		Name:            "Default",
+		Engine:          engine,
+		URL:             cfg.WhisperURL,
+		SpeedFactor:     cfg.WhisperSpeedFactor,
+		DockerContainer: cfg.WhisperDockerContainer,
+		Language:        cfg.WhisperLanguage,
+		Prompt:          cfg.WhisperPrompt,
+		WakeCommand:     cfg.WhisperWakeCommand,
+		Model:           model,
+		CliBinary:       cfg.WhisperCliBinary,
+		Processors:      procs,
+		Threads:         threads,
+		Greedy:          cfg.WhisperGreedy,
 	}
 }
 
@@ -338,6 +481,15 @@ func loadConfig() Config {
 	}
 	if cfg.RemoteWorkDir == "" {
 		cfg.RemoteWorkDir = "~/abs_remote"
+	}
+	for i := range cfg.WhisperProfiles {
+		if cfg.WhisperProfiles[i].Engine == "" {
+			cfg.WhisperProfiles[i].Engine = inferWhisperEngine(cfg.WhisperProfiles[i])
+		}
+	}
+	if len(cfg.WhisperProfiles) == 0 && cfg.WhisperURL == "" {
+		cfg.WhisperProfiles = defaultWhisperProfiles
+		cfg.ActiveWhisperID = 1
 	}
 	resolveActiveWhisperProfile(&cfg)
 	setConfigFileSnapshot(cfg)

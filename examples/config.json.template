@@ -13,23 +13,31 @@
   "whisper_profiles": [
     {
       "id": 1,
-      "name": "Local Whisper Server (Default)",
-      "url": "http://127.0.0.1:8088/inference",
-      "speed_factor": 7.0,
-      "docker_container": "",
-      "language": "",
-      "prompt": "",
-      "wake_command": ""
+      "name": "Local whisper-cli (tiny.en)",
+      "url": "",
+      "speed_factor": 70.0,
+      "engine": "local",
+      "model": "tiny.en",
+      "cli_binary": "whisper-cli",
+      "processors": 4,
+      "threads": 4,
+      "greedy": true
     },
     {
       "id": 2,
-      "name": "Cloud8 VM",
+      "name": "Docker Daemon (localhost:8088)",
+      "url": "http://127.0.0.1:8088/inference",
+      "speed_factor": 7.0,
+      "docker_container": "whisper",
+      "engine": "docker"
+    },
+    {
+      "id": 3,
+      "name": "Remote cloud8 (faster-whisper)",
       "url": "http://cloud8:8000/v1/audio/transcriptions",
       "speed_factor": 7.0,
-      "docker_container": "",
-      "language": "",
-      "prompt": "",
-      "wake_command": "cloud8 wake"
+      "wake_command": "wake_cloud8",
+      "engine": "remote"
     }
   ],
   "podcasts_dir": "/path/to/podcasts",
