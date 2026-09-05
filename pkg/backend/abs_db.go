@@ -10,6 +10,7 @@ import (
 )
 
 func GetTokenFromDB(dbPath string) string {
+	verifyAudiobookshelfNotDisabled("GetTokenFromDB")
 	if dbPath == "" {
 		return ""
 	}
@@ -33,6 +34,7 @@ func GetTokenFromDB(dbPath string) string {
 }
 
 func ResetPodcastDateCheckInDB(dbPath, itemID, title string) error {
+	verifyAudiobookshelfNotDisabled("ResetPodcastDateCheckInDB")
 	if dbPath == "" {
 		return fmt.Errorf("database path does not exist: %s", dbPath)
 	}

@@ -23,7 +23,10 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 	}
 
 	cfg := loadConfig()
-	client, _ := getABSClient(cfg, true)
+	var client *ABSClient
+	if isAudiobookshelfActive(cfg) {
+		client, _ = getABSClient(cfg, true)
+	}
 
 	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, cfg, client, feedURL)
 	if err != nil && len(feedEpisodes) == 0 {
@@ -66,7 +69,9 @@ func fetchFeedEpisodesForPodcast(pod *tuiPodcast, cfg Config, client *ABSClient,
 	if pod.absData != nil {
 		itemID = pod.absData.ID
 	}
-	_ = resetPodcastDateCheck(client, cfg.AudiobookshelfDBPath, itemID, pod.name)
+	if isAudiobookshelfActive(cfg) {
+		_ = resetPodcastDateCheck(client, cfg.AudiobookshelfDBPath, itemID, pod.name)
+	}
 
 	var feedEpisodes []FeedEpisode
 	var err error
@@ -195,9 +200,11 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 	}
 
 	cfg := loadConfig()
-	client, _ := getABSClient(cfg, true)
-	if client != nil && len(toDownload) > 0 && pod.absData != nil {
-		_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
+	if isAudiobookshelfActive(cfg) {
+		client, _ := getABSClient(cfg, true)
+		if client != nil && len(toDownload) > 0 && pod.absData != nil {
+			_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
+		}
 	}
 
 	if count > 0 {

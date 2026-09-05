@@ -35,6 +35,7 @@ func init() {
 }
 
 func NewAudiobookshelf(cfg Config) *AudiobookshelfBackend {
+	verifyAudiobookshelfNotDisabled("NewAudiobookshelf")
 	host := strings.TrimRight(cfg.Host, "/")
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -82,6 +83,7 @@ func (c *AudiobookshelfBackend) getRetryDelay(attempt int) time.Duration {
 }
 
 func (c *AudiobookshelfBackend) Login() (string, error) {
+	verifyAudiobookshelfNotDisabled("Login")
 	if c.Host == "" {
 		return "", fmt.Errorf("host is not configured")
 	}
@@ -170,6 +172,7 @@ func (c *AudiobookshelfBackend) TestConnection(quiet bool) (bool, error) {
 }
 
 func (c *AudiobookshelfBackend) Request(endpoint, method string, data interface{}) ([]byte, error) {
+	verifyAudiobookshelfNotDisabled("Request " + endpoint)
 	if c.Host == "" {
 		return nil, fmt.Errorf("host is not configured")
 	}

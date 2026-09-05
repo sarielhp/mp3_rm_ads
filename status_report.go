@@ -102,7 +102,7 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 	}
 
 	renderedABS := false
-	if cfg.AudiobookshelfURL != "" {
+	if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 		if err := renderABSPodcastStatus(cfg, cfg.AudiobookshelfURL, "", podcastsDir, quiet); err == nil {
 			renderedABS = true
 		}

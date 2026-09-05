@@ -153,7 +153,7 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 		var absCli *ABSClient
 		if m.podcastsDir != "" {
 			cfg := loadConfig()
-			if cfg.AudiobookshelfURL != "" {
+			if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
 			}
 		}

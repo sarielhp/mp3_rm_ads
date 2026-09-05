@@ -236,7 +236,7 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 		var absCli *ABSClient
 		if m.podcastsDir != "" {
 			cfg := loadConfig()
-			if cfg.AudiobookshelfURL != "" {
+			if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
 			}
 		}

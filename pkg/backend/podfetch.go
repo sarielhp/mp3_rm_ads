@@ -36,6 +36,7 @@ func init() {
 }
 
 func NewPodFetch(cfg Config) *PodFetchBackend {
+	verifyPodfetchNotDisabled("NewPodFetch")
 	host := strings.TrimRight(cfg.Host, "/")
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -84,6 +85,7 @@ func (c *PodFetchBackend) getRetryDelay(attempt int) time.Duration {
 }
 
 func (c *PodFetchBackend) Login() (string, error) {
+	verifyPodfetchNotDisabled("Login")
 	if c.APIKey != "" {
 		return c.APIKey, nil
 	}
@@ -152,6 +154,7 @@ func (c *PodFetchBackend) TestConnection(quiet bool) (bool, error) {
 }
 
 func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]byte, error) {
+	verifyPodfetchNotDisabled("Request " + endpoint)
 	if c.Host == "" {
 		return nil, fmt.Errorf("host is not configured")
 	}

@@ -28,20 +28,61 @@ func stripHTML(s string) string {
 	return backend.StripHTML(s)
 }
 
+func isAudiobookshelfActive(cfg Config) bool {
+	if strings.EqualFold(cfg.BackendType, "podfetch") || strings.EqualFold(cfg.BackendType, "pod_fetch") {
+		return false
+	}
+	if strings.EqualFold(cfg.BackendType, "audiobookshelf") || strings.EqualFold(cfg.BackendType, "abs") {
+		return true
+	}
+	if cfg.PodfetchURL != "" || cfg.PodfetchDBPath != "" {
+		return false
+	}
+	return true
+}
+
+func isPodfetchActive(cfg Config) bool {
+	if strings.EqualFold(cfg.BackendType, "audiobookshelf") || strings.EqualFold(cfg.BackendType, "abs") {
+		return false
+	}
+	if strings.EqualFold(cfg.BackendType, "podfetch") || strings.EqualFold(cfg.BackendType, "pod_fetch") {
+		return true
+	}
+	return cfg.PodfetchURL != "" || cfg.PodfetchDBPath != ""
+}
+
+func verifyAudiobookshelfAllowedWithConfig(cfg Config, operation string) {
+	if !isAudiobookshelfActive(cfg) {
+		panic(fmt.Sprintf("FATAL: Runtime verification failed: Audiobookshelf operation '%s' blocked because active backend is '%s'.", operation, cfg.BackendType))
+	}
+}
+
+func verifyPodfetchAllowedWithConfig(cfg Config, operation string) {
+	if !isPodfetchActive(cfg) {
+		panic(fmt.Sprintf("FATAL: Runtime verification failed: Podfetch operation '%s' blocked because active backend is '%s'.", operation, cfg.BackendType))
+	}
+}
+
+func verifyAudiobookshelfAllowed(operation string) {
+	verifyAudiobookshelfAllowedWithConfig(loadConfig(), operation)
+}
+
+func applyBackendVerification(cfg Config) {
+	if isPodfetchActive(cfg) {
+		verifyPodfetchAllowedWithConfig(cfg, "applyBackendVerification")
+		backend.SetAudiobookshelfDisabled(true)
+		backend.SetPodfetchDisabled(false)
+	} else if isAudiobookshelfActive(cfg) {
+		verifyAudiobookshelfAllowedWithConfig(cfg, "applyBackendVerification")
+		backend.SetAudiobookshelfDisabled(false)
+		backend.SetPodfetchDisabled(true)
+	}
+}
+
 func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
-	backendName := cfg.BackendType
-	if backendName == "" {
-		if cfg.PodfetchURL != "" || cfg.PodfetchDBPath != "" {
-			if cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" {
-				backendName = "podfetch"
-			}
-		}
-	}
-	if backendName == "" {
-		backendName = "audiobookshelf"
-	}
-	switch strings.ToLower(backendName) {
-	case "podfetch", "pod_fetch":
+	if isPodfetchActive(cfg) {
+		backend.SetAudiobookshelfDisabled(true)
+		backend.SetPodfetchDisabled(false)
 		bCfg := backend.Config{
 			Host:        cfg.PodfetchURL,
 			User:        cfg.PodfetchUser,
@@ -53,21 +94,24 @@ func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
 			Quiet:       quiet,
 		}
 		return backend.New("podfetch", bCfg)
-	default:
-		bCfg := backend.Config{
-			Host:        cfg.AudiobookshelfURL,
-			User:        cfg.AudiobookshelfUser,
-			Pass:        cfg.AudiobookshelfPass,
-			Token:       cfg.AudiobookshelfToken,
-			DBPath:      cfg.AudiobookshelfDBPath,
-			PodcastsDir: cfg.PodcastsDir,
-			Quiet:       quiet,
-		}
-		return backend.New("audiobookshelf", bCfg)
 	}
+
+	backend.SetAudiobookshelfDisabled(false)
+	backend.SetPodfetchDisabled(true)
+	bCfg := backend.Config{
+		Host:        cfg.AudiobookshelfURL,
+		User:        cfg.AudiobookshelfUser,
+		Pass:        cfg.AudiobookshelfPass,
+		Token:       cfg.AudiobookshelfToken,
+		DBPath:      cfg.AudiobookshelfDBPath,
+		PodcastsDir: cfg.PodcastsDir,
+		Quiet:       quiet,
+	}
+	return backend.New("audiobookshelf", bCfg)
 }
 
 func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error) {
+	verifyAudiobookshelfAllowed("getABSClient")
 	token := cfg.AudiobookshelfToken
 	if token == "" {
 		token = backend.GetTokenFromDB(cfg.AudiobookshelfDBPath)
@@ -91,6 +135,7 @@ func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error
 }
 
 func NewABSClient(host, token string) *backend.AudiobookshelfBackend {
+	verifyAudiobookshelfAllowed("NewABSClient")
 	return backend.NewAudiobookshelf(backend.Config{
 		Host:  host,
 		Token: token,
@@ -152,6 +197,7 @@ func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) 
 }
 
 func resetPodcastDateCheck(client *backend.AudiobookshelfBackend, dbPath, itemID, title string) error {
+	verifyAudiobookshelfAllowed("resetPodcastDateCheck")
 	if client != nil {
 		return client.ResetPodcastDateCheck(itemID, title)
 	}
@@ -162,6 +208,7 @@ func resetPodcastDateCheck(client *backend.AudiobookshelfBackend, dbPath, itemID
 }
 
 func resetPodcastDateCheckInDB(dbPath, itemID, title string) error {
+	verifyAudiobookshelfAllowed("resetPodcastDateCheckInDB")
 	return backend.ResetPodcastDateCheckInDB(dbPath, itemID, title)
 }
 

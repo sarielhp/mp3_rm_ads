@@ -3,6 +3,7 @@ package backend
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 )
 
@@ -60,7 +61,13 @@ func Register(name string, factory FactoryFunc) {
 
 func New(name string, cfg Config) (Backend, error) {
 	if name == "" {
-		name = "audiobookshelf"
+		name = "podfetch"
+	}
+	switch strings.ToLower(name) {
+	case "audiobookshelf", "abs":
+		verifyAudiobookshelfNotDisabled("New")
+	case "podfetch", "pod_fetch":
+		verifyPodfetchNotDisabled("New")
 	}
 	factory, ok := backends[name]
 	if !ok {

@@ -253,7 +253,9 @@ func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
 
 	if client == nil {
 		cfg := loadConfig()
-		client = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+			client = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+		}
 	}
 
 	podcastID := item.PodcastID

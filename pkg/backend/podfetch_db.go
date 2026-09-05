@@ -13,6 +13,7 @@ import (
 )
 
 func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
+	verifyPodfetchNotDisabled("fetchPodFetchPodcastsDB")
 	if dbPath == "" {
 		return nil, fmt.Errorf("dbPath is empty")
 	}
@@ -71,6 +72,7 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 }
 
 func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID int64) ([]Episode, error) {
+	verifyPodfetchNotDisabled("fetchPodFetchEpisodesForPodcastDB")
 	rows, err := db.Query("SELECT id, episode_id, name, url, date_of_recording, total_time, local_url, description, status FROM podcast_episodes WHERE podcast_id = ? ORDER BY id DESC", podcastID)
 	if err != nil {
 		return nil, err
@@ -125,6 +127,7 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID int64) ([]Episode, 
 }
 
 func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
+	verifyPodfetchNotDisabled("fetchPodFetchPodcastDB")
 	if dbPath == "" {
 		return nil, fmt.Errorf("dbPath is empty")
 	}
@@ -171,6 +174,7 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 }
 
 func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast, error) {
+	verifyPodfetchNotDisabled("createPodFetchPodcastDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return nil, err
@@ -200,6 +204,7 @@ func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast
 }
 
 func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
+	verifyPodfetchNotDisabled("deletePodFetchEpisodeDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return err
@@ -211,6 +216,7 @@ func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
 }
 
 func deletePodFetchPodcastDB(dbPath, podcastID string) error {
+	verifyPodfetchNotDisabled("deletePodFetchPodcastDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return err
@@ -223,6 +229,7 @@ func deletePodFetchPodcastDB(dbPath, podcastID string) error {
 }
 
 func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) {
+	verifyPodfetchNotDisabled("fetchActiveDownloadsDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return nil, err
@@ -254,6 +261,7 @@ func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) 
 }
 
 func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
+	verifyPodfetchNotDisabled("updatePodFetchDurationDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return err
@@ -269,6 +277,7 @@ func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
 }
 
 func resetPodFetchDateCheckDB(dbPath, itemID, title string) error {
+	verifyPodfetchNotDisabled("resetPodFetchDateCheckDB")
 	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
 	if err != nil {
 		return err

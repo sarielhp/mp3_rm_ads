@@ -29,6 +29,7 @@ func main() {
 
 	ensureConfigExists()
 	config := loadConfig()
+	applyBackendVerification(config)
 
 	switch action {
 	case "test":

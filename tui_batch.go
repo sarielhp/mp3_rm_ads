@@ -129,7 +129,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
 		cfg := loadConfig()
 		var absCli *ABSClient
-		if cfg.AudiobookshelfURL != "" {
+		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 			absCli, _ = getABSClient(cfg, true)
 		}
 		if absCli != nil && ep.isFeedOnly && pod.absData != nil && ep.enclosureURL != "" {
@@ -217,7 +217,7 @@ func (m *tuiModel) batchQueueDownload() {
 		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
 		cfg := loadConfig()
 		var absCli *ABSClient
-		if cfg.AudiobookshelfURL != "" {
+		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 			absCli, _ = getABSClient(cfg, true)
 		}
 		if absCli != nil && len(toDownload) > 0 && pod.absData != nil {
