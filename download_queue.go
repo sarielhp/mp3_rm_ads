@@ -45,6 +45,27 @@ func getDownloadQueueFilePath() string {
 	return filepath.Join(configDir(), "download_queue.json")
 }
 
+var reconcileDownloadQueueOnce = &syncOnce{}
+
+func resetReconcileDownloadQueueOnceForTest() {
+	reconcileDownloadQueueOnce = &syncOnce{}
+}
+
+func reconcileStaleDownloadingItems(q *DownloadQueuePersist) {
+	reconcileDownloadQueueOnce.Do(func() {
+		dirty := false
+		for i := range q.Items {
+			if q.Items[i].Status == "downloading" {
+				q.Items[i].Status = "queued"
+				dirty = true
+			}
+		}
+		if dirty {
+			_ = saveDownloadQueue(q)
+		}
+	})
+}
+
 func loadDownloadQueue() *DownloadQueuePersist {
 	path := getDownloadQueueFilePath()
 	data, err := os.ReadFile(path)
@@ -58,6 +79,7 @@ func loadDownloadQueue() *DownloadQueuePersist {
 	if q.Items == nil {
 		q.Items = []DownloadQueueItem{}
 	}
+	reconcileStaleDownloadingItems(&q)
 	return &q
 }
 

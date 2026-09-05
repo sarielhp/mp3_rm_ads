@@ -263,7 +263,11 @@ func (m *tuiModel) nextTranscriptMatch() {
 		}
 		return
 	}
-	m.transcriptMatchIdx = (m.transcriptMatchIdx + 1) % len(matches)
+	if m.transcriptMatchIdx < 0 || m.transcriptMatchIdx >= len(matches)-1 {
+		m.transcriptMatchIdx = 0
+	} else {
+		m.transcriptMatchIdx++
+	}
 	m.scrollToTranscriptLine(matches[m.transcriptMatchIdx])
 	m.showPopup(fmt.Sprintf("Match %d of %d", m.transcriptMatchIdx+1, len(matches)))
 }
@@ -276,9 +280,10 @@ func (m *tuiModel) prevTranscriptMatch() {
 		}
 		return
 	}
-	m.transcriptMatchIdx--
-	if m.transcriptMatchIdx < 0 {
+	if m.transcriptMatchIdx <= 0 || m.transcriptMatchIdx >= len(matches) {
 		m.transcriptMatchIdx = len(matches) - 1
+	} else {
+		m.transcriptMatchIdx--
 	}
 	m.scrollToTranscriptLine(matches[m.transcriptMatchIdx])
 	m.showPopup(fmt.Sprintf("Match %d of %d", m.transcriptMatchIdx+1, len(matches)))

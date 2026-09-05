@@ -90,8 +90,7 @@ func (m *FeedCacheManager) Save() error {
 	if err != nil {
 		return err
 	}
-	_ = os.MkdirAll(filepath.Dir(m.cacheFile), 0755)
-	err = os.WriteFile(m.cacheFile, data, 0644)
+	err = writeFileAtomic(m.cacheFile, data, 0644)
 	if err == nil {
 		m.dirty = false
 	}

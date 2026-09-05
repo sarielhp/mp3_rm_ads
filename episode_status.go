@@ -88,16 +88,7 @@ func saveEpisodeStatus(path string, st *EpisodeStatusFile) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal episode status: %w", err)
 	}
-	data = append(data, '\n')
-	tmpPath := fmt.Sprintf("%s.tmp.%d", path, time.Now().UnixNano())
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write tmp episode status %s: %w", tmpPath, err)
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to atomically rename episode status %s: %w", path, err)
-	}
-	return nil
+	return writeFileAtomic(path, append(data, '\n'), 0644)
 }
 
 func getOrCreateEpisodeStatus(audioPath string) *EpisodeStatusFile {

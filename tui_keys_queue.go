@@ -9,8 +9,9 @@ func (m *tuiModel) handlePlayQueueKey(s string) (tea.Model, tea.Cmd) {
 	switch s {
 	case "up", "k":
 		if m.pqGrabbed && m.pqIdx > 0 {
-			globalPlayer.MoveTrack(m.pqIdx, m.pqIdx-1)
-			m.pqIdx--
+			if globalPlayer.MoveUnifiedItem(m.pqIdx, m.pqIdx-1) {
+				m.pqIdx--
+			}
 		} else if m.pqIdx > 0 {
 			m.pqIdx--
 		}
@@ -19,8 +20,9 @@ func (m *tuiModel) handlePlayQueueKey(s string) (tea.Model, tea.Cmd) {
 		}
 	case "down", "j":
 		if m.pqGrabbed && m.pqIdx < len(unified)-1 {
-			globalPlayer.MoveTrack(m.pqIdx, m.pqIdx+1)
-			m.pqIdx++
+			if globalPlayer.MoveUnifiedItem(m.pqIdx, m.pqIdx+1) {
+				m.pqIdx++
+			}
 		} else if m.pqIdx < len(unified)-1 {
 			m.pqIdx++
 		}
@@ -37,10 +39,11 @@ func (m *tuiModel) handlePlayQueueKey(s string) (tea.Model, tea.Cmd) {
 		}
 	case "d", "D", "x", "X":
 		if len(unified) > 0 && m.pqIdx < len(unified) {
-			globalPlayer.RemoveTrack(m.pqIdx)
-			m.showPopup("Removed from queue")
-			if m.pqIdx >= len(unified)-1 && m.pqIdx > 0 {
-				m.pqIdx--
+			if globalPlayer.RemoveUnifiedItem(m.pqIdx) {
+				m.showPopup("Removed from queue")
+				if m.pqIdx >= len(unified)-1 && m.pqIdx > 0 {
+					m.pqIdx--
+				}
 			}
 		}
 	case "c", "C":
@@ -48,7 +51,16 @@ func (m *tuiModel) handlePlayQueueKey(s string) (tea.Model, tea.Cmd) {
 		m.showPopup("Queue cleared")
 	case "enter":
 		if len(unified) > 0 && m.pqIdx < len(unified) {
-			globalPlayer.PlayQueueIndex(m.pqIdx)
+			hasCurrent := globalPlayer.View().Has
+			if hasCurrent && m.pqIdx == 0 {
+				globalPlayer.TogglePause()
+			} else {
+				targetIdx := m.pqIdx
+				if hasCurrent {
+					targetIdx--
+				}
+				globalPlayer.PlayQueueIndex(targetIdx)
+			}
 			m.screen = screenPlayer
 		}
 	case "esc":

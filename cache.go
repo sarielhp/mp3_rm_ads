@@ -109,7 +109,7 @@ func savePodcastCache(podcastDir string, index *CachedPodcastIndex) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(indexPath, append(data, '\n'), 0644)
+	return writeFileAtomic(indexPath, append(data, '\n'), 0644)
 }
 
 func detailFileName(filename string) string {
@@ -147,7 +147,7 @@ func saveEpisodeDetails(podcastDir, filename string, details *CachedEpisodeDetai
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(detPath, append(data, '\n'), 0644)
+	return writeFileAtomic(detPath, append(data, '\n'), 0644)
 }
 
 func resetCache() error {

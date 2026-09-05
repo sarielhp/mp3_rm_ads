@@ -141,3 +141,17 @@ func TestAnalyzePodcastFrequency(t *testing.T) {
 		t.Errorf("expected intermittent for few episodes, got %s", infoFew.Type)
 	}
 }
+
+func TestApplyKeepPolicyNegativeCount(t *testing.T) {
+	absBackend := &AudiobookshelfBackend{}
+	_, err := absBackend.ApplyKeepPolicy("pod-1", "Test Pod", -1, true, true, false)
+	if err == nil {
+		t.Errorf("expected error for negative keep count in ABS backend, got nil")
+	}
+
+	podfetchBackend := &PodFetchBackend{}
+	_, err = podfetchBackend.ApplyKeepPolicy("pod-1", "Test Pod", -1, true, true, false)
+	if err == nil {
+		t.Errorf("expected error for negative keep count in PodFetch backend, got nil")
+	}
+}

@@ -19,6 +19,8 @@ func (m *tuiModel) drawPlayerScreen() string {
 		statusBadge := tuiPlayerPlaying.Render("▶ PLAYING")
 		if pv.IsPaused {
 			statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
+		} else if !pv.IsPlaying {
+			statusBadge = tuiPlayerPaused.Render("⏸ LOADED")
 		}
 		out.WriteString("  " + statusBadge + "  " + tuiTitleStyle.Render(displayName(pv.Title)) + "\n")
 		out.WriteString("    " + tuiSubtitleStyle.Render("in "+displayName(pv.Podcast)) + "\n\n")

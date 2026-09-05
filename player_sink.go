@@ -103,9 +103,8 @@ func (p *AudioPlayer) RefreshSinks() {
 func (p *AudioPlayer) CycleSpeaker() {
 	p.RefreshSinks()
 	p.mu.Lock()
-	defer p.mu.Unlock()
-
 	if len(p.Sinks) <= 1 {
+		p.mu.Unlock()
 		return
 	}
 	curIdx := 0
@@ -117,9 +116,11 @@ func (p *AudioPlayer) CycleSpeaker() {
 	}
 	nextIdx := (curIdx + 1) % len(p.Sinks)
 	target := p.Sinks[nextIdx]
+	p.CurrentSpeaker = target.Description
+	p.mu.Unlock()
+
 	_ = exec.Command("pactl", "set-default-sink", target.Name).Run()
 	_ = exec.Command("wpctl", "set-default", target.ID).Run()
-	p.CurrentSpeaker = target.Description
 }
 
 func formatPlayerTime(seconds float64) string {

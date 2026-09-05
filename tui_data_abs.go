@@ -100,7 +100,7 @@ func buildABSEpisodeMap(episodes []absEpisode) map[string]*absEpisode {
 	episodeMap := make(map[string]*absEpisode, len(episodes)*3)
 	for epIdx := range episodes {
 		ep := &episodes[epIdx]
-		if ep.AudioFile != nil {
+		if ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
 			if ep.AudioFile.Metadata.Filename != "" {
 				episodeMap[ep.AudioFile.Metadata.Filename] = ep
 				episodeMap[normalizeEpisodeTitle(ep.AudioFile.Metadata.Filename)] = ep

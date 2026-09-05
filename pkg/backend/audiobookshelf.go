@@ -23,7 +23,6 @@ type AudiobookshelfBackend struct {
 	Quiet       bool
 	Verbose     bool
 	httpClient  *http.Client
-	reqMu       syncMutex
 }
 
 func init() {
@@ -174,9 +173,6 @@ func (c *AudiobookshelfBackend) Request(endpoint, method string, data interface{
 	if c.Host == "" {
 		return nil, fmt.Errorf("host is not configured")
 	}
-
-	c.reqMu.Lock()
-	defer c.reqMu.Unlock()
 
 	reqURL := fmt.Sprintf("%s%s", c.Host, endpoint)
 	var jsonData []byte

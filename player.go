@@ -2,9 +2,7 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"os/exec"
-	"os/signal"
 	"syscall"
 	"time"
 )
@@ -51,13 +49,6 @@ var globalPlayer = &AudioPlayer{
 var playerSpawnEnabled = true
 
 func init() {
-	c := make(chan os.Signal, 1)
-	signal.Notify(c, os.Interrupt, syscall.SIGTERM, syscall.SIGHUP, syscall.SIGQUIT)
-	go func() {
-		<-c
-		globalPlayer.Stop()
-		os.Exit(0)
-	}()
 	globalPlayer.LoadQueueFromFile()
 }
 
@@ -224,7 +215,11 @@ func (p *AudioPlayer) TogglePause() {
 	p.mu.Lock()
 	defer p.mu.Unlock()
 
-	if !p.IsPlaying || p.Current == nil {
+	if p.Current == nil {
+		return
+	}
+	if !p.IsPlaying {
+		p.startProcessLocked(p.Position)
 		return
 	}
 

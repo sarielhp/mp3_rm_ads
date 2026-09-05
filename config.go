@@ -45,7 +45,7 @@ func ensureConfigExists() {
 			cfg.Profiles[i].URL = replaceIP(cfg.Profiles[i].URL, ip)
 		}
 		data, _ := json.MarshalIndent(cfg, "", "  ")
-		os.WriteFile(configPath(), append(data, '\n'), 0644)
+		_ = writeFileAtomic(configPath(), append(data, '\n'), 0600)
 		fmt.Printf("Created default configuration file at: '%s'\n", configPath())
 	}
 }

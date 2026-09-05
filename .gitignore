@@ -2,3 +2,5 @@ abs
 scratch/
 *.xml
 .work/
+.review_state.json
+reports/logs/

@@ -69,7 +69,7 @@ func quarantineAbandonedDuplicates(podDir string, trackedEpisodes []absEpisode) 
 
 	for _, ep := range trackedEpisodes {
 		fn := ""
-		if ep.AudioFile != nil && ep.AudioFile.Metadata.Filename != "" {
+		if ep.AudioFile != nil && ep.AudioFile.Metadata != nil && ep.AudioFile.Metadata.Filename != "" {
 			fn = ep.AudioFile.Metadata.Filename
 		} else if ep.Title != "" {
 			fn = ep.Title + ".mp3"

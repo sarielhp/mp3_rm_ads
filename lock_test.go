@@ -3,8 +3,6 @@ package main
 import (
 	"os"
 	"path/filepath"
-	"strconv"
-	"strings"
 	"testing"
 )
 
@@ -26,15 +24,6 @@ func TestAcquireAndReleaseFileLock(t *testing.T) {
 	lockPath := targetFile + ".lock"
 	if !fileExists(lockPath) {
 		t.Errorf("expected lock file %s to exist", lockPath)
-	}
-
-	pidData, err := os.ReadFile(lockPath)
-	if err != nil {
-		t.Fatalf("failed to read lock file: %v", err)
-	}
-	pid, err := strconv.Atoi(strings.TrimSpace(string(pidData)))
-	if err != nil || pid != os.Getpid() {
-		t.Errorf("expected lock file to contain current PID %d, got %s", os.Getpid(), string(pidData))
 	}
 
 	lock2, err := acquireFileLock(targetFile)

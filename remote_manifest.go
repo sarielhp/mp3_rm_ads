@@ -59,65 +59,76 @@ func saveDoneManifest(path string, m *RemoteDoneManifest) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal done manifest: %w", err)
 	}
-	data = append(data, '\n')
-	tmpPath := fmt.Sprintf("%s.tmp.%d", path, time.Now().UnixNano())
-	if err := os.WriteFile(tmpPath, data, 0644); err != nil {
-		return fmt.Errorf("failed to write tmp done manifest %s: %w", tmpPath, err)
+	return writeFileAtomic(path, append(data, '\n'), 0644)
+}
+
+func withDoneManifestLock(manifestPath string, fn func() error) error {
+	fl, err := acquireFileLockWithTimeout(manifestPath, 5*time.Second)
+	if err != nil {
+		return err
 	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		_ = os.Remove(tmpPath)
-		return fmt.Errorf("failed to atomically rename done manifest %s: %w", path, err)
+	if fl == nil {
+		return fmt.Errorf("could not acquire lock for %s", manifestPath)
 	}
-	return nil
+	defer fl.Release()
+	return fn()
 }
 
 func addDoneEpisode(manifestPath string, item RemoteDoneItem) error {
-	m, err := loadDoneManifest(manifestPath)
-	if err != nil {
-		return err
-	}
-	if item.CompletedAt == "" {
-		item.CompletedAt = time.Now().UTC().Format(time.RFC3339)
-	}
-	m.Episodes[item.RelPath] = item
-	return saveDoneManifest(manifestPath, m)
+	return withDoneManifestLock(manifestPath, func() error {
+		m, err := loadDoneManifest(manifestPath)
+		if err != nil {
+			return err
+		}
+		if item.CompletedAt == "" {
+			item.CompletedAt = time.Now().UTC().Format(time.RFC3339)
+		}
+		m.Episodes[item.RelPath] = item
+		return saveDoneManifest(manifestPath, m)
+	})
 }
 
 func removeDoneEpisode(manifestPath, relPath string) error {
-	m, err := loadDoneManifest(manifestPath)
-	if err != nil {
-		return err
-	}
-	delete(m.Episodes, relPath)
-	return saveDoneManifest(manifestPath, m)
+	return withDoneManifestLock(manifestPath, func() error {
+		m, err := loadDoneManifest(manifestPath)
+		if err != nil {
+			return err
+		}
+		delete(m.Episodes, relPath)
+		return saveDoneManifest(manifestPath, m)
+	})
 }
 
 func archiveDoneEpisode(donePath, archivePath, relPath string) error {
-	doneM, err := loadDoneManifest(donePath)
-	if err != nil {
-		return err
-	}
-	item, ok := doneM.Episodes[relPath]
-	if !ok {
-		item = RemoteDoneItem{
-			RelPath:     relPath,
-			Status:      StateArchived,
-			CompletedAt: time.Now().UTC().Format(time.RFC3339),
-		}
-	} else {
-		item.Status = StateArchived
-		delete(doneM.Episodes, relPath)
-		if err := saveDoneManifest(donePath, doneM); err != nil {
+	return withDoneManifestLock(donePath, func() error {
+		doneM, err := loadDoneManifest(donePath)
+		if err != nil {
 			return err
 		}
-	}
-
-	archM, err := loadDoneManifest(archivePath)
-	if err != nil {
-		archM = &RemoteDoneManifest{
-			Episodes: make(map[string]RemoteDoneItem),
+		item, ok := doneM.Episodes[relPath]
+		if !ok {
+			item = RemoteDoneItem{
+				RelPath:     relPath,
+				Status:      StateArchived,
+				CompletedAt: time.Now().UTC().Format(time.RFC3339),
+			}
+		} else {
+			item.Status = StateArchived
+			delete(doneM.Episodes, relPath)
+			if err := saveDoneManifest(donePath, doneM); err != nil {
+				return err
+			}
 		}
-	}
-	archM.Episodes[relPath] = item
-	return saveDoneManifest(archivePath, archM)
+
+		return withDoneManifestLock(archivePath, func() error {
+			archM, err := loadDoneManifest(archivePath)
+			if err != nil {
+				archM = &RemoteDoneManifest{
+					Episodes: make(map[string]RemoteDoneItem),
+				}
+			}
+			archM.Episodes[relPath] = item
+			return saveDoneManifest(archivePath, archM)
+		})
+	})
 }

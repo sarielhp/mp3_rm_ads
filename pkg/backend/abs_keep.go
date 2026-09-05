@@ -27,9 +27,16 @@ func (c *AudiobookshelfBackend) ApplyKeepPolicy(podcastID, podcastTitle string, 
 		return getEpPubMS(sortedDownloaded[i]) < getEpPubMS(sortedDownloaded[j])
 	})
 
+	if keep < 0 {
+		return 0, fmt.Errorf("keep count cannot be negative: %d", keep)
+	}
+
 	deletedCount := 0
 	if len(sortedDownloaded) > keep {
 		toDeleteCount := len(sortedDownloaded) - keep
+		if toDeleteCount > len(sortedDownloaded) {
+			toDeleteCount = len(sortedDownloaded)
+		}
 		episodesToDelete := sortedDownloaded[:toDeleteCount]
 
 		if !quiet {
