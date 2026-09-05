@@ -126,6 +126,11 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 			continue
 		}
 		podDir := filepath.Dir(mp3)
+		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		if strings.EqualFold(filepath.Base(mp3), "podcast.mp3") {
+			epName = filepath.Base(podDir)
+			podDir = filepath.Dir(podDir)
+		}
 		podTitle := podTitleMap[podDir]
 		if podTitle == "" {
 			podTitle = filepath.Base(podDir)
@@ -135,7 +140,6 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 			shortID = generatePodcastShortID(podTitle)
 		}
 
-		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
 		statusStr, statusColor := getEpisodeStatusLabel(mp3)
 
 		items = append(items, lsEpisodeItem{
@@ -213,6 +217,9 @@ func collectSinglePodcastEpisodes(mp3s []string, podDir, title, shortID string) 
 			continue
 		}
 		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		if strings.EqualFold(filepath.Base(mp3), "podcast.mp3") {
+			epName = filepath.Base(filepath.Dir(mp3))
+		}
 		st := getOrCreateEpisodeStatus(mp3)
 		statusStr, statusColor := getEpisodeStatusLabel(mp3)
 		origDur, cleanDur := getEpisodeDurations(mp3, st)

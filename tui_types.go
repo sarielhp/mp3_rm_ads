@@ -2,6 +2,8 @@ package main
 
 import (
 	"fmt"
+	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -79,6 +81,9 @@ func (e tuiEpisode) displayTitle() string {
 	}
 	if e.absData != nil && e.absData.Title != "" {
 		return e.absData.Title
+	}
+	if strings.EqualFold(e.filename, "podcast.mp3") && e.path != "" {
+		return filepath.Base(filepath.Dir(e.path))
 	}
 	return e.filename
 }
