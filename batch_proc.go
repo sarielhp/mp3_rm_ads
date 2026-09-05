@@ -236,7 +236,13 @@ func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Co
 }
 
 func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config Config, action string) {
-	wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
+	wp := getActiveWhisperProfile(config)
+	if cli.WhisperEngine != "" {
+		wp.Engine = WhisperEngine(cli.WhisperEngine)
+	}
+	if wp.Engine != WhisperEngineLocal {
+		wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
+	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
 	batchStartTime := time.Now()

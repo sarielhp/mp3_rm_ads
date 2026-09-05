@@ -13,12 +13,13 @@ import (
 var extraWhisperModelDirs []string
 
 func getWhisperModelSearchDirs() []string {
-	dirs := []string{"/media/dockers/whisper/models"}
-	if home, err := os.UserHomeDir(); err == nil && home != "" {
-		dirs = append(dirs, filepath.Join(home, ".local", "share", "whisper-models"))
-	}
+	var dirs []string
 	if len(extraWhisperModelDirs) > 0 {
 		dirs = append(dirs, extraWhisperModelDirs...)
+	}
+	dirs = append(dirs, "/media/dockers/whisper/models")
+	if home, err := os.UserHomeDir(); err == nil && home != "" {
+		dirs = append(dirs, filepath.Join(home, ".local", "share", "whisper-models"))
 	}
 	return dirs
 }
