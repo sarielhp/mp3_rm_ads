@@ -4,3 +4,4 @@ scratch/
 .work/
 .review_state.json
 reports/logs/
+.verified_head

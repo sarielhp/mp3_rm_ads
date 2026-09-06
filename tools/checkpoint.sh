@@ -1,9 +1,5 @@
-#!/usr/bin/env bash
-set -euo pipefail
-cd "$(dirname "$0")/.."
+#!/usr/bin/env ruby
+# frozen_string_literal: true
 
-if [[ -n $(git status --porcelain) ]]; then
-    git add -A > /dev/null 2>&1
-    git commit -m "wip: checkpoint [$(date +'%H:%M:%S')]" --no-verify > /dev/null 2>&1
-    echo "Checkpoint saved."
-fi
+root_dir = File.expand_path('..', __dir__)
+load File.join(root_dir, 'tools', 'snapshot')

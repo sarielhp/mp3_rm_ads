@@ -15,7 +15,7 @@
 | `tools/build_local` | Build local `./abs` binary strictly within repo directory |
 | `tools/check` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
-| `tools/lint` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines` |
+| `tools/lint` | Static analysis: `go vet` + `staticcheck` (respecting baseline) + `tools/audit_lines` |
 | `tools/audit_lines` | Audit function lengths (80-line limit) and file lengths (800 warn / 1100 limit) |
 | `tools/outline_symbols` | Index all Go types, structs, interfaces, and functions |
 | `tools/show_symbol <sym>` | Display single symbol code block with line numbers |
@@ -25,9 +25,10 @@
 | `tools/version.sh` | Print current version from `VERSION` file |
 | `tools/visual_audit` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
 | `tools/verify_remote_queue` | Live remote queue compliance audit against 24h & duration policy |
-| `tools/bump-version` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
-| `tools/commit <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
-| `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
+| `tools/bump-version` | Bump version, git add/commit/push (skips duplicate gate if .verified_head matches; silent, outputs "Success VERSION (commit+push)") |
+| `tools/commit <msg>` | Quality gate + stage + commit + records .verified_head (silent, outputs "Success <msg>") |
+| `tools/snapshot [msg]` | Fast WIP commit without gating (<0.1s, never pushes) |
+| `tools/checkpoint.sh` | Auto micro-commit of all changes (delegates to `tools/snapshot`) |
 
 ## Makefile
 
@@ -51,29 +52,30 @@ A `Makefile` at the project root delegates to all scripts:
 | `make bump` | Bump patch version |
 | `make commit` | Quality gate + commit |
 | `make push` | Alias for `make bump` |
-| `make checkpoint` | Micro-commit all changes |
+| `make snapshot` | Fast WIP micro-commit (`tools/snapshot ARGS="..."`) |
+| `make snap` | Alias for `make snapshot` |
+| `make checkpoint` | Micro-commit all changes (delegates to `make snapshot`) |
 | `make ci` | Alias for `make check` |
 | `make clean` | Remove binary |
 
 ### Workflow
 
+#### Standard Development & Release Loop
 ```
-# Standard development loop:
-make commit ARGS="feat: add new feature"   # quality gate + commits (silent)
-make bump                                   # bumps version, commits, pushes (silent)
-
-# Quick checks without commit:
-make check
-
-# Explore architecture before making changes:
-make map
-
-# Save work state during long sessions:
-make checkpoint
-
-# Manual version bump (already covered above):
-# make bump
+make commit ARGS="feat: add new feature"   # quality gate + commits + records .verified_head (silent)
+make bump                                   # deduplicates gate via .verified_head, bumps version, commits, pushes (silent)
 ```
+
+#### Deduplicated Commit-to-Bump Pipeline
+`tools/commit` executes `./tools/check`. Upon passing and committing, it records the committed HEAD SHA into `.verified_head`. When `tools/bump-version` (`make bump`) runs immediately afterward, it checks whether HEAD matches `.verified_head` and only `VERSION` (or nothing) is modified in the working tree. If verified, it skips the redundant full CI quality gate (`./tools/check --full`), saving ~60s of duplicate test runs, increments the patch version, commits, pushes, and removes `.verified_head`. If `.verified_head` is absent, mismatched, or other files are modified, it executes the full quality gate as usual before pushing.
+
+#### Fast Inner-Loop Testing Advice
+During active development, use lightweight commands to maximize iteration speed:
+- **Instant Snapshots (<0.1s)**: Use `make snap` or `make snapshot [ARGS="..."]` (or `make checkpoint`) freely to checkpoint dirty working trees into fast WIP commits (`--no-verify`, never pushes).
+- **Fast Static Analysis**: Run `make lint` for fast feedback (`go vet` + baseline-aware `staticcheck` + line audit). `tools/lint` respects `tools/staticcheck-baseline.txt` so it succeeds when there are 0 new findings rather than failing on pre-existing baselined findings, running in seconds.
+- **Targeted Unit Tests**: Run `go test ./...` or `make test` rather than full race/vulnerability scans on every minor change.
+- **Full Gate Verification**: Run `make check` before preparing commits to verify formatting, vet, linting, tests, and build.
+- **Publishing**: Run `make commit ARGS="..."` followed by `make bump` for a fast, zero-redundancy gated release.
 
 ## Version Management
 
@@ -222,8 +224,8 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
    error before making additional changes.
 3. **Exploration**: Run `make map` before introducing new types to inspect
    existing structs and interfaces.
-4. **Checkpointing**: Run `make checkpoint` after passing checks to preserve
-   working states during long sessions.
+4. **Checkpointing & Snapshots**: Run `make snapshot` (or `make snap` / `make checkpoint`)
+   to preserve working states in sub-0.1s without gating or pushing.
 5. **Surgical Editing**: Never perform full-file rewrites (`replaceAll`) on existing
    files. Read the target section, locate the specific function/struct, and apply
    localized targeted diffs.

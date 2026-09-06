@@ -1,0 +1,27 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'time'
+
+root_dir = File.expand_path('..', __dir__)
+Dir.chdir(root_dir)
+
+# Stage all working changes
+system('git', 'add', '-A')
+
+# Check if there are staged changes
+if system('git', 'diff', '--cached', '--quiet')
+  puts 'Nothing to snapshot (working tree clean).'
+  exit 0
+end
+
+timestamp = Time.now.strftime('%Y-%m-%d %H:%M:%S')
+msg = ARGV.join(' ').strip
+commit_msg = msg.empty? ? "wip: snapshot [#{timestamp}]" : "wip: snapshot [#{timestamp}] - #{msg}"
+
+if system('git', 'commit', '-m', commit_msg, '--no-verify', out: File::NULL, err: File::NULL)
+  puts "Snapshot saved: #{commit_msg}"
+else
+  warn '✗ Snapshot failed'
+  exit 1
+end

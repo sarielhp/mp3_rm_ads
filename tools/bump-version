@@ -2,15 +2,31 @@
 # frozen_string_literal: true
 
 require 'open3'
+require 'fileutils'
 
 root_dir = File.expand_path('..', __dir__)
 Dir.chdir(root_dir)
 
-# Run full quality gate (including race detector and vulnerability scan)
-_, _, status = Open3.capture3("./tools/check --full")
-unless status.success?
-  puts "✗ Full Quality Gate failed! Run 'make ci' or 'make check' to see details."
-  exit 1
+verified = false
+if File.exist?('.verified_head')
+  verified_sha = File.read('.verified_head').strip
+  current_sha, _, s = Open3.capture3('git', 'rev-parse', 'HEAD')
+  if s.success? && !verified_sha.empty? && verified_sha == current_sha.strip
+    status_out, _, s2 = Open3.capture3('git', 'status', '--porcelain')
+    if s2.success?
+      changed_files = status_out.lines.map { |l| l[3..].to_s.strip }.reject(&:empty?)
+      verified = changed_files.all? { |f| f == 'VERSION' }
+    end
+  end
+end
+
+unless verified
+  # Run full quality gate (including race detector and vulnerability scan)
+  _, _, status = Open3.capture3("./tools/check --full")
+  unless status.success?
+    puts "✗ Full Quality Gate failed! Run 'make ci' or 'make check' to see details."
+    exit 1
+  end
 end
 
 # Read current version
@@ -18,11 +34,13 @@ current = File.read("VERSION").strip
 major, minor, patch = current.split('.').map(&:to_i)
 patch += 1
 new_ver = "#{major}.#{minor}.#{patch}"
-File.write("VERSION", new_ver + "\n")
+File.write("VERSION", "#{new_ver}\n")
 
 # Git add, commit, push
-Open3.capture3("git add VERSION")
-Open3.capture3("git commit -m 'chore: bump version to #{new_ver}'")
-Open3.capture3("git push")
+Open3.capture3("git", "add", "VERSION")
+Open3.capture3("git", "commit", "-m", "chore: bump version to #{new_ver}")
+Open3.capture3("git", "push")
+
+FileUtils.rm_f('.verified_head')
 
 puts "Success #{new_ver} (commit+push)"

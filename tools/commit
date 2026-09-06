@@ -2,6 +2,7 @@
 # frozen_string_literal: true
 
 require 'open3'
+require 'fileutils'
 
 root_dir = File.expand_path('..', __dir__)
 Dir.chdir(root_dir)
@@ -13,6 +14,9 @@ end
 
 msg = ARGV.join(' ')
 
+# Remove any stale verified head before running checks
+FileUtils.rm_f('.verified_head')
+
 # Run quality gate silently
 _, _, status = Open3.capture3("./tools/check")
 unless status.success?
@@ -21,7 +25,18 @@ unless status.success?
 end
 
 # Commit
-Open3.capture3("git add -A")
-Open3.capture3("git commit -m '#{msg}'")
+Open3.capture3("git", "add", "-A")
+_, stderr, commit_status = Open3.capture3("git", "commit", "-m", msg)
+unless commit_status.success?
+  puts "✗ Git commit failed!"
+  warn stderr unless stderr.empty?
+  exit 1
+end
+
+# Record the committed HEAD SHA into .verified_head
+head_sha, _, sha_status = Open3.capture3("git", "rev-parse", "HEAD")
+if sha_status.success?
+  File.write('.verified_head', "#{head_sha.strip}\n")
+end
 
 puts "Success #{msg}"

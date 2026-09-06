@@ -17,8 +17,50 @@ def run_cmd(name, cmd)
   [stdout, stderr]
 end
 
+STATICCHECK_CHECKS = 'inherit,-SA2001'
+BASELINE_PATH = 'tools/staticcheck-baseline.txt'
+
+def run_staticcheck
+  stdout, stderr, = Open3.capture3("staticcheck -checks '#{STATICCHECK_CHECKS}' ./...")
+  if stderr.include?('not found') || stderr.include?('no such file')
+    puts "\e[31m✗ Staticcheck is not installed or not on PATH.\e[0m"
+    puts stderr
+    exit 1
+  end
+  found = stdout.lines.map(&:chomp).reject(&:empty?)
+  baseline = File.exist?(BASELINE_PATH) ? File.readlines(BASELINE_PATH).map(&:chomp).reject(&:empty?) : []
+
+  # Key on file + message, not file:line:col, so that editing a file does not
+  # turn every pre-existing finding below the edit into a spurious "new" one.
+  # Counts are compared, so a second instance of the same message is still caught.
+  tally = lambda do |lines|
+    lines.each_with_object(Hash.new(0)) do |l, h|
+      h[l.sub(/\A([^:]+):\d+:\d+:\s*/) { "#{Regexp.last_match(1)}: " }] += 1
+    end
+  end
+
+  found_t = tally.call(found)
+  base_t = tally.call(baseline)
+
+  new_findings = found_t.each_with_object([]) do |(k, n), acc|
+    extra = n - base_t.fetch(k, 0)
+    acc << (extra > 1 ? "#{k} (x#{extra} new)" : k) if extra > 0
+  end
+
+  unless new_findings.empty?
+    puts "\e[31m✗ Staticcheck found #{new_findings.length} new finding(s)!\e[0m"
+    puts new_findings
+    puts "\nIf these are pre-existing and intentional, refresh the baseline:"
+    puts "  staticcheck -checks '#{STATICCHECK_CHECKS}' ./... | sort > #{BASELINE_PATH}"
+    exit 1
+  end
+
+  resolved = base_t.sum { |k, n| [n - found_t.fetch(k, 0), 0].max }
+  puts "Staticcheck: #{found.length} baselined finding(s), 0 new#{resolved.zero? ? '' : ", #{resolved} resolved"}"
+end
+
 run_cmd("Go vet", "go vet ./...")
-run_cmd("Staticcheck", "staticcheck -checks 'inherit,-SA2001' ./...")
+run_staticcheck
 
 stdout, _ = run_cmd("Line audit", "./tools/audit_lines --quiet")
 puts stdout.strip unless stdout.strip.empty?

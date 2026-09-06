@@ -1,4 +1,4 @@
-.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue review-loop
+.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue review-loop snapshot snap
 
 all: check
 
@@ -73,9 +73,12 @@ install: build
 	@echo "Installed to $$HOME/bin/abs"
 
 ci: check
+snapshot:
+	@./tools/snapshot $(ARGS)
 
-checkpoint:
-	@./tools/checkpoint.sh
+snap: snapshot
+
+checkpoint: snapshot
 
 review-loop:
 	@./tools/review_loop $(ARGS)
