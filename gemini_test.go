@@ -292,3 +292,98 @@ func TestInferWhisperEngineURLGemini(t *testing.T) {
 		t.Errorf("expected WhisperEngineGemini, got %s", eng)
 	}
 }
+
+func TestComputeGeminiChunks(t *testing.T) {
+	_ = t.TempDir()
+	c1 := computeGeminiChunks(1200.0, 1800.0)
+	if len(c1) != 1 || c1[0].startSec != 0 || c1[0].durSec != 1200.0 {
+		t.Errorf("unexpected chunks for 1200s: %+v", c1)
+	}
+
+	c2 := computeGeminiChunks(1800.0, 1800.0)
+	if len(c2) != 1 || c2[0].startSec != 0 || c2[0].durSec != 1800.0 {
+		t.Errorf("unexpected chunks for 1800s: %+v", c2)
+	}
+
+	c3 := computeGeminiChunks(3700.0, 1800.0)
+	if len(c3) != 3 {
+		t.Fatalf("expected 3 chunks for 3700s, got %d", len(c3))
+	}
+	if c3[0].startSec != 0 || c3[0].durSec != 1800.0 {
+		t.Errorf("unexpected chunk 0: %+v", c3[0])
+	}
+	if c3[1].startSec != 1800.0 || c3[1].durSec != 1800.0 {
+		t.Errorf("unexpected chunk 1: %+v", c3[1])
+	}
+	if c3[2].startSec != 3600.0 || c3[2].durSec != 100.0 {
+		t.Errorf("unexpected chunk 2: %+v", c3[2])
+	}
+
+	c4 := computeGeminiChunks(2000.0, 0)
+	if len(c4) != 2 {
+		t.Fatalf("expected 2 chunks with default chunk size, got %d", len(c4))
+	}
+}
+
+func TestMergeGeminiChunkResults(t *testing.T) {
+	_ = t.TempDir()
+	r1 := &geminiChunkResult{
+		index:    0,
+		startSec: 0.0,
+		payload: &geminiResponsePayload{
+			Cuts:     []geminiCutItem{{Start: 10.0, End: 30.0, Type: "advertisement", Reason: "Ad 1"}},
+			Segments: []geminiSegmentItem{{Start: 0.0, End: 50.0, Text: "Part 1."}},
+		},
+	}
+	r2 := &geminiChunkResult{
+		index:    1,
+		startSec: 1800.0,
+		payload: &geminiResponsePayload{
+			Cuts:     []geminiCutItem{{Start: 5.0, End: 25.0, Type: "music_interlude", Reason: "Music"}},
+			Segments: []geminiSegmentItem{{Start: 0.0, End: 40.0, Text: "Part 2."}},
+		},
+	}
+
+	merged := mergeGeminiChunkResults([]*geminiChunkResult{r1, r2, nil})
+	if len(merged.Cuts) != 2 {
+		t.Fatalf("expected 2 cuts, got %d", len(merged.Cuts))
+	}
+	if merged.Cuts[0].Start != 10.0 || merged.Cuts[0].End != 30.0 {
+		t.Errorf("unexpected cut 0: %+v", merged.Cuts[0])
+	}
+	if merged.Cuts[1].Start != 1805.0 || merged.Cuts[1].End != 1825.0 {
+		t.Errorf("unexpected cut 1 with offset: %+v", merged.Cuts[1])
+	}
+
+	if len(merged.Segments) != 2 {
+		t.Fatalf("expected 2 segments, got %d", len(merged.Segments))
+	}
+	if merged.Segments[1].Start != 1800.0 || merged.Segments[1].End != 1840.0 {
+		t.Errorf("unexpected segment 1 with offset: %+v", merged.Segments[1])
+	}
+}
+
+func TestPrepareGeminiChunksSingle(t *testing.T) {
+	tempDir := t.TempDir()
+	mockAudio := filepath.Join(tempDir, "ep.mp3")
+	chunks := []geminiChunkInfo{{index: 0, startSec: 0, durSec: 600.0}}
+	prepared, cleanup, err := prepareGeminiChunks(mockAudio, chunks)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer cleanup()
+	if len(prepared) != 1 || prepared[0].filePath != mockAudio {
+		t.Errorf("expected single chunk to point directly to original file, got %+v", prepared)
+	}
+}
+
+func TestSplitAudioChunkInvalidFile(t *testing.T) {
+	tempDir := t.TempDir()
+	workDir := filepath.Join(tempDir, ".work")
+	_ = os.MkdirAll(workDir, 0755)
+	outChunk := filepath.Join(workDir, "chunk.mp3")
+	err := splitAudioChunk(filepath.Join(tempDir, "missing.mp3"), outChunk, 0, 10)
+	if err == nil {
+		t.Error("expected error when splitting missing file, got nil")
+	}
+}
