@@ -96,6 +96,12 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		Commands: []clihelp.Command{
 			buildProcCommand(opts, action),
 			buildLsCommand(opts, action),
+			buildInfoCommand(opts, action),
+			buildPolicyCommand(opts, action),
+			buildQueueCommand(opts, action),
+			buildFetchCommand(opts, action),
+			buildPlayCommand(opts, action),
+			buildTranscriptCommand(opts, action),
 			buildRecutCommand(opts, action),
 			buildExportCommand(opts, action),
 			buildTUICommand(opts, action),

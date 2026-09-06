@@ -40,6 +40,7 @@ type EpisodeAdCut struct {
 }
 
 type EpisodeStatusFile struct {
+	ID            string           `json:"id,omitempty"`
 	Version       int              `json:"version"`
 	MediaFile     string           `json:"media_file"`
 	Status        EpisodeState     `json:"status"`

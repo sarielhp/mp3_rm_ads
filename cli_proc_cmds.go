@@ -84,8 +84,22 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "ls",
 		Description: "List podcast episodes, latest downloads, or podcast contents",
-		UsageLine:   "abs ls [latest|<podcast>] [options]",
+		UsageLine:   "abs ls [latest|podcasts|<podcast>] [options]",
 		Subcommands: []clihelp.Command{
+			{
+				Name:        "podcasts",
+				Description: "List all podcasts in the library",
+				UsageLine:   "abs ls podcasts [options]",
+				Options: []clihelp.Option{
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
+					clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "ls"
+					opts.Args = []string{"podcasts"}
+					return nil
+				},
+			},
 			{
 				Name:        "latest",
 				Description: "List the latest downloaded/added episodes across all podcasts",
@@ -97,6 +111,7 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Options: []clihelp.Option{
 					clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of latest episodes to list (default: 10)"),
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
+					clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
 					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show file sizes and full paths"),
 				},
 				Run: func(ctx *clihelp.Context) error {
@@ -108,11 +123,12 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 		},
 		Parameters: []clihelp.Param{
-			{Name: "[latest|<podcast>]", Description: "'latest' or a podcast short ID, index, or name"},
+			{Name: "[latest|podcasts|<podcast>]", Description: "'latest', 'podcasts', or a podcast short ID, index, or name"},
 		},
 		Options: []clihelp.Option{
 			clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of episodes to list (default: 10)"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
+			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show file sizes and full paths"),
 		},
 		Run: func(ctx *clihelp.Context) error {

@@ -44,6 +44,10 @@ func main() {
 	config := loadConfig()
 	applyBackendVerification(config)
 
+	if handleParityCommands(action, config, cli) {
+		return
+	}
+
 	switch action {
 	case "test":
 		handleMainTest(config, cli)
@@ -69,6 +73,31 @@ func main() {
 	case "proc", "recut":
 		handleMainProc(config, cli, action)
 	}
+}
+
+func handleParityCommands(action string, config Config, cli CLIOptions) bool {
+	var err error
+	switch action {
+	case "info":
+		err = runInfoCommand(config, cli)
+	case "policy":
+		err = runPolicyCommand(config, cli)
+	case "queue":
+		err = runQueueCommand(config, cli)
+	case "fetch":
+		err = runFetchCommand(config, cli)
+	case "play":
+		err = runPlayCommand(config, cli)
+	case "transcript":
+		err = runTranscriptCommand(config, cli)
+	default:
+		return false
+	}
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		os.Exit(1)
+	}
+	return true
 }
 
 func handleMainTest(config Config, cli CLIOptions) {

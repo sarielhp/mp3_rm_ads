@@ -11,6 +11,7 @@ import (
 )
 
 type CachedEpisodeSummary struct {
+	ID            string  `json:"id,omitempty"`
 	Path          string  `json:"path"`
 	Filename      string  `json:"filename"`
 	Title         string  `json:"title"`

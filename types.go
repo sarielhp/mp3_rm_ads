@@ -296,6 +296,15 @@ type CLIOptions struct {
 	IfDirty             bool
 	BatchWorkerDir      string
 	Priority            int
+	JSON                bool
+	ShowCuts            bool
+	AutoDownloadStr     string
+	DownloadPolicy      string
+	DownloadK           int
+	AutoCleanupStr      string
+	CleanupDays         int
+	AdRemovalMode       string
+	QueueSubcmd         string
 }
 
 type CostInfo struct {
