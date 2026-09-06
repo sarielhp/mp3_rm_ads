@@ -119,20 +119,21 @@ func handleDownloadPolicyModalKey(m *tuiModel, s string) {
 		}
 	case "1":
 		m.downloadPolicyModalIdx = 0
+		m.togglePolicyModalField(0)
 	case "2":
 		m.downloadPolicyModalIdx = 1
+		m.togglePolicyModalField(1)
 	case "3":
 		m.downloadPolicyModalIdx = 2
 	case "4":
 		m.downloadPolicyModalIdx = 3
+		m.togglePolicyModalField(3)
+	case " ", "tab":
+		m.togglePolicyModalField(m.downloadPolicyModalIdx)
 	case "+", "=", "right", "l":
-		if m.downloadPolicyModalK < 99 {
-			m.downloadPolicyModalK++
-		}
+		m.adjustPolicyModalField(1)
 	case "-", "_", "left", "h":
-		if m.downloadPolicyModalK > 1 {
-			m.downloadPolicyModalK--
-		}
+		m.adjustPolicyModalField(-1)
 	case "enter":
 		m.applyDownloadPolicyModal()
 	case "esc", "q", "d", "D":

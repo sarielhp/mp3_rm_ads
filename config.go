@@ -601,6 +601,12 @@ func loadConfig() Config {
 		cfg.ActiveWhisperID = 1
 	}
 	resolveActiveWhisperProfile(&cfg)
+	if cfg.PodfetchDBPath == "" && testConfigPath == "" {
+		defaultDB := "/media/dockers/podfetch/db/podcast.db"
+		if _, err := os.Stat(defaultDB); err == nil {
+			cfg.PodfetchDBPath = defaultDB
+		}
+	}
 	setConfigFileSnapshot(cfg)
 	applyEnvOverrides(&cfg)
 	resolveAuthFolderCredentials(&cfg)

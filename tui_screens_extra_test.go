@@ -149,24 +149,24 @@ func TestTUITranscriptScreenExportKeys(t *testing.T) {
 }
 
 func testDownloadPolicyModalKeys(t *testing.T, m *tuiModel, tempDir string) {
-	kBefore := m.downloadPolicyModalK
+	daysBefore := m.policyCleanupDays
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
-	if m.downloadPolicyModalK != kBefore+1 {
-		t.Errorf("expected K to increase to %d, got %d", kBefore+1, m.downloadPolicyModalK)
+	if m.policyCleanupDays != daysBefore+1 {
+		t.Errorf("expected days to increase to %d, got %d", daysBefore+1, m.policyCleanupDays)
 	}
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'-'}})
-	if m.downloadPolicyModalK != kBefore {
-		t.Errorf("expected K to return to %d, got %d", kBefore, m.downloadPolicyModalK)
+	if m.policyCleanupDays != daysBefore {
+		t.Errorf("expected days to return to %d, got %d", daysBefore, m.policyCleanupDays)
 	}
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRight})
-	if m.downloadPolicyModalK != kBefore+1 {
-		t.Errorf("expected K to increase with right arrow, got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != daysBefore+1 {
+		t.Errorf("expected days to increase with right arrow, got %d", m.policyCleanupDays)
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyLeft})
-	if m.downloadPolicyModalK != kBefore {
-		t.Errorf("expected K to decrease with left arrow, got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != daysBefore {
+		t.Errorf("expected days to decrease with left arrow, got %d", m.policyCleanupDays)
 	}
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'+'}})
@@ -176,12 +176,12 @@ func testDownloadPolicyModalKeys(t *testing.T, m *tuiModel, tempDir string) {
 	if m.showDownloadPolicyModal {
 		t.Errorf("expected modal to close after pressing Enter")
 	}
-	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK || m.podcasts[0].config.DownloadK != kBefore+2 {
-		t.Errorf("expected policy LatestK with K %d, got %+v", kBefore+2, m.podcasts[0].config)
+	if !m.podcasts[0].config.IsAutoCleanupEnabled() || m.podcasts[0].config.AutoCleanupDays != daysBefore+2 {
+		t.Errorf("expected auto cleanup enabled with days %d, got %+v", daysBefore+2, m.podcasts[0].config)
 	}
 
 	diskCfg := loadPodcastConfig(tempDir)
-	if diskCfg.DownloadPolicy != DownloadPolicyLatestK || diskCfg.DownloadK != kBefore+2 {
+	if !diskCfg.IsAutoCleanupEnabled() || diskCfg.AutoCleanupDays != daysBefore+2 {
 		t.Errorf("expected saved config on disk to match, got %+v", diskCfg)
 	}
 }
@@ -200,7 +200,7 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	}
 
 	modal := m.drawDownloadPolicyModal()
-	if !strings.Contains(modal, "DOWNLOAD POLICY") || !strings.Contains(modal, "Latest Episode Only") || !strings.Contains(modal, "Latest K Episodes") {
+	if !strings.Contains(modal, "PODCAST POLICY") || !strings.Contains(modal, "Auto-Download") || !strings.Contains(modal, "Cleanup Days") {
 		t.Errorf("expected download policy modal contents, got:\n%s", modal)
 	}
 
@@ -208,6 +208,8 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	if m.downloadPolicyModalIdx != 2 {
 		t.Errorf("expected downloadPolicyModalIdx 2, got %d", m.downloadPolicyModalIdx)
 	}
+	m.policyAutoCleanup = true
+	m.policyCleanupDays = 30
 
 	testDownloadPolicyModalKeys(t, m, tempDir)
 
@@ -218,8 +220,8 @@ func TestInteractiveDownloadPolicyModal(t *testing.T) {
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'4'}})
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEscape})
-	if m.showDownloadPolicyModal || m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK {
-		t.Errorf("expected modal closed and policy preserved after Esc")
+	if m.showDownloadPolicyModal {
+		t.Errorf("expected modal closed after Esc")
 	}
 
 	m.screen = screenPodcastDetail

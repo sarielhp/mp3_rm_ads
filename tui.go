@@ -62,6 +62,10 @@ type tuiModel struct {
 	showDownloadPolicyModal bool
 	downloadPolicyModalIdx  int
 	downloadPolicyModalK    int
+	policyAutoDownload      bool
+	policyAutoCleanup       bool
+	policyCleanupDays       int
+	policyAdRemoval         string
 	selectedEpisodes        map[string]bool
 	showEpisodePlayerPane   bool
 }

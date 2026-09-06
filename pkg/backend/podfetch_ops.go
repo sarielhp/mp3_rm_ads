@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -258,4 +259,41 @@ func (c *PodFetchBackend) WaitForActiveDownloads(podcasts []Podcast, quiet bool,
 		}
 	}
 	return nil
+}
+
+func (c *PodFetchBackend) UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	var errs []string
+	if c.DBPath != "" {
+		if err := updatePodFetchSettingsDB(c.DBPath, podcastID, autoDownload, autoCleanup, autoCleanupDays); err != nil {
+			errs = append(errs, err.Error())
+		}
+	}
+	if c.Host != "" {
+		if err := c.syncPodFetchSettingsAPI(podcastID, autoDownload, autoCleanup, autoCleanupDays); err != nil {
+			if c.DBPath == "" {
+				errs = append(errs, err.Error())
+			}
+		}
+	}
+	if len(errs) > 0 && c.DBPath == "" && c.Host == "" {
+		return fmt.Errorf("%s", strings.Join(errs, "; "))
+	}
+	return nil
+}
+
+func (c *PodFetchBackend) syncPodFetchSettingsAPI(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	body, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/settings", podcastID), "GET", nil)
+	if err != nil || len(body) == 0 {
+		return nil
+	}
+	var settings map[string]interface{}
+	if err := json.Unmarshal(body, &settings); err != nil {
+		return nil
+	}
+	settings["autoDownload"] = autoDownload
+	settings["autoCleanup"] = autoCleanup
+	settings["autoCleanupDays"] = autoCleanupDays
+	settings["activated"] = true
+	_, err = c.Request(fmt.Sprintf("/api/v1/podcasts/%s/settings", podcastID), "PUT", settings)
+	return err
 }

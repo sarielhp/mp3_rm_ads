@@ -325,3 +325,7 @@ func (c *AudiobookshelfBackend) checkHTMLResponse(res *http.Response, body []byt
 	}
 	return false, fmt.Errorf("server returned HTML response instead of JSON (server may still be starting up)")
 }
+
+func (c *AudiobookshelfBackend) UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	return nil
+}

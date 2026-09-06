@@ -34,6 +34,7 @@ type Backend interface {
 	SyncDuration(filePath string, duration float64) error
 	ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error)
 	WaitForActiveDownloads(podcasts []Podcast, quiet bool, timeout time.Duration) error
+	UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error
 }
 
 type Config struct {

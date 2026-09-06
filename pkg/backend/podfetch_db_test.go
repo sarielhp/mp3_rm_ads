@@ -230,3 +230,73 @@ func TestParseRSSFeedXML(t *testing.T) {
 		t.Errorf("unexpected enclosure: %+v", eps[0].Enclosure)
 	}
 }
+
+func TestUpdatePodFetchSettingsDB(t *testing.T) {
+	tempDir := t.TempDir()
+	dbPath := filepath.Join(tempDir, "podcast.db")
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open test db: %v", err)
+	}
+	defer db.Close()
+
+	schema := `
+		CREATE TABLE podcasts (
+			id TEXT PRIMARY KEY,
+			name TEXT,
+			directory_name TEXT,
+			active BOOLEAN DEFAULT 1
+		);
+		CREATE TABLE podcast_settings (
+			podcast_id TEXT PRIMARY KEY,
+			episode_numbering BOOLEAN DEFAULT 0,
+			auto_download BOOLEAN DEFAULT 0,
+			auto_update BOOLEAN DEFAULT 1,
+			auto_cleanup BOOLEAN DEFAULT 0,
+			auto_cleanup_days INTEGER DEFAULT -1,
+			replace_invalid_characters BOOLEAN DEFAULT 1,
+			use_existing_filename BOOLEAN DEFAULT 0,
+			replacement_strategy TEXT DEFAULT 'replace-with-dash-and-underscore',
+			episode_format TEXT DEFAULT '{}',
+			podcast_format TEXT DEFAULT '{}',
+			direct_paths BOOLEAN DEFAULT 0,
+			activated BOOLEAN DEFAULT 0,
+			podcast_prefill INTEGER DEFAULT 0,
+			use_one_cover_for_all_episodes BOOLEAN DEFAULT 0,
+			nfo_format TEXT DEFAULT 'off',
+			cover_filename TEXT DEFAULT 'image',
+			auto_transcribe BOOLEAN DEFAULT 0
+		);
+		INSERT INTO podcasts (id, name, directory_name, active)
+		VALUES ('pod-uuid-1', 'My Tech Show', 'podcasts/my_tech_show', 1);
+	`
+	if _, err := db.Exec(schema); err != nil {
+		t.Fatalf("failed to exec schema: %v", err)
+	}
+
+	be := NewPodFetch(Config{DBPath: dbPath})
+
+	if err := be.UpdatePodcastSettings("my_tech_show", false, true, 45); err != nil {
+		t.Fatalf("UpdatePodcastSettings failed: %v", err)
+	}
+
+	var autoDl, autoCl bool
+	var days int
+	err = db.QueryRow("SELECT auto_download, auto_cleanup, auto_cleanup_days FROM podcast_settings WHERE podcast_id = 'pod-uuid-1'").Scan(&autoDl, &autoCl, &days)
+	if err != nil {
+		t.Fatalf("failed to query podcast_settings: %v", err)
+	}
+	if autoDl || !autoCl || days != 45 {
+		t.Errorf("expected dl=false, cl=true, days=45, got dl=%v, cl=%v, days=%d", autoDl, autoCl, days)
+	}
+
+	var active bool
+	err = db.QueryRow("SELECT active FROM podcasts WHERE id = 'pod-uuid-1'").Scan(&active)
+	if err != nil {
+		t.Fatalf("failed to query podcasts active: %v", err)
+	}
+	if active {
+		t.Errorf("expected active=false, got %v", active)
+	}
+}

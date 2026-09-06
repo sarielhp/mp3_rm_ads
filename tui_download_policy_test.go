@@ -46,22 +46,25 @@ func testDownloadPolicyIndexNavigation(t *testing.T, m *tuiModel) {
 	}
 }
 
-func testDownloadPolicyKAdjustment(t *testing.T, m *tuiModel) {
+func testDownloadPolicyDaysAdjustment(t *testing.T, m *tuiModel) {
+	m.downloadPolicyModalIdx = 2
+	m.policyAutoCleanup = true
+	m.policyCleanupDays = 30
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'='}})
-	if m.downloadPolicyModalK != 4 {
-		t.Errorf("expected K 4 after '=', got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != 31 {
+		t.Errorf("expected days 31 after '=', got %d", m.policyCleanupDays)
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'_'}})
-	if m.downloadPolicyModalK != 3 {
-		t.Errorf("expected K 3 after '_', got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != 30 {
+		t.Errorf("expected days 30 after '_', got %d", m.policyCleanupDays)
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
-	if m.downloadPolicyModalK != 4 {
-		t.Errorf("expected K 4 after 'l', got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != 31 {
+		t.Errorf("expected days 31 after 'l', got %d", m.policyCleanupDays)
 	}
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h'}})
-	if m.downloadPolicyModalK != 3 {
-		t.Errorf("expected K 3 after 'h', got %d", m.downloadPolicyModalK)
+	if m.policyCleanupDays != 30 {
+		t.Errorf("expected days 30 after 'h', got %d", m.policyCleanupDays)
 	}
 }
 
@@ -79,19 +82,19 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 	}
 
 	testDownloadPolicyIndexNavigation(t, m)
-	testDownloadPolicyKAdjustment(t, m)
+	testDownloadPolicyDaysAdjustment(t, m)
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	if m.showDownloadPolicyModal {
 		t.Errorf("expected modal to close after Enter")
 	}
-	if m.podcasts[0].config.DownloadPolicy != DownloadPolicyLatestK || m.podcasts[0].config.DownloadK != 3 {
-		t.Errorf("expected policy latest_k 3, got %s %d", m.podcasts[0].config.DownloadPolicy, m.podcasts[0].config.DownloadK)
+	if !m.podcasts[0].config.IsAutoCleanupEnabled() || m.podcasts[0].config.AutoCleanupDays != 30 {
+		t.Errorf("expected auto cleanup enabled 30 days, got %+v", m.podcasts[0].config)
 	}
 
 	saved := loadPodcastConfig(tempDir)
-	if saved.DownloadPolicy != DownloadPolicyLatestK || saved.DownloadK != 3 {
-		t.Errorf("expected saved config to match latest_k 3, got %+v", saved)
+	if !saved.IsAutoCleanupEnabled() || saved.AutoCleanupDays != 30 {
+		t.Errorf("expected saved config to match cleanup 30 days, got %+v", saved)
 	}
 }
 
@@ -104,16 +107,12 @@ func TestTUIDownloadPolicyModalRenderingAndCancel(t *testing.T) {
 	m.width = 80
 
 	m.openDownloadPolicyModal()
-	if m.downloadPolicyModalIdx != 3 {
-		t.Errorf("expected initial idx 3 for all, got %d", m.downloadPolicyModalIdx)
-	}
-
 	rendered := m.drawDownloadPolicyModal()
-	if !strings.Contains(rendered, "DOWNLOAD POLICY") {
+	if !strings.Contains(rendered, "PODCAST POLICY") {
 		t.Errorf("expected title in modal, got:\n%s", rendered)
 	}
-	if !strings.Contains(rendered, "1. No Automatic Downloads") || !strings.Contains(rendered, "4. All Episodes") {
-		t.Errorf("expected 4 options in modal, got:\n%s", rendered)
+	if !strings.Contains(rendered, "1. Auto-Download") || !strings.Contains(rendered, "4. Ad Removal") {
+		t.Errorf("expected options in modal, got:\n%s", rendered)
 	}
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'1'}})

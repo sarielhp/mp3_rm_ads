@@ -296,3 +296,68 @@ func resetPodFetchDateCheckDB(dbPath, itemID, title string) error {
 	}
 	return nil
 }
+
+func updatePodFetchSettingsDB(dbPath, identifier string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	verifyPodfetchNotDisabled("updatePodFetchSettingsDB")
+	if dbPath == "" {
+		return fmt.Errorf("dbPath is empty")
+	}
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	if err != nil {
+		return err
+	}
+	defer db.Close()
+
+	var realID string
+	query := "SELECT id FROM podcasts WHERE id = ? OR lower(name) = lower(?) OR lower(directory_name) = lower(?) OR lower(directory_name) = lower('podcasts/' || ?) OR lower(directory_name) = lower(?) LIMIT 1"
+	cleanIdent := strings.TrimPrefix(identifier, "podcasts/")
+	err = db.QueryRow(query, identifier, identifier, identifier, identifier, cleanIdent).Scan(&realID)
+	if err != nil {
+		realID = identifier
+	}
+
+	activeVal := 1
+	if !autoDownload {
+		activeVal = 0
+	}
+	_, _ = db.Exec("UPDATE podcasts SET active = ? WHERE id = ?", activeVal, realID)
+
+	autoDlVal := 0
+	if autoDownload {
+		autoDlVal = 1
+	}
+	autoClVal := 0
+	if autoCleanup {
+		autoClVal = 1
+	}
+
+	upsert := `INSERT INTO podcast_settings (
+		podcast_id,
+		episode_numbering,
+		auto_download,
+		auto_update,
+		auto_cleanup,
+		auto_cleanup_days,
+		replace_invalid_characters,
+		use_existing_filename,
+		replacement_strategy,
+		episode_format,
+		podcast_format,
+		direct_paths,
+		activated,
+		podcast_prefill,
+		use_one_cover_for_all_episodes,
+		nfo_format,
+		cover_filename,
+		auto_transcribe
+	) VALUES (
+		?, 0, ?, 1, ?, ?, 1, 0, 'replace-with-dash-and-underscore', '{}', '{}', 0, 1, 0, 0, 'off', 'image', 0
+	) ON CONFLICT(podcast_id) DO UPDATE SET
+		auto_download = excluded.auto_download,
+		auto_cleanup = excluded.auto_cleanup,
+		auto_cleanup_days = excluded.auto_cleanup_days,
+		activated = 1`
+
+	_, err = db.Exec(upsert, realID, autoDlVal, autoClVal, autoCleanupDays)
+	return err
+}

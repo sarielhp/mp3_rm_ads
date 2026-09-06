@@ -61,6 +61,9 @@ func (m *mockOrphanBackend) ApplyKeepPolicy(pID, t string, k int, dr, v, q bool)
 func (m *mockOrphanBackend) WaitForActiveDownloads(p []PodcastItem, q bool, to time.Duration) error {
 	return nil
 }
+func (m *mockOrphanBackend) UpdatePodcastSettings(pID string, autoDl, autoCl bool, days int) error {
+	return nil
+}
 
 func makeTestPod(id, title, feedURL string, epCount int) PodcastItem {
 	eps := make([]Episode, epCount)

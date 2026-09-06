@@ -24,12 +24,47 @@ const (
 )
 
 type PodcastConfig struct {
-	ID             string                `json:"id,omitempty"`
-	AdRemoval      string                `json:"ad_removal"`
-	DownloadPolicy string                `json:"download_policy,omitempty"`
-	DownloadK      int                   `json:"download_k,omitempty"`
-	Frequency      *PodcastFrequencyInfo `json:"frequency,omitempty"`
-	UpdatedAt      time.Time             `json:"updated_at,omitempty"`
+	ID              string                `json:"id,omitempty"`
+	AdRemoval       string                `json:"ad_removal"`
+	DownloadPolicy  string                `json:"download_policy,omitempty"`
+	DownloadK       int                   `json:"download_k,omitempty"`
+	AutoDownload    *bool                 `json:"auto_download,omitempty"`
+	AutoCleanup     *bool                 `json:"auto_cleanup,omitempty"`
+	AutoCleanupDays int                   `json:"auto_cleanup_days,omitempty"`
+	Frequency       *PodcastFrequencyInfo `json:"frequency,omitempty"`
+	UpdatedAt       time.Time             `json:"updated_at,omitempty"`
+}
+
+func (c *PodcastConfig) IsAutoDownloadEnabled() bool {
+	if c.AutoDownload != nil {
+		return *c.AutoDownload
+	}
+	return normalizeDownloadPolicy(c.DownloadPolicy) != DownloadPolicyNone
+}
+
+func (c *PodcastConfig) SetAutoDownload(enabled bool) {
+	c.AutoDownload = &enabled
+	if !enabled {
+		c.DownloadPolicy = DownloadPolicyNone
+	} else if normalizeDownloadPolicy(c.DownloadPolicy) == DownloadPolicyNone {
+		c.DownloadPolicy = DownloadPolicyLatest
+	}
+}
+
+func (c *PodcastConfig) IsAutoCleanupEnabled() bool {
+	if c.AutoCleanup != nil {
+		return *c.AutoCleanup
+	}
+	return c.AutoCleanupDays > 0
+}
+
+func (c *PodcastConfig) SetAutoCleanup(enabled bool) {
+	c.AutoCleanup = &enabled
+	if !enabled {
+		c.AutoCleanupDays = -1
+	} else if c.AutoCleanupDays <= 0 {
+		c.AutoCleanupDays = 30
+	}
 }
 
 func defaultPodcastConfig() PodcastConfig {
@@ -46,10 +81,15 @@ func defaultPodcastConfig() PodcastConfig {
 	if adPolicy == "" {
 		adPolicy = AdRemovalAll
 	}
+	autoDl := normalizeDownloadPolicy(dlPolicy) != DownloadPolicyNone
+	autoCl := false
 	return PodcastConfig{
-		AdRemoval:      normalizeAdRemovalMode(adPolicy),
-		DownloadPolicy: normalizeDownloadPolicy(dlPolicy),
-		DownloadK:      dlK,
+		AdRemoval:       normalizeAdRemovalMode(adPolicy),
+		DownloadPolicy:  normalizeDownloadPolicy(dlPolicy),
+		DownloadK:       dlK,
+		AutoDownload:    &autoDl,
+		AutoCleanup:     &autoCl,
+		AutoCleanupDays: -1,
 	}
 }
 
@@ -161,50 +201,42 @@ func downloadPolicyBadge(policy string, k int) string {
 	}
 }
 
-func loadPodcastConfig(dir string) PodcastConfig {
-	cfgPath := filepath.Join(dir, podcastConfigFileName)
-	data, err := os.ReadFile(cfgPath)
-	if err != nil {
-		return defaultPodcastConfig()
+func extractLegacyPodcastConfigFields(data []byte, cfg *PodcastConfig) {
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return
 	}
-	var cfg PodcastConfig
-	if err := json.Unmarshal(data, &cfg); err != nil {
-		return defaultPodcastConfig()
-	}
-	def := defaultPodcastConfig()
-	if cfg.AdRemoval == "" || cfg.DownloadPolicy == "" || cfg.DownloadK <= 0 || cfg.ID == "" {
-		var raw map[string]interface{}
-		if err := json.Unmarshal(data, &raw); err == nil {
-			if cfg.ID == "" {
-				if v, ok := raw["id"].(string); ok {
-					cfg.ID = v
-				} else if v, ok := raw["podcast_id"].(string); ok {
-					cfg.ID = v
-				}
-			}
-			if cfg.AdRemoval == "" {
-				if v, ok := raw["ad_removal_mode"].(string); ok {
-					cfg.AdRemoval = v
-				} else if v, ok := raw["status"].(string); ok {
-					cfg.AdRemoval = v
-				}
-			}
-			if cfg.DownloadPolicy == "" {
-				if v, ok := raw["download_policy"].(string); ok {
-					cfg.DownloadPolicy = v
-				} else if v, ok := raw["download_mode"].(string); ok {
-					cfg.DownloadPolicy = v
-				} else if v, ok := raw["policy"].(string); ok {
-					cfg.DownloadPolicy = v
-				}
-			}
-			if cfg.DownloadK <= 0 {
-				if v, ok := raw["download_k"].(float64); ok && v > 0 {
-					cfg.DownloadK = int(v)
-				}
-			}
+	if cfg.ID == "" {
+		if v, ok := raw["id"].(string); ok {
+			cfg.ID = v
+		} else if v, ok := raw["podcast_id"].(string); ok {
+			cfg.ID = v
 		}
 	}
+	if cfg.AdRemoval == "" {
+		if v, ok := raw["ad_removal_mode"].(string); ok {
+			cfg.AdRemoval = v
+		} else if v, ok := raw["status"].(string); ok {
+			cfg.AdRemoval = v
+		}
+	}
+	if cfg.DownloadPolicy == "" {
+		if v, ok := raw["download_policy"].(string); ok {
+			cfg.DownloadPolicy = v
+		} else if v, ok := raw["download_mode"].(string); ok {
+			cfg.DownloadPolicy = v
+		} else if v, ok := raw["policy"].(string); ok {
+			cfg.DownloadPolicy = v
+		}
+	}
+	if cfg.DownloadK <= 0 {
+		if v, ok := raw["download_k"].(float64); ok && v > 0 {
+			cfg.DownloadK = int(v)
+		}
+	}
+}
+
+func normalizeLoadedPodcastConfig(cfg *PodcastConfig, def PodcastConfig) {
 	if cfg.AdRemoval == "" {
 		cfg.AdRemoval = def.AdRemoval
 	} else {
@@ -218,12 +250,65 @@ func loadPodcastConfig(dir string) PodcastConfig {
 	if cfg.DownloadK <= 0 {
 		cfg.DownloadK = def.DownloadK
 	}
+	if cfg.AutoDownload == nil {
+		autoDl := normalizeDownloadPolicy(cfg.DownloadPolicy) != DownloadPolicyNone
+		cfg.AutoDownload = &autoDl
+	}
+	if cfg.AutoCleanup == nil {
+		autoCl := cfg.AutoCleanupDays > 0
+		cfg.AutoCleanup = &autoCl
+	}
+	if cfg.AutoCleanupDays == 0 {
+		if cfg.AutoCleanup != nil && *cfg.AutoCleanup {
+			cfg.AutoCleanupDays = 30
+		} else {
+			cfg.AutoCleanupDays = -1
+		}
+	}
+}
+
+func loadPodcastConfig(dir string) PodcastConfig {
+	cfgPath := filepath.Join(dir, podcastConfigFileName)
+	data, err := os.ReadFile(cfgPath)
+	if err != nil {
+		return defaultPodcastConfig()
+	}
+	var cfg PodcastConfig
+	if err := json.Unmarshal(data, &cfg); err != nil {
+		return defaultPodcastConfig()
+	}
+	def := defaultPodcastConfig()
+	if cfg.AdRemoval == "" || cfg.DownloadPolicy == "" || cfg.DownloadK <= 0 || cfg.ID == "" {
+		extractLegacyPodcastConfigFields(data, &cfg)
+	}
+	normalizeLoadedPodcastConfig(&cfg, def)
 	return cfg
 }
 
 func savePodcastConfig(dir string, cfg PodcastConfig) error {
 	cfg.AdRemoval = normalizeAdRemovalMode(cfg.AdRemoval)
 	cfg.DownloadPolicy = normalizeDownloadPolicy(cfg.DownloadPolicy)
+	if cfg.DownloadPolicy == DownloadPolicyNone {
+		autoDl := false
+		cfg.AutoDownload = &autoDl
+	} else if cfg.AutoDownload != nil && !*cfg.AutoDownload {
+		cfg.DownloadPolicy = DownloadPolicyNone
+	} else {
+		autoDl := true
+		cfg.AutoDownload = &autoDl
+	}
+
+	if cfg.AutoCleanupDays <= 0 {
+		autoCl := false
+		cfg.AutoCleanup = &autoCl
+		cfg.AutoCleanupDays = -1
+	} else if cfg.AutoCleanup != nil && !*cfg.AutoCleanup {
+		cfg.AutoCleanupDays = -1
+	} else {
+		autoCl := true
+		cfg.AutoCleanup = &autoCl
+	}
+
 	if cfg.DownloadK <= 0 {
 		cfg.DownloadK = 3
 	}
