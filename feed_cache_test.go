@@ -222,3 +222,30 @@ func TestFetchFeedDirect_TransientRetrySuccess(t *testing.T) {
 		t.Errorf("expected exactly 3 attempts, got %d", attempts)
 	}
 }
+
+func TestParseFeedDate_AllTimezonesAndFormats(t *testing.T) {
+	timezones := []string{"PDT", "PST", "EDT", "EST", "CDT", "CST", "MDT", "MST", "pdt", "pst"}
+	for _, tz := range timezones {
+		input := fmt.Sprintf("Tue, 03 Sep 2024 12:00:00 %s", tz)
+		ms, raw := parseFeedDate(input)
+		if ms == 0 || raw != input {
+			t.Errorf("failed to parse timezone %q: ms=%d raw=%q", tz, ms, raw)
+		}
+	}
+
+	customFormats := []string{
+		"2024-09-03 12:00:00",
+		"3 Sep 2024 12:00:00 -0700",
+		"Tue, 3 Sep 2024 12:00:00 -0700",
+	}
+	for _, fmtStr := range customFormats {
+		ms, _ := parseFeedDate(fmtStr)
+		if ms == 0 {
+			t.Errorf("failed to parse custom format %q", fmtStr)
+		}
+	}
+
+	if ms, _ := parseFeedDate("not a real date string"); ms != 0 {
+		t.Errorf("expected 0 for invalid date, got %d", ms)
+	}
+}

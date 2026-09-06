@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"bytes"
 	"database/sql"
 	"encoding/json"
 	"net/http"
@@ -224,5 +225,21 @@ func TestAudiobookshelfDBOperations(t *testing.T) {
 	_ = db.QueryRow("SELECT lastEpisodeCheck, maxNewEpisodesToDownload FROM podcasts WHERE id = 'p1'").Scan(&lastCheck, &maxDL)
 	if !strings.HasPrefix(lastCheck, "1970-01-01") || maxDL != 0 {
 		t.Errorf("reset failed in DB: lastCheck=%s maxDL=%d", lastCheck, maxDL)
+	}
+}
+
+func TestReadLimitedBody(t *testing.T) {
+	data := []byte("hello world")
+	body, err := readLimitedBody(bytes.NewReader(data), 20)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(body) != "hello world" {
+		t.Errorf("expected 'hello world', got %s", string(body))
+	}
+
+	_, err = readLimitedBody(bytes.NewReader(data), 5)
+	if err == nil {
+		t.Fatalf("expected error for exceeding limit, got nil")
 	}
 }

@@ -208,11 +208,15 @@ func renderHTML(html string) string {
 			continue
 		}
 		if c == '&' {
-			entityEnd := strings.IndexByte(html[i:], ';')
-			if entityEnd >= 0 {
-				entity := html[i : i+entityEnd+1]
+			const maxEntityBytes = 8
+			end := i + maxEntityBytes
+			if end > len(html) {
+				end = len(html)
+			}
+			if off := strings.IndexByte(html[i:end], ';'); off >= 0 {
+				entity := html[i : i+off+1]
 				textBuf.WriteString(decodeHTMLEntity(entity))
-				i += entityEnd
+				i += off
 				continue
 			}
 		}

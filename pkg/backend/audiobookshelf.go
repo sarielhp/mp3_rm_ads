@@ -207,6 +207,19 @@ func (c *AudiobookshelfBackend) Request(endpoint, method string, data interface{
 	return nil, fmt.Errorf("request failed after %d attempts", maxAttempts)
 }
 
+const maxBackendResponseBytes int64 = 128 << 20
+
+func readLimitedBody(r io.Reader, maxBytes int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("response exceeds %d bytes limit", maxBytes)
+	}
+	return body, nil
+}
+
 func (c *AudiobookshelfBackend) executeRequestAttempt(method, reqURL string, jsonData []byte, attempt, maxAttempts int, retryDelay time.Duration) ([]byte, bool, error) {
 	req, err := buildHTTPRequest(method, reqURL, jsonData, c.Token)
 	if err != nil {
@@ -228,7 +241,7 @@ func (c *AudiobookshelfBackend) executeRequestAttempt(method, reqURL string, jso
 		return nil, false, err
 	}
 
-	body, err := io.ReadAll(res.Body)
+	body, err := readLimitedBody(res.Body, maxBackendResponseBytes)
 	res.Body.Close()
 	if err != nil {
 		if attempt < maxAttempts {

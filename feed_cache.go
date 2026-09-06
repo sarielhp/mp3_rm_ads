@@ -163,43 +163,50 @@ type enclosureXML struct {
 	Type string `xml:"type,attr"`
 }
 
+var feedTZOffsets = [...]struct {
+	suffix string
+	offset string
+}{
+	{" PDT", " -0700"},
+	{" PST", " -0800"},
+	{" EDT", " -0400"},
+	{" EST", " -0500"},
+	{" CDT", " -0500"},
+	{" CST", " -0600"},
+	{" MDT", " -0600"},
+	{" MST", " -0700"},
+}
+
+var feedDateFormats = [...]string{
+	time.RFC1123Z,
+	time.RFC1123,
+	time.RFC822Z,
+	time.RFC822,
+	time.RFC3339,
+	"Mon, 2 Jan 2006 15:04:05 -0700",
+	"Mon, 2 Jan 2006 15:04:05 MST",
+	"Mon, 02 Jan 2006 15:04:05 -0700",
+	"2 Jan 2006 15:04:05 -0700",
+	"2006-01-02 15:04:05",
+}
+
+func normalizeFeedTimezone(s string) string {
+	for _, tz := range feedTZOffsets {
+		if len(s) >= len(tz.suffix) && strings.EqualFold(s[len(s)-len(tz.suffix):], tz.suffix) {
+			return s[:len(s)-len(tz.suffix)] + tz.offset
+		}
+	}
+	return s
+}
+
 func parseFeedDate(pubDate string) (int64, string) {
 	pubDate = strings.TrimSpace(pubDate)
 	if pubDate == "" {
 		return 0, ""
 	}
 
-	tzMap := map[string]string{
-		" PDT": " -0700",
-		" PST": " -0800",
-		" EDT": " -0400",
-		" EST": " -0500",
-		" CDT": " -0500",
-		" CST": " -0600",
-		" MDT": " -0600",
-		" MST": " -0700",
-	}
-	normalizedPubDate := pubDate
-	for tz, offset := range tzMap {
-		if strings.HasSuffix(strings.ToUpper(normalizedPubDate), tz) {
-			normalizedPubDate = normalizedPubDate[:len(normalizedPubDate)-len(tz)] + offset
-			break
-		}
-	}
-
-	dateFormats := []string{
-		time.RFC1123Z,
-		time.RFC1123,
-		time.RFC822Z,
-		time.RFC822,
-		time.RFC3339,
-		"Mon, 2 Jan 2006 15:04:05 -0700",
-		"Mon, 2 Jan 2006 15:04:05 MST",
-		"Mon, 02 Jan 2006 15:04:05 -0700",
-		"2 Jan 2006 15:04:05 -0700",
-		"2006-01-02 15:04:05",
-	}
-	for _, layout := range dateFormats {
+	normalizedPubDate := normalizeFeedTimezone(pubDate)
+	for _, layout := range feedDateFormats {
 		if t, err := time.Parse(layout, normalizedPubDate); err == nil {
 			return t.UnixMilli(), pubDate
 		}

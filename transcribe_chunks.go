@@ -197,11 +197,7 @@ func assembleTranscriptionResult(allSegments []TranscriptionSegment) *Transcript
 	sortSegments(allSegments)
 	mergedSegments := mergeSegments(allSegments)
 
-	fullText := ""
-	for _, seg := range mergedSegments {
-		fullText += seg.Text + " "
-	}
-	fullText = trimSpace(fullText)
+	fullText := joinSegmentText(mergedSegments)
 
 	lang := "he"
 	if len(allSegments) > 0 && allSegments[0].Language != "" {

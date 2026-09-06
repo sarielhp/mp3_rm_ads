@@ -116,9 +116,7 @@ func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, qu
 	segments := data.Segments
 	fullText := data.Text
 	if fullText == "" && len(segments) > 0 {
-		for _, seg := range segments {
-			fullText += seg.Text + " "
-		}
+		fullText = joinSegmentText(segments)
 	}
 
 	wordCount := countWords(fullText)

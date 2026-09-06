@@ -9,6 +9,8 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -16,11 +18,6 @@ const wavSampleRate = 16000
 const wavBytesPerSec = wavSampleRate * 2
 
 func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*TranscriptionData, error) {
-	bodyBytes, contentType, err := buildWhisperMultipartBody(audioPath, prompt, language, pcmData)
-	if err != nil {
-		return nil, err
-	}
-
 	maxRetries := 5
 	retryDelay := 5
 	readTimeout := int(totalDuration*1.5) + 600
@@ -33,7 +30,12 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 	}
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
-		data, err := executeWhisperAttempt(client, whisperURL, contentType, bodyBytes, quiet, verbose)
+		bodyReader, contentType, err := buildWhisperMultipartBody(audioPath, prompt, language, pcmData)
+		if err != nil {
+			return nil, err
+		}
+
+		data, err := executeWhisperAttempt(client, whisperURL, contentType, bodyReader, quiet, verbose)
 		if err == nil {
 			return data, nil
 		}
@@ -52,51 +54,87 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 	return nil, fmt.Errorf("whisper transcription failed after %d attempts", maxRetries)
 }
 
-func buildWhisperMultipartBody(audioPath, prompt, language string, pcmData []byte) ([]byte, string, error) {
-	var audioContent []byte
+func buildWhisperMultipartBody(audioPath, prompt, language string, pcmData []byte) (io.ReadCloser, string, error) {
+	var audioSource io.Reader
+	var closeSrc func() error
+
 	if pcmData != nil {
 		header := buildWavHeader(len(pcmData))
-		audioContent = append(header, pcmData...)
+		audioSource = io.MultiReader(bytes.NewReader(header), bytes.NewReader(pcmData))
 	} else {
-		var err error
-		audioContent, err = os.ReadFile(audioPath)
+		f, err := os.Open(audioPath)
 		if err != nil {
-			return nil, "", fmt.Errorf("failed to read audio file: %w", err)
+			return nil, "", fmt.Errorf("failed to open audio file: %w", err)
 		}
+		audioSource = f
+		closeSrc = f.Close
 	}
 
-	boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())
-	var buf bytes.Buffer
-	w := multipart.NewWriter(&buf)
-	w.SetBoundary(boundary)
+	pr, pw := io.Pipe()
+	mw := multipart.NewWriter(pw)
 
-	fw, err := w.CreateFormFile("file", filepath.Base(audioPath))
-	if err != nil {
-		return nil, "", fmt.Errorf("failed to create form file: %w", err)
-	}
-	if _, err := fw.Write(audioContent); err != nil {
-		return nil, "", fmt.Errorf("failed to write audio content: %w", err)
-	}
+	go func() {
+		if closeSrc != nil {
+			defer closeSrc()
+		}
+		err := writeWhisperMultipartFields(mw, audioSource, filepath.Base(audioPath), prompt, language)
+		if closeErr := mw.Close(); err == nil {
+			err = closeErr
+		}
+		_ = pw.CloseWithError(err)
+	}()
 
-	w.WriteField("response_format", "verbose_json")
-	w.WriteField("temperature", "0.0")
-	if language != "" && language != "auto" {
-		w.WriteField("language", language)
-	}
-	if prompt != "" {
-		w.WriteField("prompt", prompt)
-	}
-	w.Close()
-
-	return buf.Bytes(), w.FormDataContentType(), nil
+	return pr, mw.FormDataContentType(), nil
 }
 
-func executeWhisperAttempt(client *http.Client, uri, contentType string, bodyData []byte, quiet, verbose bool) (*TranscriptionData, error) {
+func writeWhisperMultipartFields(mw *multipart.Writer, audioSource io.Reader, filename, prompt, language string) error {
+	fw, err := mw.CreateFormFile("file", filename)
+	if err != nil {
+		return err
+	}
+	if _, err := io.Copy(fw, audioSource); err != nil {
+		return err
+	}
+	if err := mw.WriteField("response_format", "verbose_json"); err != nil {
+		return err
+	}
+	if err := mw.WriteField("temperature", "0.0"); err != nil {
+		return err
+	}
+	if language != "" && language != "auto" {
+		if err := mw.WriteField("language", language); err != nil {
+			return err
+		}
+	}
+	if prompt != "" {
+		if err := mw.WriteField("prompt", prompt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+const maxWhisperResponseBytes int64 = 128 << 20
+
+func readLimitedBody(r io.Reader, maxBytes int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(r, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, fmt.Errorf("response exceeds %d bytes limit", maxBytes)
+	}
+	return body, nil
+}
+
+func executeWhisperAttempt(client *http.Client, uri, contentType string, bodyReader io.ReadCloser, quiet, verbose bool) (*TranscriptionData, error) {
+	defer bodyReader.Close()
+
 	progressDone := make(chan struct{})
 	defer close(progressDone)
 
 	startTime := time.Now()
-	req, err := http.NewRequest("POST", uri, bytes.NewReader(bodyData))
+	req, err := http.NewRequest("POST", uri, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -117,7 +155,7 @@ func executeWhisperAttempt(client *http.Client, uri, contentType string, bodyDat
 		fmt.Printf("\rTranscription finished in %s!                                  \n", formatClock(elapsed.Seconds()))
 	}
 
-	body, err := io.ReadAll(resp.Body)
+	body, err := readLimitedBody(resp.Body, maxWhisperResponseBytes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read response body: %w", err)
 	}
@@ -148,13 +186,25 @@ func startTranscriptionProgressTicker(startTime time.Time, done chan struct{}) {
 }
 
 func sortSegments(segs []TranscriptionSegment) {
-	for i := 0; i < len(segs); i++ {
-		for j := i + 1; j < len(segs); j++ {
-			if segs[j].Start < segs[i].Start {
-				segs[i], segs[j] = segs[j], segs[i]
-			}
-		}
+	sort.Slice(segs, func(i, j int) bool {
+		return segs[i].Start < segs[j].Start
+	})
+}
+
+func joinSegmentText(segs []TranscriptionSegment) string {
+	var b strings.Builder
+	total := 0
+	for _, seg := range segs {
+		total += len(seg.Text) + 1
 	}
+	b.Grow(total)
+	for i, seg := range segs {
+		if i > 0 {
+			b.WriteByte(' ')
+		}
+		b.WriteString(seg.Text)
+	}
+	return strings.TrimSpace(b.String())
 }
 
 func mergeSegments(segs []TranscriptionSegment) []TranscriptionSegment {
@@ -162,19 +212,26 @@ func mergeSegments(segs []TranscriptionSegment) []TranscriptionSegment {
 		return segs
 	}
 
-	merged := []TranscriptionSegment{segs[0]}
+	merged := make([]TranscriptionSegment, 0, len(segs))
+	current := segs[0]
+	currentParts := []string{segs[0].Text}
+
 	for i := 1; i < len(segs); i++ {
-		last := &merged[len(merged)-1]
 		seg := segs[i]
-		if seg.Start <= last.End+0.5 {
-			if seg.End > last.End {
-				last.End = seg.End
-				last.Text = last.Text + " " + seg.Text
+		if seg.Start <= current.End+0.5 {
+			if seg.End > current.End {
+				current.End = seg.End
+				currentParts = append(currentParts, seg.Text)
 			}
 		} else {
-			merged = append(merged, seg)
+			current.Text = strings.Join(currentParts, " ")
+			merged = append(merged, current)
+			current = seg
+			currentParts = []string{seg.Text}
 		}
 	}
+	current.Text = strings.Join(currentParts, " ")
+	merged = append(merged, current)
 	return merged
 }
 

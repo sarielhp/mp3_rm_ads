@@ -159,3 +159,17 @@ func TestDisplayNameBidi(t *testing.T) {
 		t.Errorf("expected 'Ep 1 - ' in %q", gotMixed)
 	}
 }
+
+func TestValidateTranscriptSanity_ReconstructFullText(t *testing.T) {
+	data := &TranscriptionData{
+		Text: "",
+		Segments: []TranscriptionSegment{
+			{Start: 0.0, End: 10.0, Text: "this is segment one with many words to satisfy sanity check"},
+			{Start: 10.0, End: 20.0, Text: "this is segment two with more words to reach the threshold"},
+		},
+	}
+	ok := validateTranscriptSanity(data, 20.0, true)
+	if !ok {
+		t.Errorf("expected validateTranscriptSanity to pass")
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -104,6 +105,19 @@ func cutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile stri
 	return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 }
 
+func buildCutFilterComplex(keepSegments [][2]float64) string {
+	var filter strings.Builder
+	filter.Grow(len(keepSegments) * 80)
+	for idx, seg := range keepSegments {
+		fmt.Fprintf(&filter, "[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[a%d];", seg[0], seg[1], idx)
+	}
+	for idx := range keepSegments {
+		fmt.Fprintf(&filter, "[a%d]", idx)
+	}
+	fmt.Fprintf(&filter, "concat=n=%d:v=0:a=1[aout]", len(keepSegments))
+	return filter.String()
+}
+
 func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputFile, remoteHost string) bool {
 	if len(keepSegments) == 0 {
 		return false
@@ -116,17 +130,7 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 	absInput, _ := filepath.Abs(inputFile)
 	absOutput, _ := filepath.Abs(outputFile)
 
-	var filterParts string
-	var concatInputs string
-
-	for idx, seg := range keepSegments {
-		st := seg[0]
-		en := seg[1]
-		filterParts += fmt.Sprintf("[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS[a%d];", st, en, idx)
-		concatInputs += fmt.Sprintf("[a%d]", idx)
-	}
-
-	filterComplex := filterParts + concatInputs + fmt.Sprintf("concat=n=%d:v=0:a=1[aout]", len(keepSegments))
+	filterComplex := buildCutFilterComplex(keepSegments)
 
 	if remoteHost != "" {
 		tempID := fmt.Sprintf("abs_%d_%d", time.Now().UnixNano(), os.Getpid())
