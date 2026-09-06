@@ -209,13 +209,16 @@ func (m *tuiModel) applyDownloadPolicyModal() {
 		m.showToast("Policy saved: DL="+boolStatus(m.policyAutoDownload)+", Cleanup="+boolStatus(m.policyAutoCleanup)+", Ads="+m.policyAdRemoval, ToastSuccess)
 	}
 
+	autoDownload := m.policyAutoDownload
+	autoCleanup := m.policyAutoCleanup
+	cleanupDays := pod.config.AutoCleanupDays
 	go func() {
 		defer func() {
 			if r := recover(); r != nil {
 				log.Printf("panic syncing policy to backend: %v\n%s", r, debug.Stack())
 			}
 		}()
-		syncPolicyToBackend(pod, m.policyAutoDownload, m.policyAutoCleanup, pod.config.AutoCleanupDays)
+		syncPolicyToBackend(pod, autoDownload, autoCleanup, cleanupDays)
 	}()
 	m.showDownloadPolicyModal = false
 }
