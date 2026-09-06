@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"os/exec"
 	"syscall"
 	"time"
@@ -47,6 +48,10 @@ var globalPlayer = &AudioPlayer{
 }
 
 var playerSpawnEnabled = true
+
+func isAudioSpawnDisabled() bool {
+	return !playerSpawnEnabled || os.Getenv("ABS_NO_AUDIO") == "1" || os.Getenv("ABS_PLAYER_DISABLED") == "1"
+}
 
 func init() {
 	globalPlayer.LoadQueueFromFile()
@@ -106,7 +111,7 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 
 	p.killProcessLocked()
 
-	if !playerSpawnEnabled {
+	if isAudioSpawnDisabled() {
 		p.IsPlaying = true
 		p.IsPaused = false
 		p.startPlayTime = time.Now()

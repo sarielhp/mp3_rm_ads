@@ -3,14 +3,27 @@ package main
 import (
 	"fmt"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
 
+func initSignalHandler() {
+	sigCh := make(chan os.Signal, 1)
+	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
+	go func() {
+		<-sigCh
+		globalPlayer.Stop()
+		os.Exit(0)
+	}()
+}
+
 func main() {
+	initSignalHandler()
 	defer func() {
 		globalPlayer.Stop()
 		if r := recover(); r != nil {

@@ -15,7 +15,8 @@ def run_master_visual_tour
   env = {
     "TERM" => "xterm-kitty",
     "KITTY_WINDOW_ID" => "1",
-    "ABS_DEBUG" => "1"
+    "ABS_DEBUG" => "1",
+    "ABS_NO_AUDIO" => "1"
   }
 
   abs_bin = File.expand_path("abs", Dir.pwd)
