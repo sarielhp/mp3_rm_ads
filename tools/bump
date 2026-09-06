@@ -7,16 +7,33 @@ require 'fileutils'
 root_dir = File.expand_path('..', __dir__)
 Dir.chdir(root_dir)
 
+# Guard: Refuse to bump if working tree has uncommitted changes (other than VERSION)
+status_out, _, status_res = Open3.capture3('git', 'status', '--porcelain')
+unless status_res.success?
+  puts '✗ Failed to check git status'
+  exit 1
+end
+
+changed_files = status_out.lines.map { |l| l[3..].to_s.strip }.reject(&:empty?)
+dirty_files = changed_files.reject { |f| f == 'VERSION' }
+
+unless dirty_files.empty?
+  puts "✗ Cannot bump: working tree has uncommitted changes in #{dirty_files.length} file(s):"
+  dirty_files.first(5).each { |f| puts "  - #{f}" }
+  puts "  ... and #{dirty_files.length - 5} more" if dirty_files.length > 5
+  puts "\nPlease commit your changes first:"
+  puts '  make commit ARGS="feat: <description>"'
+  puts 'or save a WIP snapshot:'
+  puts '  make snap'
+  exit 1
+end
+
 verified = false
 if File.exist?('.verified_head')
   verified_sha = File.read('.verified_head').strip
   current_sha, _, s = Open3.capture3('git', 'rev-parse', 'HEAD')
   if s.success? && !verified_sha.empty? && verified_sha == current_sha.strip
-    status_out, _, s2 = Open3.capture3('git', 'status', '--porcelain')
-    if s2.success?
-      changed_files = status_out.lines.map { |l| l[3..].to_s.strip }.reject(&:empty?)
-      verified = changed_files.all? { |f| f == 'VERSION' }
-    end
+    verified = true
   end
 end
 
