@@ -102,17 +102,18 @@ func handleActionModalOrTriggerKey(m *tuiModel, s string) bool {
 			m.fetchPodcastFullFeed()
 		}
 		return true
-	case "d", "D":
+	case "d":
+		if m.screen == screenPodcasts {
+			m.openDownloadPolicyModal()
+		} else {
+			m.handleEpisodeDownloadAction()
+		}
+		return true
+	case "D":
 		if m.screen == screenPodcasts {
 			m.downloadAllForSelectedPodcast()
-		} else if m.screen == screenPodcastDetail {
-			if len(m.selectedEpisodes) > 0 {
-				m.batchQueueDownload()
-			} else {
-				m.enqueueCurrentEpisodeDownload()
-			}
-		} else if m.screen == screenEpisodeDetail {
-			m.enqueueCurrentEpisodeDownload()
+		} else {
+			m.handleEpisodeDownloadAction()
 		}
 		return true
 	case "t", "T":
@@ -208,4 +209,16 @@ func (m *tuiModel) playSelectedEpisode() {
 		m.prevScreen = m.screen
 	}
 	m.screen = screenPlayer
+}
+
+func (m *tuiModel) handleEpisodeDownloadAction() {
+	if m.screen == screenPodcastDetail {
+		if len(m.selectedEpisodes) > 0 {
+			m.batchQueueDownload()
+		} else {
+			m.enqueueCurrentEpisodeDownload()
+		}
+	} else if m.screen == screenEpisodeDetail {
+		m.enqueueCurrentEpisodeDownload()
+	}
 }

@@ -125,3 +125,13 @@ func TestTUIDownloadPolicyModalRenderingAndCancel(t *testing.T) {
 		t.Errorf("expected unchanged policy after cancel, got %s", m.podcasts[0].config.DownloadPolicy)
 	}
 }
+
+func TestTUIDownloadPolicyKeyPress(t *testing.T) {
+	m := makeTestModel()
+	m.screen = screenPodcasts
+	m.podIdx = 0
+	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'d'}})
+	if !m.showDownloadPolicyModal {
+		t.Errorf("expected pressing 'd' to open download policy modal")
+	}
+}
