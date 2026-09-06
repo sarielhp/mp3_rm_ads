@@ -249,7 +249,7 @@ func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptio
 		return runWhisperCLITranscription(sourceAudioFile, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
 	}
 	if wp.Engine == WhisperEngineGemini {
-		td, _, err := ProcessWithGeminiFlash(context.Background(), sourceAudioFile, config.GetGeminiProjectID(), config.GetGeminiStagingBucket())
+		td, _, err := ProcessWithGeminiConfig(context.Background(), sourceAudioFile, config, defaultGeminiChunkSec)
 		return td, err
 	}
 

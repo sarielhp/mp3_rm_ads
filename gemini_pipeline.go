@@ -129,7 +129,30 @@ func prepareGeminiChunks(audioPath string, chunks []geminiChunkInfo) ([]geminiCh
 	return prepared, cleanup, nil
 }
 
-func processSingleGeminiChunk(ctx context.Context, ch geminiChunkInfo, projectID, location, bucketName string) (*geminiChunkResult, error) {
+func processSingleGeminiChunk(ctx context.Context, ch geminiChunkInfo, config Config) (*geminiChunkResult, error) {
+	apiKey := config.GetGeminiAPIKey()
+	if apiKey != "" {
+		fileURI, fileName, err := uploadAudioToGeminiStudio(ctx, apiKey, ch.filePath)
+		if err != nil {
+			return nil, fmt.Errorf("chunk %d studio upload failed: %w", ch.index, err)
+		}
+		defer deleteGeminiStudioFile(ctx, apiKey, fileName)
+
+		payload, err := callGeminiStudioProcessor(ctx, apiKey, config.GetGeminiModel(), fileURI)
+		if err != nil {
+			return nil, fmt.Errorf("chunk %d studio processing failed: %w", ch.index, err)
+		}
+		return &geminiChunkResult{
+			index:    ch.index,
+			startSec: ch.startSec,
+			payload:  payload,
+		}, nil
+	}
+
+	bucketName := config.GetGeminiStagingBucket()
+	projectID := config.GetGeminiProjectID()
+	location := config.GetGeminiLocation()
+
 	gcsURI, err := uploadAudioToGCS(ctx, bucketName, ch.filePath)
 	if err != nil {
 		return nil, fmt.Errorf("chunk %d upload failed: %w", ch.index, err)
@@ -148,7 +171,7 @@ func processSingleGeminiChunk(ctx context.Context, ch geminiChunkInfo, projectID
 	}, nil
 }
 
-func processGeminiChunksParallel(ctx context.Context, chunks []geminiChunkInfo, projectID, location, bucketName string) ([]*geminiChunkResult, error) {
+func processGeminiChunksParallel(ctx context.Context, chunks []geminiChunkInfo, config Config) ([]*geminiChunkResult, error) {
 	results := make([]*geminiChunkResult, len(chunks))
 	var wg syncWG
 	var mu syncMutex
@@ -158,7 +181,7 @@ func processGeminiChunksParallel(ctx context.Context, chunks []geminiChunkInfo, 
 		wg.Add(1)
 		go func(idx int, chunk geminiChunkInfo) {
 			defer wg.Done()
-			res, err := processSingleGeminiChunk(ctx, chunk, projectID, location, bucketName)
+			res, err := processSingleGeminiChunk(ctx, chunk, config)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil && firstErr == nil {
@@ -202,10 +225,20 @@ func mergeGeminiChunkResults(results []*geminiChunkResult) *geminiResponsePayloa
 }
 
 func ProcessWithGeminiFlash(ctx context.Context, audioPath, projectID, bucketName string) (*TranscriptionData, []AdSegment, error) {
-	return ProcessWithGeminiFlashChunks(ctx, audioPath, projectID, bucketName, defaultGeminiChunkSec)
+	var cfg Config
+	cfg.GeminiProjectID = projectID
+	cfg.GeminiStagingBucket = bucketName
+	return ProcessWithGeminiConfig(ctx, audioPath, cfg, defaultGeminiChunkSec)
 }
 
 func ProcessWithGeminiFlashChunks(ctx context.Context, audioPath, projectID, bucketName string, chunkDurSec float64) (*TranscriptionData, []AdSegment, error) {
+	var cfg Config
+	cfg.GeminiProjectID = projectID
+	cfg.GeminiStagingBucket = bucketName
+	return ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDurSec)
+}
+
+func ProcessWithGeminiConfig(ctx context.Context, audioPath string, config Config, chunkDurSec float64) (*TranscriptionData, []AdSegment, error) {
 	totDur := getAudioDuration(audioPath)
 	if totDur <= 0 {
 		totDur = defaultGeminiChunkSec
@@ -217,19 +250,21 @@ func ProcessWithGeminiFlashChunks(ctx context.Context, audioPath, projectID, buc
 	}
 	defer cleanup()
 
+	apiKey := config.GetGeminiAPIKey()
+	backendLabel := "Vertex AI"
+	if apiKey != "" {
+		backendLabel = "Google AI Studio (free API)"
+	}
+
 	if len(prepared) > 1 {
-		fmt.Printf("Splitting '%s' (%s) into %d parallel 30-min chunks for Gemini...\n",
-			filepath.Base(audioPath), formatTime(totDur), len(prepared))
+		fmt.Printf("Splitting '%s' (%s) into %d parallel 30-min chunks for Gemini [%s]...\n",
+			filepath.Base(audioPath), formatTime(totDur), len(prepared), backendLabel)
 	} else {
-		fmt.Printf("Uploading '%s' to GCS staging bucket...\n", filepath.Base(audioPath))
+		fmt.Printf("Processing '%s' with Gemini [%s]...\n", filepath.Base(audioPath), backendLabel)
 	}
 
 	t0 := time.Now()
-	location := os.Getenv("GEMINI_LOCATION")
-	if location == "" {
-		location = "us-central1"
-	}
-	results, err := processGeminiChunksParallel(ctx, prepared, projectID, location, bucketName)
+	results, err := processGeminiChunksParallel(ctx, prepared, config)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -252,14 +287,12 @@ func isGeminiEngine(config Config, cli CLIOptions) bool {
 func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) bool {
 	ctx := context.Background()
 	t0Step1 := time.Now()
-	projectID := config.GetGeminiProjectID()
-	bucketName := config.GetGeminiStagingBucket()
 
 	chunkDur := defaultGeminiChunkSec
 	if config.ChunkDurationSec > 0 {
 		chunkDur = float64(config.ChunkDurationSec)
 	}
-	td, ads, err := ProcessWithGeminiFlashChunks(ctx, sourceAudioFile, projectID, bucketName, chunkDur)
+	td, ads, err := ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing with Gemini Flash: %v\n", err)
 		return false

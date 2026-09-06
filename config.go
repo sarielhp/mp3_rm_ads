@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -220,6 +221,12 @@ func applyWhisperAndRemoteEnvOverrides(cfg *Config) {
 }
 
 func applyGeminiEnvOverrides(cfg *Config) {
+	if v := os.Getenv("GEMINI_API_KEY"); v != "" {
+		cfg.GeminiAPIKey = v
+	}
+	if v := os.Getenv("GEMINI_MODEL"); v != "" {
+		cfg.GeminiModel = v
+	}
 	if v := os.Getenv("GEMINI_PROJECT_ID"); v != "" {
 		cfg.GeminiProjectID = v
 	} else if v := os.Getenv("GCP_PROJECT"); v != "" {
@@ -237,6 +244,53 @@ func applyGeminiEnvOverrides(cfg *Config) {
 	} else if v := os.Getenv("GCP_REGION"); v != "" {
 		cfg.GeminiLocation = v
 	}
+}
+
+const defaultGeminiModel = "gemini-flash-latest"
+
+func resolveGeminiAPIKey(config Config) string {
+	if config.GeminiAPIKey != "" {
+		return config.GeminiAPIKey
+	}
+	if envKey := os.Getenv("GEMINI_API_KEY"); envKey != "" {
+		return envKey
+	}
+	home, err := os.UserHomeDir()
+	if err == nil {
+		authPath := filepath.Join(home, ".config", "auth", "gemini_api_key")
+		if data, err := os.ReadFile(authPath); err == nil {
+			if k := strings.TrimSpace(string(data)); k != "" {
+				return k
+			}
+		}
+		geminiPath := filepath.Join(home, ".config", "gemini", "api_key")
+		if data, err := os.ReadFile(geminiPath); err == nil {
+			if k := strings.TrimSpace(string(data)); k != "" {
+				return k
+			}
+		}
+		geminiAuthPath := filepath.Join(home, ".config", "gemini", "gemini_api_key")
+		if data, err := os.ReadFile(geminiAuthPath); err == nil {
+			if k := strings.TrimSpace(string(data)); k != "" {
+				return k
+			}
+		}
+	}
+	return ""
+}
+
+func (c *Config) GetGeminiAPIKey() string {
+	if c == nil {
+		return resolveGeminiAPIKey(Config{})
+	}
+	return resolveGeminiAPIKey(*c)
+}
+
+func (c *Config) GetGeminiModel() string {
+	if c != nil && c.GeminiModel != "" {
+		return c.GeminiModel
+	}
+	return defaultGeminiModel
 }
 
 func (c *Config) GetGeminiProjectID() string {

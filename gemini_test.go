@@ -387,3 +387,71 @@ func TestSplitAudioChunkInvalidFile(t *testing.T) {
 		t.Error("expected error when splitting missing file, got nil")
 	}
 }
+
+func TestResolveGeminiAPIKey(t *testing.T) {
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origKey := os.Getenv("GEMINI_API_KEY")
+	defer func() {
+		os.Setenv("HOME", origHome)
+		os.Setenv("GEMINI_API_KEY", origKey)
+	}()
+
+	os.Setenv("HOME", tempDir)
+	os.Unsetenv("GEMINI_API_KEY")
+
+	cfg1 := Config{GeminiAPIKey: "key-from-config"}
+	if resolveGeminiAPIKey(cfg1) != "key-from-config" {
+		t.Errorf("expected key from config, got %s", resolveGeminiAPIKey(cfg1))
+	}
+
+	os.Setenv("GEMINI_API_KEY", "key-from-env")
+	cfg2 := Config{}
+	if resolveGeminiAPIKey(cfg2) != "key-from-env" {
+		t.Errorf("expected key from env, got %s", resolveGeminiAPIKey(cfg2))
+	}
+	os.Unsetenv("GEMINI_API_KEY")
+
+	authDir := filepath.Join(tempDir, ".config", "auth")
+	_ = os.MkdirAll(authDir, 0755)
+	_ = os.WriteFile(filepath.Join(authDir, "gemini_api_key"), []byte("key-from-auth-file\n"), 0600)
+	if resolveGeminiAPIKey(Config{}) != "key-from-auth-file" {
+		t.Errorf("expected key from auth file, got %s", resolveGeminiAPIKey(Config{}))
+	}
+}
+
+func TestParseGeminiStudioResponse(t *testing.T) {
+	_ = t.TempDir()
+	validBody := []byte(`{
+		"candidates": [
+			{
+				"content": {
+					"parts": [
+						{"text": "{\"cuts\": [{\"start\": 5.0, \"end\": 15.0, \"type\": \"ad\", \"reason\": \"sponsor\"}], \"segments\": [{\"start\": 15.0, \"end\": 30.0, \"text\": \"hello\"}]}"}
+					]
+				}
+			}
+		]
+	}`)
+	payload, err := parseGeminiStudioResponse(validBody)
+	if err != nil {
+		t.Fatalf("unexpected error parsing studio response: %v", err)
+	}
+	if len(payload.Cuts) != 1 || payload.Cuts[0].Start != 5.0 {
+		t.Errorf("unexpected cuts: %+v", payload.Cuts)
+	}
+	if len(payload.Segments) != 1 || payload.Segments[0].Text != "hello" {
+		t.Errorf("unexpected segments: %+v", payload.Segments)
+	}
+
+	invalidBody := []byte(`{"candidates": []}`)
+	if _, err := parseGeminiStudioResponse(invalidBody); err == nil {
+		t.Error("expected error for empty candidates in studio response")
+	}
+}
+
+func TestDeleteGeminiStudioFileNoop(t *testing.T) {
+	_ = t.TempDir()
+	deleteGeminiStudioFile(context.Background(), "", "")
+	deleteGeminiStudioFile(context.Background(), "key", "")
+}

@@ -166,6 +166,8 @@ type Config struct {
 	GeminiProjectID        string           `json:"gemini_project_id,omitempty"`
 	GeminiStagingBucket    string           `json:"gemini_staging_bucket,omitempty"`
 	GeminiLocation         string           `json:"gemini_location,omitempty"`
+	GeminiAPIKey           string           `json:"gemini_api_key,omitempty"`
+	GeminiModel            string           `json:"gemini_model,omitempty"`
 	TUIColor               *TUIColorConfig  `json:"tui_color,omitempty"`
 }
 
