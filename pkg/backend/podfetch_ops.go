@@ -217,6 +217,7 @@ func (c *PodFetchBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep i
 	}
 
 	deletedCount := 0
+	var errs []string
 	if len(sortedDownloaded) > keep {
 		toDeleteCount := len(sortedDownloaded) - keep
 		if toDeleteCount > len(sortedDownloaded) {
@@ -225,12 +226,18 @@ func (c *PodFetchBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep i
 		episodesToDelete := sortedDownloaded[:toDeleteCount]
 
 		for _, ep := range episodesToDelete {
-			if !dryRun {
-				if err := c.DeletePodcastEpisode(podcastID, ep.ID); err == nil {
-					deletedCount++
-				}
+			if dryRun {
+				continue
 			}
+			if err := c.DeletePodcastEpisode(podcastID, ep.ID); err != nil {
+				errs = append(errs, fmt.Sprintf("%s: %v", ep.ID, err))
+				continue
+			}
+			deletedCount++
 		}
+	}
+	if len(errs) > 0 {
+		return deletedCount, fmt.Errorf("keep policy: %d deletion(s) failed: %s", len(errs), strings.Join(errs, "; "))
 	}
 	return deletedCount, nil
 }

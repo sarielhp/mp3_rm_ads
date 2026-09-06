@@ -188,3 +188,37 @@ func TestFetchFeedDirectBoundsBody(t *testing.T) {
 		t.Error("expected XML parse error on truncated large feed, got nil")
 	}
 }
+
+func TestFetchFeedDirect_TransientRetrySuccess(t *testing.T) {
+	setTestFeedRetryDelay(1 * time.Millisecond)
+	defer setTestFeedRetryDelay(0)
+
+	attempts := 0
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte("rate limited"))
+			return
+		}
+		if attempts == 2 {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			_, _ = w.Write([]byte("service unavailable"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		fmt.Fprintln(w, `<rss version="2.0"><channel><title>Retry Show</title><item><title>Recovered Episode</title><guid>rec-1</guid><enclosure url="https://example.com/rec1.mp3" type="audio/mpeg"/></item></channel></rss>`)
+	}))
+	defer ts.Close()
+
+	eps, _, _, _, err := fetchFeedDirect(ts.URL, "", "")
+	if err != nil {
+		t.Fatalf("expected retry to succeed on 3rd attempt, got: %v", err)
+	}
+	if len(eps) != 1 || eps[0].Title != "Recovered Episode" {
+		t.Fatalf("unexpected episodes returned: %+v", eps)
+	}
+	if attempts != 3 {
+		t.Errorf("expected exactly 3 attempts, got %d", attempts)
+	}
+}

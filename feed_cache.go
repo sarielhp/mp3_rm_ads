@@ -5,12 +5,30 @@ import (
 	"encoding/xml"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
 )
+
+var (
+	testFeedRetryMu    syncMutex
+	testFeedRetryDelay time.Duration
+)
+
+func setTestFeedRetryDelay(d time.Duration) {
+	testFeedRetryMu.Lock()
+	defer testFeedRetryMu.Unlock()
+	testFeedRetryDelay = d
+}
+
+func getTestFeedRetryDelay() time.Duration {
+	testFeedRetryMu.Lock()
+	defer testFeedRetryMu.Unlock()
+	return testFeedRetryDelay
+}
 
 type FeedCacheEntry struct {
 	FeedURL      string        `json:"feed_url"`
@@ -236,34 +254,78 @@ func parseRSSXML(data []byte) ([]FeedEpisode, error) {
 	return episodes, nil
 }
 
+func isTransientHTTPStatus(code int) bool {
+	return code == http.StatusTooManyRequests || code == http.StatusRequestTimeout || code >= 500
+}
+
+func feedSleepBackoff(attempt int) {
+	if d := getTestFeedRetryDelay(); d > 0 {
+		time.Sleep(d)
+		return
+	}
+	jitter := time.Duration(rand.Intn(500)) * time.Millisecond
+	time.Sleep(time.Duration(attempt)*time.Second + jitter)
+}
+
 func fetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]FeedEpisode, string, string, bool, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	req, err := http.NewRequest("GET", feedURL, nil)
-	if err != nil {
-		return nil, "", "", false, err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ABSPodcastManager/1.0)")
-	if cachedETag != "" {
-		req.Header.Set("If-None-Match", cachedETag)
-	}
-	if cachedLastMod != "" {
-		req.Header.Set("If-Modified-Since", cachedLastMod)
+	const maxAttempts = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequest("GET", feedURL, nil)
+		if err != nil {
+			return nil, "", "", false, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ABSPodcastManager/1.0)")
+		if cachedETag != "" {
+			req.Header.Set("If-None-Match", cachedETag)
+		}
+		if cachedLastMod != "" {
+			req.Header.Set("If-Modified-Since", cachedLastMod)
+		}
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < maxAttempts {
+				feedSleepBackoff(attempt)
+				continue
+			}
+			return nil, "", "", false, err
+		}
+
+		if resp.StatusCode == http.StatusNotModified {
+			resp.Body.Close()
+			return nil, cachedETag, cachedLastMod, true, nil
+		}
+
+		if isTransientHTTPStatus(resp.StatusCode) {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+			if attempt < maxAttempts {
+				feedSleepBackoff(attempt)
+				continue
+			}
+			return nil, "", "", false, lastErr
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, "", "", false, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+		}
+
+		return readAndParseFeedResponse(resp)
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, "", "", false, err
+	if lastErr != nil {
+		return nil, "", "", false, lastErr
 	}
+	return nil, "", "", false, fmt.Errorf("failed to fetch feed")
+}
+
+func readAndParseFeedResponse(resp *http.Response) ([]FeedEpisode, string, string, bool, error) {
 	defer resp.Body.Close()
-
-	if resp.StatusCode == http.StatusNotModified {
-		return nil, cachedETag, cachedLastMod, true, nil
-	}
-
-	if resp.StatusCode != http.StatusOK {
-		return nil, "", "", false, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
-	}
-
 	newETag := resp.Header.Get("ETag")
 	newLastMod := resp.Header.Get("Last-Modified")
 

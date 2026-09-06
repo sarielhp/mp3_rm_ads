@@ -2,10 +2,12 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -426,5 +428,110 @@ func TestEnqueueDownload_RetryFailedItem(t *testing.T) {
 	}
 	if items[0].Error != "" {
 		t.Errorf("expected item error to be cleared, got %q", items[0].Error)
+	}
+}
+
+func TestTriggerDownloadQueueWorker_PanicRecovery(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() {
+		WaitDownloadWorkerForTest()
+		testDownloadQueuePath = ""
+		setTestDownloadExecuteHook(nil)
+	}()
+
+	ClearDownloadQueue()
+
+	item := DownloadQueueItem{
+		ID:           "panic-item-1",
+		PodcastTitle: "Panic Podcast",
+		PodcastID:    "panic-pod-id",
+		EpisodeTitle: "Panic Ep",
+		GUID:         "guid-panic-1",
+		EnclosureURL: "https://example.com/panic.mp3",
+	}
+	ok, _ := EnqueueDownload(item, nil)
+	if !ok {
+		t.Fatalf("failed to enqueue item")
+	}
+
+	setTestDownloadExecuteHook(func(it DownloadQueueItem) error {
+		panic("simulated worker panic for test")
+	})
+
+	TriggerDownloadQueueWorker(nil)
+	WaitDownloadWorkerForTest()
+
+	downloadWorkerMu.Lock()
+	running := downloadWorkerRunning
+	downloadWorkerMu.Unlock()
+	if running {
+		t.Errorf("expected downloadWorkerRunning to be reset to false after panic")
+	}
+
+	setTestDownloadExecuteHook(func(it DownloadQueueItem) error {
+		return nil
+	})
+	item2 := DownloadQueueItem{
+		ID:           "panic-item-2",
+		PodcastTitle: "Second Podcast",
+		PodcastID:    "second-pod-id",
+		EpisodeTitle: "Second Ep",
+		GUID:         "guid-panic-2",
+		EnclosureURL: "https://example.com/panic2.mp3",
+	}
+	EnqueueDownload(item2, nil)
+	TriggerDownloadQueueWorker(nil)
+	WaitDownloadWorkerForTest()
+
+	downloadWorkerMu.Lock()
+	running2 := downloadWorkerRunning
+	downloadWorkerMu.Unlock()
+	if running2 {
+		t.Errorf("expected downloadWorkerRunning to be false after second run")
+	}
+}
+
+func TestProcessNextDownloadQueueItem_FinalizeError(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() {
+		testDownloadQueuePath = ""
+		setTestDownloadExecuteHook(nil)
+	}()
+
+	ClearDownloadQueue()
+
+	item := DownloadQueueItem{
+		ID:           "finalize-fail-1",
+		PodcastTitle: "Finalize Podcast",
+		PodcastID:    "fin-pod-id",
+		EpisodeTitle: "Finalize Ep",
+		GUID:         "guid-finalize-1",
+		EnclosureURL: "https://example.com/finalize.mp3",
+	}
+	EnqueueDownload(item, nil)
+
+	setTestDownloadExecuteHook(func(it DownloadQueueItem) error {
+		badDir := filepath.Join(tempDir, "unwritable_dir")
+		_ = os.MkdirAll(badDir, 0755)
+		testDownloadQueuePath = badDir
+		return fmt.Errorf("underlying download failed")
+	})
+
+	processed, err := ProcessNextDownloadQueueItem(nil)
+	if !processed {
+		t.Fatalf("expected processed=true")
+	}
+	if err == nil {
+		t.Fatalf("expected error from ProcessNextDownloadQueueItem")
+	}
+	if !strings.Contains(err.Error(), "finalize error") {
+		t.Errorf("expected error to mention 'finalize error', got: %v", err)
+	}
+	if !strings.Contains(err.Error(), "underlying download failed") {
+		t.Errorf("expected error to contain download error, got: %v", err)
 	}
 }

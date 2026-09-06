@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -30,12 +31,22 @@ func (t *DefaultSSHTransport) getTimeout() time.Duration {
 }
 
 func (t *DefaultSSHTransport) Exec(host string, cmd string) (string, error) {
-	c := exec.Command("ssh", "-o", "BatchMode=yes", "-o", "ConnectTimeout=5", host, cmd)
+	ctx, cancel := context.WithTimeout(context.Background(), t.getTimeout())
+	defer cancel()
+	c := exec.CommandContext(ctx, "ssh",
+		"-o", "BatchMode=yes",
+		"-o", "ConnectTimeout=5",
+		"-o", "ServerAliveInterval=5",
+		"-o", "ServerAliveCountMax=3",
+		host, cmd)
 	var outBuf, errBuf bytes.Buffer
 	c.Stdout = &outBuf
 	c.Stderr = &errBuf
 	err := c.Run()
 	outStr := strings.TrimSpace(outBuf.String())
+	if ctx.Err() == context.DeadlineExceeded {
+		return outStr, fmt.Errorf("ssh command on %s timed out after %s", host, t.getTimeout())
+	}
 	if err != nil {
 		errStr := strings.TrimSpace(errBuf.String())
 		if errStr != "" {
@@ -55,10 +66,16 @@ func (t *DefaultSSHTransport) Download(host string, remoteSrc, localDst string) 
 }
 
 func (t *DefaultSSHTransport) RsyncTo(host string, localSrc, remoteDst string) error {
-	c := exec.Command("rsync", "-avz", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=5", localSrc, fmt.Sprintf("%s:%s", host, remoteDst))
+	ctx, cancel := context.WithTimeout(context.Background(), t.getTimeout())
+	defer cancel()
+	sshOpt := "ssh -o BatchMode=yes -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+	c := exec.CommandContext(ctx, "rsync", "-avz", "-e", sshOpt, localSrc, fmt.Sprintf("%s:%s", host, remoteDst))
 	var errBuf bytes.Buffer
 	c.Stderr = &errBuf
 	if err := c.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("rsync to %s timed out after %s", host, t.getTimeout())
+		}
 		errStr := strings.TrimSpace(errBuf.String())
 		if errStr != "" {
 			return fmt.Errorf("rsync to %s failed: %s (%w)", host, errStr, err)
@@ -69,10 +86,16 @@ func (t *DefaultSSHTransport) RsyncTo(host string, localSrc, remoteDst string) e
 }
 
 func (t *DefaultSSHTransport) RsyncFrom(host string, remoteSrc, localDst string) error {
-	c := exec.Command("rsync", "-avz", "-e", "ssh -o BatchMode=yes -o ConnectTimeout=5", fmt.Sprintf("%s:%s", host, remoteSrc), localDst)
+	ctx, cancel := context.WithTimeout(context.Background(), t.getTimeout())
+	defer cancel()
+	sshOpt := "ssh -o BatchMode=yes -o ConnectTimeout=5 -o ServerAliveInterval=5 -o ServerAliveCountMax=3"
+	c := exec.CommandContext(ctx, "rsync", "-avz", "-e", sshOpt, fmt.Sprintf("%s:%s", host, remoteSrc), localDst)
 	var errBuf bytes.Buffer
 	c.Stderr = &errBuf
 	if err := c.Run(); err != nil {
+		if ctx.Err() == context.DeadlineExceeded {
+			return fmt.Errorf("rsync from %s timed out after %s", host, t.getTimeout())
+		}
 		errStr := strings.TrimSpace(errBuf.String())
 		if errStr != "" {
 			return fmt.Errorf("rsync from %s failed: %s (%w)", host, errStr, err)

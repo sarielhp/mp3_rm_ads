@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -133,4 +134,39 @@ func TestTUIDownloadPolicyKeyPress(t *testing.T) {
 	if !m.showDownloadPolicyModal {
 		t.Errorf("expected pressing 'd' to open download policy modal")
 	}
+}
+
+func TestSyncPolicyToBackend_PanicRecovery(t *testing.T) {
+	tempDir := t.TempDir()
+	m := makeTestModel()
+	m.podcasts[0].dir = tempDir
+	m.podIdx = 0
+
+	ch := make(chan struct{}, 1)
+	setTestSyncPolicyHook(func(pod *tuiPodcast) {
+		select {
+		case ch <- struct{}{}:
+		default:
+		}
+		panic("simulated backend panic during policy sync")
+	})
+	defer setTestSyncPolicyHook(nil)
+
+	m.openDownloadPolicyModal()
+	m.applyDownloadPolicyModal()
+
+	select {
+	case <-ch:
+	case <-time.After(2 * time.Second):
+		t.Fatalf("expected testSyncPolicyHook to run")
+	}
+
+	time.Sleep(10 * time.Millisecond)
+
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("syncPolicyToBackend failed to catch internal panic: %v", r)
+		}
+	}()
+	syncPolicyToBackend(&m.podcasts[0], true, false, 0)
 }

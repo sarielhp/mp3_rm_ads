@@ -155,24 +155,61 @@ func (c *PodFetchBackend) PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, er
 		}
 	}
 
+	return c.fetchFeedDirectFallback(feedURL)
+}
+
+func (c *PodFetchBackend) fetchFeedDirectFallback(feedURL string) ([]FeedEpisode, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
-	req, err := http.NewRequest("GET", feedURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+	const maxAttempts = 3
+	var lastErr error
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return nil, err
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequest("GET", feedURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64)")
+
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			if attempt < maxAttempts {
+				time.Sleep(c.getRetryDelay(attempt))
+				continue
+			}
+			return nil, err
+		}
+
+		if resp.StatusCode == 429 || resp.StatusCode == 408 || resp.StatusCode >= 500 {
+			resp.Body.Close()
+			lastErr = fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+			if attempt < maxAttempts {
+				time.Sleep(c.getRetryDelay(attempt))
+				continue
+			}
+			return nil, lastErr
+		}
+
+		if resp.StatusCode != http.StatusOK {
+			resp.Body.Close()
+			return nil, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+		}
+
+		return readAndParseDirectFeedXML(resp)
 	}
+
+	if lastErr != nil {
+		return nil, lastErr
+	}
+	return nil, fmt.Errorf("failed to fetch podcast feed")
+}
+
+func readAndParseDirectFeedXML(resp *http.Response) ([]FeedEpisode, error) {
 	defer resp.Body.Close()
-
 	rawXML, err := io.ReadAll(io.LimitReader(resp.Body, 32*1024*1024))
 	if err != nil {
 		return nil, err
 	}
-
 	return parseRSSFeedXML(rawXML)
 }
 
@@ -198,6 +235,7 @@ func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpis
 }
 
 func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) error {
+	var lastErr error
 	if c.Host != "" {
 		endpoint := fmt.Sprintf("/api/v1/podcasts/%s/episodes/%s", podcastID, episodeID)
 		_, err := c.Request(endpoint, "DELETE", nil)
@@ -208,11 +246,12 @@ func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) erro
 		if err == nil {
 			return nil
 		}
+		lastErr = err
 	}
 	if c.DBPath != "" {
 		return deletePodFetchEpisodeDB(c.DBPath, podcastID, episodeID)
 	}
-	return nil
+	return lastErr
 }
 
 func (c *PodFetchBackend) ActiveDownloads(podcastID string) ([]ActiveDownload, error) {
@@ -273,13 +312,15 @@ func (c *PodFetchBackend) DownloadCover(podcastID, destPath string) error {
 		if strings.HasPrefix(imgURL, "http://") || strings.HasPrefix(imgURL, "https://") {
 			client := &http.Client{Timeout: 60 * time.Second}
 			resp, err := client.Get(imgURL)
-			if err == nil && resp.StatusCode == http.StatusOK {
+			if err == nil {
 				defer resp.Body.Close()
-				const maxImageSize = 10 * 1024 * 1024
-				data, _ := io.ReadAll(io.LimitReader(resp.Body, maxImageSize))
-				if len(data) > 0 {
-					_ = os.MkdirAll(filepath.Dir(destPath), 0755)
-					return os.WriteFile(destPath, data, 0644)
+				if resp.StatusCode == http.StatusOK {
+					const maxImageSize = 10 * 1024 * 1024
+					data, _ := io.ReadAll(io.LimitReader(resp.Body, maxImageSize))
+					if len(data) > 0 {
+						_ = os.MkdirAll(filepath.Dir(destPath), 0755)
+						return os.WriteFile(destPath, data, 0644)
+					}
 				}
 			}
 		}

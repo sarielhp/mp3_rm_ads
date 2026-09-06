@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 	"time"
 )
@@ -33,12 +35,26 @@ type DownloadQueuePersist struct {
 }
 
 var (
-	testDownloadQueuePath string
-	downloadQueueMutex    syncMutex
-	downloadWorkerRunning bool
-	downloadWorkerPending bool
-	downloadWorkerMu      syncMutex
+	testDownloadQueuePath   string
+	testDownloadHookMu      syncMutex
+	testDownloadExecuteHook func(item DownloadQueueItem) error
+	downloadQueueMutex      syncMutex
+	downloadWorkerRunning   bool
+	downloadWorkerPending   bool
+	downloadWorkerMu        syncMutex
 )
+
+func getTestDownloadExecuteHook() func(item DownloadQueueItem) error {
+	testDownloadHookMu.Lock()
+	defer testDownloadHookMu.Unlock()
+	return testDownloadExecuteHook
+}
+
+func setTestDownloadExecuteHook(h func(item DownloadQueueItem) error) {
+	testDownloadHookMu.Lock()
+	defer testDownloadHookMu.Unlock()
+	testDownloadExecuteHook = h
+}
 
 func getDownloadQueueFilePath() string {
 	if testDownloadQueuePath != "" {
@@ -313,8 +329,19 @@ func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
 	}
 
 	podcastID := resolveQueueItemPodcastID(client, item)
-	dlErr := executeQueueItemDownload(client, podcastID, item)
-	_ = finalizeDownloadQueueItem(item.ID, dlErr)
+	var dlErr error
+	if hook := getTestDownloadExecuteHook(); hook != nil {
+		dlErr = hook(item)
+	} else {
+		dlErr = executeQueueItemDownload(client, podcastID, item)
+	}
+	fErr := finalizeDownloadQueueItem(item.ID, dlErr)
+	if fErr != nil {
+		if dlErr != nil {
+			return true, fmt.Errorf("download error: %v, finalize error: %w", dlErr, fErr)
+		}
+		return true, fmt.Errorf("finalize error: %w", fErr)
+	}
 	return true, dlErr
 }
 
@@ -367,12 +394,25 @@ func TriggerDownloadQueueWorker(client *ABSClient) {
 	downloadWorkerRunning = true
 	downloadWorkerMu.Unlock()
 
-	go runDownloadQueueWorkerLoop(client)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic in download worker: %v\n%s", r, debug.Stack())
+			}
+			downloadWorkerMu.Lock()
+			downloadWorkerRunning = false
+			downloadWorkerMu.Unlock()
+		}()
+		runDownloadQueueWorkerLoop(client)
+	}()
 }
 
 func runDownloadQueueWorkerLoop(client *ABSClient) {
 	for {
-		processed, _ := ProcessNextDownloadQueueItem(client)
+		processed, err := ProcessNextDownloadQueueItem(client)
+		if err != nil {
+			log.Printf("download queue: processing error: %v", err)
+		}
 		if processed {
 			time.Sleep(100 * time.Millisecond)
 			continue

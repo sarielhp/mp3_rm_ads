@@ -2,6 +2,8 @@ package backend
 
 import (
 	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
@@ -153,5 +155,49 @@ func TestApplyKeepPolicyNegativeCount(t *testing.T) {
 	_, err = podfetchBackend.ApplyKeepPolicy("pod-1", "Test Pod", -1, true, true, false)
 	if err == nil {
 		t.Errorf("expected error for negative keep count in PodFetch backend, got nil")
+	}
+}
+
+func TestPodFetchApplyKeepPolicy_ErrorSurfacing(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method == "GET" && r.URL.Path == "/api/v1/podcasts/pod-1" {
+			_ = json.NewEncoder(w).Encode(struct {
+				podFetchItemDTO
+				Episodes []podFetchEpisodeDTO `json:"episodes"`
+			}{
+				podFetchItemDTO: podFetchItemDTO{ID: 1, Name: "Test Pod", Directory: "test_pod"},
+				Episodes: []podFetchEpisodeDTO{
+					{ID: 101, EpisodeID: "ep-1", Name: "Episode 1", DateOfRecording: "2026-01-01"},
+					{ID: 102, EpisodeID: "ep-2", Name: "Episode 2", DateOfRecording: "2026-01-02"},
+					{ID: 103, EpisodeID: "ep-3", Name: "Episode 3", DateOfRecording: "2026-01-03"},
+				},
+			})
+			return
+		}
+		if r.Method == "DELETE" {
+			w.WriteHeader(http.StatusInternalServerError)
+			_, _ = w.Write([]byte(`{"error":"deletion rejected"}`))
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	be := NewPodFetch(Config{
+		Host:        srv.URL,
+		APIKey:      "key-123",
+		RetryDelay:  1 * time.Millisecond,
+		MaxAttempts: 1,
+	})
+	deletedCount, err := be.ApplyKeepPolicy("pod-1", "Test Pod", 1, false, false, true)
+	if err == nil {
+		t.Fatalf("expected error from ApplyKeepPolicy when deletions fail, got nil")
+	}
+	if !strings.Contains(err.Error(), "keep policy:") || !strings.Contains(err.Error(), "deletion(s) failed") {
+		t.Errorf("expected error message to mention failed deletions, got: %v", err)
+	}
+	if deletedCount != 0 {
+		t.Errorf("expected deletedCount=0 on failure, got %d", deletedCount)
 	}
 }

@@ -8,6 +8,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestPodFetchLoginAndTestConnection(t *testing.T) {
@@ -234,5 +235,73 @@ func TestPodFetchDownloadCoverBoundsOversizedImage(t *testing.T) {
 	}
 	if info.Size() != 10*1024*1024 {
 		t.Errorf("expected cover size bounded to 10MB (10485760 bytes), got %d", info.Size())
+	}
+}
+
+func TestPodFetchDownloadCover_Non200ClosesBody(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+		_, _ = w.Write([]byte("not found image"))
+	}))
+	defer imgSrv.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v1/podcasts/1/cover" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.URL.Path == "/api/v1/podcasts/1" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id": 1, "name": "Show", "directory": "show",
+				"image_url": imgSrv.URL + "/missing_cover.jpg",
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	be := NewPodFetch(Config{Host: srv.URL, APIKey: "key-123"})
+	tempDir := t.TempDir()
+	dest := filepath.Join(tempDir, "missing_cover.jpg")
+
+	if err := be.DownloadCover("1", dest); err != nil {
+		t.Fatalf("DownloadCover returned unexpected error: %v", err)
+	}
+
+	if _, err := os.Stat(dest); !os.IsNotExist(err) {
+		t.Errorf("expected cover file not to exist on non-200, got err: %v", err)
+	}
+}
+
+func TestPodcastFeedEpisodes_DirectFetchRetry(t *testing.T) {
+	attempts := 0
+	feedSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		attempts++
+		if attempts == 1 {
+			w.WriteHeader(http.StatusTooManyRequests)
+			_, _ = w.Write([]byte("rate limit"))
+			return
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`<rss version="2.0"><channel><title>Podcast</title><item><title>Retry Success Ep</title><guid>rs-1</guid><enclosure url="https://example.com/rs1.mp3" type="audio/mpeg"/></item></channel></rss>`))
+	}))
+	defer feedSrv.Close()
+
+	be := NewPodFetch(Config{
+		Host:       "",
+		RetryDelay: 1 * time.Millisecond,
+	})
+
+	eps, err := be.PodcastFeedEpisodes(feedSrv.URL)
+	if err != nil {
+		t.Fatalf("expected PodcastFeedEpisodes to succeed on retry, got: %v", err)
+	}
+	if len(eps) != 1 || eps[0].Title != "Retry Success Ep" {
+		t.Fatalf("unexpected episodes returned: %+v", eps)
+	}
+	if attempts != 2 {
+		t.Errorf("expected exactly 2 attempts, got %d", attempts)
 	}
 }

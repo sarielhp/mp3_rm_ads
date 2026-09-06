@@ -2,11 +2,30 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"path/filepath"
+	"runtime/debug"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 )
+
+var (
+	testSyncPolicyMu   syncMutex
+	testSyncPolicyHook func(pod *tuiPodcast)
+)
+
+func getTestSyncPolicyHook() func(pod *tuiPodcast) {
+	testSyncPolicyMu.Lock()
+	defer testSyncPolicyMu.Unlock()
+	return testSyncPolicyHook
+}
+
+func setTestSyncPolicyHook(h func(pod *tuiPodcast)) {
+	testSyncPolicyMu.Lock()
+	defer testSyncPolicyMu.Unlock()
+	testSyncPolicyHook = h
+}
 
 func (m *tuiModel) drawDownloadPolicyModal() string {
 	if m.podIdx >= len(m.podcasts) {
@@ -190,11 +209,27 @@ func (m *tuiModel) applyDownloadPolicyModal() {
 		m.showToast("Policy saved: DL="+boolStatus(m.policyAutoDownload)+", Cleanup="+boolStatus(m.policyAutoCleanup)+", Ads="+m.policyAdRemoval, ToastSuccess)
 	}
 
-	go syncPolicyToBackend(pod, m.policyAutoDownload, m.policyAutoCleanup, pod.config.AutoCleanupDays)
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				log.Printf("panic syncing policy to backend: %v\n%s", r, debug.Stack())
+			}
+		}()
+		syncPolicyToBackend(pod, m.policyAutoDownload, m.policyAutoCleanup, pod.config.AutoCleanupDays)
+	}()
 	m.showDownloadPolicyModal = false
 }
 
 func syncPolicyToBackend(pod *tuiPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("panic in syncPolicyToBackend: %v\n%s", r, debug.Stack())
+		}
+	}()
+	if hook := getTestSyncPolicyHook(); hook != nil {
+		hook(pod)
+		return
+	}
 	cfg := loadConfig()
 	b, err := getBackend(cfg, true)
 	if err != nil || b == nil {
