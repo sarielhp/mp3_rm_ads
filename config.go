@@ -455,9 +455,13 @@ func restoreBackendEnvOverriddenFields(cfg *Config, disk Config, anySet func(...
 	}
 	if anySet("ABS_PASS", "AUDIOBOOKSHELF_PASS") {
 		cfg.AudiobookshelfPass = disk.AudiobookshelfPass
+	} else if disk.AudiobookshelfPass == "" && (readAuthSecret("audiobookshelf_password") != "" || readAuthSecret("audiobookshelf_pass") != "") {
+		cfg.AudiobookshelfPass = ""
 	}
 	if anySet("ABS_TOKEN") {
 		cfg.AudiobookshelfToken = disk.AudiobookshelfToken
+	} else if disk.AudiobookshelfToken == "" && (readAuthSecret("audiobookshelf_token") != "" || readAuthSecret("audiobookshelf_api_key") != "") {
+		cfg.AudiobookshelfToken = ""
 	}
 	if anySet("ABS_SQLITE_DB_PATH") {
 		cfg.AudiobookshelfDBPath = disk.AudiobookshelfDBPath
@@ -473,12 +477,13 @@ func restoreBackendEnvOverriddenFields(cfg *Config, disk Config, anySet func(...
 	}
 	if anySet("PODFETCH_PASS") {
 		cfg.PodfetchPass = disk.PodfetchPass
+	} else if disk.PodfetchPass == "" && (readAuthSecret("podfetch_password") != "" || readAuthSecret("podfetch_pass") != "") {
+		cfg.PodfetchPass = ""
 	}
 	if anySet("PODFETCH_API_KEY", "PODFETCH_KEY", "PODFETCH_TOKEN") {
 		cfg.PodfetchAPIKey = disk.PodfetchAPIKey
-	}
-	if anySet("PODFETCH_DB_PATH", "PODFETCH_SQLITE_DB_PATH", "PODFETCH_DB") {
-		cfg.PodfetchDBPath = disk.PodfetchDBPath
+	} else if disk.PodfetchAPIKey == "" && readAuthSecret("podfetch_api_key") != "" {
+		cfg.PodfetchAPIKey = ""
 	}
 	if anySet("PODCASTS_DIR") {
 		cfg.PodcastsDir = disk.PodcastsDir
@@ -537,6 +542,11 @@ func restoreEnvOverriddenFields(cfg *Config, disk Config) {
 	if anySet("OPENROUTER_API_KEY_ENABLED") {
 		cfg.OpenRouterAPIKeyEnabled = disk.OpenRouterAPIKeyEnabled
 	}
+	for i := range cfg.Profiles {
+		if i < len(disk.Profiles) && disk.Profiles[i].APIKey == "" && readAuthSecret("openrouter_api_key") != "" {
+			cfg.Profiles[i].APIKey = ""
+		}
+	}
 }
 
 func loadConfig() Config {
@@ -550,6 +560,7 @@ func loadConfig() Config {
 		}
 		cfg := defaultConfig
 		applyEnvOverrides(&cfg)
+		resolveAuthFolderCredentials(&cfg)
 		sanitizeDisabledAPIKeys(&cfg)
 		return cfg
 	}
@@ -561,6 +572,7 @@ func loadConfig() Config {
 		fmt.Fprintf(os.Stderr, "existing settings and credentials are not overwritten. Fix or remove the file.\n")
 		cfg = defaultConfig
 		applyEnvOverrides(&cfg)
+		resolveAuthFolderCredentials(&cfg)
 		sanitizeDisabledAPIKeys(&cfg)
 		return cfg
 	}
@@ -591,6 +603,7 @@ func loadConfig() Config {
 	resolveActiveWhisperProfile(&cfg)
 	setConfigFileSnapshot(cfg)
 	applyEnvOverrides(&cfg)
+	resolveAuthFolderCredentials(&cfg)
 	sanitizeDisabledAPIKeys(&cfg)
 	return cfg
 }

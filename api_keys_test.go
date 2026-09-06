@@ -196,3 +196,69 @@ func TestApplyAPIKeyEnvOverrides(t *testing.T) {
 		t.Errorf("expected OPENROUTER_API_KEY_ENABLED=true override")
 	}
 }
+
+func TestResolveAuthFolderCredentials(t *testing.T) {
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	defer func() { os.Setenv("HOME", origHome) }()
+	os.Setenv("HOME", tempDir)
+
+	authDir := filepath.Join(tempDir, ".config", "auth")
+	_ = os.MkdirAll(authDir, 0700)
+	_ = os.WriteFile(filepath.Join(authDir, "podfetch_api_key"), []byte("pf-key-test\n"), 0600)
+	_ = os.WriteFile(filepath.Join(authDir, "podfetch_password"), []byte("pf-pass-test\n"), 0600)
+	_ = os.WriteFile(filepath.Join(authDir, "audiobookshelf_token"), []byte("abs-tok-test\n"), 0600)
+	_ = os.WriteFile(filepath.Join(authDir, "audiobookshelf_password"), []byte("abs-pass-test\n"), 0600)
+
+	var cfg Config
+	resolveAuthFolderCredentials(&cfg)
+
+	if cfg.PodfetchAPIKey != "pf-key-test" {
+		t.Errorf("expected pf-key-test, got %q", cfg.PodfetchAPIKey)
+	}
+	if cfg.PodfetchPass != "pf-pass-test" {
+		t.Errorf("expected pf-pass-test, got %q", cfg.PodfetchPass)
+	}
+	if cfg.AudiobookshelfToken != "abs-tok-test" {
+		t.Errorf("expected abs-tok-test, got %q", cfg.AudiobookshelfToken)
+	}
+	if cfg.AudiobookshelfPass != "abs-pass-test" {
+		t.Errorf("expected abs-pass-test, got %q", cfg.AudiobookshelfPass)
+	}
+}
+
+func TestResolveOpenRouterAPIKeyFromAuth(t *testing.T) {
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origEnv := os.Getenv("OPENROUTER_API_KEY")
+	defer func() {
+		os.Setenv("HOME", origHome)
+		if origEnv != "" {
+			os.Setenv("OPENROUTER_API_KEY", origEnv)
+		} else {
+			os.Unsetenv("OPENROUTER_API_KEY")
+		}
+	}()
+	os.Setenv("HOME", tempDir)
+	os.Unsetenv("OPENROUTER_API_KEY")
+
+	authDir := filepath.Join(tempDir, ".config", "auth")
+	_ = os.MkdirAll(authDir, 0700)
+	_ = os.WriteFile(filepath.Join(authDir, "openrouter_api_key"), []byte("sk-or-test-central-key\n"), 0600)
+
+	tr := true
+	cfg := Config{OpenRouterAPIKeyEnabled: &tr}
+	prof := LLMProfile{Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions"}
+
+	key := resolveOpenRouterAPIKey(prof, cfg)
+	if key != "sk-or-test-central-key" {
+		t.Errorf("expected sk-or-test-central-key, got %q", key)
+	}
+
+	fl := false
+	cfgDisabled := Config{OpenRouterAPIKeyEnabled: &fl}
+	disabledKey := resolveOpenRouterAPIKey(prof, cfgDisabled)
+	if disabledKey != "" {
+		t.Errorf("expected empty key when disabled, got %q", disabledKey)
+	}
+}

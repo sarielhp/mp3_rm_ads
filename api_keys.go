@@ -140,3 +140,79 @@ func applyAPIKeyEnvOverrides(cfg *Config) {
 		}
 	}
 }
+
+func readAuthSecret(name string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	path := filepath.Join(home, ".config", "auth", name)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	k := strings.TrimSpace(string(data))
+	if isZeroedKey(k) {
+		return ""
+	}
+	return k
+}
+
+func resolveOpenRouterAPIKey(profile LLMProfile, cfg Config) string {
+	isOpenRouter := profile.Type == "openrouter" || strings.Contains(profile.URL, "openrouter") || strings.HasPrefix(profile.APIKey, "sk-or-")
+	if !isOpenRouter {
+		return profile.APIKey
+	}
+	if !cfg.IsOpenRouterAPIKeyEnabled() {
+		if profile.APIKey != "" {
+			_ = zeroWipeKey(profile.APIKey)
+		}
+		if envKey := os.Getenv("OPENROUTER_API_KEY"); envKey != "" {
+			_ = zeroWipeKey(envKey)
+			os.Unsetenv("OPENROUTER_API_KEY")
+		}
+		return ""
+	}
+	if profile.APIKey != "" && !isZeroedKey(profile.APIKey) {
+		return profile.APIKey
+	}
+	if envKey := os.Getenv("OPENROUTER_API_KEY"); envKey != "" && !isZeroedKey(envKey) {
+		return envKey
+	}
+	if envKey := os.Getenv("OPENAI_API_KEY"); envKey != "" && strings.HasPrefix(envKey, "sk-or-") && !isZeroedKey(envKey) {
+		return envKey
+	}
+	return readAuthSecret("openrouter_api_key")
+}
+
+func resolveAuthFolderCredentials(cfg *Config) {
+	if cfg == nil {
+		return
+	}
+	if cfg.PodfetchAPIKey == "" {
+		cfg.PodfetchAPIKey = readAuthSecret("podfetch_api_key")
+	}
+	if cfg.PodfetchPass == "" {
+		if pass := readAuthSecret("podfetch_password"); pass != "" {
+			cfg.PodfetchPass = pass
+		} else {
+			cfg.PodfetchPass = readAuthSecret("podfetch_pass")
+		}
+	}
+	if cfg.AudiobookshelfToken == "" {
+		if tok := readAuthSecret("audiobookshelf_token"); tok != "" {
+			cfg.AudiobookshelfToken = tok
+		} else if tok := readAuthSecret("audiobookshelf_api_key"); tok != "" {
+			cfg.AudiobookshelfToken = tok
+		} else {
+			cfg.AudiobookshelfToken = readAuthSecret("abs_token")
+		}
+	}
+	if cfg.AudiobookshelfPass == "" {
+		if pass := readAuthSecret("audiobookshelf_password"); pass != "" {
+			cfg.AudiobookshelfPass = pass
+		} else {
+			cfg.AudiobookshelfPass = readAuthSecret("audiobookshelf_pass")
+		}
+	}
+}
