@@ -1,0 +1,75 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require 'fileutils'
+require 'open3'
+
+kitty_config_dir = File.expand_path('~/.config/kitty')
+kitty_config_path = File.join(kitty_config_dir, 'kitty.conf')
+
+puts '==> Kitty Hebrew & RTL Configuration Fix'
+
+# 1. Ensure ~/.config/kitty exists
+FileUtils.mkdir_p(kitty_config_dir)
+
+# 2. Read or initialize kitty.conf
+content = if File.exist?(kitty_config_path)
+            File.read(kitty_config_path)
+          else
+            ''
+          end
+
+# 3. Check / Update force_ltr setting
+changed = false
+if content =~ /^\s*force_ltr\s+/
+  if content =~ /^\s*force_ltr\s+yes\b/
+    puts "✓ 'force_ltr yes' is already set in #{kitty_config_path}"
+  else
+    content = content.gsub(/^\s*force_ltr\s+.*$/, 'force_ltr yes')
+    changed = true
+    puts "✓ Updated 'force_ltr' to 'yes' in #{kitty_config_path}"
+  end
+else
+  # Append force_ltr yes to the config
+  content += "\n# Disable Kitty heuristic RTL reversal to let CLI apps (like abs) handle Unicode BiDi\nforce_ltr yes\n"
+  changed = true
+  puts "✓ Added 'force_ltr yes' to #{kitty_config_path}"
+end
+
+if changed
+  # Backup existing config before writing
+  backup_path = "#{kitty_config_path}.bak.#{Time.now.to_i}"
+  FileUtils.cp(kitty_config_path, backup_path) if File.exist?(kitty_config_path)
+  File.write(kitty_config_path, content)
+  puts "  (Backup saved to #{backup_path})"
+end
+
+# 4. Check available Hebrew fonts on the host system
+puts "\n==> Checking Hebrew font coverage..."
+he_fonts_out, _, s = Open3.capture3('fc-list', ':charset=5d0', 'family')
+if s.success? && !he_fonts_out.strip.empty?
+  sample_fonts = he_fonts_out.lines.map(&:strip).reject(&:empty?).uniq.first(3)
+  puts "✓ Hebrew fonts detected: #{sample_fonts.join(', ')}"
+else
+  puts "⚠ No Hebrew fonts detected via fontconfig. Consider installing:"
+  puts "  sudo apt-get install fonts-noto-core fonts-dejavu-core"
+end
+
+# 5. Reload running Kitty instances via SIGUSR1
+puts "\n==> Reloading Kitty..."
+pids_out, _, _ = Open3.capture3('pgrep', '-x', 'kitty')
+pids = pids_out.lines.map(&:strip).reject(&:empty?)
+
+if pids.empty?
+  puts 'ℹ No active Kitty instances detected. New windows will use the updated configuration.'
+else
+  puts "✓ Sending SIGUSR1 to #{pids.length} running Kitty instance(s)..."
+  Open3.capture3('killall', '-SIGUSR1', 'kitty')
+  puts '✓ Kitty configuration reloaded.'
+end
+
+# 6. Print verification test
+puts "\n==> Visual Verification Test:"
+puts '  Logical: פרק 240 - ישראל (חלק 1)'
+puts "  If 'force_ltr yes' is active, standard terminal text renders without scramble."
+puts 'Done!'
