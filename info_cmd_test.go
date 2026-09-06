@@ -181,3 +181,60 @@ func TestInfoEpisodeWithCuts(t *testing.T) {
 		t.Errorf("expected cuts information in output, got: %s", out)
 	}
 }
+
+func TestFormatPodcastInfoHebrew(t *testing.T) {
+	info := PodcastInfoJSON{
+		ID:        "pod1",
+		Title:     "פודקאסט חדשות",
+		Directory: "/podcasts/news",
+		Author:    "יוסי כהן",
+		RecentEpisodes: []RecentEpisodeDTO{
+			{
+				ID:       "ep01",
+				Title:    "פרק ראשון",
+				Date:     "2026-09-06",
+				Status:   "Clean",
+				Duration: "10:00",
+			},
+		},
+	}
+
+	out := formatPodcastInfo(info)
+
+	expectedTitle := displayName("פודקאסט חדשות")
+	expectedAuthor := displayName("יוסי כהן")
+	expectedEp := displayName("פרק ראשון")
+
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected output to contain %q, got: %s", expectedTitle, out)
+	}
+	if !strings.Contains(out, expectedAuthor) {
+		t.Errorf("expected output to contain %q, got: %s", expectedAuthor, out)
+	}
+	if !strings.Contains(out, expectedEp) {
+		t.Errorf("expected output to contain %q, got: %s", expectedEp, out)
+	}
+}
+
+func TestFormatEpisodeInfoHebrew(t *testing.T) {
+	info := EpisodeInfoJSON{
+		ID:           "ep01",
+		PodcastID:    "pod1",
+		PodcastTitle: "פודקאסט היסטוריה",
+		Title:        "פרק 1 - העת העתיקה",
+		AudioPath:    "/podcasts/hist/ep1.mp3",
+		Status:       "Clean",
+	}
+
+	out := formatEpisodeInfo(info)
+
+	expectedPod := displayName("פודקאסט היסטוריה")
+	expectedTitle := displayName("פרק 1 - העת העתיקה")
+
+	if !strings.Contains(out, expectedPod) {
+		t.Errorf("expected output to contain %q, got: %s", expectedPod, out)
+	}
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected output to contain %q, got: %s", expectedTitle, out)
+	}
+}

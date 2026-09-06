@@ -214,3 +214,161 @@ func TestLsSinglePodcastJSON(t *testing.T) {
 		t.Errorf("expected json episodes list, got: %s", out)
 	}
 }
+
+func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
+	tempDir := t.TempDir()
+	pod := filepath.Join(tempDir, "Hebrew_Podcast")
+	_ = os.MkdirAll(pod, 0755)
+
+	epHebrew := filepath.Join(pod, "פרק 1 - שלום עולם.mp3")
+	_ = os.WriteFile(epHebrew, []byte("audio"), 0644)
+
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		LsSubcmd: "latest",
+		Count:    1,
+	}
+	err := runLsCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runLsCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	rawTitle := "פרק 1 - שלום עולם"
+	expectedTitle := displayName(rawTitle)
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected latest episodes table to contain displayName reordered %q, got: %s", expectedTitle, out)
+	}
+	if expectedTitle != rawTitle && strings.Contains(out, rawTitle) {
+		t.Errorf("expected latest episodes table not to contain raw Hebrew %q, got: %s", rawTitle, out)
+	}
+}
+
+func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
+	tempDir := t.TempDir()
+	pod := filepath.Join(tempDir, "פודקאסט_בעברית")
+	_ = os.MkdirAll(pod, 0755)
+
+	epHebrew := filepath.Join(pod, "פרק ראשון של הפודקאסט.mp3")
+	_ = os.WriteFile(epHebrew, []byte("audio"), 0644)
+
+	id := getOrSetPodcastShortID(pod, "פודקאסט_בעברית")
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		Args: []string{id},
+	}
+	err := runLsCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runLsCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	rawTitle := "פרק ראשון של הפודקאסט"
+	expectedTitle := displayName(rawTitle)
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected single podcast table to contain displayName reordered %q, got: %s", expectedTitle, out)
+	}
+	if expectedTitle != rawTitle && strings.Contains(out, rawTitle) {
+		t.Errorf("expected single podcast table not to contain raw Hebrew %q, got: %s", rawTitle, out)
+	}
+	expectedPodTitle := displayName("פודקאסט_בעברית")
+	if !strings.Contains(out, expectedPodTitle) {
+		t.Errorf("expected header to contain displayName reordered podcast title %q, got: %s", expectedPodTitle, out)
+	}
+}
+
+func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
+	items := []lsEpisodeItem{
+		{
+			podcastTitle:   "חדשות הבוקר",
+			podcastShortID: "hds1",
+			episodeShortID: "ep01",
+			episodeName:    "פרק בדיקה עם עברית",
+			modTime:        time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC),
+			origDuration:   120.0,
+			statusStr:      "Needs Ad Removal",
+			statusColor:    "yellow",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	printLatestEpisodesTable(items, 1)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	expectedEp := displayName("פרק בדיקה עם עברית")
+	expectedPod := displayName("חדשות הבוקר")
+
+	if !strings.Contains(out, expectedEp) {
+		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)
+	}
+	if !strings.Contains(out, expectedPod) {
+		t.Errorf("expected table to contain %q, got: %s", expectedPod, out)
+	}
+}
+
+func TestPrintSinglePodcastEpisodesTableHebrewDirect(t *testing.T) {
+	items := []lsEpisodeItem{
+		{
+			episodeShortID: "ep01",
+			episodeName:    "ראיון בלעדי עם מומחה",
+			pubTime:        time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC),
+			origDuration:   300.0,
+			cleanDuration:  270.0,
+			statusStr:      "Clean",
+			statusColor:    "green",
+			hasTranscript:  true,
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	printSinglePodcastEpisodesTable(items, "פודקאסט שיחות", "pc01")
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	expectedEp := displayName("ראיון בלעדי עם מומחה")
+	expectedPod := displayName("פודקאסט שיחות")
+
+	if !strings.Contains(out, expectedEp) {
+		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)
+	}
+	if !strings.Contains(out, expectedPod) {
+		t.Errorf("expected table to contain %q, got: %s", expectedPod, out)
+	}
+}

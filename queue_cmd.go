@@ -169,8 +169,8 @@ func printQueueTable(items []queueEpisodeItem) {
 		strings.Repeat("─", 5), strings.Repeat("─", 6), strings.Repeat("─", 30), strings.Repeat("─", 30))
 
 	for _, it := range items {
-		t := truncate(it.Title, 30)
-		fn := truncate(it.Filename, 30)
+		t := truncate(displayName(it.Title), 30)
+		fn := truncate(displayName(it.Filename), 30)
 		fmt.Printf("  %-5s │ %-6s │ %-30s │ %s\n",
 			it.PodcastID, boldCyan(it.EpisodeID), t, fn)
 	}
@@ -188,15 +188,15 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 			ep := res.Episode
 			added := addEpisodeToQueueFile(ep.PodcastDir, ep.Filename)
 			if added {
-				fmt.Printf("Added to queue: [%s] %s\n", boldCyan(ep.ShortID), ep.Title)
+				fmt.Printf("Added to queue: [%s] %s\n", boldCyan(ep.ShortID), displayName(ep.Title))
 			} else {
-				fmt.Printf("Already in queue: [%s] %s\n", boldCyan(ep.ShortID), ep.Title)
+				fmt.Printf("Already in queue: [%s] %s\n", boldCyan(ep.ShortID), displayName(ep.Title))
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
 			count := addPodcastEpisodesToQueue(pod.Dir)
 			fmt.Printf("Added %d uncleaned episode(s) of %s [%s] to queue\n",
-				count, bold(pod.Title), boldCyan(pod.ShortID))
+				count, bold(displayName(pod.Title)), boldCyan(pod.ShortID))
 		}
 	}
 	return nil
@@ -257,14 +257,14 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 			ep := res.Episode
 			removed := removeEpisodeFromQueueFile(ep.PodcastDir, ep.Filename)
 			if removed {
-				fmt.Printf("Removed from queue: [%s] %s\n", boldCyan(ep.ShortID), ep.Title)
+				fmt.Printf("Removed from queue: [%s] %s\n", boldCyan(ep.ShortID), displayName(ep.Title))
 			} else {
-				fmt.Printf("Not found in queue: [%s] %s\n", boldCyan(ep.ShortID), ep.Title)
+				fmt.Printf("Not found in queue: [%s] %s\n", boldCyan(ep.ShortID), displayName(ep.Title))
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
 			_ = saveQueue(pod.Dir, []string{})
-			fmt.Printf("Cleared queue for %s [%s]\n", bold(pod.Title), boldCyan(pod.ShortID))
+			fmt.Printf("Cleared queue for %s [%s]\n", bold(displayName(pod.Title)), boldCyan(pod.ShortID))
 		}
 	}
 	return nil
@@ -297,7 +297,7 @@ func handleQueueClear(podcastsDir, target string) error {
 		}
 		if res.IsPodcast() {
 			_ = saveQueue(res.Podcast.Dir, []string{})
-			fmt.Printf("Queue cleared for %s [%s]\n", bold(res.Podcast.Title), boldCyan(res.Podcast.ShortID))
+			fmt.Printf("Queue cleared for %s [%s]\n", bold(displayName(res.Podcast.Title)), boldCyan(res.Podcast.ShortID))
 			return nil
 		} else if res.IsEpisode() {
 			removeEpisodeFromQueueFile(res.Episode.PodcastDir, res.Episode.Filename)

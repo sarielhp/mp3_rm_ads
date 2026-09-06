@@ -164,3 +164,32 @@ func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
 		t.Fatalf("expected exactly 5 episodes in queue after concurrent remove, got %d", len(entries))
 	}
 }
+
+func TestPrintQueueTableHebrew(t *testing.T) {
+	items := []queueEpisodeItem{
+		{
+			PodcastID: "pod1",
+			EpisodeID: "ep01",
+			Title:     "פרק מיוחד בעברית",
+			AudioPath: "/podcasts/heb/ep01.mp3",
+			Filename:  "פרק מיוחד בעברית.mp3",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	printQueueTable(items)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	expected := displayName("פרק מיוחד בעברית")
+	if !strings.Contains(out, expected) {
+		t.Errorf("expected queue table to contain %q, got: %s", expected, out)
+	}
+}

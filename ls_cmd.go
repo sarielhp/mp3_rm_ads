@@ -351,7 +351,7 @@ func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 		}
 
 		fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-12s │ %-7s │ %s\n",
-			dStr, item.podcastShortID, boldCyan(item.episodeShortID), pName, coloredStatus, durStr, item.episodeName)
+			dStr, item.podcastShortID, boldCyan(item.episodeShortID), pName, coloredStatus, durStr, displayName(item.episodeName))
 	}
 	fmt.Printf("%s\n\n", strings.Repeat("=", 105))
 }
@@ -453,7 +453,7 @@ func collectSinglePodcastEpisodes(mp3s []string, podDir, title, shortID string) 
 }
 
 func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID string) {
-	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(title), shortID, len(items))
+	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(displayName(title)), shortID, len(items))
 	fmt.Printf("%s\n", strings.Repeat("=", 92))
 	fmt.Printf("  %-6s │ %-10s │ %-7s │ %-7s │ %-8s │ %-3s │ %s\n",
 		"ID", "Date", "Orig", "Clean", "Status", "Tx", "Episode Title")
@@ -490,7 +490,7 @@ func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID strin
 			txFlag = boldGreen("Tx")
 		}
 
-		t := item.episodeName
+		t := displayName(item.episodeName)
 		r := []rune(t)
 		if len(r) > 38 {
 			t = string(r[:35]) + "..."

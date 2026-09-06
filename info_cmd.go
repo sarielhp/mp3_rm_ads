@@ -236,60 +236,66 @@ func buildPodcastInfoDTO(pod *ResolvedPodcast) PodcastInfoJSON {
 	}
 }
 
-func printPodcastInfoCard(info PodcastInfoJSON) {
-	fmt.Printf("\n%s\n", strings.Repeat("=", 80))
-	fmt.Printf("Podcast: %s [%s]\n", bold(info.Title), boldCyan(info.ID))
-	fmt.Printf("%s\n", strings.Repeat("=", 80))
-	fmt.Printf("  Short ID:         %s\n", boldCyan(info.ID))
+func formatPodcastInfo(info PodcastInfoJSON) string {
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%s\n", strings.Repeat("=", 80)))
+	sb.WriteString(fmt.Sprintf("Podcast: %s [%s]\n", bold(displayName(info.Title)), boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("=", 80)))
+	sb.WriteString(fmt.Sprintf("  Short ID:         %s\n", boldCyan(info.ID)))
 	if info.UUID != "" {
-		fmt.Printf("  UUID:             %s\n", info.UUID)
+		sb.WriteString(fmt.Sprintf("  UUID:             %s\n", info.UUID))
 	}
-	fmt.Printf("  Directory:        %s\n", info.Directory)
+	sb.WriteString(fmt.Sprintf("  Directory:        %s\n", info.Directory))
 	if info.Author != "" {
-		fmt.Printf("  Author:           %s\n", info.Author)
+		sb.WriteString(fmt.Sprintf("  Author:           %s\n", displayName(info.Author)))
 	}
 	if info.FeedURL != "" {
-		fmt.Printf("  Feed URL:         %s\n", info.FeedURL)
+		sb.WriteString(fmt.Sprintf("  Feed URL:         %s\n", info.FeedURL))
 	}
 	if info.CoverPath != "" {
-		fmt.Printf("  Cover:            %s\n", info.CoverPath)
+		sb.WriteString(fmt.Sprintf("  Cover:            %s\n", info.CoverPath))
 	}
 
-	fmt.Println("\n  Policy & Sync:")
-	fmt.Printf("    SQLite Sync:    %s\n", info.SQLiteSync)
+	sb.WriteString("\n  Policy & Sync:\n")
+	sb.WriteString(fmt.Sprintf("    SQLite Sync:    %s\n", info.SQLiteSync))
 	dlBadge := downloadPolicyBadge(info.DownloadPolicy, info.DownloadK)
-	fmt.Printf("    Auto Download:  %v %s\n", info.AutoDownload, dlBadge)
+	sb.WriteString(fmt.Sprintf("    Auto Download:  %v %s\n", info.AutoDownload, dlBadge))
 	retStr := "Disabled"
 	if info.AutoCleanupDays > 0 {
 		retStr = fmt.Sprintf("%dd retention", info.AutoCleanupDays)
 	}
-	fmt.Printf("    Auto Cleanup:   %v (%s)\n", info.AutoCleanup, retStr)
+	sb.WriteString(fmt.Sprintf("    Auto Cleanup:   %v (%s)\n", info.AutoCleanup, retStr))
 	adBadge := adRemovalModeBadge(info.AdRemoval)
-	fmt.Printf("    Ad Removal:     %s %s\n", adRemovalModeLabel(info.AdRemoval), adBadge)
+	sb.WriteString(fmt.Sprintf("    Ad Removal:     %s %s\n", adRemovalModeLabel(info.AdRemoval), adBadge))
 
-	fmt.Println("\n  Library Stats:")
+	sb.WriteString("\n  Library Stats:\n")
 	cleanPct := 0.0
 	if info.TotalEpisodes > 0 {
 		cleanPct = float64(info.CleanEpisodes) / float64(info.TotalEpisodes) * 100
 	}
-	fmt.Printf("    Episodes:       %d total (%d clean, %.1f%% clean)\n", info.TotalEpisodes, info.CleanEpisodes, cleanPct)
-	fmt.Printf("    Total Duration: %s\n", formatDurationHours(info.TotalDurationSec))
-	fmt.Printf("    Disk Usage:     %s\n", formatDiskSize(info.TotalDiskSizeBytes))
+	sb.WriteString(fmt.Sprintf("    Episodes:       %d total (%d clean, %.1f%% clean)\n", info.TotalEpisodes, info.CleanEpisodes, cleanPct))
+	sb.WriteString(fmt.Sprintf("    Total Duration: %s\n", formatDurationHours(info.TotalDurationSec)))
+	sb.WriteString(fmt.Sprintf("    Disk Usage:     %s\n", formatDiskSize(info.TotalDiskSizeBytes)))
 
 	if info.Description != "" {
-		fmt.Println("\n  Description:")
+		sb.WriteString("\n  Description:\n")
 		formatted := cleanAndFormatNotes(info.Description, 4, 76)
-		fmt.Println(formatted)
+		sb.WriteString(formatted + "\n")
 	}
 
 	if len(info.RecentEpisodes) > 0 {
-		fmt.Println("\n  Recent Episodes:")
+		sb.WriteString("\n  Recent Episodes:\n")
 		for _, ep := range info.RecentEpisodes {
-			fmt.Printf("    %-6s  %-10s  [%-7s]  %-7s  %s\n",
-				boldCyan(ep.ID), ep.Date, ep.Status, ep.Duration, truncate(ep.Title, 35))
+			sb.WriteString(fmt.Sprintf("    %-6s  %-10s  [%-7s]  %-7s  %s\n",
+				boldCyan(ep.ID), ep.Date, ep.Status, ep.Duration, truncate(displayName(ep.Title), 35)))
 		}
 	}
-	fmt.Printf("%s\n\n", strings.Repeat("=", 80))
+	sb.WriteString(fmt.Sprintf("%s\n\n", strings.Repeat("=", 80)))
+	return sb.String()
+}
+
+func printPodcastInfoCard(info PodcastInfoJSON) {
+	fmt.Print(formatPodcastInfo(info))
 }
 
 func inspectEpisodeInfo(ep *ResolvedEpisode, cli CLIOptions) error {
@@ -416,63 +422,75 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 	}
 }
 
-func printEpisodeInfoCard(info EpisodeInfoJSON, showCuts bool) {
-	fmt.Printf("\n%s\n", strings.Repeat("=", 80))
-	fmt.Printf("Episode: %s [%s]\n", bold(info.Title), boldCyan(info.ID))
-	fmt.Printf("%s\n", strings.Repeat("=", 80))
-	fmt.Printf("  Episode ID:       %s\n", boldCyan(info.ID))
-	fmt.Printf("  Podcast:          %s [%s]\n", info.PodcastTitle, boldCyan(info.PodcastID))
-	fmt.Printf("  Published Date:   %s\n", info.PublishedDate)
-	fmt.Printf("  Audio Path:       %s\n", info.AudioPath)
-	fmt.Printf("  File Size:        %s\n", info.FileSizeFormatted)
-	fmt.Printf("  Status:           %s\n", bold(info.Status))
+func formatEpisodeInfo(info EpisodeInfoJSON, showCuts ...bool) string {
+	sc := false
+	if len(showCuts) > 0 {
+		sc = showCuts[0]
+	}
+	var sb strings.Builder
+	sb.WriteString(fmt.Sprintf("\n%s\n", strings.Repeat("=", 80)))
+	sb.WriteString(fmt.Sprintf("Episode: %s [%s]\n", bold(displayName(info.Title)), boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("=", 80)))
+	sb.WriteString(fmt.Sprintf("  Episode ID:       %s\n", boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("  Podcast:          %s [%s]\n", displayName(info.PodcastTitle), boldCyan(info.PodcastID)))
+	sb.WriteString(fmt.Sprintf("  Published Date:   %s\n", info.PublishedDate))
+	sb.WriteString(fmt.Sprintf("  Audio Path:       %s\n", info.AudioPath))
+	sb.WriteString(fmt.Sprintf("  File Size:        %s\n", info.FileSizeFormatted))
+	sb.WriteString(fmt.Sprintf("  Status:           %s\n", bold(info.Status)))
 
-	fmt.Println("\n  Audio & Processing Stats:")
-	fmt.Printf("    Original Dur:   %s (%.1fs)\n", formatClock(info.OriginalDurationSec), info.OriginalDurationSec)
+	sb.WriteString("\n  Audio & Processing Stats:\n")
+	sb.WriteString(fmt.Sprintf("    Original Dur:   %s (%.1fs)\n", formatClock(info.OriginalDurationSec), info.OriginalDurationSec))
 	cleanStr := "-"
 	if info.CleanDurationSec > 0 {
 		cleanStr = fmt.Sprintf("%s (%.1fs)", formatClock(info.CleanDurationSec), info.CleanDurationSec)
 	}
-	fmt.Printf("    Cleaned Dur:    %s\n", cleanStr)
+	sb.WriteString(fmt.Sprintf("    Cleaned Dur:    %s\n", cleanStr))
 	if info.PercentReduction > 0 {
 		diffSec := info.OriginalDurationSec - info.CleanDurationSec
-		fmt.Printf("    Reduction:      -%s (-%.1f%%)\n", formatClock(diffSec), info.PercentReduction)
+		sb.WriteString(fmt.Sprintf("    Reduction:      -%s (-%.1f%%)\n", formatClock(diffSec), info.PercentReduction))
 	}
 
-	printEpisodeCutsAndTranscript(info, showCuts)
-	fmt.Printf("%s\n\n", strings.Repeat("=", 80))
+	sb.WriteString(formatEpisodeCutsAndTranscript(info, sc))
+	sb.WriteString(fmt.Sprintf("%s\n\n", strings.Repeat("=", 80)))
+	return sb.String()
 }
 
-func printEpisodeCutsAndTranscript(info EpisodeInfoJSON, showCuts bool) {
+func formatEpisodeCutsAndTranscript(info EpisodeInfoJSON, showCuts bool) string {
+	var sb strings.Builder
 	if len(info.Cuts) > 0 || showCuts {
-		fmt.Printf("\n  Commercial Cuts (%d cuts detected):\n", len(info.Cuts))
+		sb.WriteString(fmt.Sprintf("\n  Commercial Cuts (%d cuts detected):\n", len(info.Cuts)))
 		if len(info.Cuts) == 0 {
-			fmt.Println("    No cuts detected.")
+			sb.WriteString("    No cuts detected.\n")
 		} else {
 			for idx, cut := range info.Cuts {
 				reason := cut.Reason
 				if reason == "" {
 					reason = "Advertisement segment"
 				}
-				fmt.Printf("    [%d] %-8s - %-8s (%s) : %s\n",
-					idx+1, cut.StartFormatted, cut.EndFormatted, cut.DurationStr, reason)
+				sb.WriteString(fmt.Sprintf("    [%d] %-8s - %-8s (%s) : %s\n",
+					idx+1, cut.StartFormatted, cut.EndFormatted, cut.DurationStr, reason))
 			}
 		}
 	}
 
-	fmt.Println("\n  Transcript Info:")
+	sb.WriteString("\n  Transcript Info:\n")
 	if info.HasTranscript {
-		fmt.Printf("    Status:         Available (%d segments)\n", info.TranscriptSegments)
-		fmt.Printf("    Path:           %s\n", info.TranscriptPath)
+		sb.WriteString(fmt.Sprintf("    Status:         Available (%d segments)\n", info.TranscriptSegments))
+		sb.WriteString(fmt.Sprintf("    Path:           %s\n", info.TranscriptPath))
 	} else {
-		fmt.Println("    Status:         Not available")
+		sb.WriteString("    Status:         Not available\n")
 	}
 
 	if info.Description != "" {
-		fmt.Println("\n  Show Notes / Description:")
+		sb.WriteString("\n  Show Notes / Description:\n")
 		formatted := cleanAndFormatNotes(info.Description, 4, 76)
-		fmt.Println(formatted)
+		sb.WriteString(formatted + "\n")
 	}
+	return sb.String()
+}
+
+func printEpisodeInfoCard(info EpisodeInfoJSON, showCuts bool) {
+	fmt.Print(formatEpisodeInfo(info, showCuts))
 }
 
 func formatDurationHours(totalSec float64) string {
