@@ -92,7 +92,7 @@ func handleServerFrequency(config Config, cli CLIOptions) {
 		return
 	}
 
-	shouldDisable := cli.ServerSubcmd == "disable_hourly" || cli.DisableHourly
+	shouldDisable := cli.ServerSubcmd == "disable_hourly" || cli.ServerSubcmd == "disable-hourly" || cli.DisableHourly
 	if !cli.Quiet {
 		desc := "Analyzing podcast release frequency"
 		if shouldDisable {

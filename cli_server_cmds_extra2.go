@@ -158,22 +158,23 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 
 func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "disable_hourly",
-		Description: "Analyze podcasts and disable download policy and ad removal for all hourly podcasts",
-		UsageLine:   "abs server disable_hourly [options]",
+		Name:        "disable-hourly",
+		Aliases:     []string{"disable_hourly"},
+		Description: "Disable policy for hourly podcasts",
+		UsageLine:   "abs server disable-hourly [options]",
 		Parameters: []clihelp.Param{
-			{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to filter"},
+			{Name: "[<podcast>]", Description: "Podcast name, index, or ID"},
 		},
 		Args: clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Filter to a single podcast"),
-			clihelp.Bool(&opts.Refresh, "--refresh", false, "Force re-fetching latest 100 episodes from online RSS feed"),
+			clihelp.Bool(&opts.Refresh, "--refresh", false, "Re-fetch latest episodes from feed"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "server"
-			opts.ServerSubcmd = "disable_hourly"
+			opts.ServerSubcmd = "disable-hourly"
 			opts.DisableHourly = true
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 && opts.Podcast == "" {
@@ -187,12 +188,12 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "clean-orphans",
-		Description: "Scan Audiobookshelf library, identify fake or orphaned podcast entries (missing feed URL or duplicate feeds), and delete them",
+		Description: "Delete orphaned ABS podcast entries",
 		UsageLine:   "abs server clean-orphans [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
-			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview orphaned items to be deleted without deleting"),
-			clihelp.Bool(&opts.ForceDelete, "-f, --force", false, "Delete orphaned items without interactive confirmation"),
+			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview items without deleting"),
+			clihelp.Bool(&opts.ForceDelete, "-f, --force", false, "Delete items without confirmation"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
 		},

@@ -17,7 +17,7 @@ func TestConfigCacheRequiresAnExplicitDestructiveAction(t *testing.T) {
 		{[]string{"abs", "config", "cache"}, "cache-show", false},
 		{[]string{"abs", "config", "cache", "show"}, "cache-show", false},
 		{[]string{"abs", "config", "cache", "clear"}, "cache-reset", false},
-		{[]string{"abs", "config", "cache", "reset"}, "cache-reset", false},
+		{[]string{"abs", "config", "cache", "reset"}, "", true},
 		{[]string{"abs", "config", "cache", "bogus"}, "", true},
 	}
 

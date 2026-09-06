@@ -102,9 +102,13 @@ func handleParityCommands(action string, config Config, cli CLIOptions) bool {
 
 func handleMainTest(config Config, cli CLIOptions) {
 	if cli.TestABSMap {
-		absMapPodcasts(config, cli.Quiet)
+		if !absMapPodcasts(config, cli.Quiet) {
+			os.Exit(1)
+		}
 	} else if cli.TestABSDownload {
-		absDownloadAllData(config, cli.Quiet)
+		if !absDownloadAllData(config, cli.Quiet) {
+			os.Exit(1)
+		}
 	} else if cli.TestKitty {
 		testKittyImage(cli.Args)
 	} else if cli.TestABS {
@@ -152,7 +156,10 @@ func handleMainExport(cli CLIOptions) {
 func handleMainConfig(config *Config, cli CLIOptions) {
 	switch cli.ConfigCmd {
 	case "get":
-		handleConfigGet(*config, cli.ConfigKey)
+		if err := handleConfigGet(*config, cli.ConfigKey); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "set":
 		if err := handleConfigSet(config, cli.ConfigKey, cli.ConfigVal); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)

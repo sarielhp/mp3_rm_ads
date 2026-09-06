@@ -22,7 +22,7 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 func buildServerScanSubcommand(opts *CLIOptions, action *string, countVal *int) clihelp.Command {
 	return clihelp.Command{
 		Name:             "scan",
-		Description:      "Scan Audiobookshelf for new podcasts (create directories, cache covers) and check for new episodes",
+		Description:      "Scan ABS library for podcasts & episodes",
 		UsageLine:        "abs server scan [podcasts_dir] [options]",
 		Parameters:       []clihelp.Param{{Name: "[podcasts_dir]", Description: "Optional podcasts directory path (defaults to configured podcasts_dir)"}},
 		Args:             clihelp.MaximumNArgs(1),
@@ -184,20 +184,21 @@ func buildServerKeepSubcommand(opts *CLIOptions, action *string, keepVal *int) c
 
 func buildServerGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "get_info",
-		Description: "Force Audiobookshelf to fetch and cache metadata for the latest K episodes without downloading audio",
-		UsageLine:   "abs server get_info [<k>] [options]",
-		Parameters:  []clihelp.Param{{Name: "[<k>]", Description: "Number of latest episodes to fetch metadata for per podcast (defaults to 100)"}},
+		Name:        "get-info",
+		Aliases:     []string{"get_info"},
+		Description: "Cache metadata for latest K episodes",
+		UsageLine:   "abs server get-info [<k>] [options]",
+		Parameters:  []clihelp.Param{{Name: "[<k>]", Description: "Episodes count per podcast (default 100)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
-			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID (defaults to all podcasts)"),
-			clihelp.Bool(&opts.Refresh, "-r, --refresh", false, "Force re-fetching latest metadata from online RSS feeds (bypasses cache)"),
+			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+			clihelp.Bool(&opts.Refresh, "-r, --refresh", false, "Force re-fetching metadata from feed"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed per-episode metadata"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "server"
-			opts.ServerSubcmd = "get_info"
+			opts.ServerSubcmd = "get-info"
 			opts.Count = 100
 			opts.CountGiven = false
 			opts.Args = ctx.Args

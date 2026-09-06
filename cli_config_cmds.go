@@ -25,6 +25,9 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Subcommands: subcmds,
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"
+			if len(ctx.Args) > 0 {
+				return fmt.Errorf("unknown config subcommand %q", ctx.Args[0])
+			}
 			opts.ConfigCmd = "show"
 			return nil
 		},
@@ -69,17 +72,6 @@ func buildConfigBasicSubcommands(opts *CLIOptions, action *string) []clihelp.Com
 			Name:        "show",
 			Description: "Display current configuration summary table",
 			UsageLine:   "abs config show",
-			Args:        clihelp.NoArgs,
-			Run: func(ctx *clihelp.Context) error {
-				*action = "config"
-				opts.ConfigCmd = "show"
-				return nil
-			},
-		},
-		{
-			Name:        "list",
-			Description: "Display current configuration summary table",
-			UsageLine:   "abs config list",
 			Args:        clihelp.NoArgs,
 			Run: func(ctx *clihelp.Context) error {
 				*action = "config"
@@ -214,10 +206,10 @@ func buildConfigWhisperSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 func buildConfigCacheSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "cache",
-		Description: "Manage and reset local podcast metadata and cover image cache",
-		UsageLine:   "abs config cache [reset|clear]",
+		Description: "Manage and clear local cache",
+		UsageLine:   "abs config cache [clear]",
 		Parameters: []clihelp.Param{
-			{Name: "[reset|clear]", Description: "Action to perform (reset or clear cache)"},
+			{Name: "[clear]", Description: "Clear local cache"},
 		},
 		Args: clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
@@ -227,12 +219,12 @@ func buildConfigCacheSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 				return nil
 			}
 			switch strings.ToLower(ctx.Args[0]) {
-			case "clear", "reset":
+			case "clear":
 				opts.ConfigCmd = "cache-reset"
 			case "show":
 				opts.ConfigCmd = "cache-show"
 			default:
-				return fmt.Errorf("unknown cache action %q (want show, clear or reset)", ctx.Args[0])
+				return fmt.Errorf("unknown cache action %q (want clear or show)", ctx.Args[0])
 			}
 			return nil
 		},

@@ -7,15 +7,15 @@ import (
 func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "proc",
-		Description: "Process audio files or directories (recursive) for ad removal",
+		Description: "Process audio files or dirs for ad removal",
 		UsageLine:   "abs proc [<path1> ...] [options]",
 		Parameters: []clihelp.Param{
-			{Name: "[<path1> ...]", Description: "Optional audio files (.mp3), transcript JSONs (.json), or directories (defaults to configured podcasts_dir)"},
+			{Name: "[<path1> ...]", Description: "Audio files (.mp3), JSONs, or directories"},
 		},
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "collect",
-				Description: "Pull completed batch results from remote host and update local library",
+				Description: "Pull completed batches from remote host",
 				UsageLine:   "abs proc collect [host] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
@@ -36,7 +36,7 @@ func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "clear",
-				Description: "Stop remote workers and empty all scheduled/pending jobs from remote queue",
+				Description: "Stop remote workers and clear remote queue",
 				UsageLine:   "abs proc clear [host] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
@@ -66,7 +66,7 @@ func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 					}
 					return nil
 				}
-				if ctx.Args[0] == "clear" || ctx.Args[0] == "empty" {
+				if ctx.Args[0] == "clear" {
 					opts.ProcSubcmd = "clear"
 					if len(ctx.Args) > 1 {
 						opts.RemoteHost = ctx.Args[1]

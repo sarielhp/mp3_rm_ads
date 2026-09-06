@@ -136,7 +136,32 @@ func runTranscriptCommand(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("transcript file not found for episode [%s]: %s", ep.ShortID, jsonPath)
 	}
 
-	if cli.ExportFormat == "txt" || cli.ExportTXT {
+	fmtCount := 0
+	if cli.ExportFormat != "" {
+		fmtCount++
+	}
+	if cli.ExportTXT {
+		fmtCount++
+	}
+	if cli.ExportSRT {
+		fmtCount++
+	}
+	if fmtCount > 1 {
+		return fmt.Errorf("conflicting export format flags; use canonical '--export <format>'")
+	}
+
+	format := strings.ToLower(cli.ExportFormat)
+	if cli.ExportTXT {
+		format = "txt"
+	} else if cli.ExportSRT {
+		format = "srt"
+	}
+
+	if format != "" && format != "txt" && format != "srt" {
+		return fmt.Errorf("invalid export format %q; expected 'txt' or 'srt'", format)
+	}
+
+	if format == "txt" {
 		out := convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
 		if !cli.Quiet {
 			fmt.Printf("Exported TXT: %s\n", out)
@@ -144,7 +169,7 @@ func runTranscriptCommand(cfg Config, cli CLIOptions) error {
 		return nil
 	}
 
-	if cli.ExportFormat == "srt" || cli.ExportSRT {
+	if format == "srt" {
 		out := convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
 		if !cli.Quiet {
 			fmt.Printf("Exported SRT: %s\n", out)

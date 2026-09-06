@@ -257,12 +257,11 @@ func TestPodFetchConfigSetGet(t *testing.T) {
 		t.Errorf("unexpected cfg values: %+v", cfg)
 	}
 
-	handleConfigGet(cfg, "backend-type")
-	handleConfigGet(cfg, "podfetch-url")
-	handleConfigGet(cfg, "podfetch-user")
-	handleConfigGet(cfg, "podfetch-pass")
-	handleConfigGet(cfg, "podfetch-api-key")
-	handleConfigGet(cfg, "podfetch-db-path")
+	for _, k := range []string{"backend-type", "podfetch-url", "podfetch-user", "podfetch-pass", "podfetch-api-key", "podfetch-db-path"} {
+		if err := handleConfigGet(cfg, k); err != nil {
+			t.Errorf("handleConfigGet(cfg, %q) returned unexpected error: %v", k, err)
+		}
+	}
 }
 
 func TestApplyEnvOverridesPodFetch(t *testing.T) {

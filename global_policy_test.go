@@ -121,17 +121,21 @@ func TestPodcastConfigInheritanceFromGlobalDefaults(t *testing.T) {
 	}
 }
 
-func TestCLIConfigListAndSet(t *testing.T) {
+func TestCLIConfigShowAndSet(t *testing.T) {
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	err := app.Execute([]string{"config", "list"})
+	err := app.Execute([]string{"config", "show"})
 	if err != nil {
-		t.Fatalf("executing 'config list' failed: %v", err)
+		t.Fatalf("executing 'config show' failed: %v", err)
 	}
 	if action != "config" || opts.ConfigCmd != "show" {
 		t.Errorf("expected action 'config' with ConfigCmd 'show', got action=%q, cmd=%q", action, opts.ConfigCmd)
+	}
+
+	if err := app.Execute([]string{"config", "list"}); err == nil {
+		t.Errorf("expected 'config list' to fail as removed duplicate subcommand, but got nil")
 	}
 
 	var action2 string

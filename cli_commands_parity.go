@@ -171,8 +171,8 @@ func buildTranscriptCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Args: clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.ExportFormat, "--export <format>", "", "Export format: 'txt' or 'srt'"),
-			clihelp.Bool(&opts.ExportTXT, "--txt", false, "Export transcript to plain text file"),
-			clihelp.Bool(&opts.ExportSRT, "--srt", false, "Export transcript to SubRip (SRT) subtitle file"),
+			hideOption(clihelp.Bool(&opts.ExportTXT, "--txt", false, "Export transcript to plain text file")),
+			hideOption(clihelp.Bool(&opts.ExportSRT, "--srt", false, "Export transcript to SubRip (SRT) subtitle file")),
 			clihelp.String(&opts.Output, "-o, --output <path>", "", "Custom output destination path"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress banner and print text only"),
 		},

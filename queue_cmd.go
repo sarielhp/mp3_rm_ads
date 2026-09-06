@@ -27,13 +27,13 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 	args := cli.Args
 	if subcmd == "" && len(args) > 0 {
 		switch strings.ToLower(args[0]) {
-		case "list", "ls":
+		case "list":
 			subcmd = "list"
 			args = args[1:]
 		case "add":
 			subcmd = "add"
 			args = args[1:]
-		case "remove", "rm", "del", "delete":
+		case "remove":
 			subcmd = "remove"
 			args = args[1:]
 		case "clear":

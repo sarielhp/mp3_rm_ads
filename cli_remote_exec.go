@@ -13,7 +13,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Priority, cli.Quiet, cli.Verbose)
 	case "pull":
 		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
-	case "clear", "empty", "purge":
+	case "clear":
 		err = runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
 	case "stop":
 		err = runRemoteStop(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)

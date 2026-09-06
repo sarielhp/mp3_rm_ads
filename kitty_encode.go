@@ -109,6 +109,9 @@ func kittyClearGraphics() string {
 }
 
 func testKittyImage(args []string) {
+	if len(args) > 0 && args[0] == "kitty" {
+		args = args[1:]
+	}
 	if len(args) == 0 {
 		fmt.Println("Usage: abs test kitty <image-file>")
 		fmt.Println()

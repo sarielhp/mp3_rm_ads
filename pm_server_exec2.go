@@ -21,9 +21,9 @@ func handleServerCommandPart2(config Config, cli CLIOptions) {
 		handleServerRescan(config, cli)
 	case "timeline":
 		handleServerTimeline(config, cli)
-	case "get_info":
+	case "get_info", "get-info":
 		handleServerGetInfo(config, cli)
-	case "frequency", "disable_hourly":
+	case "frequency", "disable_hourly", "disable-hourly":
 		handleServerFrequency(config, cli)
 	case "clean-orphans":
 		handleServerCleanOrphans(config, cli)

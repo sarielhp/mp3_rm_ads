@@ -134,7 +134,7 @@ func handleConfigSet(cfg *Config, key, val string) error {
 	return nil
 }
 
-func handleConfigGet(cfg Config, key string) {
+func handleConfigGet(cfg Config, key string) error {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
 	case "podcasts-dir", "podcasts.dir", "dir":
 		fmt.Println(cfg.PodcastsDir)
@@ -189,6 +189,7 @@ func handleConfigGet(cfg Config, key string) {
 	case "gemini-model":
 		fmt.Println(cfg.GetGeminiModel())
 	default:
-		fmt.Printf("Unknown configuration key: '%s'\n", key)
+		return fmt.Errorf("unknown configuration key %q; run 'abs config show' to list keys", key)
 	}
+	return nil
 }

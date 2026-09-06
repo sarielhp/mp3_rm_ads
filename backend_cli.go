@@ -63,22 +63,46 @@ func showOPMLUsage() {
 	fmt.Println()
 }
 
-func absMapPodcasts(cfg Config, quiet bool) {
+func printMappedEpisodeSummary(matched Episode, entryName string, hasCut bool) {
+	summary := fmt.Sprintf("  %s %s\n", greenCheck, displayName(entryName))
+	if matched.Title != "" && matched.Title != strings.TrimSuffix(entryName, ".mp3") {
+		summary += fmt.Sprintf("    Title:       %s\n", displayName(matched.Title))
+	}
+	if matched.Description != "" {
+		desc := stripHTML(matched.Description)
+		if len(desc) > 120 {
+			desc = desc[:120] + "..."
+		}
+		summary += fmt.Sprintf("    Description: %s\n", desc)
+	}
+	if matched.PubDate != "" {
+		summary += fmt.Sprintf("    Published:   %s\n", matched.PubDate)
+	}
+	if matched.Duration > 0 {
+		summary += fmt.Sprintf("    Duration:    %s\n", formatDurationShort(matched.Duration))
+	}
+	if hasCut {
+		summary += fmt.Sprintf("    Ads:         %s Removed\n", greenCheck)
+	}
+	fmt.Print(summary)
+}
+
+func absMapPodcasts(cfg Config, quiet bool) bool {
 	b, err := getBackend(cfg, quiet)
 	if err != nil {
-		fmt.Println("ERROR: audiobookshelf is not configured.")
-		return
+		fmt.Fprintln(os.Stderr, "Error: audiobookshelf is not configured.")
+		return false
 	}
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
-		fmt.Println("ERROR: podcasts_dir is not configured.")
-		return
+		fmt.Fprintln(os.Stderr, "Error: podcasts_dir is not configured.")
+		return false
 	}
 
 	podcasts, err := b.Podcasts()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "ERROR: %v\n", err)
-		return
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return false
 	}
 
 	for _, item := range podcasts {
@@ -116,42 +140,56 @@ func absMapPodcasts(cfg Config, quiet bool) {
 				continue
 			}
 
-			summary := fmt.Sprintf("  %s %s\n", greenCheck, displayName(entry.Name()))
-			if matched.Title != "" && matched.Title != strings.TrimSuffix(entry.Name(), ".mp3") {
-				summary += fmt.Sprintf("    Title:       %s\n", displayName(matched.Title))
+			printMappedEpisodeSummary(matched, entry.Name(), hasCut)
+		}
+	}
+	return true
+}
+
+func printPodcastItemDetails(item Podcast) {
+	fmt.Printf("\n  Item: %s\n", item.RelPath)
+	if item.Media.Metadata.Title != "" {
+		fmt.Printf("    Title: %s\n", item.Media.Metadata.Title)
+	}
+	if item.Media.Metadata.Author != "" {
+		fmt.Printf("    Author: %s\n", item.Media.Metadata.Author)
+	}
+	if item.Media.Metadata.Description != "" {
+		desc := stripHTML(item.Media.Metadata.Description)
+		fmt.Printf("    Description: %s\n", desc)
+	}
+	if len(item.Media.Episodes) > 0 {
+		fmt.Printf("    Episodes (%d):\n", len(item.Media.Episodes))
+		for i, ep := range item.Media.Episodes {
+			fmt.Printf("      %d. %s\n", i+1, ep.Title)
+			if ep.Description != "" {
+				desc := stripHTML(ep.Description)
+				fmt.Printf("         Description: %s\n", desc)
 			}
-			if matched.Description != "" {
-				desc := stripHTML(matched.Description)
-				if len(desc) > 120 {
-					desc = desc[:120] + "..."
-				}
-				summary += fmt.Sprintf("    Description: %s\n", desc)
+			if ep.PubDate != "" {
+				fmt.Printf("         Published: %s\n", ep.PubDate)
 			}
-			if matched.PubDate != "" {
-				summary += fmt.Sprintf("    Published:   %s\n", matched.PubDate)
+			if ep.Duration > 0 {
+				fmt.Printf("         Duration: %s\n", formatDurationShort(ep.Duration))
 			}
-			if matched.Duration > 0 {
-				summary += fmt.Sprintf("    Duration:    %s\n", formatDurationShort(matched.Duration))
+			if ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
+				fmt.Printf("         Audio File: %s\n", ep.AudioFile.Metadata.Filename)
 			}
-			if hasCut {
-				summary += fmt.Sprintf("    Ads:         %s Removed\n", greenCheck)
-			}
-			fmt.Print(summary)
 		}
 	}
 }
 
-func absDownloadAllData(cfg Config, quiet bool) {
+func absDownloadAllData(cfg Config, quiet bool) bool {
 	b, err := getBackend(cfg, quiet)
 	if err != nil {
-		fmt.Println("ERROR: audiobookshelf is not configured.")
-		return
+		fmt.Fprintln(os.Stderr, "Error: audiobookshelf is not configured.")
+		return false
 	}
 
 	libs, err := b.PodcastLibraries()
 	if err != nil || len(libs) == 0 {
-		fmt.Println("No podcast libraries found.")
-		return
+		fmt.Fprintln(os.Stderr, "Error: no podcast libraries found.")
+		return false
 	}
 
 	fmt.Printf("Found %d podcast libraries\n", len(libs))
@@ -163,38 +201,10 @@ func absDownloadAllData(cfg Config, quiet bool) {
 		}
 		fmt.Printf("  Found %d items\n", len(podcasts))
 		for _, item := range podcasts {
-			fmt.Printf("\n  Item: %s\n", item.RelPath)
-			if item.Media.Metadata.Title != "" {
-				fmt.Printf("    Title: %s\n", item.Media.Metadata.Title)
-			}
-			if item.Media.Metadata.Author != "" {
-				fmt.Printf("    Author: %s\n", item.Media.Metadata.Author)
-			}
-			if item.Media.Metadata.Description != "" {
-				desc := stripHTML(item.Media.Metadata.Description)
-				fmt.Printf("    Description: %s\n", desc)
-			}
-			if len(item.Media.Episodes) > 0 {
-				fmt.Printf("    Episodes (%d):\n", len(item.Media.Episodes))
-				for i, ep := range item.Media.Episodes {
-					fmt.Printf("      %d. %s\n", i+1, ep.Title)
-					if ep.Description != "" {
-						desc := stripHTML(ep.Description)
-						fmt.Printf("         Description: %s\n", desc)
-					}
-					if ep.PubDate != "" {
-						fmt.Printf("         Published: %s\n", ep.PubDate)
-					}
-					if ep.Duration > 0 {
-						fmt.Printf("         Duration: %s\n", formatDurationShort(ep.Duration))
-					}
-					if ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
-						fmt.Printf("         Audio File: %s\n", ep.AudioFile.Metadata.Filename)
-					}
-				}
-			}
+			printPodcastItemDetails(item)
 		}
 	}
+	return true
 }
 
 func sanitizePodcastTitle(title string) string {
