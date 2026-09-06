@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 )
 
@@ -157,6 +158,23 @@ func TestDisplayNameBidi(t *testing.T) {
 	gotMixed := displayName(mixed)
 	if !containsStr(gotMixed, "Ep 1 - ") {
 		t.Errorf("expected 'Ep 1 - ' in %q", gotMixed)
+	}
+}
+
+func TestTruncateDisplayName(t *testing.T) {
+	eng := "This is a very long English title that should truncate"
+	gotEng := truncateDisplayName(eng, 20)
+	if gotEng != "This is a very lo..." {
+		t.Errorf("expected 'This is a very lo...', got %q", gotEng)
+	}
+
+	heb := "ישראל היא רק חלק קטן בדרך של הדמוקרטים החדשים אל הבית הלבן"
+	gotHeb := truncateDisplayName(heb, 38)
+	if !strings.HasPrefix(gotHeb, "...") {
+		t.Errorf("expected Hebrew truncated title to start with '...', got %q", gotHeb)
+	}
+	if !strings.HasSuffix(gotHeb, "לארשי") {
+		t.Errorf("expected Hebrew truncated title to end with 'לארשי' (start of title in visual order), got %q", gotHeb)
 	}
 }
 

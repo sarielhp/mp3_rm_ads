@@ -192,11 +192,7 @@ func printPodcastsTable(items []lsPodcastItem) {
 		strings.Repeat("─", 9), strings.Repeat("─", 10))
 
 	for _, item := range items {
-		pName := displayName(item.Title)
-		r := []rune(pName)
-		if len(r) > 26 {
-			pName = string(r[:23]) + "..."
-		}
+		pName := truncateDisplayName(item.Title, 26)
 
 		dlBadge := downloadPolicyBadge(item.DownloadPolicy, 3)
 		adBadge := adRemovalModeBadge(item.AdRemoval)
@@ -323,26 +319,23 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
 	fmt.Printf("%s\n", strings.Repeat("=", 105))
-	fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-12s │ %-7s │ %s\n",
+	fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-10s │ %-8s │ %s\n",
 		"Date / Time", "PodID", "EpID", "Podcast", "Status", "Dur", "Episode Title")
-	fmt.Printf("  %-16s ┼ %-5s ┼ %-6s ┼ %-20s ┼ %-12s ┼ %-7s ┼ %s\n",
+	fmt.Printf("  %-16s ┼ %-5s ┼ %-6s ┼ %-20s ┼ %-10s ┼ %-8s ┼ %s\n",
 		strings.Repeat("─", 16), strings.Repeat("─", 5), strings.Repeat("─", 6),
-		strings.Repeat("─", 20), strings.Repeat("─", 12), strings.Repeat("─", 7), strings.Repeat("─", 26))
+		strings.Repeat("─", 20), strings.Repeat("─", 10), strings.Repeat("─", 8), strings.Repeat("─", 26))
 
 	for _, item := range latest {
 		dStr := item.modTime.Format("2006-01-02 15:04")
-		pName := displayName(item.podcastTitle)
-		r := []rune(pName)
-		if len(r) > 20 {
-			pName = string(r[:17]) + "..."
-		}
-		coloredStatus := item.statusStr
+		pName := truncateDisplayName(item.podcastTitle, 20)
+		shortStatus := formatShortStatus(item.statusStr)
+		coloredStatus := shortStatus
 		if item.statusColor == "green" {
-			coloredStatus = boldGreen(item.statusStr)
+			coloredStatus = boldGreen(shortStatus)
 		} else if item.statusColor == "yellow" {
-			coloredStatus = boldYellow(item.statusStr)
+			coloredStatus = boldYellow(shortStatus)
 		} else if item.statusColor == "cyan" {
-			coloredStatus = bold(item.statusStr)
+			coloredStatus = bold(shortStatus)
 		}
 
 		durStr := "-"
@@ -350,8 +343,8 @@ func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 			durStr = formatClock(item.origDuration)
 		}
 
-		fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-12s │ %-7s │ %s\n",
-			dStr, item.podcastShortID, boldCyan(item.episodeShortID), pName, coloredStatus, durStr, displayName(item.episodeName))
+		fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-10s │ %-8s │ %s\n",
+			dStr, item.podcastShortID, boldCyan(item.episodeShortID), pName, coloredStatus, durStr, truncateDisplayName(item.episodeName, 30))
 	}
 	fmt.Printf("%s\n\n", strings.Repeat("=", 105))
 }
@@ -454,12 +447,12 @@ func collectSinglePodcastEpisodes(mp3s []string, podDir, title, shortID string) 
 
 func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID string) {
 	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(displayName(title)), shortID, len(items))
-	fmt.Printf("%s\n", strings.Repeat("=", 92))
-	fmt.Printf("  %-6s │ %-10s │ %-7s │ %-7s │ %-8s │ %-3s │ %s\n",
+	fmt.Printf("%s\n", strings.Repeat("=", 99))
+	fmt.Printf("  %-6s │ %-10s │ %-8s │ %-8s │ %-10s │ %-3s │ %s\n",
 		"ID", "Date", "Orig", "Clean", "Status", "Tx", "Episode Title")
-	fmt.Printf("  %-6s ┼ %-10s ┼ %-7s ┼ %-7s ┼ %-8s ┼ %-3s ┼ %s\n",
-		strings.Repeat("─", 6), strings.Repeat("─", 10), strings.Repeat("─", 7),
-		strings.Repeat("─", 7), strings.Repeat("─", 8), strings.Repeat("─", 3), strings.Repeat("─", 38))
+	fmt.Printf("  %-6s ┼ %-10s ┼ %-8s ┼ %-8s ┼ %-10s ┼ %-3s ┼ %s\n",
+		strings.Repeat("─", 6), strings.Repeat("─", 10), strings.Repeat("─", 8),
+		strings.Repeat("─", 8), strings.Repeat("─", 10), strings.Repeat("─", 3), strings.Repeat("─", 38))
 
 	for _, item := range items {
 		origStr := formatClock(item.origDuration)
@@ -487,31 +480,28 @@ func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID strin
 
 		txFlag := "-"
 		if item.hasTranscript {
-			txFlag = boldGreen("Tx")
+			txFlag = boldGreen("✓")
 		}
 
-		t := displayName(item.episodeName)
-		r := []rune(t)
-		if len(r) > 38 {
-			t = string(r[:35]) + "..."
-		}
-
+		t := truncateDisplayName(item.episodeName, 38)
 		dateStr := item.pubTime.Format("2006-01-02")
 
-		fmt.Printf("  %-6s │ %-10s │ %-7s │ %-7s │ %-8s │ %-3s │ %s\n",
+		fmt.Printf("  %-6s │ %-10s │ %-8s │ %-8s │ %-10s │ %-3s │ %s\n",
 			boldCyan(item.episodeShortID), dateStr, origStr, cleanStr, coloredStatus, txFlag, t)
 	}
-	fmt.Printf("%s\n\n", strings.Repeat("=", 92))
+	fmt.Printf("%s\n\n", strings.Repeat("=", 99))
 }
 
 func formatShortStatus(status string) string {
 	switch status {
-	case "Needs Ad Removal":
-		return "NeedsAd"
-	case "Queued Remote":
-		return "Queued"
-	case "In Progress":
-		return "Active"
+	case "Needs Ad Removal", "NeedsAd":
+		return "✂ NeedsAd"
+	case "Queued Remote", "Queued":
+		return "⏳ Queued"
+	case "In Progress", "Active":
+		return "⚡ Active"
+	case "Clean":
+		return "✓ Clean"
 	default:
 		return status
 	}

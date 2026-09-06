@@ -79,3 +79,18 @@ func displayName(name string) string {
 	}
 	return sb.String()
 }
+
+func truncateDisplayName(s string, maxRunes int) string {
+	runes := []rune(s)
+	if len(runes) <= maxRunes {
+		return displayName(s)
+	}
+	if maxRunes <= 3 {
+		return "..."
+	}
+	if hasRTL(s) {
+		sub := string(runes[:maxRunes-3])
+		return "..." + displayName(sub)
+	}
+	return string(runes[:maxRunes-3]) + "..."
+}

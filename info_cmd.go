@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"html"
 	"os"
 	"path/filepath"
 	"sort"
@@ -603,14 +604,10 @@ func stripHTMLTags(text string) string {
 			b.WriteRune(r)
 		}
 	}
-	clean := b.String()
-	clean = strings.ReplaceAll(clean, "&amp;", "&")
-	clean = strings.ReplaceAll(clean, "&quot;", "\"")
-	clean = strings.ReplaceAll(clean, "&#39;", "'")
-	clean = strings.ReplaceAll(clean, "&apos;", "'")
-	clean = strings.ReplaceAll(clean, "&lt;", "<")
-	clean = strings.ReplaceAll(clean, "&gt;", ">")
-	return strings.ReplaceAll(clean, "&nbsp;", " ")
+	clean := html.UnescapeString(b.String())
+	clean = strings.ReplaceAll(clean, "&nbsp;", " ")
+	clean = strings.ReplaceAll(clean, "\u00a0", " ")
+	return clean
 }
 
 func cleanAndFormatNotes(raw string, indentSpaces, maxLineWidth int) string {
@@ -632,7 +629,7 @@ func cleanAndFormatNotes(raw string, indentSpaces, maxLineWidth int) string {
 		}
 		wrapped := wrapText(trimmed, maxLineWidth-indentSpaces)
 		for _, w := range wrapped {
-			result = append(result, indent+w)
+			result = append(result, indent+displayName(w))
 		}
 	}
 	return strings.Join(result, "\n")
