@@ -98,7 +98,7 @@ func (m *tuiModel) renderTopNavBar() string {
 	} else if m.screen == screenPlayQueue {
 		pathParts = []string{"Playback Queue"}
 	} else if m.screen == screenAdQueue {
-		pathParts = []string{"Ad Removal Queue"}
+		pathParts = []string{"AdR Queue"}
 	} else if m.screen == screenDownloadQueue {
 		pathParts = []string{"Download Queue"}
 	} else if m.screen == screenLatestEpisodes {
@@ -265,9 +265,9 @@ func (m *tuiModel) handleQueueToggle() {
 			return
 		}
 		m.queue[pod.dir] = append(entries, ep.filename)
-		m.showPopup("Added to ad removal queue")
+		m.showPopup("Added to AdR queue")
 	} else {
-		m.showPopup("Removed from ad removal queue")
+		m.showPopup("Removed from AdR queue")
 	}
 	if m.bk != nil && m.bk.SaveQueue != nil {
 		m.bk.SaveQueue(pod.dir, m.queue[pod.dir])

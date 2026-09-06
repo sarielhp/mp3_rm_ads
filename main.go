@@ -86,8 +86,8 @@ func handleParityCommands(action string, config Config, cli CLIOptions) bool {
 		err = runQueueCommand(config, cli)
 	case "fetch":
 		err = runFetchCommand(config, cli)
-	case "play":
-		err = runPlayCommand(config, cli)
+	case "player":
+		err = runPlayerCommand(config, cli)
 	case "transcript":
 		err = runTranscriptCommand(config, cli)
 	default:

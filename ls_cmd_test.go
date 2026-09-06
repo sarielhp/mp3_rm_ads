@@ -372,3 +372,24 @@ func TestPrintSinglePodcastEpisodesTableHebrewDirect(t *testing.T) {
 		t.Errorf("expected table to contain %q, got: %s", expectedPod, out)
 	}
 }
+
+func TestFormatShortStatusAdR(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"NeedAdR", "✂ NeedAdR"},
+		{"NeedsAd", "✂ NeedAdR"},
+		{"NeedAd", "✂ NeedAdR"},
+		{"Needs Ad Removal", "✂ NeedAdR"},
+		{"Clean", "✓ Clean"},
+		{"Queued", "⏳ Queued"},
+		{"Active", "⚡ Active"},
+	}
+	for _, tc := range cases {
+		got := formatShortStatus(tc.input)
+		if got != tc.want {
+			t.Errorf("formatShortStatus(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}

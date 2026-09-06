@@ -12,7 +12,8 @@ func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
 
 	return clihelp.Command{
 		Name:        "remote",
-		Description: "Manage remote batch transcription and processing offloading",
+		Description: "Manage remote batch transcription offload",
+		UsageLine:   "abs remote [command]",
 		Subcommands: subcmds,
 	}
 }
@@ -267,8 +268,8 @@ func buildRemoteCancelSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 func buildBatchWorkerCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "batch-worker",
-		Description: "Internal background worker to process staged batch audio files",
-		UsageLine:   "abs batch-worker [--batch-dir <path>] [options]",
+		Description: "Internal worker to process staged batch files",
+		UsageLine:   "abs batch-worker [options]",
 		Options: []clihelp.Option{
 			clihelp.String(&opts.BatchWorkerDir, "--batch-dir <path>", "", "Path to the staged batch directory"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),

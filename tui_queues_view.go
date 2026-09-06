@@ -172,7 +172,7 @@ func (m *tuiModel) drawAdQueueScreen() string {
 	adItems := getAllAdQueueItems(m.podcasts, m.queue)
 	total := len(adItems)
 
-	banner := tuiHeaderBanner.Render(fmt.Sprintf(" AD REMOVAL QUEUE (F3) — %d items ", total))
+	banner := tuiHeaderBanner.Render(fmt.Sprintf(" ADR QUEUE (F3) — %d items ", total))
 	out.WriteString("  " + banner)
 
 	if m.adqGrabbed {
@@ -184,7 +184,7 @@ func (m *tuiModel) drawAdQueueScreen() string {
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 
 	if total == 0 {
-		out.WriteString("\n  " + tuiDimStyle.Render("Ad removal queue is empty. Press 'r' on an episode or 'p' to enqueue for playback & ad removal.") + "\n\n")
+		out.WriteString("\n  " + tuiDimStyle.Render("AdR queue is empty. Press 'r' on an episode or 'p' to enqueue for playback & ad removal.") + "\n\n")
 		out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 		out.WriteString(tuiDimStyle.Render("  F1 Player │ F2 Play Queue │ Esc/q Back") + "\n")
 		return out.String()

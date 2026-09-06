@@ -185,7 +185,7 @@ func printPodcastsTable(items []lsPodcastItem) {
 	fmt.Printf("\nPodcasts in Library (%d total):\n", len(items))
 	fmt.Printf("%s\n", strings.Repeat("=", 96))
 	fmt.Printf("  %-5s │ %-26s │ %-8s │ %-5s │ %-15s │ %-12s │ %-9s │ %s\n",
-		"ID", "Podcast Name", "Episodes", "Clean", "DL Policy", "Ads Policy", "Retention", "Last Ep")
+		"ID", "Title", "Episodes", "Clean", "DL Policy", "AdR Policy", "Retention", "Last Ep")
 	fmt.Printf("  %-5s ┼ %-26s ┼ %-8s ┼ %-5s ┼ %-15s ┼ %-12s ┼ %-9s ┼ %s\n",
 		strings.Repeat("─", 5), strings.Repeat("─", 26), strings.Repeat("─", 8),
 		strings.Repeat("─", 5), strings.Repeat("─", 15), strings.Repeat("─", 12),
@@ -320,7 +320,7 @@ func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
 	fmt.Printf("%s\n", strings.Repeat("=", 105))
 	fmt.Printf("  %-16s │ %-5s │ %-6s │ %-20s │ %-10s │ %-8s │ %s\n",
-		"Date / Time", "PodID", "EpID", "Podcast", "Status", "Dur", "Episode Title")
+		"Date", "Pod", "Ep", "Podcast", "AdR", "Dur", "Title")
 	fmt.Printf("  %-16s ┼ %-5s ┼ %-6s ┼ %-20s ┼ %-10s ┼ %-8s ┼ %s\n",
 		strings.Repeat("─", 16), strings.Repeat("─", 5), strings.Repeat("─", 6),
 		strings.Repeat("─", 20), strings.Repeat("─", 10), strings.Repeat("─", 8), strings.Repeat("─", 26))
@@ -449,7 +449,7 @@ func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID strin
 	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(displayName(title)), shortID, len(items))
 	fmt.Printf("%s\n", strings.Repeat("=", 99))
 	fmt.Printf("  %-6s │ %-10s │ %-8s │ %-8s │ %-10s │ %-3s │ %s\n",
-		"ID", "Date", "Orig", "Clean", "Status", "Tx", "Episode Title")
+		"ID", "Date", "Orig", "Clean", "AdR", "Tx", "Title")
 	fmt.Printf("  %-6s ┼ %-10s ┼ %-8s ┼ %-8s ┼ %-10s ┼ %-3s ┼ %s\n",
 		strings.Repeat("─", 6), strings.Repeat("─", 10), strings.Repeat("─", 8),
 		strings.Repeat("─", 8), strings.Repeat("─", 10), strings.Repeat("─", 3), strings.Repeat("─", 38))
@@ -494,8 +494,8 @@ func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID strin
 
 func formatShortStatus(status string) string {
 	switch status {
-	case "Needs Ad Removal", "NeedsAd":
-		return "✂ NeedsAd"
+	case "Needs Ad Removal", "NeedsAd", "NeedAd", "NeedAdR":
+		return "✂ NeedAdR"
 	case "Queued Remote", "Queued":
 		return "⏳ Queued"
 	case "In Progress", "Active":
@@ -518,6 +518,9 @@ func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float6
 	if st != nil {
 		origDur = st.Original.DurationSec
 		cleanDur = st.Cleaned.DurationSec
+		if cleanDur == 0 && (st.Status == StateDone || st.Status == StateCopiedBack) {
+			cleanDur = origDur
+		}
 	}
 	if origDur == 0 {
 		cutsFile := stripExt(mp3Path) + ".cuts.json"
@@ -549,5 +552,5 @@ func getEpisodeStatusLabel(mp3Path string) (string, string) {
 	if st.Status == StateTranscribingRemotely || st.Status == StateCuttingRemotely || st.Status == StateTranscribingLocally || st.Status == StateCuttingLocally {
 		return "In Progress", "yellow"
 	}
-	return "Needs Ad Removal", "yellow"
+	return "NeedAdR", "yellow"
 }

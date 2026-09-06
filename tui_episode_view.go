@@ -92,7 +92,7 @@ func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode,
 	} else if ep.hasAdsRemoved {
 		badgeLeft += tuiBadgeAdFree.Render("✓ Ad-Free") + " "
 	} else {
-		badgeLeft += tuiBadgeHasAds.Render("Has Ads") + " "
+		badgeLeft += tuiBadgeHasAds.Render("✂ NeedAdR") + " "
 	}
 	if ep.hasTranscript {
 		badgeLeft += tuiBadgeTranscript.Render("TX Transcript ('t')") + " "

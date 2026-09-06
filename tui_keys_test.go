@@ -111,8 +111,8 @@ func TestTUIViewEpisodeDetail(t *testing.T) {
 	if !strings.Contains(view, "Show Notes") {
 		t.Error("should show Show Notes")
 	}
-	if !strings.Contains(view, "Has Ads") {
-		t.Error("should show Has Ads status")
+	if !strings.Contains(view, "NeedAdR") {
+		t.Error("should show NeedAdR status")
 	}
 	if !strings.Contains(view, "F4 Show Player") {
 		t.Error("should show F4 Show Player legend by default")

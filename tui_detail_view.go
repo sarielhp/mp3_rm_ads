@@ -75,9 +75,9 @@ func renderPodcastDetailHeader(pod tuiPodcast, eps []tuiEpisode, queuedCount, se
 	dlPolicyLabel := downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
 	selInfo := ""
 	if selCount > 0 {
-		selInfo = fmt.Sprintf(" • %d selected ('a' queue ads, 'p' play)", selCount)
+		selInfo = fmt.Sprintf(" • %d selected ('a' queue AdR, 'p' play)", selCount)
 	}
-	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • Ads: %s • DL: %s%s", len(eps), done, txCount, queuedCount, policyLabel, dlPolicyLabel, selInfo))
+	statPill := tuiStatStyle.Render(fmt.Sprintf("  %d episodes, %d ad-free, %d transcribed, %d queued • AdR: %s • DL: %s%s", len(eps), done, txCount, queuedCount, policyLabel, dlPolicyLabel, selInfo))
 	out.WriteString(statPill + "\n")
 	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
 }

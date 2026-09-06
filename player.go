@@ -41,8 +41,6 @@ type AudioPlayer struct {
 	isStarting     bool
 }
 
-const playerFailFastWindow = 2 * time.Second
-
 var globalPlayer = &AudioPlayer{
 	Volume: 70,
 }
@@ -119,76 +117,41 @@ func (p *AudioPlayer) startProcessLocked(startSec float64) {
 		return
 	}
 
-	cmd, startErr := spawnAudioCommand(p.Current.Path, startSec)
+	startErr := StartPlayerTrack(p.Current.Path, p.Current.Title, p.Current.Podcast)
 	if startErr != nil {
 		p.cmd = nil
 		p.IsPlaying = false
 		p.IsPaused = false
-		p.LastError = fmt.Sprintf("no audio player available (tried ffplay and mpg123): %v", startErr)
+		p.LastError = fmt.Sprintf("could not play %s", filepathBase(p.Current.Path))
 		return
 	}
 
 	p.LastError = ""
-	p.cmd = cmd
 	p.IsPlaying = true
 	p.IsPaused = false
 	p.startPlayTime = time.Now()
 	p.startOffsetSec = startSec
 
-	trackPath := p.Current.Path
-	launchedAt := time.Now()
-	expectedRemaining := p.Duration - startSec
-
-	go p.watchAudioProcess(cmd, launchedAt, trackPath, expectedRemaining)
+	go p.watchSocketPlayback(p.Current.Path)
 }
 
-func spawnAudioCommand(path string, startSec float64) (*exec.Cmd, error) {
-	args := []string{"-nodisp", "-autoexit", "-loglevel", "quiet"}
-	if startSec > 0 {
-		args = append(args, "-ss", fmt.Sprintf("%.2f", startSec))
-	}
-	args = append(args, path)
-
-	cmd := exec.Command("ffplay", args...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-
-	startErr := cmd.Start()
-	if startErr != nil {
-		mpgArgs := []string{"-q"}
-		if startSec > 0 {
-			mpgArgs = append(mpgArgs, "-k", fmt.Sprintf("%d", int(startSec*38.28)))
+func (p *AudioPlayer) watchSocketPlayback(path string) {
+	for {
+		time.Sleep(500 * time.Millisecond)
+		p.mu.Lock()
+		if p.Current == nil || p.Current.Path != path || !p.IsPlaying {
+			p.mu.Unlock()
+			return
 		}
-		mpgArgs = append(mpgArgs, path)
-		cmd = exec.Command("mpg123", mpgArgs...)
-		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-		startErr = cmd.Start()
+		if !isPlayerSocketAlive() {
+			p.IsPlaying = false
+			p.IsPaused = false
+			p.nextLocked()
+			p.mu.Unlock()
+			return
+		}
+		p.mu.Unlock()
 	}
-	if startErr != nil {
-		return nil, startErr
-	}
-	return cmd, nil
-}
-
-func (p *AudioPlayer) watchAudioProcess(targetCmd *exec.Cmd, startedAt time.Time, path string, expected float64) {
-	if targetCmd == nil {
-		return
-	}
-	_ = targetCmd.Wait()
-	p.mu.Lock()
-	defer p.mu.Unlock()
-	if p.cmd != targetCmd {
-		return
-	}
-	p.cmd = nil
-
-	elapsed := time.Since(startedAt)
-	if elapsed < playerFailFastWindow && (expected <= 0 || expected > playerFailFastWindow.Seconds()) {
-		p.IsPlaying = false
-		p.IsPaused = false
-		p.LastError = fmt.Sprintf("could not play %s", filepathBase(path))
-		return
-	}
-	p.nextLocked()
 }
 
 func (p *AudioPlayer) killProcessLocked() {
@@ -210,6 +173,9 @@ func (p *AudioPlayer) Stop() {
 
 func (p *AudioPlayer) stopLocked() {
 	p.killProcessLocked()
+	if !isAudioSpawnDisabled() {
+		_ = StopPlayerSocket()
+	}
 	p.IsPlaying = false
 	p.IsPaused = false
 	p.Position = 0
@@ -229,6 +195,14 @@ func (p *AudioPlayer) TogglePause() {
 	}
 
 	p.updatePositionLocked()
+
+	if !isAudioSpawnDisabled() && isPlayerSocketAlive() {
+		paused, err := PausePlayerSocket()
+		if err == nil {
+			p.IsPaused = paused
+			return
+		}
+	}
 
 	if p.IsPaused {
 		p.startProcessLocked(p.Position)
@@ -256,6 +230,10 @@ func (p *AudioPlayer) Seek(deltaSec float64) {
 		newPos = p.Duration
 	}
 	p.Position = newPos
+	if !isAudioSpawnDisabled() && isPlayerSocketAlive() {
+		_ = SeekPlayerSocket(deltaSec)
+		return
+	}
 	if !p.IsPaused {
 		p.startProcessLocked(newPos)
 	}
@@ -324,6 +302,17 @@ func (p *AudioPlayer) UpdatePosition() {
 }
 
 func (p *AudioPlayer) updatePositionLocked() {
+	if !isAudioSpawnDisabled() && isPlayerSocketAlive() {
+		if st, err := QueryPlayerStatus(); err == nil && st != nil {
+			p.Position = st.Position
+			if st.Duration > 0 {
+				p.Duration = st.Duration
+			}
+			p.IsPaused = st.IsPaused
+			p.IsPlaying = st.IsRunning
+			return
+		}
+	}
 	if p.IsPlaying && !p.IsPaused {
 		elapsed := time.Since(p.startPlayTime).Seconds()
 		p.Position = p.startOffsetSec + elapsed

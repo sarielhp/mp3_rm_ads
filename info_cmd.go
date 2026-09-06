@@ -267,7 +267,7 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 	}
 	sb.WriteString(fmt.Sprintf("    Auto Cleanup:   %v (%s)\n", info.AutoCleanup, retStr))
 	adBadge := adRemovalModeBadge(info.AdRemoval)
-	sb.WriteString(fmt.Sprintf("    Ad Removal:     %s %s\n", adRemovalModeLabel(info.AdRemoval), adBadge))
+	sb.WriteString(fmt.Sprintf("    AdR Policy:     %s %s\n", adRemovalModeLabel(info.AdRemoval), adBadge))
 
 	sb.WriteString("\n  Library Stats:\n")
 	cleanPct := 0.0
@@ -437,7 +437,7 @@ func formatEpisodeInfo(info EpisodeInfoJSON, showCuts ...bool) string {
 	sb.WriteString(fmt.Sprintf("  Published Date:   %s\n", info.PublishedDate))
 	sb.WriteString(fmt.Sprintf("  Audio Path:       %s\n", info.AudioPath))
 	sb.WriteString(fmt.Sprintf("  File Size:        %s\n", info.FileSizeFormatted))
-	sb.WriteString(fmt.Sprintf("  Status:           %s\n", bold(info.Status)))
+	sb.WriteString(fmt.Sprintf("  AdR Status:       %s\n", bold(info.Status)))
 
 	sb.WriteString("\n  Audio & Processing Stats:\n")
 	sb.WriteString(fmt.Sprintf("    Original Dur:   %s (%.1fs)\n", formatClock(info.OriginalDurationSec), info.OriginalDurationSec))

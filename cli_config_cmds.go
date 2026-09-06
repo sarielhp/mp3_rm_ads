@@ -15,13 +15,13 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 		buildConfigCacheSubcommand(opts, action),
 		buildConfigProcessorSubcommand(opts, action),
 		buildConfigMigrateSubcommand(opts, action),
-		clihelp.CompletionCommand(),
+		buildConfigCompletionCommand(),
 	)
 
 	return clihelp.Command{
 		Name:        "config",
 		Description: "View and manage application configuration",
-		UsageLine:   "abs config [<subcommand>] [options]",
+		UsageLine:   "abs config [command]",
 		Subcommands: subcmds,
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"
@@ -304,4 +304,20 @@ func buildConfigMigrateSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 			return nil
 		},
 	}
+}
+
+func buildConfigCompletionCommand() clihelp.Command {
+	cmd := clihelp.CompletionCommand()
+	cmd.Examples = []clihelp.Example{
+		{Line: "config completion zsh", Description: "Generate Zsh tab-completion script"},
+		{Line: "config completion install", Description: "Install tab-completions for the active shell"},
+	}
+	for i := range cmd.Subcommands {
+		if cmd.Subcommands[i].Name == "install" {
+			cmd.Subcommands[i].Examples = []clihelp.Example{
+				{Line: "config completion install zsh", Description: "Install completions to ~/.local/share/zsh/site-functions"},
+			}
+		}
+	}
+	return cmd
 }

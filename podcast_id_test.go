@@ -197,8 +197,8 @@ func TestStatusReportColumns(t *testing.T) {
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
 
-	if !strings.Contains(out, "#") || !strings.Contains(out, "ID") || !strings.Contains(out, "Podcast Name") {
-		t.Errorf("expected header with #, ID, Podcast Name, got: %s", out)
+	if !strings.Contains(out, "#") || !strings.Contains(out, "ID") || (!strings.Contains(out, "Title") && !strings.Contains(out, "Podcast Name")) {
+		t.Errorf("expected header with #, ID, Title, got: %s", out)
 	}
 	if !strings.Contains(out, id) {
 		t.Errorf("expected short ID %q in status output, got: %s", id, out)

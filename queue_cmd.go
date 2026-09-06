@@ -158,13 +158,13 @@ func collectPodcastQueueItems(p podcastDirEntry) []queueEpisodeItem {
 
 func printQueueTable(items []queueEpisodeItem) {
 	if len(items) == 0 {
-		fmt.Println("Ad removal queue is currently empty.")
+		fmt.Println("AdR queue is currently empty.")
 		return
 	}
 
-	fmt.Printf("\nAd Removal Queue (%d queued):\n", len(items))
+	fmt.Printf("\nAdR Queue (%d queued):\n", len(items))
 	fmt.Printf("%s\n", strings.Repeat("=", 80))
-	fmt.Printf("  %-5s │ %-6s │ %-30s │ %s\n", "PodID", "EpID", "Title", "Audio File")
+	fmt.Printf("  %-5s │ %-6s │ %-30s │ %s\n", "Pod", "Ep", "Title", "File")
 	fmt.Printf("  %-5s ┼ %-6s ┼ %-30s ┼ %s\n",
 		strings.Repeat("─", 5), strings.Repeat("─", 6), strings.Repeat("─", 30), strings.Repeat("─", 30))
 

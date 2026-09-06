@@ -67,7 +67,12 @@ The program creates a config file at `~/.config/abs/config.json` on first run, u
   ],
   "audiobookshelf_url": "",
   "audiobookshelf_user": "",
-  "audiobookshelf_pass": ""
+  "audiobookshelf_pass": "",
+  "backend_type": "audiobookshelf",
+  "podfetch_url": "",
+  "podfetch_user": "",
+  "podfetch_pass": "",
+  "podfetch_db_path": ""
 }
 ```
 
@@ -83,52 +88,109 @@ The program creates a config file at `~/.config/abs/config.json` on first run, u
 | `podcasts_dir` | "" | Default directory for podcast processing |
 | `whisper_language` | "" | Language override for Whisper transcription |
 | `whisper_prompt` | "" | Prompt to prepend to Whisper transcription |
+| `backend_type` | "audiobookshelf" | Backend provider: `"audiobookshelf"` or `"podfetch"` |
 | `audiobookshelf_url` | "" | Audiobookshelf server URL |
 | `audiobookshelf_user` | "" | Audiobookshelf username |
 | `audiobookshelf_pass` | "" | Audiobookshelf password |
+| `podfetch_url` | "" | PodFetch server URL |
+| `podfetch_user` | "" | PodFetch username |
+| `podfetch_pass` | "" | PodFetch password |
+| `podfetch_db_path` | "" | Path to PodFetch SQLite database file |
+
+## Podcast Server Backends
+
+`abs` supports two podcast server backends for metadata sync, episode downloads, and feed management:
+
+### 1. Audiobookshelf (Default)
+Integrates with Audiobookshelf podcast libraries via REST API and direct SQLite database access.
+- Config keys: `audiobookshelf_url`, `audiobookshelf_user`, `audiobookshelf_pass`, `audiobookshelf_sqlite_db_path`
+- Env overrides: `ABS_URL`, `ABS_USER`, `ABS_PASS`
+
+### 2. PodFetch
+Full-featured alternative backend (`pkg/backend/podfetch*.go`) communicating via PodFetch REST API and GORM/SQLite database.
+- Config keys: `backend_type: "podfetch"`, `podfetch_url`, `podfetch_user`, `podfetch_pass`, `podfetch_db_path`
+- Env overrides: `PODFETCH_URL`, `PODFETCH_USER`, `PODFETCH_PASS`, `PODFETCH_DB_PATH`
+
+## Ad Removal Terminology (AdR)
+
+The codebase and CLI standardize on concise **AdR** (Ad Removal) terminology:
+- **`✂ NeedAdR`**: Episode has not yet undergone ad removal.
+- **`✓ Ad-Free`**: Commercial segments have been detected and cut.
+- **`AdR Policy`**: Per-podcast ad removal setting (`none`, `latest`, `all`).
+- **`AdR Queue`**: Priority queue of episodes pending commercial excision.
+
+## Background Audio Player (`abs player`)
+
+Headless audio playback daemon with MPRIS D-Bus integration:
+```bash
+abs player play [id]     # Play episode by ID (eXXXXX) or resume playback
+abs player pause         # Toggle playback pause state
+abs player stop          # Stop playback and shutdown daemon
+abs player status        # Display current track, position, duration, and status
+```
+Spawns a detached background player (prefers headless `mpv` with `--input-ipc-server=/tmp/abs_player.sock`, with graceful fallback to `cvlc --control dbus` or built-in players). Player state reflects in real time inside the interactive TUI.
 
 ## Usage
 
 ### Basic Usage
 
 ```bash
-# Process a single episode
-./abs episode.mp3
+# Process audio files or directories for ad removal
+abs proc episode.mp3
+abs proc /path/to/podcasts/
 
-# Process all MP3s in a directory
-./abs /path/to/podcasts/
+# List podcasts or latest episodes
+abs ls
+abs ls latest 10
+abs ls podcasts
 
-# Process multiple episodes
-./abs episode1.mp3 episode2.mp3 episode3.mp3
+# Inspect episode or podcast metadata and cuts
+abs info e12345
 
-# Quiet mode
-./abs -q episode.mp3
-```
+# View or update download and AdR policy
+abs policy p0001 --ad-removal latest
 
-### Subcommands
-
-```bash
-# Process all MP3s in a directory
-./abs dir /path/to/podcasts/
-
-# Process a single file
-./abs file episode.mp3
+# Manage AdR queue
+abs queue list
+abs queue add e12345
+abs queue remove e12345
+abs queue clear
 
 # Interactive TUI browser
-./abs tui [path/to/podcasts/dir]
+abs tui
 
-# Configuration management
-./abs config
+# Library status overview
+abs status
 
-# Test Whisper server
-./abs test --test-whisper
-
-# Test Audiobookshelf server
-./abs test --test-abs
-
-# Map Audiobookshelf podcasts
-./abs test --abs-map
+# Background playback
+abs player play e12345
+abs player pause
+abs player status
+abs player stop
 ```
+
+### Commands Overview
+
+| Command | Usage | Description |
+|---------|-------|-------------|
+| `proc` | `abs proc [paths...]` | Process audio files or directories for ad removal |
+| `ls` | `abs ls [latest\|podcasts]` | List library podcasts, episodes, or latest downloads |
+| `info` | `abs info <id>` | Inspect podcast or episode metadata and cuts |
+| `policy` | `abs policy <podcast-id>` | View or update podcast download and AdR policy |
+| `queue` | `abs queue [command]` | Manage the ad removal (AdR) processing queue |
+| `fetch` | `abs fetch [podcast-id]` | Fetch and sync latest RSS feeds for podcasts |
+| `player` | `abs player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
+| `transcript` | `abs transcript <id>` | View or export transcript for an episode |
+| `recut` | `abs recut [paths...]` | Recut audio files using existing cuts metadata |
+| `export` | `abs export <srt\|txt>` | Export transcript JSON to SRT subtitles or plain text |
+| `tui` | `abs tui [directory]` | Interactive TUI browser for podcasts and episodes |
+| `status` | `abs status [podcasts]` | Show status overview of library and worker |
+| `test` | `abs test <target>` | Test external services (Whisper, ABS, Kitty) |
+| `server` | `abs server [command]` | Manage and interact with Audiobookshelf server |
+| `config` | `abs config [command]` | View and manage application configuration |
+| `remote` | `abs remote [command]` | Manage remote batch processing offload |
+| `batch-worker` | `abs batch-worker` | Internal worker to process staged batch files |
+| `help` | `abs help [command]` | Display usage help message |
 
 ### Chunked Transcription
 

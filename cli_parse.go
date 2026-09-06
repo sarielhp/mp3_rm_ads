@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/sarielhp/clihelp"
+	"github.com/sarielhp/clihelp/tree"
 )
 
 func isCommandPathOrPrefix(app *clihelp.App, args []string) bool {
@@ -89,6 +90,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	return &clihelp.App{
 		Name:                "abs",
 		Description:         "Automatic Ad Segment Remover & Podcast Manager",
+		UsageLine:           "abs [OPTIONS] <COMMAND>",
 		Version:             getVersion(),
 		GlobalNote:          "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
 		AbbrevCommands:      true,
@@ -101,7 +103,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			buildPolicyCommand(opts, action),
 			buildQueueCommand(opts, action),
 			buildFetchCommand(opts, action),
-			buildPlayCommand(opts, action),
+			buildPlayerCommand(opts, action),
 			buildTranscriptCommand(opts, action),
 			buildRecutCommand(opts, action),
 			buildExportCommand(opts, action),
@@ -121,11 +123,8 @@ func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "tui",
 		Description: "Interactive TUI browser for podcasts and episodes",
-		UsageLine:   "abs tui [directory]",
-		Parameters: []clihelp.Param{
-			{Name: "[directory]", Description: "Optional path to podcasts directory (defaults to configured podcasts_dir)"},
-		},
-		Args: clihelp.MaximumNArgs(1),
+		UsageLine:   "abs tui [options] [directory]",
+		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),
 			clihelp.Bool(&opts.Debug, "-d, --debug", false, "Enable debug mode with key logging and screen snapshots (F12)"),
@@ -141,12 +140,9 @@ func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "status",
-		Description: "Show status overview of library & worker",
-		UsageLine:   "abs status [podcasts|<podcasts_dir>]",
-		Parameters: []clihelp.Param{
-			{Name: "[podcasts]", Description: "Use 'podcasts' or directory path to show full detailed table"},
-		},
-		Args: clihelp.MaximumNArgs(1),
+		Description: "Show status overview of library and worker",
+		UsageLine:   "abs status [options] [podcasts]",
+		Args:        clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "status"
 			opts.Args = ctx.Args
@@ -158,13 +154,9 @@ func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildTestCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "test",
-		Description: "Test external services like Whisper server or Audiobookshelf",
-		UsageLine:   "abs test <whisper|abs [connect|map|download]|kitty <image>>",
-		Parameters: []clihelp.Param{
-			{Name: "<whisper|abs|kitty>", Description: "Target service/device to test ('whisper', 'abs', or 'kitty')"},
-			{Name: "[args]", Description: "Optional test arguments (e.g., 'map' or 'download' for abs, or path to an image file for kitty)"},
-		},
-		Args: clihelp.RangeArgs(0, 2),
+		Description: "Test external services (Whisper, ABS, Kitty)",
+		UsageLine:   "abs test [options] <target>",
+		Args:        clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
 			clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
@@ -218,13 +210,13 @@ func resolveTestCommandArgs(args []string, opts *CLIOptions) error {
 func buildHelpCommand() clihelp.Command {
 	return clihelp.Command{
 		Name:        "help",
-		Description: "Display usage help message for abs or a specific command",
-		UsageLine:   "abs help [<command>]",
+		Description: "Display usage help message for abs or a command",
+		UsageLine:   "abs help [command]",
 		Run: func(ctx *clihelp.Context) error {
 			if len(ctx.Args) > 0 {
 				topic := strings.ToLower(ctx.Args[0])
 				if topic == "tree" || topic == "--tree" || topic == "t" {
-					ctx.App.RenderTree(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
+					tree.Render(ctx.Stdout, ctx.App, tree.Options{})
 					os.Exit(0)
 				}
 				if !ctx.App.RenderCommand(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager}, ctx.Args...) {
@@ -281,7 +273,7 @@ func parseFlags() (string, CLIOptions) {
 	for _, a := range normArgs {
 		if a == "--tree" {
 			app := buildCLIApp(&action, &opts)
-			app.RenderTree(clihelp.Options{})
+			tree.Render(os.Stdout, app, tree.Options{})
 			os.Exit(0)
 		}
 	}

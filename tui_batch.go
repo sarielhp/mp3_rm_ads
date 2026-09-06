@@ -58,7 +58,7 @@ func (m *tuiModel) batchQueueAdRemoval() {
 		m.bk.SaveQueue(pod.dir, entries)
 	}
 	m.clearSelectedEpisodes()
-	m.showToast(fmt.Sprintf("Batch added %d episode(s) to ad removal queue", addedCount), ToastSuccess)
+	m.showToast(fmt.Sprintf("Batch added %d episode(s) to AdR queue", addedCount), ToastSuccess)
 }
 
 func (m *tuiModel) batchQueuePlayback() {

@@ -115,6 +115,15 @@ func (p *AudioPlayer) View() PlayerView {
 		v.Title = p.Current.Title
 		v.Podcast = p.Current.Podcast
 		v.Path = p.Current.Path
+	} else if !isAudioSpawnDisabled() && isPlayerSocketAlive() {
+		if st, err := QueryPlayerStatus(); err == nil && st != nil && st.IsRunning {
+			v.Has = true
+			v.Title = st.Title
+			v.Position = st.Position
+			v.Duration = st.Duration
+			v.IsPlaying = true
+			v.IsPaused = st.IsPaused
+		}
 	}
 	return v
 }

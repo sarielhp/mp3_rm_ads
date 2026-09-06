@@ -305,6 +305,7 @@ type CLIOptions struct {
 	CleanupDays         int
 	AdRemovalMode       string
 	QueueSubcmd         string
+	PlayerSubcmd        string
 }
 
 type CostInfo struct {

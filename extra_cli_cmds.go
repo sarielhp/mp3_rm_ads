@@ -4,9 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"strings"
-	"time"
 )
 
 func runFetchCommand(cfg Config, cli CLIOptions) error {
@@ -64,22 +62,58 @@ func fetchSinglePodcastFeedCLI(pod *ResolvedPodcast) error {
 	return nil
 }
 
-func runPlayCommand(cfg Config, cli CLIOptions) error {
+func runPlayerCommand(cfg Config, cli CLIOptions) error {
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
 
-	if len(cli.Args) == 0 {
-		return fmt.Errorf("missing episode identifier for play command")
+	subcmd := cli.PlayerSubcmd
+	args := cli.Args
+	if subcmd == "" && len(args) > 0 {
+		switch strings.ToLower(args[0]) {
+		case "play", "stop", "pause", "status", "daemon":
+			subcmd = strings.ToLower(args[0])
+			args = args[1:]
+		default:
+			subcmd = "play"
+		}
+	} else if subcmd == "" {
+		subcmd = "status"
 	}
 
-	target := cli.Args[0]
+	switch subcmd {
+	case "play":
+		return handlePlayerPlay(podcastsDir, args)
+	case "stop":
+		return handlePlayerStop()
+	case "pause":
+		return handlePlayerPause()
+	case "status":
+		return handlePlayerStatus()
+	case "daemon":
+		return handlePlayerDaemon(args)
+	default:
+		return fmt.Errorf("unknown player action %q (use play, stop, pause, or status)", subcmd)
+	}
+}
+
+func handlePlayerPlay(podcastsDir string, args []string) error {
+	if len(args) == 0 {
+		if isPlayerSocketAlive() {
+			if err := ResumePlayerSocket(); err == nil {
+				fmt.Println("Playback resumed.")
+				return nil
+			}
+		}
+		return fmt.Errorf("missing episode identifier for player play")
+	}
+
+	target := args[0]
 	res, err := resolveAnyID(podcastsDir, target)
 	if err != nil {
 		return err
 	}
-
 	if !res.IsEpisode() {
 		return fmt.Errorf("identifier %q is a podcast; please specify an episode ID to play", target)
 	}
@@ -88,13 +122,8 @@ func runPlayCommand(cfg Config, cli CLIOptions) error {
 	fmt.Printf("Playing: %s [%s]\n", bold(ep.Title), boldCyan(ep.ShortID))
 	fmt.Printf("Audio file: %s\n", ep.Path)
 
-	for _, playerBin := range []string{"mpv", "ffplay", "mplayer"} {
-		if path, err := exec.LookPath(playerBin); err == nil {
-			cmd := exec.Command(path, ep.Path)
-			cmd.Stdout = os.Stdout
-			cmd.Stderr = os.Stderr
-			return cmd.Run()
-		}
+	if err := StartPlayerTrack(ep.Path, ep.Title, ep.PodcastTitle); err != nil {
+		return fmt.Errorf("failed to start player: %w", err)
 	}
 
 	track := PlayerTrack{
@@ -102,12 +131,84 @@ func runPlayCommand(cfg Config, cli CLIOptions) error {
 		Podcast: ep.PodcastTitle,
 		Path:    ep.Path,
 	}
-	globalPlayer.PlayTrack(track)
-	fmt.Println("Playback started in background. Press Ctrl+C to stop.")
-	for globalPlayer.View().IsPlaying {
-		time.Sleep(500 * time.Millisecond)
+	globalPlayer.Current = &track
+	globalPlayer.IsPlaying = true
+	fmt.Printf("Started background playback (socket: %s)\n", PlayerSocketPath)
+	return nil
+}
+
+func handlePlayerStop() error {
+	if !isPlayerSocketAlive() {
+		fmt.Println("Player is not running.")
+		return nil
+	}
+	if err := StopPlayerSocket(); err != nil {
+		return err
+	}
+	globalPlayer.Stop()
+	fmt.Println("Playback stopped.")
+	return nil
+}
+
+func handlePlayerPause() error {
+	if !isPlayerSocketAlive() {
+		fmt.Println("Player is not running.")
+		return nil
+	}
+	paused, err := PausePlayerSocket()
+	if err != nil {
+		return err
+	}
+	if paused {
+		fmt.Println("Playback paused.")
+	} else {
+		fmt.Println("Playback resumed.")
 	}
 	return nil
+}
+
+func handlePlayerStatus() error {
+	st, err := QueryPlayerStatus()
+	if err != nil || st == nil || !st.IsRunning {
+		fmt.Println("No active playback session (player is stopped).")
+		return nil
+	}
+
+	statusLabel := "Playing"
+	if st.IsPaused {
+		statusLabel = "Paused"
+	}
+
+	fmt.Printf("Playback Status:  %s\n", bold(statusLabel))
+	if st.Title != "" {
+		fmt.Printf("Track:            %s\n", boldCyan(st.Title))
+	}
+	pct := 0.0
+	if st.Duration > 0 {
+		pct = (st.Position / st.Duration) * 100
+	}
+	fmt.Printf("Position:         %s / %s (%.0f%%)\n", formatPlayerTime(st.Position), formatPlayerTime(st.Duration), pct)
+	fmt.Printf("Socket:           %s\n", PlayerSocketPath)
+	return nil
+}
+
+func handlePlayerDaemon(args []string) error {
+	if len(args) == 0 {
+		return fmt.Errorf("missing audio path for player daemon")
+	}
+	audioPath := args[0]
+	title := ""
+	podcast := ""
+	for i := 1; i < len(args); i++ {
+		if args[i] == "--title" && i+1 < len(args) {
+			title = args[i+1]
+			i++
+		} else if args[i] == "--podcast" && i+1 < len(args) {
+			podcast = args[i+1]
+			i++
+		}
+	}
+	return runPlayerDaemon(audioPath, title, podcast)
 }
 
 func runTranscriptCommand(cfg Config, cli CLIOptions) error {

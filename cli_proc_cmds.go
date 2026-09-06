@@ -7,11 +7,8 @@ import (
 func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "proc",
-		Description: "Process audio files or dirs for ad removal",
-		UsageLine:   "abs proc [<path1> ...] [options]",
-		Parameters: []clihelp.Param{
-			{Name: "[<path1> ...]", Description: "Audio files (.mp3), JSONs, or directories"},
-		},
+		Description: "Process audio files for ad removal",
+		UsageLine:   "abs proc [command]",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "collect",
@@ -83,8 +80,8 @@ func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "ls",
-		Description: "List podcast episodes, latest downloads, or podcast contents",
-		UsageLine:   "abs ls [latest|podcasts|<podcast>] [options]",
+		Description: "List library podcasts, episodes, or latest downloads",
+		UsageLine:   "abs ls [command]",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "podcasts",
@@ -102,7 +99,7 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "latest",
-				Description: "List the latest downloaded/added episodes across all podcasts",
+				Description: "List latest added episodes across all podcasts",
 				UsageLine:   "abs ls latest [N] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "[N]", Description: "Number of episodes to show (default: 10)"},
@@ -121,9 +118,6 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 					return nil
 				},
 			},
-		},
-		Parameters: []clihelp.Param{
-			{Name: "[latest|podcasts|<podcast>]", Description: "'latest', 'podcasts', or a podcast short ID, index, or name"},
 		},
 		Options: []clihelp.Option{
 			clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of episodes to list (default: 10)"),
@@ -147,11 +141,8 @@ func buildLsCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildRecutCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "recut",
-		Description: "Recut audio files or directories using existing .cuts.json metadata",
-		UsageLine:   "abs recut [<path1> ...] [options]",
-		Parameters: []clihelp.Param{
-			{Name: "[<path1> ...]", Description: "Optional audio files (.mp3) or directories with existing .cuts.json metadata (defaults to configured podcasts_dir)"},
-		},
+		Description: "Recut audio files using existing cuts metadata",
+		UsageLine:   "abs recut [options] [path...]",
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
@@ -171,12 +162,12 @@ func buildRecutCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildExportCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "export",
-		Description: "Export transcript JSON to SRT subtitles or plain text",
-		UsageLine:   "abs export <srt|txt> <path1> [path2 ...] [options]",
+		Description: "Export transcript JSON to SRT subtitles or text",
+		UsageLine:   "abs export [command]",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "srt",
-				Description: "Export transcript JSON to SubRip subtitle (.srt) format",
+				Description: "Export transcript to SubRip (.srt) subtitle format",
 				UsageLine:   "abs export srt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
@@ -196,7 +187,7 @@ func buildExportCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "txt",
-				Description: "Export transcript JSON to plain text (.txt) format",
+				Description: "Export transcript to plain text (.txt) format",
 				UsageLine:   "abs export txt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},

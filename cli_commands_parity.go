@@ -7,10 +7,10 @@ import (
 func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "info",
-		Description: "Deep inspection of a podcast or episode by short ID, title, or filename",
-		UsageLine:   "abs info <id> [options]",
-		Parameters: []clihelp.Param{
-			{Name: "<id>", Description: "Podcast short ID (5 chars), episode short ID (eXXXXX), title, or path"},
+		Description: "Inspect podcast or episode metadata and cuts",
+		UsageLine:   "abs info [options] <id>",
+		Examples: []clihelp.Example{
+			{Line: "abs info e12345", Description: "Inspect episode metadata and cuts breakdown"},
 		},
 		Args: clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
@@ -28,12 +28,9 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildPolicyCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "policy",
-		Description: "View or update auto-download, auto-cleanup, and ad removal policy for a podcast",
-		UsageLine:   "abs policy <podcast-id> [options]",
-		Parameters: []clihelp.Param{
-			{Name: "<podcast-id>", Description: "Podcast short ID (5 chars), index, or title"},
-		},
-		Args: clihelp.ExactArgs(1),
+		Description: "View or update podcast download and AdR policy",
+		UsageLine:   "abs policy [options] <podcast-id>",
+		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable or disable automatic downloads (true/false)"),
 			clihelp.String(&opts.DownloadPolicy, "--download-policy <mode>", "", "Download policy mode ('none', 'latest', 'latest_k', 'all')"),
@@ -54,12 +51,12 @@ func buildPolicyCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "queue",
-		Description: "Manage ad removal queue (list, add, remove, or clear)",
-		UsageLine:   "abs queue <list|add|remove|clear> [ids] [options]",
+		Description: "Manage the ad removal (AdR) processing queue",
+		UsageLine:   "abs queue [command]",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "list",
-				Description: "List queued episodes across all podcasts or for a specific podcast",
+				Description: "List queued episodes across library or podcast",
 				UsageLine:   "abs queue list [podcast-id] [options]",
 				Args:        clihelp.MaximumNArgs(1),
 				Options: []clihelp.Option{
@@ -75,7 +72,7 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "add",
-				Description: "Add one or more episodes (or all uncleaned episodes of a podcast) to the queue",
+				Description: "Add episodes or podcast uncleaned episodes to queue",
 				UsageLine:   "abs queue add <id...>",
 				Args:        clihelp.MinimumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
@@ -99,7 +96,7 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 			},
 			{
 				Name:        "clear",
-				Description: "Clear queue for a specific podcast or for all podcasts",
+				Description: "Clear queue for a specific podcast or all podcasts",
 				UsageLine:   "abs queue clear [podcast-id]",
 				Args:        clihelp.MaximumNArgs(1),
 				Run: func(ctx *clihelp.Context) error {
@@ -109,14 +106,6 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 					return nil
 				},
 			},
-		},
-		Parameters: []clihelp.Param{
-			{Name: "<subcommand>", Description: "'list', 'add', 'remove', or 'clear'"},
-			{Name: "[ids]", Description: "Podcast or episode IDs"},
-		},
-		Options: []clihelp.Option{
-			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress table formatting"),
-			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
@@ -129,12 +118,9 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 func buildFetchCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "fetch",
-		Description: "Fetch and refresh RSS feed for a podcast or all podcasts",
-		UsageLine:   "abs fetch [podcast-id]",
-		Parameters: []clihelp.Param{
-			{Name: "[podcast-id]", Description: "Optional podcast short ID, index, or name (defaults to all)"},
-		},
-		Args: clihelp.MaximumNArgs(1),
+		Description: "Fetch and sync latest RSS feeds for podcasts",
+		UsageLine:   "abs fetch [options] [podcast-id]",
+		Args:        clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "fetch"
 			opts.Args = ctx.Args
@@ -143,17 +129,72 @@ func buildFetchCommand(opts *CLIOptions, action *string) clihelp.Command {
 	}
 }
 
-func buildPlayCommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "play",
-		Description: "Play episode audio by episode ID",
-		UsageLine:   "abs play <episode-id>",
-		Parameters: []clihelp.Param{
-			{Name: "<episode-id>", Description: "Episode short ID (eXXXXX), filename, or path"},
+		Name:        "player",
+		Description: "Control background audio playback",
+		UsageLine:   "abs player [command]",
+		Subcommands: []clihelp.Command{
+			{
+				Name:        "play",
+				Description: "Play an episode or resume playback",
+				UsageLine:   "abs player play [id]",
+				Args:        clihelp.RangeArgs(0, 1),
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "play"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "stop",
+				Description: "Stop background audio playback",
+				UsageLine:   "abs player stop",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "stop"
+					return nil
+				},
+			},
+			{
+				Name:        "pause",
+				Description: "Toggle playback pause state",
+				UsageLine:   "abs player pause",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "pause"
+					return nil
+				},
+			},
+			{
+				Name:        "status",
+				Description: "Display player status and progress",
+				UsageLine:   "abs player status",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "status"
+					return nil
+				},
+			},
+			{
+				Name:        "daemon",
+				Hidden:      true,
+				Description: "Internal background player daemon",
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "daemon"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
 		},
-		Args: clihelp.ExactArgs(1),
+		Args: clihelp.RangeArgs(0, 2),
 		Run: func(ctx *clihelp.Context) error {
-			*action = "play"
+			*action = "player"
 			opts.Args = ctx.Args
 			return nil
 		},
@@ -164,11 +205,8 @@ func buildTranscriptCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "transcript",
 		Description: "View or export transcript for an episode",
-		UsageLine:   "abs transcript <episode-id> [options]",
-		Parameters: []clihelp.Param{
-			{Name: "<episode-id>", Description: "Episode short ID (eXXXXX), filename, or path"},
-		},
-		Args: clihelp.ExactArgs(1),
+		UsageLine:   "abs transcript [options] <id>",
+		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.ExportFormat, "--export <format>", "", "Export format: 'txt' or 'srt'"),
 			hideOption(clihelp.Bool(&opts.ExportTXT, "--txt", false, "Export transcript to plain text file")),

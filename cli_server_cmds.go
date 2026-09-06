@@ -7,7 +7,8 @@ import (
 func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
 	return clihelp.Command{
 		Name:        "server",
-		Description: "Manage and interact with the Audiobookshelf server",
+		Description: "Manage and interact with Audiobookshelf server",
+		UsageLine:   "abs server [command]",
 		Subcommands: buildServerSubcommands(opts, action, countVal, keepVal),
 	}
 }

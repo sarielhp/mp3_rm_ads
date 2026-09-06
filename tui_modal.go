@@ -49,7 +49,7 @@ func (m *tuiModel) drawHelpModal() string {
 		"  c            Ad policy",
 		"  e / o        Timeline",
 		"  v / Space    Multi-select",
-		"  r            Queue ad removal",
+		"  r            Queue AdR",
 		"  x            Delete queue item",
 		"  i            Cover art",
 	}

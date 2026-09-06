@@ -206,6 +206,11 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
  - Progress: Docker log polling via `docker logs --tail N`
  - Ad detection: LLM API (Ollama, OpenRouter, etc.)
  - Audio cutting: ffmpeg filter_complex with concat
+ - Backends (`pkg/backend/`):
+   - **Audiobookshelf (ABS)**: Primary podcast server backend via REST API (`audiobookshelf_url`, `audiobookshelf_user`, `audiobookshelf_pass`, `audiobookshelf_token`, `audiobookshelf_sqlite_db_path`).
+   - **PodFetch**: Full-featured alternative podcast backend (`pkg/backend/podfetch*.go`) via REST API and SQLite database (`podfetch_url`, `podfetch_user`, `podfetch_pass`, `podfetch_api_key`, `podfetch_db_path`). Selected via `backend_type: "podfetch"`.
+ - Playback Architecture: Headless background playback daemon spawned via `abs player <play|stop|pause|status> [id]`, controlled through IPC socket `/tmp/abs_player.sock` with MPRIS D-Bus integration (supports mpv and cvlc fallback).
+ - Terminology: Standardized on "AdR" (Ad Removal) and "NeedAdR" across CLI, tables, status badges, and TUI.
  - Config: `~/.config/abs/config.json`
  - Migration: Run `abs config migrate` to import settings from legacy `podcasts_manager` or `mp3_rm_ads` configs.
  - Environment Overrides: Supported env vars override config values:
@@ -213,6 +218,10 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
    - `ABS_URL` / `AUDIOBOOKSHELF_URL`
    - `ABS_USER` / `AUDIOBOOKSHELF_USER`
    - `ABS_PASS` / `AUDIOBOOKSHELF_PASS`
+   - `PODFETCH_URL`
+   - `PODFETCH_USER`
+   - `PODFETCH_PASS`
+   - `PODFETCH_DB_PATH`
    - `PODCASTS_DIR`
    - `WHISPER_LANGUAGE`
    - `WHISPER_DOCKER_CONTAINER`

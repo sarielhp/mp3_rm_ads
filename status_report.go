@@ -83,9 +83,9 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 		fmt.Printf("  - Podcasts:          %d\n", podcastsCount)
 		fmt.Printf("  - Total Episodes:    %d\n", totalEpisodes)
 		if totalNeedsAd > 0 {
-			fmt.Printf("  - Needs Ad Removal:  %s\n", boldYellow(fmt.Sprintf("%d episode(s)", totalNeedsAd)))
+			fmt.Printf("  - AdR Status:        %s\n", boldYellow(fmt.Sprintf("%d episode(s) need AdR", totalNeedsAd)))
 		} else {
-			fmt.Printf("  - Needs Ad Removal:  %s\n", boldGreen("0 (All clean)"))
+			fmt.Printf("  - AdR Status:        %s\n", boldGreen("0 (All clean)"))
 		}
 	}
 	return podcastsCount, totalEpisodes, totalNeedsAd
@@ -138,8 +138,8 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		fmt.Printf("\n%s\n", strings.Repeat("=", 90))
 		fmt.Println("AUDIOBOOKSHELF DATABASE STATUS REPORT (DRY RUN)")
 		fmt.Printf("%s\n", strings.Repeat("=", 90))
-		fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-16s\n", "#", "ID", "Podcast Name", "Episodes", "Needs Ad Removal")
-		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
+		fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-10s\n", "#", "ID", "Title", "Episodes", "NeedAdR")
+		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-10s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 10))
 	}
 
 	totalEpisodes := 0
@@ -261,8 +261,8 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	fmt.Printf("\n%s\n", strings.Repeat("=", 90))
 	fmt.Println("LOCAL LIBRARY PODCAST STATUS REPORT")
 	fmt.Printf("%s\n", strings.Repeat("=", 90))
-	fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-16s\n", "#", "ID", "Podcast Name", "Episodes", "Needs Ad Removal")
-	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
+	fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-10s\n", "#", "ID", "Title", "Episodes", "NeedAdR")
+	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-10s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 10))
 
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
