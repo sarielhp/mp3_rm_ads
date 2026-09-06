@@ -58,8 +58,8 @@ func loadSingleTUIPodcast(podDir, name string) *tuiPodcast {
 		}
 	}
 
-	mp3Files, err := filepath.Glob(filepath.Join(podDir, "*.mp3"))
-	if err != nil || len(mp3Files) == 0 {
+	mp3Files := findMP3Files(podDir)
+	if len(mp3Files) == 0 {
 		return nil
 	}
 
@@ -88,9 +88,15 @@ func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]Cach
 		modTime = fi.ModTime()
 	}
 	fn := filepath.Base(mp3)
+	title := ""
+	if strings.EqualFold(fn, "podcast.mp3") {
+		title = filepath.Base(filepath.Dir(mp3))
+		fn = title + ".mp3"
+	}
 	ep := tuiEpisode{
 		filename:      fn,
 		path:          absPath,
+		title:         title,
 		hasAdsRemoved: hasCut,
 		hasTranscript: hasTx,
 		fileSize:      fSize,

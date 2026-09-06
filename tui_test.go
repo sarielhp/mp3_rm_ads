@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -132,6 +133,32 @@ func TestTUILoadPodcastsNonExistentDir(t *testing.T) {
 	_, err := loadTUIPodcasts("/nonexistent/path/xyz123")
 	if err == nil {
 		t.Error("expected error for nonexistent dir")
+	}
+}
+
+func TestTUILoadPodcastsNestedPodfetchStructure(t *testing.T) {
+	d := t.TempDir()
+	podDir := filepath.Join(d, "NPR News Now")
+	epDir := filepath.Join(podDir, "NPR News- 09-05-2026 9PM EDT")
+	_ = os.MkdirAll(epDir, 0755)
+	_ = os.WriteFile(filepath.Join(epDir, "podcast.mp3"), []byte("dummy audio"), 0644)
+
+	pods, err := loadTUIPodcasts(d)
+	if err != nil {
+		t.Fatalf("loadTUIPodcasts error: %v", err)
+	}
+	if len(pods) != 1 {
+		t.Fatalf("expected 1 podcast, got %d", len(pods))
+	}
+	if pods[0].name != "NPR News Now" {
+		t.Errorf("expected NPR News Now, got %s", pods[0].name)
+	}
+	if len(pods[0].episodes) != 1 {
+		t.Fatalf("expected 1 episode, got %d", len(pods[0].episodes))
+	}
+	ep := pods[0].episodes[0]
+	if ep.title != "NPR News- 09-05-2026 9PM EDT" {
+		t.Errorf("expected episode title %q, got %q", "NPR News- 09-05-2026 9PM EDT", ep.title)
 	}
 }
 

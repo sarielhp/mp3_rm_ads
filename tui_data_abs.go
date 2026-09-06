@@ -18,12 +18,8 @@ func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 		return nil, err
 	}
 
-	if cfg.AudiobookshelfURL == "" || cfg.AudiobookshelfUser == "" || cfg.AudiobookshelfPass == "" {
-		return podcasts, nil
-	}
-
 	b, err := getBackend(cfg, true)
-	if err != nil {
+	if err != nil || b == nil {
 		return podcasts, nil
 	}
 
