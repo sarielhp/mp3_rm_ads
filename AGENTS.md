@@ -25,7 +25,7 @@
 | `tools/version.sh` | Print current version from `VERSION` file |
 | `tools/visual_audit` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
 | `tools/verify_remote_queue` | Live remote queue compliance audit against 24h & duration policy |
-| `tools/bump-version` | Bump version, git add/commit/push (skips duplicate gate if .verified_head matches; silent, outputs "Success VERSION (commit+push)") |
+| `tools/bump` | Bump version, git add/commit/push (skips duplicate gate if .verified_head matches; silent, outputs "Success VERSION (commit+push)") |
 | `tools/commit <msg>` | Quality gate + stage + commit + records .verified_head (silent, outputs "Success <msg>") |
 | `tools/snapshot [msg]` | Fast WIP commit without gating (<0.1s, never pushes) |
 | `tools/checkpoint.sh` | Auto micro-commit of all changes (delegates to `tools/snapshot`) |
@@ -67,7 +67,7 @@ make bump                                   # deduplicates gate via .verified_he
 ```
 
 #### Deduplicated Commit-to-Bump Pipeline
-`tools/commit` executes `./tools/check`. Upon passing and committing, it records the committed HEAD SHA into `.verified_head`. When `tools/bump-version` (`make bump`) runs immediately afterward, it checks whether HEAD matches `.verified_head` and only `VERSION` (or nothing) is modified in the working tree. If verified, it skips the redundant full CI quality gate (`./tools/check --full`), saving ~60s of duplicate test runs, increments the patch version, commits, pushes, and removes `.verified_head`. If `.verified_head` is absent, mismatched, or other files are modified, it executes the full quality gate as usual before pushing.
+`tools/commit` executes `./tools/check`. Upon passing and committing, it records the committed HEAD SHA into `.verified_head`. When `tools/bump` (`make bump`) runs immediately afterward, it checks whether HEAD matches `.verified_head` and only `VERSION` (or nothing) is modified in the working tree. If verified, it skips the redundant full CI quality gate (`./tools/check --full`), saving ~60s of duplicate test runs, increments the patch version, commits, pushes, and removes `.verified_head`. If `.verified_head` is absent, mismatched, or other files are modified, it executes the full quality gate as usual before pushing.
 
 #### Fast Inner-Loop Testing Advice
 During active development, use lightweight commands to maximize iteration speed:

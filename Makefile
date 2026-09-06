@@ -60,7 +60,7 @@ version:
 	@./tools/version.sh
 
 bump:
-	@./tools/bump-version
+	@./tools/bump
 
 commit:
 	@./tools/commit $(ARGS)
