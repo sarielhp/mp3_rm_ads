@@ -1,254 +1,403 @@
 # Systems Code Review Report #001 (Lens: systems)
 
-- **Date**: 2026-09-05
-- **Auditor**: Gemini 3.8 Flash (Tier 0 Workhorse) via `tools/audit`
+- **Date**: 2026-09-06
+- **Auditor**: Claude / Codex (Tier 1 Standard) via `tools/audit`
 - **Focus Lens**: `systems`
-- **Model Tier**: `TIER0`
-- **Backend**: `gemini`
+- **Model Tier**: `STANDARD`
+- **Backend**: `auto`
 - **Scope**: `.`
 - **Status**: Action Required
 
 ---
 
-Auditing via Gemini Flash (bws run) [Profile: systems]...
-[SEVERITY]: Critical
-[LOCATION]: `lock.go:82-122` (`acquireWorkerLock`)
-[ROOT CAUSE]: Time-of-check to time-of-use (TOCTOU) race condition and non-atomic file creation in lock acquisition. `acquireWorkerLock` attempts to enforce single-instance execution for background remote workers. It first checks for lock existence using `os.ReadFile(lockPath)`, and if not found, proceeds to write the current process PID using `os.WriteFile(lockPath, []byte(content), 0644)`. Because `os.WriteFile` opens the file with `os.O_WRONLY|os.O_CREATE|os.O_TRUNC` rather than `os.O_EXCL`, concurrent processes attempting to start a worker will both observe a missing lockfile and both successfully overwrite `.worker.lock`. Both processes receive an `unlock` callback with `nil` error, completely breaking mutual exclusion.
+Auditing via Codex CLI (gpt-5.6-sol, tier: standard) [Profile: systems]...
+[SEVERITY]: Critical  
+[LOCATION]: `lock.go:76-95, 98-131` — `checkStaleWorkerLock` / `acquireWorkerLock`  
+[ROOT CAUSE]: The PID-file locking protocol can remove a lock belonging to a live worker. Any lock older than six hours is declared stale even when its PID is alive. Stale-lock reclamation also has an ABA race: two contenders can inspect the same stale file, after which one deletes the newly created lock of the other.  
 [FAILURE TRACE]:
-1. Worker A and Worker B are triggered near-simultaneously (e.g., automated cron job and manual CLI invocation `abs remote scan`).
-2. Both execute `os.ReadFile(lockPath)`, which fails with `os.ErrNotExist`.
-3. Worker A writes its PID via `os.WriteFile`.
-4. Worker B immediately overwrites `.worker.lock` with its own PID via `os.WriteFile`.
-5. Both Worker A and Worker B return `(unlockFunc, nil)`, entering the worker processing loop concurrently on the same directory, corrupting manifests and causing duplicate/colliding ffmpeg operations.
-[REMEDIATION]:
-Use atomic file creation with `os.O_CREATE|os.O_EXCL` so only one process can successfully create and hold the lock file:
+
+1. Worker A legitimately runs longer than six hours, or an old stale lock exists.
+2. Processes B and C both classify the lock as stale.
+3. B removes it and creates a new lock containing B’s PID.
+4. C executes its already-authorized `os.Remove(lockPath)`, deleting B’s lock, then creates its own.
+5. Both B and C process the same remote queue concurrently; either unlock callback can subsequently delete the other owner’s lock.
+
+[REMEDIATION]: Use an OS advisory lock whose ownership is tied to an open descriptor. Do not infer ownership from age or unlink locks during acquisition.
+
 ```go
 func acquireWorkerLock(resolvedDir string) (func(), error) {
 	lockPath := filepath.Join(resolvedDir, ".worker.lock")
-	content := fmt.Sprintf("%d\n%s\n", os.Getpid(), time.Now().UTC().Format(time.RFC3339))
+	fl := flock.New(lockPath)
 
-	f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+	locked, err := fl.TryLock()
 	if err != nil {
-		if !os.IsExist(err) {
-			return nil, fmt.Errorf("failed to create worker lockfile %s: %w", lockPath, err)
-		}
-		// Existing lock inspection and stale lock recovery logic...
-	} else {
-		_, _ = f.WriteString(content)
-		_ = f.Close()
+		return nil, fmt.Errorf("acquire worker lock %s: %w", lockPath, err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("remote worker is already running")
 	}
 
 	return func() {
-		_ = os.Remove(lockPath)
+		_ = fl.Unlock()
 	}, nil
 }
 ```
 
 ---
 
-[SEVERITY]: Major
-[LOCATION]: `tui_data_abs.go:103-113` (`buildABSEpisodeMap`) and `quarantine.go:72-74` (`quarantineAbandonedDuplicates`)
-[ROOT CAUSE]: Nil pointer dereference of optional `ep.AudioFile.Metadata`. In `backend.Episode`, `AudioFile` is a `*PodcastAudioFile`, within which `Metadata` is an optional pointer (`*AudioFileMetadata` tagged with `json:"metadata,omitempty"`). When Audiobookshelf returns episode items with audio stream objects that lack metadata, `ep.AudioFile != nil` evaluates to true, but `ep.AudioFile.Metadata` is `nil`. Calling `ep.AudioFile.Metadata.Filename` or `ep.AudioFile.Metadata.RelPath` immediately panics at runtime with `runtime error: invalid memory address or nil pointer dereference`.
+[SEVERITY]: Critical  
+[LOCATION]: `batch_proc_file.go:137-149` — `checkSkipOrLockAudioFile`  
+[ROOT CAUSE]: Lock acquisition fails open. An actual locking error prints a warning but processing continues with a nil lock. This converts permission errors, filesystem failures, and unsupported locking into authorization for unprotected destructive audio processing.  
 [FAILURE TRACE]:
-1. Audiobookshelf returns episode entries where the audio track is present but `metadata` is null/omitted.
-2. TUI startup loads podcasts and calls `buildABSEpisodeMap(episodes)`.
-3. `ep.AudioFile != nil` evaluates to true, but `ep.AudioFile.Metadata` is `nil`.
-4. Execution reaches `ep.AudioFile.Metadata.Filename`.
-5. The application panics and crashes during initial view rendering.
-[REMEDIATION]:
-Check `ep.AudioFile.Metadata != nil` prior to field access (consistent with checks in `abs_rescan.go` and `backend_cli.go`):
-```go
-// tui_data_abs.go
-if ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
-	if ep.AudioFile.Metadata.Filename != "" {
-		episodeMap[ep.AudioFile.Metadata.Filename] = ep
-		episodeMap[normalizeEpisodeTitle(ep.AudioFile.Metadata.Filename)] = ep
-	}
-	if ep.AudioFile.Metadata.RelPath != "" {
-		cleanRel := filepath.Base(ep.AudioFile.Metadata.RelPath)
-		episodeMap[cleanRel] = ep
-		episodeMap[normalizeEpisodeTitle(cleanRel)] = ep
-	}
-}
 
-// quarantine.go
-if ep.AudioFile != nil && ep.AudioFile.Metadata != nil && ep.AudioFile.Metadata.Filename != "" {
-	fn = ep.AudioFile.Metadata.Filename
+1. Two processes target the same MP3.
+2. Both encounter a lock error, such as an inaccessible lock path or filesystem I/O failure.
+3. Both continue because only `fileLock == nil && err == nil` causes a skip.
+4. Both transcribe/cut and race through moves of the original, `.precut`, output, status, and work directory.
+5. One process can remove or overwrite files still in use by the other.
+
+[REMEDIATION]:
+
+```go
+fileLock, err := acquireFileLock(mainMP3File)
+if err != nil {
+	if !cli.Quiet {
+		fmt.Fprintf(os.Stderr, "Cannot safely process %s: %v\n", shortName, err)
+	}
+	return nil, false, false
+}
+if fileLock == nil {
+	if !cli.Quiet {
+		fmt.Printf("Skipping %q: already being processed\n", shortName)
+	}
+	return nil, false, false
 }
 ```
 
 ---
 
-[SEVERITY]: Major
-[LOCATION]: `tui_search.go:271-285` (`prevTranscriptMatch`)
-[ROOT CAUSE]: Out-of-bounds slice indexing panic caused by stale index offset after result set shrinkage. `prevTranscriptMatch()` decrements `m.transcriptMatchIdx` and wraps negative indices to `len(matches) - 1`. However, if a user navigates forward in a large match set (e.g., `m.transcriptMatchIdx = 5` out of 10 matches) and subsequently types an additional query character such that fewer matches are found (e.g., 2 matches), `m.transcriptMatchIdx` remains 5. When `prevTranscriptMatch()` is invoked, it decrements 5 to 4, checks `4 < 0` (false), and directly evaluates `matches[4]` against a slice of length 2, causing an out-of-range panic.
+[SEVERITY]: Major  
+[LOCATION]: `download_queue.go:234-309` — `ProcessNextDownloadQueueItem`  
+[ROOT CAUSE]: Queue claiming is neither cross-process exclusive nor durably validated. `downloadQueueMutex` protects only one process, while the persistent queue is shared. The transition to `"downloading"` is also executed with its error discarded. `reconcileStaleDownloadingItems` can requeue another live process’s active item because `"downloading"` carries no owner or lease.  
 [FAILURE TRACE]:
-1. User enters transcript search mode and inputs a prefix yielding 10 matches.
-2. User presses `n` multiple times to cycle to match index 5 (`m.transcriptMatchIdx = 5`).
-3. User adds a character to narrow the search; `matchingTranscriptIndices()` now yields 2 matches.
-4. User presses `N` (Shift+N or Shift+Tab) to navigate to the previous match.
-5. `m.transcriptMatchIdx--` decrements to 4.
-6. `matches[m.transcriptMatchIdx]` accesses `matches[4]` on a slice with length 2.
-7. Runtime panic: `index out of range [4] with length 2`.
-[REMEDIATION]:
-Clamp and wrap `m.transcriptMatchIdx` against `len(matches)` before indexing:
+
+1. Two application processes read the same queued item.
+2. Each process holds only its own `downloadQueueMutex`.
+3. Both select the item and write `"downloading"`.
+4. Alternatively, one write fails due to disk exhaustion but that process still continues.
+5. Both submit the same download, and their final whole-file saves overwrite one another’s state.
+
+[REMEDIATION]: Serialize persistent read-modify-write operations with an inter-process lock, check persistence errors, and use an owner/lease rather than blindly requeuing every `"downloading"` item.
+
 ```go
-func (m *tuiModel) prevTranscriptMatch() {
-	matches := m.matchingTranscriptIndices()
-	if len(matches) == 0 {
-		if m.searchQuery != "" {
-			m.showPopup(fmt.Sprintf("No matches for %q", m.searchQuery))
+func claimDownloadQueueItem() (DownloadQueueItem, bool, error) {
+	lock, err := acquireFileLock(getDownloadQueueFilePath())
+	if err != nil || lock == nil {
+		return DownloadQueueItem{}, false, err
+	}
+	defer lock.Release()
+
+	q := loadDownloadQueue()
+	for i := range q.Items {
+		if q.Items[i].Status != "queued" {
+			continue
 		}
+		q.Items[i].Status = "downloading"
+		if err := saveDownloadQueue(q); err != nil {
+			return DownloadQueueItem{}, false, err
+		}
+		return q.Items[i], true, nil
+	}
+	return DownloadQueueItem{}, false, nil
+}
+```
+
+---
+
+[SEVERITY]: Major  
+[LOCATION]: `download_queue.go:312-335` — `TriggerDownloadQueueWorker`  
+[ROOT CAUSE]: Worker shutdown has a lost-wakeup race. A trigger observed while `downloadWorkerRunning` is still true is discarded, even if the worker has already determined the queue is empty and is committed to exiting.  
+[FAILURE TRACE]:
+
+1. Worker calls `ProcessNextDownloadQueueItem` and receives `processed == false`.
+2. Another goroutine enqueues an item.
+3. Its trigger sees `downloadWorkerRunning == true` and returns.
+4. The existing worker exits and only then clears `downloadWorkerRunning`.
+5. The new item remains queued indefinitely until another manual trigger occurs.
+
+[REMEDIATION]: Record triggers received while a worker is active and consume that pending signal before exiting.
+
+```go
+var downloadWorkerPending bool
+
+func TriggerDownloadQueueWorker(client *ABSClient) {
+	downloadWorkerMu.Lock()
+	if downloadWorkerRunning {
+		downloadWorkerPending = true
+		downloadWorkerMu.Unlock()
 		return
 	}
-	if m.transcriptMatchIdx <= 0 || m.transcriptMatchIdx >= len(matches) {
-		m.transcriptMatchIdx = len(matches) - 1
-	} else {
-		m.transcriptMatchIdx--
-	}
-	m.scrollToTranscriptLine(matches[m.transcriptMatchIdx])
-	m.showPopup(fmt.Sprintf("Match %d of %d", m.transcriptMatchIdx+1, len(matches)))
+	downloadWorkerRunning = true
+	downloadWorkerMu.Unlock()
+
+	go func() {
+		for {
+			processed, _ := ProcessNextDownloadQueueItem(client)
+			if processed {
+				continue
+			}
+
+			downloadWorkerMu.Lock()
+			if downloadWorkerPending {
+				downloadWorkerPending = false
+				downloadWorkerMu.Unlock()
+				continue
+			}
+			downloadWorkerRunning = false
+			downloadWorkerMu.Unlock()
+			return
+		}
+	}()
 }
 ```
 
 ---
 
-[SEVERITY]: Major
-[LOCATION]: `pkg/backend/abs_keep.go:31-33` and `pkg/backend/podfetch_ops.go:214-216` (`ApplyKeepPolicy`)
-[ROOT CAUSE]: Slice bounds out-of-range panic on negative `keep` count. In `ApplyKeepPolicy`, the deletion count is computed as `toDeleteCount := len(sortedDownloaded) - keep` inside the condition `if len(sortedDownloaded) > keep`. If `keep < 0` (such as from negative CLI input `--keep -1` or corrupted configuration), `len(sortedDownloaded) > keep` evaluates to true (e.g., 3 > -1). The calculation `3 - (-1)` produces `4`, which exceeds `len(sortedDownloaded)`. Slicing `sortedDownloaded[:toDeleteCount]` causes a panic: `slice bounds out of range [:4] with capacity 3`.
+[SEVERITY]: Major  
+[LOCATION]: `download_queue.go:254-291` — `ProcessNextDownloadQueueItem`  
+[ROOT CAUSE]: `client` can remain nil while `podcastID` is nonempty. The branch decision checks only `podcastID`, then unconditionally dereferences `client`.  
 [FAILURE TRACE]:
-1. User runs `abs scan --keep -1` or a negative keep policy is loaded.
-2. `ApplyKeepPolicy` is invoked on a podcast with downloaded episodes.
-3. `len(sortedDownloaded) > keep` evaluates to true.
-4. `toDeleteCount := len(sortedDownloaded) - keep` evaluates to a value strictly greater than `len(sortedDownloaded)`.
-5. Slice indexing `sortedDownloaded[:toDeleteCount]` panics.
-[REMEDIATION]:
-Validate `keep` and clamp `toDeleteCount` to the slice length:
-```go
-if keep < 0 {
-	return 0, fmt.Errorf("keep count cannot be negative: %d", keep)
-}
-if len(sortedDownloaded) > keep {
-	toDeleteCount := len(sortedDownloaded) - keep
-	if toDeleteCount > len(sortedDownloaded) {
-		toDeleteCount = len(sortedDownloaded)
-	}
-	episodesToDelete := sortedDownloaded[:toDeleteCount]
-```
 
----
+1. A persisted queue item contains `PodcastID`.
+2. Processing is triggered with `client == nil`.
+3. Audiobookshelf is disabled, its URL is empty, or client construction is unavailable.
+4. `podcastID == ""` is false.
+5. Line 291 calls `client.DownloadEpisodes`, causing a nil-pointer panic in the background goroutine and terminating the process.
 
-[SEVERITY]: Major
-[LOCATION]: `remote_manifest.go:63-71` (`saveDoneManifest`) and `episode_status.go:92-99` (`saveEpisodeStatus`)
-[ROOT CAUSE]: Missing file synchronization (`fsync`) before atomic rename causing state corruption across crashes. Both functions write manifest data to a temporary file via `os.WriteFile(tmpPath, data, 0644)` and immediately call `os.Rename(tmpPath, path)`. Because `os.WriteFile` does not call `f.Sync()` before closing the file descriptor, data resides exclusively in the OS page cache. Under standard filesystem semantics (ext4/XFS), directory entry updates from `rename` can be committed to disk journal before dirty data pages are flushed. Following an ungraceful shutdown, system crash, or VM reset, the destination file is observed as zero-length (0 bytes) or corrupted. Subsequent loads via `loadDoneManifest` or `loadEpisodeStatus` fail with JSON parse errors, permanently corrupting remote sync state.
-[FAILURE TRACE]:
-1. Worker completes processing an episode and writes `done.json` or `<episode>.json`.
-2. `os.WriteFile` writes to cache and closes; `os.Rename` updates directory structure.
-3. Power loss or host reset occurs before page cache is flushed to disk.
-4. Machine boots; `done.json` or status file has size 0 on disk.
-5. Next run attempts `json.Unmarshal` on `done.json`, throwing `unexpected end of JSON input` and aborting all subsequent pulls.
 [REMEDIATION]:
-Delegate persistence to `writeFileAtomic` (defined in `format.go`), which guarantees `f.Sync()` prior to `os.Rename`:
+
 ```go
-func saveDoneManifest(path string, m *RemoteDoneManifest) error {
-	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory for done manifest %s: %w", dir, err)
-	}
-	m.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	if m.Episodes == nil {
-		m.Episodes = make(map[string]RemoteDoneItem)
-	}
-	data, err := json.MarshalIndent(m, "", "  ")
-	if err != nil {
-		return fmt.Errorf("failed to marshal done manifest: %w", err)
-	}
-	return writeFileAtomic(path, append(data, '\n'), 0644)
+var dlErr error
+switch {
+case client == nil:
+	dlErr = fmt.Errorf("download client is unavailable")
+case podcastID == "":
+	dlErr = fmt.Errorf("podcast ID not found for %q", item.PodcastTitle)
+default:
+	dlErr = client.DownloadEpisodes(podcastID, []FeedEpisode{feedEp})
 }
 ```
 
 ---
 
-[SEVERITY]: Major
-[LOCATION]: `lock.go:32-35` and `57-60` (`acquireFileLock` and `acquireFileLockWithTimeout`)
-[ROOT CAUSE]: Inadvertent lock release under POSIX `fcntl` semantics due to second file descriptor close. `acquireFileLock` and `acquireFileLockWithTimeout` obtain an advisory lock on `lockPath` using `flock.New(lockPath)`. Immediately after acquiring the lock, they open `lockPath` a second time using `os.OpenFile(lockPath, os.O_WRONLY|os.O_TRUNC, 0644)` to write the PID, and call `f.Close()`. Under POSIX semantics, closing ANY open file descriptor associated with an inode releases ALL locks held on that inode by the entire process (`fcntl` / `F_SETLK`). On network filesystems (NFS/CIFS) or systems where `flock` translates to `fcntl`, `f.Close()` immediately and silently releases the lock that `fl` just acquired, leaving the critical section completely unprotected.
+[SEVERITY]: Major  
+[LOCATION]: `tui_batch.go:127-147` and `tui_batch.go:199-226` — single and batch download enqueue paths  
+[ROOT CAUSE]: Two components own the same side effect. The TUI directly calls `DownloadEpisodes`, then starts the queue worker, which calls `DownloadEpisodes` again for the same queued records.  
 [FAILURE TRACE]:
-1. Process A calls `acquireFileLock` on a shared or NFS-mounted directory.
-2. `fl.TryLock()` successfully acquires the lock.
-3. Lines 32-35 open `lockPath` as a second descriptor `f` and invoke `f.Close()`.
-4. The kernel drops the POSIX advisory lock associated with the inode for Process A.
-5. Process B calls `acquireFileLock` concurrently and successfully acquires the lock.
-6. Both processes execute their critical sections concurrently.
-[REMEDIATION]:
-Do not open and close a secondary file descriptor to record PID; rely on the existing descriptor held by `flock`:
+
+1. A feed-only episode is successfully appended to the queue.
+2. The TUI immediately submits it at lines 145 or 224.
+3. The item remains `"queued"`.
+4. The worker starts and claims that same item.
+5. The worker submits an identical download request, potentially creating duplicate server jobs or competing file writes.
+
+[REMEDIATION]: Make the queue worker the sole download executor.
+
 ```go
-func acquireFileLock(targetPath string) (*fileLockWrapper, error) {
-	lockPath := targetPath + ".lock"
-	fl := flock.New(lockPath)
-
-	locked, err := fl.TryLock()
-	if err != nil {
-		return nil, fmt.Errorf("failed to acquire lock on %s: %w", lockPath, err)
-	}
-	if !locked {
-		return nil, nil
-	}
-
-	return &fileLockWrapper{fl: fl, lockPath: lockPath}, nil
+if queuedCount > 0 {
+	m.showToast(
+		fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount),
+		ToastSuccess,
+	)
+	TriggerDownloadQueueWorker(absCli)
 }
+```
+
+Remove the direct `absCli.DownloadEpisodes(...)` calls from both enqueue paths.
+
+---
+
+[SEVERITY]: Major  
+[LOCATION]: `batch_proc_file.go:283-299` — `installCutAudioAndPreserveOriginal`  
+[ROOT CAUSE]: Installing cut audio is a non-transactional two-move operation. The original path is removed before the replacement is installed. A crash or second-move failure leaves the canonical episode path missing.  
+[FAILURE TRACE]:
+
+1. `mainMP3File` is moved to `precutFile`.
+2. The process crashes, the filesystem fills, or `safeMove(tempOutputFile, outputFile)` fails.
+3. `mainMP3File`/`outputFile` no longer exists.
+4. The original survives only under the internal `.precut` name, leaving the media library broken.
+
+[REMEDIATION]: Preserve the original without removing the canonical path, then atomically rename the completed output over it.
+
+```go
+if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
+	checkPrecutSymlink(precutFile)
+	if err := os.Link(mainMP3File, precutFile); err != nil {
+		return false
+	}
+}
+
+if err := os.Rename(tempOutputFile, outputFile); err != nil {
+	_ = os.Remove(precutFile)
+	return false
+}
+return true
+```
+
+A durable atomic-copy helper may replace `os.Link` where hard links are unsuitable.
+
+---
+
+[SEVERITY]: Major  
+[LOCATION]: `batch_proc_file.go:218-232` — `handleNoAdsDetected`  
+[ROOT CAUSE]: Completion metadata is committed before the output file is installed. The output copy is non-atomic and its error is discarded. Both the `"done"` status and zero-cut metadata can cause later runs to treat an absent or partially copied output as complete.  
+[FAILURE TRACE]:
+
+1. The LLM returns no ad segments.
+2. Cuts metadata and `StateDone` are persisted.
+3. `copyFile` opens/truncates the output.
+4. Copying fails or the process crashes midway.
+5. The episode is subsequently skipped as completed although its declared cleaned output is missing or truncated.
+
+[REMEDIATION]: Install the output atomically and successfully before committing completion metadata.
+
+```go
+func installNoAdsOutput(source, output string) error {
+	if source == output {
+		return nil
+	}
+	workDir := workDirFor(output)
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return err
+	}
+	tmp := filepath.Join(workDir, filepath.Base(output)+".tmp")
+	verifyTempFile(tmp)
+
+	if err := copyFileErr(source, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return safeMove(tmp, output)
+}
+
+// Only after installNoAdsOutput succeeds:
+saveCutsJSON(mainMP3File, totalDuration, nil, &selectedProfile, cli.Quiet)
+return updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+	st.Status = StateDone
+	st.Cleaned = EpisodeAudioMeta{
+		Filename: filepath.Base(outputFile),
+		DurationSec: totalDuration,
+	}
+	st.Ads = nil
+})
 ```
 
 ---
 
-[SEVERITY]: Moderate
-[LOCATION]: `player_sink.go:105-124` (`AudioPlayer.CycleSpeaker`)
-[ROOT CAUSE]: Lock contention held across long external process executions (`exec.Command(...).Run()`). `AudioPlayer.CycleSpeaker()` acquires `p.mu.Lock()` and retains it while executing external commands `pactl set-default-sink` and `wpctl set-default`. The mutex `p.mu` is shared with the Bubble Tea TUI render loop (`View()`, `RenderProgressBar()`, `RenderVolumeBar()`, `UpdatePosition()`), which queries player state on every keypress and tick. If PulseAudio or PipeWire is slow or unresponsive, `p.mu` remains held for seconds, blocking the TUI event loop and causing terminal UI freezes.
+[SEVERITY]: Major  
+[LOCATION]: `remote_batch.go:111-136` — `pushSingleAudioFile`  
+[ROOT CAUSE]: Local state transitions to `StateQueuedRemote` before either remote upload succeeds, and the status-save error is ignored. A failed transfer therefore leaves a false in-flight marker that normal filtering treats as authoritative.  
 [FAILURE TRACE]:
-1. User presses the hotkey to cycle audio output devices.
-2. `CycleSpeaker()` acquires `p.mu.Lock()`.
-3. `pactl` or `wpctl` hangs or encounters latency talking to the audio daemon.
-4. Meanwhile, Bubble Tea triggers a view refresh and calls `globalPlayer.View()`, blocking on `p.mu.Lock()`.
-5. The TUI becomes completely unresponsive until the external command terminates.
-[REMEDIATION]:
-Determine the target speaker and update player state under the lock, but execute the external CLI commands outside the mutex:
+
+1. Local status is saved as `queued_remote`.
+2. Audio upload or remote status upload fails.
+3. The function returns an error without rolling back local state.
+4. A later batch run sees `isEpisodeInRemoteFlight(f)` and filters the episode out.
+5. The episode remains stranded despite never having become a valid remote job.
+
+[REMEDIATION]: Publish remote artifacts first and commit the local transition only after successful remote admission.
+
 ```go
-func (p *AudioPlayer) CycleSpeaker() {
-	p.RefreshSinks()
-	p.mu.Lock()
-	if len(p.Sinks) <= 1 {
-		p.mu.Unlock()
-		return
+if err := saveEpisodeStatus(tmpStatPath, &remoteStat); err != nil {
+	return err
+}
+defer os.Remove(tmpStatPath)
+
+if err := transport.Upload(targetHost, f, remoteDstFile); err != nil {
+	return fmt.Errorf("upload audio: %w", err)
+}
+if err := transport.Upload(targetHost, tmpStatPath, remoteDstStatus); err != nil {
+	return fmt.Errorf("upload status: %w", err)
+}
+
+localStat.Status = StateQueuedRemote
+if err := saveEpisodeStatus(statusPathFor(f), localStat); err != nil {
+	return fmt.Errorf("record remote admission: %w", err)
+}
+```
+
+Ideally the remote files should also be uploaded under partial names and atomically published together.
+
+---
+
+[SEVERITY]: Major  
+[LOCATION]: `pkg/backend/podfetch_db.go:218-228` — `deletePodFetchPodcastDB`  
+[ROOT CAUSE]: Deleting a podcast and its episodes is one logical operation implemented as two independent autocommit statements. The first error is discarded, and no transaction protects against interruption or failure between statements.  
+[FAILURE TRACE]:
+
+1. The episode deletion succeeds.
+2. The process crashes, SQLite returns `BUSY`, or the podcast deletion fails.
+3. All episodes are permanently deleted while the podcast remains.
+4. Alternatively, the ignored first deletion fails and the podcast row is removed, leaving orphaned episode rows.
+
+[REMEDIATION]:
+
+```go
+tx, err := db.Begin()
+if err != nil {
+	return err
+}
+defer tx.Rollback()
+
+if _, err := tx.Exec(
+	"DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID,
+); err != nil {
+	return err
+}
+if _, err := tx.Exec(
+	"DELETE FROM podcasts WHERE id = ? OR name = ? OR directory = ?",
+	podcastID, podcastID, podcastID,
+); err != nil {
+	return err
+}
+return tx.Commit()
+```
+
+---
+
+[SEVERITY]: Moderate  
+[LOCATION]: `queue_cmd.go:205-220, 223-250, 278-297`; `tui_data_queue.go:52-60`  
+[ROOT CAUSE]: `queue.json` updates are unlocked read-modify-write sequences. Atomic replacement prevents malformed JSON but does not prevent lost updates between the CLI, TUI, or multiple application instances. Save errors are also suppressed.  
+[FAILURE TRACE]:
+
+1. Process A and process B read the same queue.
+2. A adds episode X while B removes episode Y.
+3. A saves `[... X]`.
+4. B saves its independently filtered snapshot afterward.
+5. Episode X silently disappears, or Y reappears, despite both commands reporting success.
+
+[REMEDIATION]: Put the complete read-modify-write transaction under a per-queue inter-process lock and return persistence errors.
+
+```go
+func updateQueue(dir string, mutate func([]string) []string) error {
+	path := filepath.Join(dir, "queue.json")
+	lock, err := acquireFileLock(path)
+	if err != nil || lock == nil {
+		return fmt.Errorf("queue is locked: %w", err)
 	}
-	curIdx := 0
-	for i, s := range p.Sinks {
-		if s.Description == p.CurrentSpeaker || s.Name == p.CurrentSpeaker {
-			curIdx = i
-			break
+	defer lock.Release()
+
+	var entries []string
+	if data, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(data, &entries); err != nil {
+			return err
 		}
 	}
-	nextIdx := (curIdx + 1) % len(p.Sinks)
-	target := p.Sinks[nextIdx]
-	p.CurrentSpeaker = target.Description
-	p.mu.Unlock()
-
-	_ = exec.Command("pactl", "set-default-sink", target.Name).Run()
-	_ = exec.Command("wpctl", "set-default", target.ID).Run()
+	entries = mutate(entries)
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return err
+	}
+	return writeFileAtomic(path, data, 0644)
 }
-```
-
----
-
-[SEVERITY]: Moderate
-[LOCATION]: `config.go:40-51` (`ensureConfigExists`)
-[ROOT CAUSE]: Non-atomic file write with overly permissive file permissions (`0644`) for sensitive credentials. `ensureConfigExists()` creates the default configuration file containing API keys and Audiobookshelf credentials using `os.WriteFile(configPath(), append(data, '\n'), 0644)`. This operation is non-atomic (susceptible to torn writes or zero-byte truncation on crash) and sets file mode to world-readable (`0644`), exposing API keys and credentials to other local users, in direct contrast to `saveConfig` which enforces `0600` via `writeFileAtomic`.
-[FAILURE TRACE]:
-1. Application is run for the first time and calls `ensureConfigExists()`.
-2. `config.json` is created with `-rw-r--r--` (`0644`).
-3. Credentials or API keys are populated.
-4. Any unprivileged local user on the multi-user system can read `~/.config/abs/config.json`.
-[REMEDIATION]:
-Use `writeFileAtomic` with `0600` permissions:
-```go
-data, _ := json.MarshalIndent(cfg, "", "  ")
-_ = writeFileAtomic(configPath(), append(data, '\n'), 0600)
 ```
