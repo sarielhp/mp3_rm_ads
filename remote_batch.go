@@ -109,11 +109,6 @@ func pushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priori
 	_, _ = transport.Exec(targetHost, mkdirCmd)
 
 	localStat := getOrCreateEpisodeStatus(f)
-	localStat.Status = StateQueuedRemote
-	if priority > 0 {
-		localStat.Priority = priority
-	}
-	_ = saveEpisodeStatus(statusPathFor(f), localStat)
 
 	remoteStat := *localStat
 	remoteStat.Status = StateAwaitingTranscription
@@ -122,18 +117,32 @@ func pushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priori
 		remoteStat.Priority = priority
 	}
 
-	tmpStatPath := filepath.Join(os.TempDir(), fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
-	_ = saveEpisodeStatus(tmpStatPath, &remoteStat)
+	workDir := workDirFor(f)
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return fmt.Errorf("failed to create staging directory for %s: %w", f, err)
+	}
+	tmpStatPath := filepath.Join(workDir, fmt.Sprintf("rem_stat_%d.json", time.Now().UnixNano()))
+	verifyTempFile(tmpStatPath)
+
+	if err := saveEpisodeStatus(tmpStatPath, &remoteStat); err != nil {
+		return fmt.Errorf("failed to save staging status for %s: %w", f, err)
+	}
+	defer os.Remove(tmpStatPath)
 
 	if err := transport.Upload(targetHost, f, remoteDstFile); err != nil {
-		_ = os.Remove(tmpStatPath)
 		return fmt.Errorf("failed to upload audio %s to %s: %w", f, targetHost, err)
 	}
 	if err := transport.Upload(targetHost, tmpStatPath, remoteDstStatus); err != nil {
-		_ = os.Remove(tmpStatPath)
 		return fmt.Errorf("failed to upload status file for %s to %s: %w", f, targetHost, err)
 	}
-	_ = os.Remove(tmpStatPath)
+
+	localStat.Status = StateQueuedRemote
+	if priority > 0 {
+		localStat.Priority = priority
+	}
+	if err := saveEpisodeStatus(statusPathFor(f), localStat); err != nil {
+		return fmt.Errorf("failed to save local status for %s: %w", f, err)
+	}
 	return nil
 }
 

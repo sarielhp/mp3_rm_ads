@@ -21,6 +21,7 @@ type DownloadQueueItem struct {
 	PublishedAt  int64        `json:"published_at,omitempty"`
 	DurationSec  float64      `json:"duration_sec,omitempty"`
 	Status       string       `json:"status"`
+	OwnerPID     int          `json:"owner_pid,omitempty"`
 	Error        string       `json:"error,omitempty"`
 	AddedAt      time.Time    `json:"added_at"`
 	EpisodeObj   *FeedEpisode `json:"episode_obj,omitempty"`
@@ -35,6 +36,7 @@ var (
 	testDownloadQueuePath string
 	downloadQueueMutex    syncMutex
 	downloadWorkerRunning bool
+	downloadWorkerPending bool
 	downloadWorkerMu      syncMutex
 )
 
@@ -56,8 +58,11 @@ func reconcileStaleDownloadingItems(q *DownloadQueuePersist) {
 		dirty := false
 		for i := range q.Items {
 			if q.Items[i].Status == "downloading" {
-				q.Items[i].Status = "queued"
-				dirty = true
+				if q.Items[i].OwnerPID <= 0 || !isProcessAlive(q.Items[i].OwnerPID) {
+					q.Items[i].Status = "queued"
+					q.Items[i].OwnerPID = 0
+					dirty = true
+				}
 			}
 		}
 		if dirty {
@@ -231,25 +236,62 @@ func GetDownloadQueueItems() []DownloadQueueItem {
 	return q.Items
 }
 
-func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
+func claimDownloadQueueItem() (DownloadQueueItem, bool, error) {
 	downloadQueueMutex.Lock()
+	defer downloadQueueMutex.Unlock()
+
+	lock, err := acquireFileLock(getDownloadQueueFilePath())
+	if err != nil || lock == nil {
+		return DownloadQueueItem{}, false, err
+	}
+	defer lock.Release()
+
 	q := loadDownloadQueue()
-	targetIdx := -1
-	for i, item := range q.Items {
-		if item.Status == "queued" {
-			targetIdx = i
+	for i := range q.Items {
+		if q.Items[i].Status != "queued" {
+			continue
+		}
+		q.Items[i].Status = "downloading"
+		q.Items[i].OwnerPID = os.Getpid()
+		if err := saveDownloadQueue(q); err != nil {
+			return DownloadQueueItem{}, false, err
+		}
+		return q.Items[i], true, nil
+	}
+	return DownloadQueueItem{}, false, nil
+}
+
+func finalizeDownloadQueueItem(itemID string, dlErr error) error {
+	downloadQueueMutex.Lock()
+	defer downloadQueueMutex.Unlock()
+
+	lock, err := acquireFileLock(getDownloadQueueFilePath())
+	if err != nil || lock == nil {
+		return err
+	}
+	defer lock.Release()
+
+	q := loadDownloadQueue()
+	for i := range q.Items {
+		if q.Items[i].ID == itemID {
+			if dlErr != nil {
+				q.Items[i].Status = "failed"
+				q.Items[i].Error = dlErr.Error()
+			} else {
+				q.Items[i].Status = "completed"
+			}
+			q.Items[i].OwnerPID = 0
 			break
 		}
 	}
-	if targetIdx == -1 {
-		downloadQueueMutex.Unlock()
-		return false, nil
-	}
+	return saveDownloadQueue(q)
+}
 
-	item := &q.Items[targetIdx]
-	item.Status = "downloading"
-	_ = saveDownloadQueue(q)
-	downloadQueueMutex.Unlock()
+func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
+	item, claimed, err := claimDownloadQueueItem()
+	if err != nil || !claimed {
+		return false, err
+	}
 
 	if client == nil {
 		cfg := loadConfig()
@@ -258,22 +300,33 @@ func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
 		}
 	}
 
+	podcastID := resolveQueueItemPodcastID(client, item)
+	dlErr := executeQueueItemDownload(client, podcastID, item)
+	_ = finalizeDownloadQueueItem(item.ID, dlErr)
+	return true, dlErr
+}
+
+func resolveQueueItemPodcastID(client *ABSClient, item DownloadQueueItem) string {
 	podcastID := item.PodcastID
 	if podcastID == "" && client != nil {
 		if pods, err := client.PodcastItems(); err == nil {
 			for _, p := range pods {
 				if strings.EqualFold(strings.TrimSpace(p.Media.Metadata.Title), strings.TrimSpace(item.PodcastTitle)) {
-					podcastID = p.ID
-					break
+					return p.ID
 				}
 			}
 		}
 	}
+	return podcastID
+}
 
-	var dlErr error
-	if podcastID == "" {
-		dlErr = fmt.Errorf("podcast ID not found for '%s'", item.PodcastTitle)
-	} else {
+func executeQueueItemDownload(client *ABSClient, podcastID string, item DownloadQueueItem) error {
+	switch {
+	case client == nil:
+		return fmt.Errorf("download client is unavailable")
+	case podcastID == "":
+		return fmt.Errorf("podcast ID not found for '%s'", item.PodcastTitle)
+	default:
 		feedEp := FeedEpisode{
 			Title:           item.EpisodeTitle,
 			GUID:            item.GUID,
@@ -288,54 +341,43 @@ func ProcessNextDownloadQueueItem(client *ABSClient) (bool, error) {
 		if item.EpisodeObj != nil {
 			feedEp = *item.EpisodeObj
 		}
-		dlErr = client.DownloadEpisodes(podcastID, []FeedEpisode{feedEp})
+		return client.DownloadEpisodes(podcastID, []FeedEpisode{feedEp})
 	}
-
-	downloadQueueMutex.Lock()
-	defer downloadQueueMutex.Unlock()
-	q = loadDownloadQueue()
-	for i := range q.Items {
-		if q.Items[i].ID == item.ID {
-			if dlErr != nil {
-				q.Items[i].Status = "failed"
-				q.Items[i].Error = dlErr.Error()
-			} else {
-				q.Items[i].Status = "completed"
-			}
-			break
-		}
-	}
-	_ = saveDownloadQueue(q)
-	return true, dlErr
 }
 
 func TriggerDownloadQueueWorker(client *ABSClient) {
 	downloadWorkerMu.Lock()
 	if downloadWorkerRunning {
+		downloadWorkerPending = true
 		downloadWorkerMu.Unlock()
 		return
 	}
 	downloadWorkerRunning = true
 	downloadWorkerMu.Unlock()
 
-	go func() {
-		defer func() {
-			downloadWorkerMu.Lock()
-			downloadWorkerRunning = false
-			downloadWorkerMu.Unlock()
-		}()
-
-		for {
-			processed, _ := ProcessNextDownloadQueueItem(client)
-			if !processed {
-				break
-			}
-			time.Sleep(100 * time.Millisecond)
-		}
-	}()
+	go runDownloadQueueWorkerLoop(client)
 }
 
-// WaitDownloadWorkerForTest blocks until the download queue worker finishes.
+func runDownloadQueueWorkerLoop(client *ABSClient) {
+	for {
+		processed, _ := ProcessNextDownloadQueueItem(client)
+		if processed {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		downloadWorkerMu.Lock()
+		if downloadWorkerPending {
+			downloadWorkerPending = false
+			downloadWorkerMu.Unlock()
+			continue
+		}
+		downloadWorkerRunning = false
+		downloadWorkerMu.Unlock()
+		return
+	}
+}
+
 func WaitDownloadWorkerForTest() {
 	for {
 		downloadWorkerMu.Lock()

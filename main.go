@@ -258,8 +258,10 @@ func handleMainTUI(config *Config, cli CLIOptions) {
 		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
 			return loadTUIPodcastsABS(dir, *config)
 		},
-		LoadQueues:  loadAllQueues,
-		SaveQueue:   saveQueue,
+		LoadQueues: loadAllQueues,
+		SaveQueue: func(dir string, entries []string) {
+			_ = saveQueue(dir, entries)
+		},
 		GetDuration: getAudioDuration,
 	}
 	go triggerBackgroundCollect(config)

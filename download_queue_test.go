@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 	"time"
@@ -255,5 +256,114 @@ func TestDownloadQueueRemoveAndClear(t *testing.T) {
 	ClearDownloadQueue()
 	if len(GetDownloadQueueItems()) != 0 {
 		t.Errorf("expected 0 items after ClearDownloadQueue, got %d", len(GetDownloadQueueItems()))
+	}
+}
+
+func TestDownloadQueue_CrossProcessClaimingAndLease(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+
+	ClearDownloadQueue()
+	EnqueueDownload(DownloadQueueItem{
+		ID:           "claim-1",
+		PodcastTitle: "Show",
+		EpisodeTitle: "Ep 1",
+	}, nil)
+
+	item, claimed, err := claimDownloadQueueItem()
+	if err != nil || !claimed {
+		t.Fatalf("expected item claimed, got claimed=%v, err=%v", claimed, err)
+	}
+	if item.OwnerPID != os.Getpid() || item.Status != "downloading" {
+		t.Errorf("expected OwnerPID=%d, status=downloading, got %+v", os.Getpid(), item)
+	}
+
+	resetReconcileDownloadQueueOnceForTest()
+	q := loadDownloadQueue()
+	if len(q.Items) != 1 || q.Items[0].Status != "downloading" {
+		t.Errorf("expected active owner item to stay downloading, got %+v", q.Items)
+	}
+
+	q.Items[0].OwnerPID = 999999
+	_ = saveDownloadQueue(q)
+	resetReconcileDownloadQueueOnceForTest()
+	q = loadDownloadQueue()
+	if len(q.Items) != 1 || q.Items[0].Status != "queued" {
+		t.Errorf("expected dead PID item to be reset to queued, got %+v", q.Items)
+	}
+}
+
+func TestDownloadQueue_WorkerPendingWakeup(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+
+	ClearDownloadQueue()
+	var downloadedItems []string
+	server := setupMockABSDownloadServer(&downloadedItems)
+	defer server.Close()
+
+	client := NewABSClient(server.URL, "test-token")
+
+	downloadWorkerMu.Lock()
+	downloadWorkerRunning = true
+	downloadWorkerMu.Unlock()
+
+	EnqueueDownload(DownloadQueueItem{
+		ID:           "wake-1",
+		PodcastTitle: "Test Podcast",
+		PodcastID:    "pod-123",
+		EpisodeTitle: "Wakeup Episode",
+	}, nil)
+
+	TriggerDownloadQueueWorker(client)
+
+	downloadWorkerMu.Lock()
+	if !downloadWorkerPending {
+		t.Errorf("expected downloadWorkerPending to be true when triggered during running")
+	}
+	downloadWorkerMu.Unlock()
+
+	go runDownloadQueueWorkerLoop(client)
+	WaitDownloadWorkerForTest()
+
+	items := GetDownloadQueueItems()
+	if len(items) != 1 || items[0].Status != "completed" {
+		t.Errorf("expected item to be processed and completed, got %+v", items)
+	}
+}
+
+func TestProcessNextDownloadQueueItem_NilClientSafe(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+
+	ClearDownloadQueue()
+	origCfgPath := testConfigPath
+	testConfigPath = filepath.Join(t.TempDir(), "config.json")
+	defer func() { testConfigPath = origCfgPath }()
+
+	EnqueueDownload(DownloadQueueItem{
+		ID:           "nil-cli-1",
+		PodcastTitle: "Any Show",
+		PodcastID:    "pod-id-exists",
+		EpisodeTitle: "Any Ep",
+	}, nil)
+
+	processed, err := ProcessNextDownloadQueueItem(nil)
+	if !processed {
+		t.Fatalf("expected processed=true")
+	}
+	if err == nil {
+		t.Fatalf("expected error for nil client, got nil")
+	}
+
+	items := GetDownloadQueueItems()
+	if len(items) != 1 || items[0].Status != "failed" {
+		t.Errorf("expected item status=failed, got %+v", items)
 	}
 }

@@ -213,7 +213,7 @@ func TestTUILoadAllQueues(t *testing.T) {
 func TestTUISaveQueue(t *testing.T) {
 	d := t.TempDir()
 
-	saveQueue(d, []string{"ep1.mp3", "ep2.mp3"})
+	_ = saveQueue(d, []string{"ep1.mp3", "ep2.mp3"})
 
 	data, err := os.ReadFile(d + "/queue.json")
 	if err != nil {
@@ -231,7 +231,7 @@ func TestTUISaveQueue(t *testing.T) {
 
 func TestTUISaveQueueEmpty(t *testing.T) {
 	d := t.TempDir()
-	saveQueue(d, []string{})
+	_ = saveQueue(d, []string{})
 	data, _ := os.ReadFile(d + "/queue.json")
 	var entries []string
 	json.Unmarshal(data, &entries)
@@ -242,7 +242,7 @@ func TestTUISaveQueueEmpty(t *testing.T) {
 
 func TestTUISaveQueueNil(t *testing.T) {
 	d := t.TempDir()
-	saveQueue(d, nil)
+	_ = saveQueue(d, nil)
 	data, _ := os.ReadFile(d + "/queue.json")
 	var entries []string
 	json.Unmarshal(data, &entries)

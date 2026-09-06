@@ -300,3 +300,25 @@ func TestUpdatePodFetchSettingsDB(t *testing.T) {
 		t.Errorf("expected active=false, got %v", active)
 	}
 }
+
+func TestDeletePodFetchPodcastDB_Transactional(t *testing.T) {
+	dbPath := setupTestPodFetchDB(t)
+
+	err := deletePodFetchPodcastDB(dbPath, "1")
+	if err != nil {
+		t.Fatalf("deletePodFetchPodcastDB failed: %v", err)
+	}
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer db.Close()
+
+	var podCount, epCount int
+	_ = db.QueryRow("SELECT COUNT(*) FROM podcasts WHERE id = 1").Scan(&podCount)
+	_ = db.QueryRow("SELECT COUNT(*) FROM podcast_episodes WHERE podcast_id = 1").Scan(&epCount)
+	if podCount != 0 || epCount != 0 {
+		t.Errorf("expected podCount=0 and epCount=0, got podCount=%d, epCount=%d", podCount, epCount)
+	}
+}

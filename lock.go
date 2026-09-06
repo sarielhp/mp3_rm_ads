@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
 	"syscall"
 	"time"
 
@@ -69,66 +68,58 @@ func isProcessAlive(pid int) bool {
 	return err == nil || err == syscall.EPERM
 }
 
-func checkStaleWorkerLock(lockPath string) (bool, int, error) {
-	data, err := os.ReadFile(lockPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return true, 0, nil
-		}
-		return false, 0, err
-	}
-	lines := splitLines(strings.TrimSpace(string(data)))
-	var lockPID int
-	var lockTime time.Time
-	if len(lines) > 0 {
-		_, _ = fmt.Sscanf(lines[0], "%d", &lockPID)
-	}
-	if len(lines) > 1 {
-		lockTime, _ = time.Parse(time.RFC3339, strings.TrimSpace(lines[1]))
-	}
-	if lockPID == os.Getpid() && lockPID > 0 {
-		return false, lockPID, nil
-	}
-	if lockPID <= 0 || !isProcessAlive(lockPID) || (!lockTime.IsZero() && time.Since(lockTime) > 6*time.Hour) {
-		return true, lockPID, nil
-	}
-	return false, lockPID, fmt.Errorf("remote worker is already running (lockfile %s exists with active PID %d)", lockPath, lockPID)
+var (
+	workerLocksMu syncMutex
+	workerLocks   = make(map[string]*workerLockEntry)
+)
+
+type workerLockEntry struct {
+	fl       *flock.Flock
+	refCount int
 }
 
 func acquireWorkerLock(resolvedDir string) (func(), error) {
 	lockPath := filepath.Join(resolvedDir, ".worker.lock")
-	content := fmt.Sprintf("%d\n%s\n", os.Getpid(), time.Now().UTC().Format(time.RFC3339))
 
-	for attempts := 0; attempts < 2; attempts++ {
-		f, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
-		if err == nil {
-			_, writeErr := f.WriteString(content)
-			closeErr := f.Close()
-			if writeErr != nil || closeErr != nil {
-				_ = os.Remove(lockPath)
-				if writeErr != nil {
-					return nil, writeErr
-				}
-				return nil, closeErr
-			}
-			return func() { _ = os.Remove(lockPath) }, nil
-		}
-		if !os.IsExist(err) {
-			return nil, fmt.Errorf("failed to create worker lockfile %s: %w", lockPath, err)
-		}
+	workerLocksMu.Lock()
+	defer workerLocksMu.Unlock()
 
-		stale, pid, checkErr := checkStaleWorkerLock(lockPath)
-		if !stale {
-			if pid == os.Getpid() && pid > 0 {
-				return func() {}, nil
-			}
-			return nil, checkErr
-		}
-
-		fmt.Fprintf(os.Stderr, "Warning: removing stale or dead worker lock %s (PID: %d)\n", lockPath, pid)
-		_ = os.Remove(lockPath)
+	if entry, exists := workerLocks[lockPath]; exists {
+		entry.refCount++
+		return releaseWorkerLockFunc(lockPath), nil
 	}
-	return nil, fmt.Errorf("failed to acquire worker lock after clearing stale lock %s", lockPath)
+
+	fl := flock.New(lockPath)
+	locked, err := fl.TryLock()
+	if err != nil {
+		return nil, fmt.Errorf("acquire worker lock %s: %w", lockPath, err)
+	}
+	if !locked {
+		return nil, fmt.Errorf("remote worker is already running")
+	}
+
+	workerLocks[lockPath] = &workerLockEntry{
+		fl:       fl,
+		refCount: 1,
+	}
+	return releaseWorkerLockFunc(lockPath), nil
+}
+
+func releaseWorkerLockFunc(lockPath string) func() {
+	var once syncOnce
+	return func() {
+		once.Do(func() {
+			workerLocksMu.Lock()
+			defer workerLocksMu.Unlock()
+			if entry, exists := workerLocks[lockPath]; exists {
+				entry.refCount--
+				if entry.refCount <= 0 {
+					delete(workerLocks, lockPath)
+					_ = entry.fl.Unlock()
+				}
+			}
+		})
+	}
 }
 
 func acquireCollectLock(dir string) (*fileLockWrapper, error) {

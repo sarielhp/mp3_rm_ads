@@ -331,3 +331,24 @@ func TestRemoteStatusAndCancel(t *testing.T) {
 		t.Fatalf("runRemoteCancel all failed: %v", err)
 	}
 }
+
+func TestPushSingleAudioFile_UploadFailureRollback(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "Show")
+	_ = os.MkdirAll(podDir, 0755)
+	epPath := filepath.Join(podDir, "ep.mp3")
+	_ = os.WriteFile(epPath, []byte("audio"), 0644)
+
+	mock := NewMockRemoteTransport(tempDir)
+	mock.Reachable = false
+
+	err := pushSingleAudioFile(epPath, tempDir, "~/abs_remote", "server1", 0, mock)
+	if err == nil {
+		t.Fatalf("expected pushSingleAudioFile to fail when host is unreachable")
+	}
+
+	st, _ := loadEpisodeStatus(statusPathFor(epPath))
+	if st != nil && st.Status == StateQueuedRemote {
+		t.Errorf("expected local status NOT to be StateQueuedRemote after upload failure")
+	}
+}

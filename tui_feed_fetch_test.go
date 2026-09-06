@@ -63,3 +63,56 @@ func TestTUIFeedFetchAndDownloadAll(t *testing.T) {
 		t.Fatalf("expected 2 items in download queue, got %d", len(items))
 	}
 }
+
+func TestTUIBatchQueueDownload_DelegatesToWorkerOnly(t *testing.T) {
+	tempDir := t.TempDir()
+	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+
+	ClearDownloadQueue()
+
+	ep1 := tuiEpisode{
+		path:         filepath.Join(tempDir, "ep1.mp3"),
+		filename:     "ep1.mp3",
+		title:        "Batch Episode 1",
+		guid:         "guid-batch-1",
+		enclosureURL: "https://example.com/b1.mp3",
+		isFeedOnly:   true,
+	}
+	ep2 := tuiEpisode{
+		path:         filepath.Join(tempDir, "ep2.mp3"),
+		filename:     "ep2.mp3",
+		title:        "Single Episode 2",
+		guid:         "guid-single-2",
+		enclosureURL: "https://example.com/s2.mp3",
+		isFeedOnly:   true,
+	}
+	pod := tuiPodcast{
+		name:     "Batch Podcast",
+		dir:      tempDir,
+		episodes: []tuiEpisode{ep1, ep2},
+	}
+
+	model := &tuiModel{
+		podcasts:         []tuiPodcast{pod},
+		podIdx:           0,
+		selectedEpisodes: map[string]bool{ep1.path: true},
+	}
+
+	model.batchQueueDownload()
+
+	items := GetDownloadQueueItems()
+	if len(items) != 1 || items[0].EpisodeTitle != "Batch Episode 1" {
+		t.Fatalf("expected batch item in download queue, got %+v", items)
+	}
+	if items[0].Status != "queued" && items[0].Status != "downloading" {
+		t.Errorf("unexpected status: %s", items[0].Status)
+	}
+
+	model.epIdx = 1
+	model.enqueueCurrentEpisodeDownload()
+	items = GetDownloadQueueItems()
+	if len(items) != 2 {
+		t.Fatalf("expected 2 items in download queue after single enqueue, got %d", len(items))
+	}
+}

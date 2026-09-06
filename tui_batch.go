@@ -132,18 +132,6 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 			absCli, _ = getABSClient(cfg, true)
 		}
-		if absCli != nil && ep.isFeedOnly && pod.absData != nil && ep.enclosureURL != "" {
-			fe := FeedEpisode{
-				Title:           ep.title,
-				GUID:            ep.guid,
-				PublishedAt:     ep.publishedAt,
-				DurationSeconds: ep.duration,
-				EnclosureURL:    ep.enclosureURL,
-				Enclosure:       &FeedEnclosure{URL: ep.enclosureURL},
-				Description:     ep.description,
-			}
-			_ = absCli.DownloadEpisodes(pod.absData.ID, []FeedEpisode{fe})
-		}
 		TriggerDownloadQueueWorker(absCli)
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
@@ -161,7 +149,6 @@ func (m *tuiModel) batchQueueDownload() {
 	pod := m.podcasts[m.podIdx]
 	eps := m.filteredEpisodes()
 	queuedCount := 0
-	var toDownload []FeedEpisode
 
 	for _, ep := range eps {
 		if !m.isEpisodeSelected(ep.path) {
@@ -199,17 +186,6 @@ func (m *tuiModel) batchQueueDownload() {
 		ok, _ := EnqueueDownload(item, m.podcasts)
 		if ok {
 			queuedCount++
-			if ep.isFeedOnly && ep.enclosureURL != "" {
-				toDownload = append(toDownload, FeedEpisode{
-					Title:           ep.title,
-					GUID:            ep.guid,
-					PublishedAt:     ep.publishedAt,
-					DurationSeconds: ep.duration,
-					EnclosureURL:    ep.enclosureURL,
-					Enclosure:       &FeedEnclosure{URL: ep.enclosureURL},
-					Description:     ep.description,
-				})
-			}
 		}
 	}
 	m.clearSelectedEpisodes()
@@ -219,9 +195,6 @@ func (m *tuiModel) batchQueueDownload() {
 		var absCli *ABSClient
 		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
 			absCli, _ = getABSClient(cfg, true)
-		}
-		if absCli != nil && len(toDownload) > 0 && pod.absData != nil {
-			_ = absCli.DownloadEpisodes(pod.absData.ID, toDownload)
 		}
 		TriggerDownloadQueueWorker(absCli)
 	} else {

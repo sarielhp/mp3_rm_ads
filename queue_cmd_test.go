@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -118,4 +119,48 @@ func TestQueueAddRemoveAndClear(t *testing.T) {
 		t.Errorf("expected empty queue after clear, got: %v", entries)
 	}
 	_ = ep2ID
+}
+
+func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
+	tempDir := t.TempDir()
+
+	var wg syncWG
+	for i := 0; i < 10; i++ {
+		fn := fmt.Sprintf("ep%d.mp3", i)
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			addEpisodeToQueueFile(tempDir, name)
+		}(fn)
+	}
+	wg.Wait()
+
+	qFile := filepath.Join(tempDir, "queue.json")
+	data, err := os.ReadFile(qFile)
+	if err != nil {
+		t.Fatalf("expected queue.json: %v", err)
+	}
+	var entries []string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if len(entries) != 10 {
+		t.Fatalf("expected exactly 10 episodes in queue, got %d: %v", len(entries), entries)
+	}
+
+	for i := 0; i < 5; i++ {
+		fn := fmt.Sprintf("ep%d.mp3", i)
+		wg.Add(1)
+		go func(name string) {
+			defer wg.Done()
+			removeEpisodeFromQueueFile(tempDir, name)
+		}(fn)
+	}
+	wg.Wait()
+
+	data, _ = os.ReadFile(qFile)
+	_ = json.Unmarshal(data, &entries)
+	if len(entries) != 5 {
+		t.Fatalf("expected exactly 5 episodes in queue after concurrent remove, got %d", len(entries))
+	}
 }

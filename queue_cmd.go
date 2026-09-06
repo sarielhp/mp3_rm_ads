@@ -203,51 +203,46 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 }
 
 func addEpisodeToQueueFile(podDir, filename string) bool {
-	qFile := filepath.Join(podDir, "queue.json")
-	var entries []string
-	if data, err := os.ReadFile(qFile); err == nil {
-		_ = json.Unmarshal(data, &entries)
-	}
-
-	for _, e := range entries {
-		if strings.EqualFold(e, filename) {
-			return false
+	added := false
+	_ = updateQueue(podDir, func(entries []string) []string {
+		for _, e := range entries {
+			if strings.EqualFold(e, filename) {
+				return entries
+			}
 		}
-	}
-
-	entries = append(entries, filename)
-	saveQueue(podDir, entries)
-	return true
+		added = true
+		return append(entries, filename)
+	})
+	return added
 }
 
 func addPodcastEpisodesToQueue(podDir string) int {
 	mp3s := findMP3Files(podDir)
-	qFile := filepath.Join(podDir, "queue.json")
-	var entries []string
-	if data, err := os.ReadFile(qFile); err == nil {
-		_ = json.Unmarshal(data, &entries)
+	var candidates []string
+	for _, mp3 := range mp3s {
+		if !isEpisodeClean(mp3) {
+			candidates = append(candidates, filepath.Base(mp3))
+		}
 	}
-
-	existing := make(map[string]bool)
-	for _, e := range entries {
-		existing[strings.ToLower(e)] = true
+	if len(candidates) == 0 {
+		return 0
 	}
 
 	addedCount := 0
-	for _, mp3 := range mp3s {
-		if !isEpisodeClean(mp3) {
-			fn := filepath.Base(mp3)
+	_ = updateQueue(podDir, func(entries []string) []string {
+		existing := make(map[string]bool)
+		for _, e := range entries {
+			existing[strings.ToLower(e)] = true
+		}
+		for _, fn := range candidates {
 			if !existing[strings.ToLower(fn)] {
 				entries = append(entries, fn)
 				existing[strings.ToLower(fn)] = true
 				addedCount++
 			}
 		}
-	}
-
-	if addedCount > 0 {
-		saveQueue(podDir, entries)
-	}
+		return entries
+	})
 	return addedCount
 }
 
@@ -268,7 +263,7 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
-			saveQueue(pod.Dir, []string{})
+			_ = saveQueue(pod.Dir, []string{})
 			fmt.Printf("Cleared queue for %s [%s]\n", bold(pod.Title), boldCyan(pod.ShortID))
 		}
 	}
@@ -276,25 +271,21 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 }
 
 func removeEpisodeFromQueueFile(podDir, filename string) bool {
-	qFile := filepath.Join(podDir, "queue.json")
-	var entries []string
-	if data, err := os.ReadFile(qFile); err == nil {
-		_ = json.Unmarshal(data, &entries)
-	}
-
-	var filtered []string
 	found := false
-	for _, e := range entries {
-		if strings.EqualFold(e, filename) {
-			found = true
-		} else {
-			filtered = append(filtered, e)
+	_ = updateQueue(podDir, func(entries []string) []string {
+		var filtered []string
+		for _, e := range entries {
+			if strings.EqualFold(e, filename) {
+				found = true
+			} else {
+				filtered = append(filtered, e)
+			}
 		}
-	}
-
-	if found {
-		saveQueue(podDir, filtered)
-	}
+		if found {
+			return filtered
+		}
+		return entries
+	})
 	return found
 }
 
@@ -305,7 +296,7 @@ func handleQueueClear(podcastsDir, target string) error {
 			return err
 		}
 		if res.IsPodcast() {
-			saveQueue(res.Podcast.Dir, []string{})
+			_ = saveQueue(res.Podcast.Dir, []string{})
 			fmt.Printf("Queue cleared for %s [%s]\n", bold(res.Podcast.Title), boldCyan(res.Podcast.ShortID))
 			return nil
 		} else if res.IsEpisode() {
@@ -320,7 +311,7 @@ func handleQueueClear(podcastsDir, target string) error {
 	for _, p := range entries {
 		qFile := filepath.Join(p.dir, "queue.json")
 		if _, err := os.Stat(qFile); err == nil {
-			saveQueue(p.dir, []string{})
+			_ = saveQueue(p.dir, []string{})
 			clearedCount++
 		}
 	}

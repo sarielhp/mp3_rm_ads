@@ -7,7 +7,9 @@ import (
 	"path/filepath"
 	"sync"
 	"testing"
+	"time"
 
+	"github.com/gofrs/flock"
 	"github.com/sariel/abs/pkg/backend"
 )
 
@@ -256,4 +258,103 @@ func TestAcquireWorkerLockAtomicExcl(t *testing.T) {
 		t.Fatalf("expected same-PID re-entry to succeed, got %v", err)
 	}
 	unlockSelf()
+}
+
+func TestWorkerLockOSAdvisoryExclusion(t *testing.T) {
+	tempDir := t.TempDir()
+	lockPath := filepath.Join(tempDir, ".worker.lock")
+
+	extFlock := flock.New(lockPath)
+	locked, err := extFlock.TryLock()
+	if err != nil || !locked {
+		t.Fatalf("failed to acquire extFlock: %v", err)
+	}
+	defer extFlock.Unlock()
+
+	_, err = acquireWorkerLock(tempDir)
+	if err == nil {
+		t.Fatalf("expected acquireWorkerLock to fail when flock is held")
+	}
+	if err.Error() != "remote worker is already running" {
+		t.Fatalf("unexpected error message: %v", err)
+	}
+}
+
+func TestCheckSkipOrLockAudioFile_LockErrorFailsClosed(t *testing.T) {
+	cli := CLIOptions{Quiet: true}
+	invalidPath := filepath.Join(t.TempDir(), "nonexistent", "podcast.mp3")
+
+	lock, proceed, shouldStop := checkSkipOrLockAudioFile(invalidPath, invalidPath, 0, 1, 0, cli)
+	if lock != nil {
+		lock.Release()
+		t.Errorf("expected nil lock on acquire error, got %v", lock)
+	}
+	if proceed {
+		t.Errorf("expected proceed=false on acquire error, got true")
+	}
+	if shouldStop {
+		t.Errorf("expected shouldStop=false on acquire error, got true")
+	}
+}
+
+func TestInstallCutAudioAndPreserveOriginal_SuccessAndRollback(t *testing.T) {
+	tempDir := t.TempDir()
+	mainMP3 := filepath.Join(tempDir, "ep.mp3")
+	precut := filepath.Join(tempDir, "ep.mp3.precut")
+	tmpOut := filepath.Join(tempDir, "temp_cut.mp3")
+	workDir := filepath.Join(tempDir, ".work")
+	_ = os.MkdirAll(workDir, 0755)
+
+	_ = os.WriteFile(mainMP3, []byte("original audio"), 0644)
+	_ = os.WriteFile(tmpOut, []byte("cut audio"), 0644)
+
+	ok := installCutAudioAndPreserveOriginal(mainMP3, mainMP3, precut, mainMP3, tmpOut, workDir, true)
+	if !ok {
+		t.Fatalf("expected successful install")
+	}
+	if b, _ := os.ReadFile(mainMP3); string(b) != "cut audio" {
+		t.Errorf("expected mainMP3 to have cut audio, got %s", string(b))
+	}
+	if b, _ := os.ReadFile(precut); string(b) != "original audio" {
+		t.Errorf("expected precut to have original audio, got %s", string(b))
+	}
+
+	_ = os.Remove(precut)
+	_ = os.WriteFile(mainMP3, []byte("original audio 2"), 0644)
+	failed := installCutAudioAndPreserveOriginal(mainMP3, mainMP3, precut, mainMP3, "/nonexistent/path.mp3", workDir, true)
+	if failed {
+		t.Fatalf("expected failure when temp output does not exist")
+	}
+	if b, _ := os.ReadFile(mainMP3); string(b) != "original audio 2" {
+		t.Errorf("expected mainMP3 to remain intact, got %s", string(b))
+	}
+	if fileExists(precut) {
+		t.Errorf("expected precut to be cleaned up on failure")
+	}
+}
+
+func TestHandleNoAdsDetected_InstallOutputFailureDoesNotCommit(t *testing.T) {
+	tempDir := t.TempDir()
+	mainMP3 := filepath.Join(tempDir, "ep.mp3")
+	srcAudio := filepath.Join(tempDir, "src.wav")
+	roDir := filepath.Join(tempDir, "readonly")
+	_ = os.MkdirAll(roDir, 0555)
+	t.Cleanup(func() { _ = os.Chmod(roDir, 0755) })
+
+	unwritableOut := filepath.Join(roDir, "nested", "out.mp3")
+	_ = os.WriteFile(mainMP3, []byte("main mp3"), 0644)
+	_ = os.WriteFile(srcAudio, []byte("source wav"), 0644)
+
+	now := time.Now()
+	handleNoAdsDetected(mainMP3, srcAudio, unwritableOut, 100.0, LLMProfile{}, CLIOptions{Quiet: true}, now, now, now)
+
+	cutsPath := filepath.Join(tempDir, "ep.mp3.cuts.json")
+	if fileExists(cutsPath) {
+		t.Errorf("expected cuts.json not to be created on install failure")
+	}
+
+	st, _ := loadEpisodeStatus(statusPathFor(mainMP3))
+	if st != nil && st.Status == StateDone {
+		t.Errorf("expected status not to be marked done on install failure")
+	}
 }

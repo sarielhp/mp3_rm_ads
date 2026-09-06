@@ -223,9 +223,19 @@ func deletePodFetchPodcastDB(dbPath, podcastID string) error {
 	}
 	defer db.Close()
 
-	_, _ = db.Exec("DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID)
-	_, err = db.Exec("DELETE FROM podcasts WHERE id = ? OR name = ? OR directory = ?", podcastID, podcastID, podcastID)
-	return err
+	tx, err := db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec("DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec("DELETE FROM podcasts WHERE id = ? OR name = ? OR directory = ?", podcastID, podcastID, podcastID); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) {

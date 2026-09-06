@@ -2,10 +2,14 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
+
+var queueUpdateMu syncMutex
 
 func loadAllQueues(pods []tuiPodcast) map[string][]string {
 	q := make(map[string][]string)
@@ -43,19 +47,42 @@ func loadAllQueues(pods []tuiPodcast) map[string][]string {
 		}
 		q[pod.dir] = filtered
 		if needsResave {
-			saveQueue(pod.dir, filtered)
+			_ = saveQueue(pod.dir, filtered)
 		}
 	}
 	return q
 }
 
-func saveQueue(dir string, entries []string) {
+func updateQueue(dir string, mutate func([]string) []string) error {
+	queueUpdateMu.Lock()
+	defer queueUpdateMu.Unlock()
+
+	path := filepath.Join(dir, "queue.json")
+	lock, err := acquireFileLockWithTimeout(path, 5*time.Second)
+	if err != nil || lock == nil {
+		return fmt.Errorf("queue is locked: %w", err)
+	}
+	defer lock.Release()
+
+	var entries []string
+	if data, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(data, &entries); err != nil {
+			return err
+		}
+	}
+	entries = mutate(entries)
 	if entries == nil {
 		entries = []string{}
 	}
 	data, err := json.MarshalIndent(entries, "", "  ")
 	if err != nil {
-		return
+		return err
 	}
-	_ = writeFileAtomic(filepath.Join(dir, "queue.json"), data, 0644)
+	return writeFileAtomic(path, append(data, '\n'), 0644)
+}
+
+func saveQueue(dir string, entries []string) error {
+	return updateQueue(dir, func([]string) []string {
+		return entries
+	})
 }

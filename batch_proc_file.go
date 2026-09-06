@@ -137,9 +137,11 @@ func checkSkipOrLockAudioFile(mainMP3File, inputFile string, idx, totalFiles, pr
 	fileLock, err := acquireFileLock(mainMP3File)
 	if err != nil {
 		if !cli.Quiet {
-			fmt.Fprintf(os.Stderr, "Warning: failed to acquire lock for %s: %v\n", shortName, err)
+			fmt.Fprintf(os.Stderr, "Cannot safely process %s: %v\n", shortName, err)
 		}
-	} else if fileLock == nil {
+		return nil, false, false
+	}
+	if fileLock == nil {
 		if !cli.Quiet {
 			fmt.Printf("⏭️  Skipping '%s' (currently being processed by another instance)\n", shortName)
 		}
@@ -215,7 +217,38 @@ func handleExportOrPreviewReturns(transcriptionData *TranscriptionData, totalDur
 	return false
 }
 
+func installNoAdsOutput(source, output string) error {
+	if source == output {
+		return nil
+	}
+	workDir := workDirFor(output)
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return err
+	}
+	tmp := filepath.Join(workDir, filepath.Base(output)+".tmp"+filepath.Ext(output))
+	verifyTempFile(tmp)
+
+	if err := copyFileErr(source, tmp); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := safeMove(tmp, output); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	_ = os.RemoveAll(workDir)
+	return nil
+}
+
 func handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile string, totalDuration float64, selectedProfile LLMProfile, cli CLIOptions, fileStartTime, t0Step1, t0Step2 time.Time) {
+	if sourceAudioFile != outputFile {
+		if err := installNoAdsOutput(sourceAudioFile, outputFile); err != nil {
+			if !cli.Quiet {
+				fmt.Fprintf(os.Stderr, "Error installing output file: %v\n", err)
+			}
+			return
+		}
+	}
 	saveCutsJSON(mainMP3File, totalDuration, nil, &selectedProfile, cli.Quiet)
 	_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 		st.Status = StateDone
@@ -225,9 +258,6 @@ func handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile string, totalD
 	if !cli.Quiet {
 		fmt.Println("No ad segments detected by LLM!")
 		printTimingSummary(cli.Verbose, totalDuration, totalDuration, 0, 0, 0, step1Duration(t0Step1), time.Since(t0Step2), 0, time.Since(fileStartTime))
-	}
-	if sourceAudioFile != outputFile {
-		copyFile(sourceAudioFile, outputFile)
 	}
 	fmt.Printf("Result saved to: '%s'\n", outputFile)
 }
@@ -281,18 +311,25 @@ func executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFi
 }
 
 func installCutAudioAndPreserveOriginal(sourceAudioFile, mainMP3File, precutFile, outputFile, tempOutputFile, workDir string, quiet bool) bool {
+	preserved := false
 	if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
 		checkPrecutSymlink(precutFile)
-		if mvErr := safeMove(mainMP3File, precutFile); mvErr != nil {
-			fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", mvErr)
-			return false
+		if err := os.Link(mainMP3File, precutFile); err != nil {
+			if cpErr := copyFileErr(mainMP3File, precutFile); cpErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", cpErr)
+				return false
+			}
 		}
+		preserved = true
 		if !quiet {
 			fmt.Printf("Original file preserved at: '%s'\n", precutFile)
 		}
 	}
 
 	if mvErr := safeMove(tempOutputFile, outputFile); mvErr != nil {
+		if preserved {
+			_ = os.Remove(precutFile)
+		}
 		fmt.Fprintf(os.Stderr, "Error: could not install the cut audio: %v\n", mvErr)
 		return false
 	}

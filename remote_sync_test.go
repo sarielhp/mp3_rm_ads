@@ -1,12 +1,12 @@
 package main
 
 import (
-	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
-	"time"
+
+	"github.com/gofrs/flock"
 )
 
 func setupDownloadIntegrityTestEnv(tempDir, remoteWorkDir, localPodcasts string) string {
@@ -112,45 +112,26 @@ func TestPIDLockAcquisitionAndStaleRecovery(t *testing.T) {
 	unlock2()
 	unlock1()
 
-	if fileExists(lockPath) {
-		t.Errorf("expected lockfile to be removed after release")
+	externalFlock := flock.New(lockPath)
+	locked, err := externalFlock.TryLock()
+	if err != nil || !locked {
+		t.Fatalf("failed to simulate external worker lock: %v", err)
 	}
 
-	deadPID := 999999
-	for isProcessAlive(deadPID) {
-		deadPID++
+	_, err = acquireWorkerLock(tempDir)
+	if err == nil {
+		t.Fatalf("expected error when external lock is held, got nil")
 	}
-	deadLockContent := fmt.Sprintf("%d\n%s\n", deadPID, time.Now().UTC().Format(time.RFC3339))
-	_ = os.WriteFile(lockPath, []byte(deadLockContent), 0644)
 
-	unlockDead, err := acquireWorkerLock(tempDir)
+	if err := externalFlock.Unlock(); err != nil {
+		t.Fatalf("failed to unlock external lock: %v", err)
+	}
+
+	unlockRecovered, err := acquireWorkerLock(tempDir)
 	if err != nil {
-		t.Fatalf("expected lock recovery on dead PID to succeed, got: %v", err)
+		t.Fatalf("expected acquiring lock after external release to succeed, got: %v", err)
 	}
-	unlockDead()
-
-	oldTimestamp := time.Now().UTC().Add(-7 * time.Hour).Format(time.RFC3339)
-	staleLockContent := fmt.Sprintf("1\n%s\n", oldTimestamp)
-	_ = os.WriteFile(lockPath, []byte(staleLockContent), 0644)
-
-	unlockStale, err := acquireWorkerLock(tempDir)
-	if err != nil {
-		t.Fatalf("expected lock recovery on >6h stale lock to succeed, got: %v", err)
-	}
-	unlockStale()
-
-	activePID := 1
-	if isProcessAlive(activePID) && activePID != os.Getpid() {
-		recentTimestamp := time.Now().UTC().Format(time.RFC3339)
-		activeLockContent := fmt.Sprintf("%d\n%s\n", activePID, recentTimestamp)
-		_ = os.WriteFile(lockPath, []byte(activeLockContent), 0644)
-
-		unlockActive, err := acquireWorkerLock(tempDir)
-		if err == nil {
-			unlockActive()
-			t.Errorf("expected error when lock held by active foreign PID, got nil")
-		}
-	}
+	unlockRecovered()
 }
 
 func TestDirtyFlagScanTrigger(t *testing.T) {
