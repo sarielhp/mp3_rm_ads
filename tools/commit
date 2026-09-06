@@ -14,7 +14,7 @@ end
 msg = ARGV.join(' ')
 
 # Run quality gate silently
-_, _, status = Open3.capture3("ruby tools/check.rb")
+_, _, status = Open3.capture3("./tools/check")
 unless status.success?
   puts "✗ Quality Gate failed! Run 'make check' to see details."
   exit 1

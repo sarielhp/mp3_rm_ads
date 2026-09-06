@@ -7,7 +7,7 @@ require 'optparse'
 # Parse command line options
 options = {}
 parser = OptionParser.new do |opts|
-  opts.banner = "Usage: ruby abs_to_opml.rb [options]"
+  opts.banner = "Usage: ./abs_to_opml [options]"
 
   opts.separator ""
   opts.separator "Detailed Description:"

@@ -23,7 +23,7 @@ full_mode = ARGV.include?('--full') || ARGV.include?('--ci')
 
 # 1. Format
 run_cmd("Formatting", "gofmt -s -w .")
-run_cmd("Config template generation", "ruby tools/generate_config_template.rb")
+run_cmd("Config template generation", "./tools/generate_config_template")
 
 # 2. Vet
 run_cmd("Go vet", "go vet ./...")
@@ -77,7 +77,7 @@ end
 run_staticcheck
 
 # 4. Audit lines
-stdout, _ = run_cmd("Line audit", "ruby tools/audit_lines.rb --quiet")
+stdout, _ = run_cmd("Line audit", "./tools/audit_lines --quiet")
 puts stdout.strip unless stdout.strip.empty?
 
 # 5. Go test
@@ -97,6 +97,6 @@ else
 end
 
 # 6. Build
-run_cmd("Go build", "ruby tools/build_local.rb")
+run_cmd("Go build", "./tools/build_local")
 
 puts full_mode ? "Success: Full CI Quality Gate Passed" : "Success: Quality Gate Passed"

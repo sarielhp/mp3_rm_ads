@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 lines = File.readlines("kitty.go")
 cover_start = lines.index { |l| l.include?("func generateGenericCover") }
 file1 = lines[0...cover_start]

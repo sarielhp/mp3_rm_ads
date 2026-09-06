@@ -7,7 +7,7 @@ root_dir = File.expand_path('..', __dir__)
 Dir.chdir(root_dir)
 
 # Run full quality gate (including race detector and vulnerability scan)
-_, _, status = Open3.capture3("ruby tools/check.rb --full")
+_, _, status = Open3.capture3("./tools/check --full")
 unless status.success?
   puts "✗ Full Quality Gate failed! Run 'make ci' or 'make check' to see details."
   exit 1

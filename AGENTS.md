@@ -3,7 +3,7 @@
 ## Build & Quality
 
 - **Go 1.26+** — single `main` package with files organized by concern
-- Build: `ruby tools/build_local.rb` (or `make build`)
+- Build: `./tools/build_local` (or `make build`)
 - Test: `go test -timeout 30s ./...` (all tests use `t.TempDir()` for isolation)
 - Lint: `go vet ./...` then `staticcheck ./...`
 - Format: `gofmt -s -w .` before committing
@@ -12,21 +12,21 @@
 
 | Script | Purpose |
 |--------|---------|
-| `tools/build_local.rb` | Build local `./abs` binary strictly within repo directory |
-| `tools/check.rb` | Full quality gate: format → tidy → vet → staticcheck → test → build |
+| `tools/build_local` | Build local `./abs` binary strictly within repo directory |
+| `tools/check` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
-| `tools/lint.rb` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines.rb` |
-| `tools/audit_lines.rb` | Audit function lengths (80-line limit) and file lengths (800 warn / 1100 limit) |
-| `tools/outline_symbols.rb` | Index all Go types, structs, interfaces, and functions |
-| `tools/show_symbol.rb <sym>` | Display single symbol code block with line numbers |
-| `tools/suggest_split.rb` | Suggest logical file split boundaries for oversized files |
-| `tools/generate_config_template.rb` | Generate `examples/config.json.template` |
+| `tools/lint` | Static analysis: `go vet` + `staticcheck` + `tools/audit_lines` |
+| `tools/audit_lines` | Audit function lengths (80-line limit) and file lengths (800 warn / 1100 limit) |
+| `tools/outline_symbols` | Index all Go types, structs, interfaces, and functions |
+| `tools/show_symbol <sym>` | Display single symbol code block with line numbers |
+| `tools/suggest_split` | Suggest logical file split boundaries for oversized files |
+| `tools/generate_config_template` | Generate `examples/config.json.template` |
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
-| `tools/visual_audit.rb` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
-| `tools/verify_remote_queue.rb` | Live remote queue compliance audit against 24h & duration policy |
-| `tools/bump-version.rb` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
-| `tools/commit.rb <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
+| `tools/visual_audit` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
+| `tools/verify_remote_queue` | Live remote queue compliance audit against 24h & duration policy |
+| `tools/bump-version` | Bump version, git add/commit/push (silent, outputs "Success VERSION (commit+push)") |
+| `tools/commit <msg>` | Quality gate + stage + commit (silent, outputs "Success <msg>") |
 | `tools/checkpoint.sh` | Auto micro-commit of all changes (saves work state) |
 
 ## Makefile
@@ -36,13 +36,13 @@ A `Makefile` at the project root delegates to all scripts:
 | Target | Action |
 |--------|--------|
 | `make check` | Full quality gate |
-| `make verify-queue` | Verify remote queue compliance (`tools/verify_remote_queue.rb`) |
-| `make visual` | Run full live PTY visual audit across all 19 TUI screens (`tools/visual_audit.rb`) |
+| `make verify-queue` | Verify remote queue compliance (`tools/verify_remote_queue`) |
+| `make visual` | Run full live PTY visual audit across all 19 TUI screens (`tools/visual_audit`) |
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
-| `make audit` | Audit Go source file line lengths (`tools/audit_lines.rb`) |
-| `make symbols` | Outline symbols (`tools/outline_symbols.rb ARGS="..."`) |
-| `make suggest-split` | Suggest file splits (`tools/suggest_split.rb ARGS="..."`) |
-| `make template` | Regenerate config template (`tools/generate_config_template.rb`) |
+| `make audit` | Audit Go source file line lengths (`tools/audit_lines`) |
+| `make symbols` | Outline symbols (`tools/outline_symbols ARGS="..."`) |
+| `make suggest-split` | Suggest file splits (`tools/suggest_split ARGS="..."`) |
+| `make template` | Regenerate config template (`tools/generate_config_template`) |
 | `make test` | Run tests |
 | `make build` | Build binary |
 | `make format` | Format code |
@@ -85,7 +85,7 @@ make checkpoint
 
 ## Sizing
 
-Two limits, and they are not equally important. `tools/audit_lines.rb` checks both.
+Two limits, and they are not equally important. `tools/audit_lines` checks both.
 
 ### Functions — hard limit 80 lines
 
@@ -103,9 +103,9 @@ Files should stay comfortably readable, but file length is a *comfort* metric, n
 correctness one. Keep functions under 80 lines and files land in the 300–700 range on
 their own; the 800-line warning exists to catch the cases where they do not.
 
-### Validation Tool — `tools/audit_lines.rb`
+### Validation Tool — `tools/audit_lines`
 
-Line lengths are verified using `tools/audit_lines.rb` (run via `make audit` or as part of `make lint` / `make check`):
+Line lengths are verified using `tools/audit_lines` (run via `make audit` or as part of `make lint` / `make check`):
 - **Function verification**: Measures line counts of Go function declarations (matching `func` in column 0 to its closing `}`). Flags any function exceeding **80 lines**.
 - **File verification**: Scans all Go files (excluding `.work/` and vendor directories). Emits a warning if a file exceeds **800 lines** and reports a hard failure if it exceeds **1100 lines**.
 - **Key Flags**:
@@ -131,7 +131,7 @@ did real damage and both compiled cleanly and passed the gate:
 When a file grows past the warning threshold, **decompose its long functions in place**
 and let the file stay long until the decomposition makes a genuine module boundary
 obvious. A file that is only long because one function inside it is long is a function
-problem, not a file problem. `tools/suggest_split.rb` proposes file boundaries — treat
+problem, not a file problem. `tools/suggest_split` proposes file boundaries — treat
 its output as a hypothesis, and never accept a boundary that falls inside a function.
 
 ## Temp File Policy
@@ -241,7 +241,7 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
     or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
 11. **No CLI Aliases**: Avoid defining command or subcommand aliases in CLI apps (`clihelp`). Each command and subcommand must have a single canonical name to maintain clarity, prevent command-space collisions, and keep documentation consistent.
-12. **Local Build Isolation**: All local Go builds must be executed using `tools/build_local.rb` (or `make build`). The build script must generate a local binary (`./abs`) within this repository directory and must NEVER write into or modify directories outside this repository.
+12. **Local Build Isolation**: All local Go builds must be executed using `./tools/build_local` (or `make build`). The build script must generate a local binary (`./abs`) within this repository directory and must NEVER write into or modify directories outside this repository.
 
 ## Test Suite
 

@@ -444,6 +444,9 @@ class MultiProfileReviewCycle
     default_gate = File.expand_path('gate', __dir__)
     return default_gate if File.exist?(default_gate) && (File.executable?(default_gate) || !File.directory?(default_gate))
 
+    check_bin = File.expand_path('check', __dir__)
+    return check_bin if File.exist?(check_bin) && (File.executable?(check_bin) || !File.directory?(check_bin))
+
     check_rb = File.expand_path('check.rb', __dir__)
     return "ruby #{check_rb}" if File.exist?(check_rb)
 
@@ -487,6 +490,9 @@ class MultiProfileReviewCycle
   def resolve_build_cmd
     return options[:build_cmd] if options[:build_cmd] && !options[:build_cmd].strip.empty?
     return ENV['BUILD_CMD'] if ENV['BUILD_CMD'] && !ENV['BUILD_CMD'].strip.empty?
+
+    build_local_bin = File.expand_path('build_local', __dir__)
+    return build_local_bin if File.exist?(build_local_bin) && (File.executable?(build_local_bin) || !File.directory?(build_local_bin))
 
     build_local = File.expand_path('build_local.rb', __dir__)
     return "ruby #{build_local}" if File.exist?(build_local)

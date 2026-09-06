@@ -3,31 +3,31 @@
 all: check
 
 verify-queue:
-	@ruby ./tools/verify_remote_queue.rb $(ARGS)
+	@./tools/verify_remote_queue $(ARGS)
 
 visual:
-	@ruby ./tools/visual_audit.rb
+	@./tools/visual_audit
 
 check:
-	@ruby ./tools/check.rb
+	@./tools/check
 
 ci:
-	@ruby ./tools/check.rb --full
+	@./tools/check --full
 
 lint:
-	@ruby ./tools/lint.rb
+	@./tools/lint
 
 audit:
-	@ruby ./tools/audit_lines.rb
+	@./tools/audit_lines
 
 symbols:
-	@ruby ./tools/outline_symbols.rb $(ARGS)
+	@./tools/outline_symbols $(ARGS)
 
 suggest-split:
-	@ruby ./tools/suggest_split.rb $(ARGS)
+	@./tools/suggest_split $(ARGS)
 
 template:
-	@ruby ./tools/generate_config_template.rb
+	@./tools/generate_config_template
 
 test:
 	@go test -race -timeout 180s ./...
@@ -39,7 +39,7 @@ vuln:
 	@$$HOME/.go/bin/govulncheck ./...
 
 build:
-	@ruby ./tools/build_local.rb
+	@./tools/build_local
 
 format:
 	@./tools/format.sh
@@ -60,10 +60,10 @@ version:
 	@./tools/version.sh
 
 bump:
-	@ruby ./tools/bump-version.rb
+	@./tools/bump-version
 
 commit:
-	@ruby ./tools/commit.rb $(ARGS)
+	@./tools/commit $(ARGS)
 
 push: bump
 
@@ -78,7 +78,7 @@ checkpoint:
 	@./tools/checkpoint.sh
 
 review-loop:
-	@ruby ./tools/review_loop.rb $(ARGS)
+	@./tools/review_loop $(ARGS)
 
 clean:
 	@rm -f abs

@@ -1,3 +1,4 @@
+#!/usr/bin/env ruby
 content = File.read("config.go")
 methods_to_extract = ["func userTmpDir", "func configDir", "func configPath", "func legacyConfigPath", "func opencodeConfigPath", "func localIP", "func replaceIP"]
 # We'll just extract these functions and put them in config_path.go
