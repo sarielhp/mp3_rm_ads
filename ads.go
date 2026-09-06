@@ -78,6 +78,10 @@ func callLLMChat(profile LLMProfile, sysPrompt, userPrompt string, maxTokens int
 	if apiKey == "" {
 		apiKey = envOr("OPENROUTER_API_KEY", "")
 	}
+	apiKey, err = validateOpenRouterKey(profile, apiKey)
+	if err != nil {
+		return "", err
+	}
 	if apiKey != "" {
 		req.Header.Set("Authorization", "Bearer "+apiKey)
 	}

@@ -16,6 +16,9 @@ func copyLLMFromOpenCode(cfg *Config) {
 	if apiKey == "" {
 		apiKey = envOr("OPENAI_API_KEY", "")
 	}
+	if !cfg.IsOpenRouterAPIKeyEnabled() && apiKey != "" {
+		apiKey = zeroWipeKey(apiKey)
+	}
 
 	fmt.Println("Copying LLM settings from OpenCode...")
 	fmt.Printf("   - Imported Primary Model: '%s'\n", cleanModel)

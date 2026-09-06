@@ -6,8 +6,34 @@ import (
 	"strings"
 )
 
-func handleConfigSet(cfg *Config, key, val string) error {
+func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
+	case "gemini-api-key-enabled":
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return true, fmt.Errorf("invalid boolean value for %s: %s", key, val)
+		}
+		cfg.GeminiAPIKeyEnabled = &b
+		return true, nil
+	case "openrouter-api-key-enabled":
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return true, fmt.Errorf("invalid boolean value for %s: %s", key, val)
+		}
+		cfg.OpenRouterAPIKeyEnabled = &b
+		return true, nil
+	case "gemini-api-key":
+		cfg.GeminiAPIKey = val
+		return true, nil
+	case "gemini-model":
+		cfg.GeminiModel = val
+		return true, nil
+	}
+	return false, nil
+}
+
+func handleConfigSetBackend(cfg *Config, normKey, val string) bool {
+	switch normKey {
 	case "podcasts-dir", "podcasts.dir", "dir":
 		cfg.PodcastsDir = val
 	case "backend-type", "backend.type", "backend":
@@ -32,6 +58,28 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		cfg.AudiobookshelfToken = val
 	case "db-path", "abs.db", "db", "sqlite-db-path":
 		cfg.AudiobookshelfDBPath = val
+	default:
+		return false
+	}
+	return true
+}
+
+func handleConfigSet(cfg *Config, key, val string) error {
+	if handled, err := handleConfigSetAPIKey(cfg, key, val); handled {
+		if err != nil {
+			return err
+		}
+		saveConfig(*cfg)
+		fmt.Printf("Updated '%s' = '%s'\n", key, val)
+		return nil
+	}
+	normKey := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+	if handleConfigSetBackend(cfg, normKey, val) {
+		saveConfig(*cfg)
+		fmt.Printf("Updated '%s' = '%s'\n", key, val)
+		return nil
+	}
+	switch normKey {
 	case "remote-ffmpeg", "remote-ffmpeg-host", "ffmpeg-host", "rffmpeg":
 		cfg.RemoteFFmpegHost = val
 	case "whisper-url", "whisper.url":
@@ -132,6 +180,14 @@ func handleConfigGet(cfg Config, key string) {
 		fmt.Println(cfg.DefaultDownloadK)
 	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
 		fmt.Println(cfg.DefaultAdRemoval)
+	case "gemini-api-key-enabled":
+		fmt.Println(cfg.IsGeminiAPIKeyEnabled())
+	case "openrouter-api-key-enabled":
+		fmt.Println(cfg.IsOpenRouterAPIKeyEnabled())
+	case "gemini-api-key":
+		fmt.Println(cfg.GetGeminiAPIKey())
+	case "gemini-model":
+		fmt.Println(cfg.GetGeminiModel())
 	default:
 		fmt.Printf("Unknown configuration key: '%s'\n", key)
 	}

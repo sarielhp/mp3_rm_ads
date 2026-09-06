@@ -34,7 +34,55 @@ type geminiStudioGenerateResponse struct {
 	} `json:"candidates"`
 }
 
+func pipeMultipartAudio(pw *io.PipeWriter, mpw *multipart.Writer, localAudioPath, mimeType string) {
+	var err error
+	defer func() {
+		if err != nil {
+			_ = pw.CloseWithError(err)
+		} else {
+			_ = pw.Close()
+		}
+	}()
+
+	h := make(textproto.MIMEHeader)
+	h.Set("Content-Disposition", `form-data; name="metadata"`)
+	h.Set("Content-Type", "application/json; charset=UTF-8")
+	part, err := mpw.CreatePart(h)
+	if err != nil {
+		return
+	}
+	meta := fmt.Sprintf(`{"file": {"display_name": %q}}`, filepath.Base(localAudioPath))
+	if _, err = part.Write([]byte(meta)); err != nil {
+		return
+	}
+
+	fileHeader := make(textproto.MIMEHeader)
+	fileHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename=%q`, filepath.Base(localAudioPath)))
+	fileHeader.Set("Content-Type", mimeType)
+	filePart, err := mpw.CreatePart(fileHeader)
+	if err != nil {
+		return
+	}
+
+	f, err := os.Open(localAudioPath)
+	if err != nil {
+		return
+	}
+	defer f.Close()
+
+	if _, err = io.Copy(filePart, f); err != nil {
+		return
+	}
+	err = mpw.Close()
+}
+
 func uploadAudioToGeminiStudio(ctx context.Context, apiKey, localAudioPath string) (string, string, error) {
+	var err error
+	apiKey, err = validateGeminiKey(apiKey)
+	if err != nil {
+		return "", "", err
+	}
+
 	pr, pw := io.Pipe()
 	mpw := multipart.NewWriter(pw)
 
@@ -43,47 +91,7 @@ func uploadAudioToGeminiStudio(ctx context.Context, apiKey, localAudioPath strin
 		mimeType = "audio/wav"
 	}
 
-	go func() {
-		var err error
-		defer func() {
-			if err != nil {
-				_ = pw.CloseWithError(err)
-			} else {
-				_ = pw.Close()
-			}
-		}()
-
-		h := make(textproto.MIMEHeader)
-		h.Set("Content-Disposition", `form-data; name="metadata"`)
-		h.Set("Content-Type", "application/json; charset=UTF-8")
-		part, err := mpw.CreatePart(h)
-		if err != nil {
-			return
-		}
-		meta := fmt.Sprintf(`{"file": {"display_name": %q}}`, filepath.Base(localAudioPath))
-		if _, err = part.Write([]byte(meta)); err != nil {
-			return
-		}
-
-		fileHeader := make(textproto.MIMEHeader)
-		fileHeader.Set("Content-Disposition", fmt.Sprintf(`form-data; name="file"; filename=%q`, filepath.Base(localAudioPath)))
-		fileHeader.Set("Content-Type", mimeType)
-		filePart, err := mpw.CreatePart(fileHeader)
-		if err != nil {
-			return
-		}
-
-		f, err := os.Open(localAudioPath)
-		if err != nil {
-			return
-		}
-		defer f.Close()
-
-		if _, err = io.Copy(filePart, f); err != nil {
-			return
-		}
-		err = mpw.Close()
-	}()
+	go pipeMultipartAudio(pw, mpw, localAudioPath, mimeType)
 
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/upload/v1beta/files?key=%s", apiKey)
 	req, err := http.NewRequestWithContext(ctx, "POST", url, pr)
@@ -116,6 +124,11 @@ func deleteGeminiStudioFile(ctx context.Context, apiKey, fileName string) {
 	if fileName == "" || apiKey == "" {
 		return
 	}
+	var err error
+	apiKey, err = validateGeminiKey(apiKey)
+	if err != nil {
+		return
+	}
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/%s?key=%s", fileName, apiKey)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
@@ -129,6 +142,11 @@ func deleteGeminiStudioFile(ctx context.Context, apiKey, fileName string) {
 }
 
 func callGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI string) (*geminiResponsePayload, error) {
+	var err error
+	apiKey, err = validateGeminiKey(apiKey)
+	if err != nil {
+		return nil, err
+	}
 	if modelName == "" {
 		modelName = defaultGeminiModel
 	}

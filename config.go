@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -51,28 +50,35 @@ var defaultWhisperProfiles = []WhisperProfile{
 	},
 }
 
+var (
+	defaultKeyEnabled  = true
+	defaultKeyDisabled = false
+)
+
 var defaultConfig = Config{
-	Instructions:          "Configuration file for abs. Select profiles by ID or set active_profile_id.",
-	DefaultDownloadPolicy: "latest",
-	DefaultDownloadK:      3,
-	DefaultAdRemoval:      "all",
-	DefaultProcessing:     "local",
-	RemoteWorkDir:         "~/abs_remote",
-	WhisperURL:            "http://127.0.0.1:8088/inference",
-	WhisperSpeedFactor:    70.0,
-	ChunkDurationSec:      0,
-	ActiveProfileID:       1,
-	ActiveWhisperID:       1,
-	WhisperProfiles:       defaultWhisperProfiles,
-	WhisperEngine:         WhisperEngineLocal,
-	WhisperModel:          "tiny.en",
-	WhisperCliBinary:      "whisper-cli",
-	WhisperProcessors:     4,
-	WhisperThreads:        4,
-	WhisperGreedy:         true,
-	GeminiProjectID:       "vm-on-cloud-sariel",
-	GeminiStagingBucket:   "abs-audio-staging-sariel",
-	GeminiLocation:        "us-central1",
+	Instructions:            "Configuration file for abs. Select profiles by ID or set active_profile_id.",
+	DefaultDownloadPolicy:   "latest",
+	DefaultDownloadK:        3,
+	DefaultAdRemoval:        "all",
+	DefaultProcessing:       "local",
+	RemoteWorkDir:           "~/abs_remote",
+	WhisperURL:              "http://127.0.0.1:8088/inference",
+	WhisperSpeedFactor:      70.0,
+	ChunkDurationSec:        0,
+	ActiveProfileID:         1,
+	ActiveWhisperID:         1,
+	WhisperProfiles:         defaultWhisperProfiles,
+	WhisperEngine:           WhisperEngineLocal,
+	WhisperModel:            "tiny.en",
+	WhisperCliBinary:        "whisper-cli",
+	WhisperProcessors:       4,
+	WhisperThreads:          4,
+	WhisperGreedy:           true,
+	GeminiProjectID:         "vm-on-cloud-sariel",
+	GeminiStagingBucket:     "abs-audio-staging-sariel",
+	GeminiLocation:          "us-central1",
+	GeminiAPIKeyEnabled:     &defaultKeyEnabled,
+	OpenRouterAPIKeyEnabled: &defaultKeyDisabled,
 	Profiles: []LLMProfile{
 		{ID: 1, Name: "Ollama Local (llama3.1:8b)", Type: "ollama", URL: "http://192.168.1.230:11434/v1/chat/completions", Model: "llama3.1:8b"},
 		{ID: 2, Name: "OpenRouter - Claude 3.5 Sonnet", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "anthropic/claude-3.5-sonnet"},
@@ -109,6 +115,7 @@ func applyEnvOverrides(cfg *Config) {
 	applyBackendEnvOverrides(cfg)
 	applyWhisperAndRemoteEnvOverrides(cfg)
 	applyGeminiEnvOverrides(cfg)
+	applyAPIKeyEnvOverrides(cfg)
 }
 
 func applyBackendEnvOverrides(cfg *Config) {
@@ -247,37 +254,6 @@ func applyGeminiEnvOverrides(cfg *Config) {
 }
 
 const defaultGeminiModel = "gemini-flash-latest"
-
-func resolveGeminiAPIKey(config Config) string {
-	if config.GeminiAPIKey != "" {
-		return config.GeminiAPIKey
-	}
-	if envKey := os.Getenv("GEMINI_API_KEY"); envKey != "" {
-		return envKey
-	}
-	home, err := os.UserHomeDir()
-	if err == nil {
-		authPath := filepath.Join(home, ".config", "auth", "gemini_api_key")
-		if data, err := os.ReadFile(authPath); err == nil {
-			if k := strings.TrimSpace(string(data)); k != "" {
-				return k
-			}
-		}
-		geminiPath := filepath.Join(home, ".config", "gemini", "api_key")
-		if data, err := os.ReadFile(geminiPath); err == nil {
-			if k := strings.TrimSpace(string(data)); k != "" {
-				return k
-			}
-		}
-		geminiAuthPath := filepath.Join(home, ".config", "gemini", "gemini_api_key")
-		if data, err := os.ReadFile(geminiAuthPath); err == nil {
-			if k := strings.TrimSpace(string(data)); k != "" {
-				return k
-			}
-		}
-	}
-	return ""
-}
 
 func (c *Config) GetGeminiAPIKey() string {
 	if c == nil {
@@ -470,21 +446,7 @@ func getConfigFileSnapshot() (Config, bool) {
 	return *configFileSnapshot, true
 }
 
-// envOverriddenFields mirrors applyEnvOverrides. Each entry restores the value
-// that was on disk whenever the corresponding environment variable is set, so a
-// per-invocation override is never persisted by a later saveConfig.
-func restoreEnvOverriddenFields(cfg *Config, disk Config) {
-	anySet := func(names ...string) bool {
-		for _, n := range names {
-			if os.Getenv(n) != "" {
-				return true
-			}
-		}
-		return false
-	}
-	if anySet("WHISPER_URL") {
-		cfg.WhisperURL = disk.WhisperURL
-	}
+func restoreBackendEnvOverriddenFields(cfg *Config, disk Config, anySet func(...string) bool) {
 	if anySet("ABS_URL", "AUDIOBOOKSHELF_URL", "ABS_HOST") {
 		cfg.AudiobookshelfURL = disk.AudiobookshelfURL
 	}
@@ -521,6 +483,24 @@ func restoreEnvOverriddenFields(cfg *Config, disk Config) {
 	if anySet("PODCASTS_DIR") {
 		cfg.PodcastsDir = disk.PodcastsDir
 	}
+}
+
+// envOverriddenFields mirrors applyEnvOverrides. Each entry restores the value
+// that was on disk whenever the corresponding environment variable is set, so a
+// per-invocation override is never persisted by a later saveConfig.
+func restoreEnvOverriddenFields(cfg *Config, disk Config) {
+	anySet := func(names ...string) bool {
+		for _, n := range names {
+			if os.Getenv(n) != "" {
+				return true
+			}
+		}
+		return false
+	}
+	restoreBackendEnvOverriddenFields(cfg, disk, anySet)
+	if anySet("WHISPER_URL") {
+		cfg.WhisperURL = disk.WhisperURL
+	}
 	if anySet("WHISPER_LANGUAGE") {
 		cfg.WhisperLanguage = disk.WhisperLanguage
 	}
@@ -551,6 +531,12 @@ func restoreEnvOverriddenFields(cfg *Config, disk Config) {
 	if anySet("DEFAULT_AD_REMOVAL", "DEFAULT_AD_POLICY") {
 		cfg.DefaultAdRemoval = disk.DefaultAdRemoval
 	}
+	if anySet("GEMINI_API_KEY_ENABLED") {
+		cfg.GeminiAPIKeyEnabled = disk.GeminiAPIKeyEnabled
+	}
+	if anySet("OPENROUTER_API_KEY_ENABLED") {
+		cfg.OpenRouterAPIKeyEnabled = disk.OpenRouterAPIKeyEnabled
+	}
 }
 
 func loadConfig() Config {
@@ -564,6 +550,7 @@ func loadConfig() Config {
 		}
 		cfg := defaultConfig
 		applyEnvOverrides(&cfg)
+		sanitizeDisabledAPIKeys(&cfg)
 		return cfg
 	}
 	var cfg Config
@@ -574,6 +561,7 @@ func loadConfig() Config {
 		fmt.Fprintf(os.Stderr, "existing settings and credentials are not overwritten. Fix or remove the file.\n")
 		cfg = defaultConfig
 		applyEnvOverrides(&cfg)
+		sanitizeDisabledAPIKeys(&cfg)
 		return cfg
 	}
 	if cfg.DefaultDownloadPolicy == "" {
@@ -603,6 +591,7 @@ func loadConfig() Config {
 	resolveActiveWhisperProfile(&cfg)
 	setConfigFileSnapshot(cfg)
 	applyEnvOverrides(&cfg)
+	sanitizeDisabledAPIKeys(&cfg)
 	return cfg
 }
 
@@ -701,6 +690,8 @@ func printConfig(cfg Config) {
 	if cfg.RemoteFFmpegHost != "" {
 		fmt.Printf("  remote_ffmpeg_host:       %s\n", cfg.RemoteFFmpegHost)
 	}
+	fmt.Printf("  gemini_api_key_enabled:   %v\n", cfg.IsGeminiAPIKeyEnabled())
+	fmt.Printf("  openrouter_api_key_enabled: %v\n", cfg.IsOpenRouterAPIKeyEnabled())
 }
 
 func setRemoteFFmpegHost(cfg *Config, host string) {

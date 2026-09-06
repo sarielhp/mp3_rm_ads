@@ -112,3 +112,26 @@ func toLower(s string) string {
 	}
 	return string(b)
 }
+
+func zeroWipeKey(key string) string {
+	if len(key) == 0 {
+		return ""
+	}
+	b := make([]byte, len(key))
+	for i := range b {
+		b[i] = '0'
+	}
+	return string(b)
+}
+
+func isZeroedKey(key string) bool {
+	if key == "" {
+		return true
+	}
+	for i := 0; i < len(key); i++ {
+		if key[i] != '0' {
+			return false
+		}
+	}
+	return true
+}
