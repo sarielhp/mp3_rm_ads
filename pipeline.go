@@ -95,18 +95,27 @@ func executeRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, 
 		fmt.Printf("Audio Recutting finished in %s\n", formatClock(time.Since(t0Recut).Seconds()))
 	}
 
+	preserved := false
 	if sourceAudioFile == mainMP3File && fileExists(mainMP3File) {
 		checkPrecutSymlink(precutFile)
-		if mvErr := safeMove(mainMP3File, precutFile); mvErr != nil {
-			fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", mvErr)
-			return
+		if err := os.Link(mainMP3File, precutFile); err != nil {
+			if cpErr := copyFileErr(mainMP3File, precutFile); cpErr != nil {
+				fmt.Fprintf(os.Stderr, "Error: could not preserve the original: %v\n", cpErr)
+				return
+			}
 		}
+		preserved = true
 		if !cli.Quiet {
 			fmt.Printf("Original file preserved at: '%s'\n", precutFile)
 		}
 	}
 
 	if mvErr := safeMove(tempOutputFile, outputFile); mvErr != nil {
+		if preserved {
+			_ = os.Remove(precutFile)
+		}
+		os.Remove(tempOutputFile)
+		os.RemoveAll(workDir)
 		fmt.Fprintf(os.Stderr, "Error: could not install the recut audio: %v\n", mvErr)
 		return
 	}

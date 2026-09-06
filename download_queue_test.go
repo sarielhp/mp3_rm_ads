@@ -367,3 +367,64 @@ func TestProcessNextDownloadQueueItem_NilClientSafe(t *testing.T) {
 		t.Errorf("expected item status=failed, got %+v", items)
 	}
 }
+
+func TestEnqueueDownload_RetryFailedItem(t *testing.T) {
+	tempDir := t.TempDir()
+	queueFile := filepath.Join(tempDir, "download_queue.json")
+	testDownloadQueuePath = queueFile
+	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+
+	ClearDownloadQueue()
+
+	item := DownloadQueueItem{
+		ID:           "test-retry-1",
+		GUID:         "guid-retry-123",
+		EnclosureURL: "https://example.com/retry.mp3",
+		EpisodeTitle: "Retry Episode",
+	}
+
+	ok, reason := EnqueueDownload(item, nil)
+	if !ok || reason != "queued" {
+		t.Fatalf("expected initial enqueue to succeed, got ok=%v, reason=%s", ok, reason)
+	}
+
+	// Verify it cannot be re-enqueued while still queued
+	ok, reason = EnqueueDownload(item, nil)
+	if ok || reason != "already_queued" {
+		t.Fatalf("expected already_queued for queued item, got ok=%v, reason=%s", ok, reason)
+	}
+
+	// Transition the item to failed
+	downloadQueueMutex.Lock()
+	q := loadDownloadQueue()
+	q.Items[0].Status = "failed"
+	q.Items[0].Error = "simulated network timeout"
+	_ = saveDownloadQueue(q)
+	downloadQueueMutex.Unlock()
+
+	// isItemInDownloadQueue should return false for failed items
+	downloadQueueMutex.Lock()
+	qNow := loadDownloadQueue()
+	inQueue := isItemInDownloadQueue(item, qNow)
+	downloadQueueMutex.Unlock()
+	if inQueue {
+		t.Fatalf("expected isItemInDownloadQueue to return false for failed items")
+	}
+
+	// Enqueue again: should succeed and transition back to queued
+	ok, reason = EnqueueDownload(item, nil)
+	if !ok || reason != "queued" {
+		t.Fatalf("expected retry enqueue to succeed, got ok=%v, reason=%s", ok, reason)
+	}
+
+	items := GetDownloadQueueItems()
+	if len(items) != 1 {
+		t.Fatalf("expected 1 item in queue, got %d", len(items))
+	}
+	if items[0].Status != "queued" {
+		t.Errorf("expected item status to be 'queued', got %q", items[0].Status)
+	}
+	if items[0].Error != "" {
+		t.Errorf("expected item error to be cleared, got %q", items[0].Error)
+	}
+}

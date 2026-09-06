@@ -322,3 +322,42 @@ func TestDeletePodFetchPodcastDB_Transactional(t *testing.T) {
 		t.Errorf("expected podCount=0 and epCount=0, got podCount=%d, epCount=%d", podCount, epCount)
 	}
 }
+
+func TestUpdatePodFetchDurationDB_ScopedToPath(t *testing.T) {
+	dbPath := setupTestPodFetchDB(t)
+
+	db, err := sql.Open("sqlite3", dbPath)
+	if err != nil {
+		t.Fatalf("failed to open db: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		INSERT INTO podcast_episodes (id, podcast_id, episode_id, name, url, date_of_recording, total_time, local_url, description, status)
+		VALUES 
+			(20, 1, 'guid-20', '01', 'https://example.com/01.mp3', '2026-08-31 10:00:00', 100, '/podcasts/Show One/01.mp3', 'Desc 20', 'D'),
+			(21, 1, 'guid-21', 'Episode 01 - Deep Dive', 'https://example.com/ep01.mp3', '2026-08-31 11:00:00', 5000, '/podcasts/Show One/deep_dive.mp3', 'Desc 21', 'D');
+	`)
+	if err != nil {
+		t.Fatalf("failed to insert test episodes: %v", err)
+	}
+
+	if err := updatePodFetchDurationDB(dbPath, "/podcasts/Show One/01.mp3", 600.0); err != nil {
+		t.Fatalf("updatePodFetchDurationDB failed: %v", err)
+	}
+
+	var dur20, dur21 int
+	if err := db.QueryRow("SELECT total_time FROM podcast_episodes WHERE id = 20").Scan(&dur20); err != nil {
+		t.Fatalf("failed to query episode 20: %v", err)
+	}
+	if err := db.QueryRow("SELECT total_time FROM podcast_episodes WHERE id = 21").Scan(&dur21); err != nil {
+		t.Fatalf("failed to query episode 21: %v", err)
+	}
+
+	if dur20 != 600 {
+		t.Errorf("expected target episode 20 duration to be 600, got %d", dur20)
+	}
+	if dur21 != 5000 {
+		t.Errorf("expected unrelated episode 21 duration to remain 5000, but was corrupted to %d", dur21)
+	}
+}

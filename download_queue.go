@@ -116,7 +116,7 @@ func matchEpisodeDeduplication(guid1, enc1, title1, guid2, enc2, title2 string) 
 
 func isItemInDownloadQueue(item DownloadQueueItem, q *DownloadQueuePersist) bool {
 	for _, existing := range q.Items {
-		if existing.Status == "completed" {
+		if existing.Status == "completed" || existing.Status == "failed" {
 			continue
 		}
 		if matchEpisodeDeduplication(item.GUID, item.EnclosureURL, item.EpisodeTitle, existing.GUID, existing.EnclosureURL, existing.EpisodeTitle) {
@@ -171,6 +171,18 @@ func EnqueueDownload(item DownloadQueueItem, pods []tuiPodcast) (bool, string) {
 	q := loadDownloadQueue()
 	if isItemInDownloadQueue(item, q) {
 		return false, "already_queued"
+	}
+
+	for i, existing := range q.Items {
+		if existing.Status == "failed" && matchEpisodeDeduplication(item.GUID, item.EnclosureURL, item.EpisodeTitle, existing.GUID, existing.EnclosureURL, existing.EpisodeTitle) {
+			q.Items[i].Status = "queued"
+			q.Items[i].Error = ""
+			q.Items[i].AddedAt = time.Now().UTC()
+			if err := saveDownloadQueue(q); err != nil {
+				return false, "save_error"
+			}
+			return true, "queued"
+		}
 	}
 
 	if item.ID == "" {

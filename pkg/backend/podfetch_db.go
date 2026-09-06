@@ -279,10 +279,9 @@ func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
 	defer db.Close()
 
 	base := filepath.Base(filePath)
-	likePattern := "%" + base + "%"
-	noExt := strings.TrimSuffix(base, filepath.Ext(base))
+	likePattern := "%" + base
 
-	_, err = db.Exec("UPDATE podcast_episodes SET total_time = ? WHERE local_url LIKE ? OR local_url = ? OR name = ? OR name LIKE ?", int(duration), likePattern, filePath, noExt, "%"+noExt+"%")
+	_, err = db.Exec("UPDATE podcast_episodes SET total_time = ? WHERE local_url = ? OR local_url LIKE ?", int(duration), filePath, likePattern)
 	return err
 }
 

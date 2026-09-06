@@ -195,6 +195,7 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 
 	existingRaw, existingMerged, existingCutsData := loadExistingCuts(cutsFile)
 	combined := append(existingRaw, adSegments...)
+	combined = sanitizeAdSegments(combined, totalDuration)
 
 	formattedRaw := buildCutEntries(combined)
 	formattedMerged, keep, keepIntervals := buildMergedAndKeepIntervals(totalDuration, combined)
@@ -233,7 +234,17 @@ func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment
 		KeepIntervals:       keepIntervals,
 	}
 
-	data, _ := jsonMarshalIndent(cutsData)
+	data, err := jsonMarshalIndent(cutsData)
+	if err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error: could not serialize cuts metadata: %v\n", err)
+		}
+		return CutsResult{
+			CutsFile:     cutsFile,
+			KeepSegments: keep,
+			Changed:      false,
+		}
+	}
 	writeFile(cutsFile, append(data, '\n'))
 
 	if !quiet {
@@ -287,6 +298,7 @@ func buildCutEntries(combined []AdSegment) []CutEntry {
 }
 
 func buildMergedAndKeepIntervals(totalDuration float64, combined []AdSegment) ([]MergedCutInterval, [][2]float64, []KeepSegment) {
+	combined = sanitizeAdSegments(combined, totalDuration)
 	allBounds := make([][2]float64, 0, len(combined))
 	for _, ad := range combined {
 		allBounds = append(allBounds, [2]float64{ad.Start, ad.End})
@@ -295,11 +307,13 @@ func buildMergedAndKeepIntervals(totalDuration float64, combined []AdSegment) ([
 
 	newMerged := mergeBounds(allBounds)
 	formattedMerged := make([]MergedCutInterval, 0, len(newMerged))
+	var mergedAds []AdSegment
 	for _, b := range newMerged {
 		formattedMerged = append(formattedMerged, MergedCutInterval{Start: roundFloat(b[0], 2), End: roundFloat(b[1], 2)})
+		mergedAds = append(mergedAds, AdSegment{Start: b[0], End: b[1]})
 	}
 
-	keep := calculateKeepSegments(totalDuration, combined)
+	keep := calculateKeepSegments(totalDuration, mergedAds)
 	keepIntervals := make([]KeepSegment, 0, len(keep))
 	for _, k := range keep {
 		keepIntervals = append(keepIntervals, KeepSegment{Start: roundFloat(k[0], 2), End: roundFloat(k[1], 2)})

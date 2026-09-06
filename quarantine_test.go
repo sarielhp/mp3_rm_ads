@@ -107,3 +107,43 @@ func TestQuarantineAbandonedDuplicates(t *testing.T) {
 		t.Errorf("expected .absignore to be created: %v", err)
 	}
 }
+
+func TestQuarantineAbandonedDuplicates_MissingTrackedFileOnDiskDoesNotQuarantine(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "TestPod")
+	os.MkdirAll(podDir, 0755)
+
+	bareMP3 := filepath.Join(podDir, "Episode 01.mp3")
+	guidMP3 := filepath.Join(podDir, "Episode 01 (9f8e7d).mp3")
+	os.WriteFile(bareMP3, []byte("active audio"), 0644)
+
+	trackedEpisodes := []absEpisode{
+		{
+			Title: "Episode 01",
+			AudioFile: &absAudioFile{
+				Metadata: &AudioFileMetadata{
+					Filename: "Episode 01 (9f8e7d).mp3",
+				},
+			},
+		},
+	}
+
+	// Replacement file does not exist on disk yet: must not quarantine active audio
+	quarantined := quarantineAbandonedDuplicates(podDir, trackedEpisodes)
+	if len(quarantined) != 0 {
+		t.Fatalf("expected 0 quarantined files when replacement doesn't exist, got %d", len(quarantined))
+	}
+	if _, err := os.Stat(bareMP3); err != nil {
+		t.Fatalf("active file was deleted/quarantined unexpectedly: %v", err)
+	}
+
+	// Now create replacement file on disk
+	os.WriteFile(guidMP3, []byte("replacement audio"), 0644)
+	quarantined = quarantineAbandonedDuplicates(podDir, trackedEpisodes)
+	if len(quarantined) != 1 || quarantined[0] != "Episode 01.mp3" {
+		t.Fatalf("expected 1 quarantined file once replacement exists, got %+v", quarantined)
+	}
+	if _, err := os.Stat(bareMP3 + ".bak"); err != nil {
+		t.Fatalf("expected bare MP3 to be quarantined to .bak: %v", err)
+	}
+}

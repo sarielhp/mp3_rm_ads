@@ -98,6 +98,10 @@ func quarantineAbandonedDuplicates(podDir string, trackedEpisodes []absEpisode) 
 
 		norm := normalizeEpisodeTitle(fn)
 		if trackedFn, exists := trackedByNormalized[norm]; exists && trackedFn != fn {
+			trackedPath := filepath.Join(podDir, trackedFn)
+			if fi, err := os.Stat(trackedPath); err != nil || fi.IsDir() || fi.Size() == 0 {
+				continue
+			}
 			base := strings.TrimSuffix(mp3, ".mp3")
 
 			_ = quarantineFile(mp3)

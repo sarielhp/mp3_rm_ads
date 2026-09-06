@@ -167,11 +167,7 @@ func adjustChunkSegment(seg TranscriptionSegment, ch chunkInfo, isFirst, isLast 
 	segStart := seg.Start + ch.extractStart
 	segEnd := seg.End + ch.extractStart
 
-	if isFirst {
-		if segEnd <= cutStart {
-			return seg, false
-		}
-	} else if segStart >= cutEnd {
+	if segEnd <= cutStart || segStart >= cutEnd {
 		return seg, false
 	}
 
@@ -184,6 +180,10 @@ func adjustChunkSegment(seg TranscriptionSegment, ch chunkInfo, isFirst, isLast 
 		seg.End = cutEnd
 	} else {
 		seg.End = segEnd
+	}
+
+	if seg.End <= seg.Start {
+		return seg, false
 	}
 
 	for i := range seg.Words {

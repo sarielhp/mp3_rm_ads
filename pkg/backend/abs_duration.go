@@ -29,14 +29,12 @@ func GetMP3DiskDurationNative(path string) float64 {
 	for {
 		if err := d.Decode(&frame, &skipped); err != nil {
 			if err == io.EOF {
-				break
+				return duration
 			}
-			break
+			return 0
 		}
 		duration += frame.Duration().Seconds()
 	}
-
-	return duration
 }
 
 func GetMP3DiskDuration(path string) float64 {

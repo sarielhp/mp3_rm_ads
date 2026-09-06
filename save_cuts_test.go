@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"os"
 	"testing"
 )
@@ -302,5 +303,56 @@ func TestSaveCutsJSONExistingRawSameOrder(t *testing.T) {
 	result := saveCutsJSON(f, 100, []AdSegment{{10, 20, ""}, {30, 40, ""}}, nil, true)
 	if result.Changed {
 		t.Error("should be unchanged")
+	}
+}
+
+func TestBuildMergedAndKeepIntervals_MergedGapKeepSegments(t *testing.T) {
+	totalDuration := 300.0
+	// Two ads: [100.0, 150.0] and [153.0, 200.0]. Gap is 3.0s, durations >= 30s.
+	// mergeBounds merges them into [100.0, 200.0].
+	ads := []AdSegment{
+		{Start: 100.0, End: 150.0},
+		{Start: 153.0, End: 200.0},
+	}
+	merged, keep, keepIntervals := buildMergedAndKeepIntervals(totalDuration, ads)
+	if len(merged) != 1 || merged[0].Start != 100.0 || merged[0].End != 200.0 {
+		t.Fatalf("expected 1 merged cut [100, 200], got %+v", merged)
+	}
+	// Keep segments must NOT include the gap [150, 153]. They should be [0, 100] and [200, 300].
+	if len(keep) != 2 {
+		t.Fatalf("expected 2 keep segments, got %d: %+v", len(keep), keep)
+	}
+	if keep[0][0] != 0 || keep[0][1] != 100.0 || keep[1][0] != 200.0 || keep[1][1] != 300.0 {
+		t.Fatalf("unexpected keep segments: %+v", keep)
+	}
+	if len(keepIntervals) != 2 || keepIntervals[0].End != 100.0 || keepIntervals[1].Start != 200.0 {
+		t.Fatalf("unexpected keepIntervals: %+v", keepIntervals)
+	}
+}
+
+func TestSaveCutsJSON_SanitizesNaNAndInf(t *testing.T) {
+	d := t.TempDir()
+	f := d + "/corrupt.mp3"
+	os.WriteFile(f, []byte("audio"), 0644)
+
+	ads := []AdSegment{
+		{Start: math.NaN(), End: 50.0},
+		{Start: 10.0, End: math.Inf(1)},
+		{Start: 20.0, End: 40.0},
+	}
+	result := saveCutsJSON(f, 100.0, ads, nil, true)
+	if !result.Changed {
+		t.Fatal("expected cuts file to be written")
+	}
+	data, err := readFile(result.CutsFile)
+	if err != nil {
+		t.Fatalf("failed reading cuts file: %v", err)
+	}
+	var cd CutsData
+	if err := json.Unmarshal(data, &cd); err != nil {
+		t.Fatalf("cuts file contains invalid json: %v", err)
+	}
+	if len(cd.CutIntervals) != 1 || cd.CutIntervals[0].StartSec != 20.0 {
+		t.Fatalf("expected only sanitized valid segment, got %+v", cd.CutIntervals)
 	}
 }
