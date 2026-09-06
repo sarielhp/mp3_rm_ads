@@ -137,3 +137,39 @@ func TestResolveAnyIDErrors(t *testing.T) {
 		t.Errorf("expected error for non-existent query")
 	}
 }
+
+func TestResolveFolderBasedEpisodes(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "FiveFour")
+	_ = os.MkdirAll(filepath.Join(podDir, "Episode One"), 0755)
+	_ = os.MkdirAll(filepath.Join(podDir, "Episode Two"), 0755)
+
+	ep1Audio := filepath.Join(podDir, "Episode One", "podcast.mp3")
+	ep2Audio := filepath.Join(podDir, "Episode Two", "podcast.mp3")
+	_ = os.WriteFile(ep1Audio, []byte("audio1"), 0644)
+	_ = os.WriteFile(ep2Audio, []byte("audio2"), 0644)
+
+	podID := getOrSetPodcastShortID(podDir, "FiveFour")
+	ep1ID := getOrSetEpisodeShortID(podDir, podID, ep1Audio)
+	ep2ID := getOrSetEpisodeShortID(podDir, podID, ep2Audio)
+
+	if ep1ID == ep2ID {
+		t.Fatalf("expected distinct episode IDs for different folder episodes, got %q for both", ep1ID)
+	}
+
+	res1, err := resolveAnyID(tempDir, ep1ID)
+	if err != nil || !res1.IsEpisode() {
+		t.Fatalf("failed to resolve ep1 by ID: %v", err)
+	}
+	if res1.Episode.Title != "Episode One" {
+		t.Errorf("expected title 'Episode One', got %q", res1.Episode.Title)
+	}
+
+	resByTitle, err := resolveAnyID(tempDir, "Episode Two")
+	if err != nil || !resByTitle.IsEpisode() {
+		t.Fatalf("failed to resolve ep2 by folder title: %v", err)
+	}
+	if resByTitle.Episode.ShortID != ep2ID {
+		t.Errorf("expected ID %q, got %q", ep2ID, resByTitle.Episode.ShortID)
+	}
+}

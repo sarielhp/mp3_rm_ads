@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -159,7 +160,7 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string) (int, flo
 		od, _ := getEpisodeDurations(mp3, getOrCreateEpisodeStatus(mp3))
 		recent = append(recent, RecentEpisodeDTO{
 			ID:       epID,
-			Title:    stripExt(filepath.Base(mp3)),
+			Title:    episodeTitleFromPath(mp3),
 			Date:     epList[i].pt.Format("2006-01-02"),
 			Status:   formatShortStatus(st),
 			Duration: formatClock(od),
@@ -183,6 +184,9 @@ func getPodcastMetadataFields(pod *ResolvedPodcast) (string, string, string, str
 		if coverPath == "" && cached.CoverPath != "" {
 			coverPath = cached.CoverPath
 		}
+	}
+	if desc == "" {
+		desc = queryPodfetchPodcastSummary(pod.Dir, pod.Title)
 	}
 	return author, feedURL, coverPath, desc, uuid
 }
@@ -274,7 +278,8 @@ func printPodcastInfoCard(info PodcastInfoJSON) {
 
 	if info.Description != "" {
 		fmt.Println("\n  Description:")
-		fmt.Printf("    %s\n", truncate(strings.ReplaceAll(info.Description, "\n", " "), 120))
+		formatted := cleanAndFormatNotes(info.Description, 4, 76)
+		fmt.Println(formatted)
 	}
 
 	if len(info.RecentEpisodes) > 0 {
@@ -375,8 +380,17 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 	hasTx, txPath, txSegments := getEpisodeTranscriptInfo(ep.Path)
 
 	desc := ""
-	if det, _ := loadEpisodeDetails(ep.PodcastDir, ep.Filename); det != nil && det.Description != "" {
+	detailKey := ep.Filename
+	if strings.EqualFold(ep.Filename, "podcast.mp3") && ep.Title != "" {
+		detailKey = ep.Title + ".mp3"
+	}
+	if det, _ := loadEpisodeDetails(ep.PodcastDir, detailKey); det != nil && det.Description != "" {
 		desc = det.Description
+	} else if det, _ := loadEpisodeDetails(ep.PodcastDir, ep.Filename); det != nil && det.Description != "" {
+		desc = det.Description
+	}
+	if desc == "" {
+		desc = queryPodfetchEpisodeDescription(ep.Title, ep.Path)
 	}
 
 	cuts := collectEpisodeCuts(ep.Path, st)
@@ -456,7 +470,8 @@ func printEpisodeCutsAndTranscript(info EpisodeInfoJSON, showCuts bool) {
 
 	if info.Description != "" {
 		fmt.Println("\n  Show Notes / Description:")
-		fmt.Printf("    %s\n", truncate(strings.ReplaceAll(info.Description, "\n", " "), 150))
+		formatted := cleanAndFormatNotes(info.Description, 4, 76)
+		fmt.Println(formatted)
 	}
 }
 
@@ -497,4 +512,110 @@ func findCoverImageInDir(dir string) string {
 		}
 	}
 	return ""
+}
+
+func queryPodfetchPodcastSummary(podDir, title string) string {
+	cfgGlobal := loadConfig()
+	dbPath := cfgGlobal.PodfetchDBPath
+	if dbPath == "" {
+		dbPath = "/media/dockers/podfetch/db/podcast.db"
+	}
+	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
+		return ""
+	}
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=3000")
+	if err != nil {
+		return ""
+	}
+	defer db.Close()
+
+	folderName := filepath.Base(podDir)
+	row := db.QueryRow("SELECT summary FROM podcasts WHERE directory_name = ? OR name = ? LIMIT 1", folderName, title)
+	var summary sql.NullString
+	if err := row.Scan(&summary); err == nil && summary.Valid {
+		return strings.TrimSpace(summary.String)
+	}
+	return ""
+}
+
+func queryPodfetchEpisodeDescription(title, audioPath string) string {
+	cfgGlobal := loadConfig()
+	dbPath := cfgGlobal.PodfetchDBPath
+	if dbPath == "" {
+		dbPath = "/media/dockers/podfetch/db/podcast.db"
+	}
+	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
+		return ""
+	}
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=3000")
+	if err != nil {
+		return ""
+	}
+	defer db.Close()
+
+	row := db.QueryRow("SELECT description FROM podcast_episodes WHERE name = ? OR file_episode_path = ? OR download_location = ? LIMIT 1", title, audioPath, audioPath)
+	var desc sql.NullString
+	if err := row.Scan(&desc); err == nil && desc.Valid {
+		return strings.TrimSpace(desc.String)
+	}
+	return ""
+}
+
+func stripHTMLTags(text string) string {
+	text = strings.ReplaceAll(text, "<br>", "\n")
+	text = strings.ReplaceAll(text, "<br/>", "\n")
+	text = strings.ReplaceAll(text, "<br />", "\n")
+	text = strings.ReplaceAll(text, "<p>", "")
+	text = strings.ReplaceAll(text, "</p>", "\n\n")
+	text = strings.ReplaceAll(text, "<div>", "")
+	text = strings.ReplaceAll(text, "</div>", "\n")
+
+	var b strings.Builder
+	inTag := false
+	for _, r := range text {
+		if r == '<' {
+			inTag = true
+			continue
+		}
+		if r == '>' {
+			inTag = false
+			continue
+		}
+		if !inTag {
+			b.WriteRune(r)
+		}
+	}
+	clean := b.String()
+	clean = strings.ReplaceAll(clean, "&amp;", "&")
+	clean = strings.ReplaceAll(clean, "&quot;", "\"")
+	clean = strings.ReplaceAll(clean, "&#39;", "'")
+	clean = strings.ReplaceAll(clean, "&apos;", "'")
+	clean = strings.ReplaceAll(clean, "&lt;", "<")
+	clean = strings.ReplaceAll(clean, "&gt;", ">")
+	return strings.ReplaceAll(clean, "&nbsp;", " ")
+}
+
+func cleanAndFormatNotes(raw string, indentSpaces, maxLineWidth int) string {
+	clean := stripHTMLTags(strings.TrimSpace(raw))
+	if clean == "" {
+		return ""
+	}
+
+	indent := strings.Repeat(" ", indentSpaces)
+	lines := strings.Split(clean, "\n")
+	var result []string
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			if len(result) > 0 && result[len(result)-1] != "" {
+				result = append(result, "")
+			}
+			continue
+		}
+		wrapped := wrapText(trimmed, maxLineWidth-indentSpaces)
+		for _, w := range wrapped {
+			result = append(result, indent+w)
+		}
+	}
+	return strings.Join(result, "\n")
 }
