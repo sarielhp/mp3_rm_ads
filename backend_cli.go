@@ -206,5 +206,9 @@ func sanitizePodcastTitle(title string) string {
 	for _, c := range badChars {
 		title = strings.ReplaceAll(title, c, "_")
 	}
-	return strings.TrimSpace(title)
+	title = strings.TrimSpace(title)
+	if title == "" || title == ".." || title == "." || strings.Trim(title, ".") == "" || strings.HasPrefix(title, "../") || strings.HasPrefix(title, ".._") {
+		return "Untitled Podcast"
+	}
+	return title
 }

@@ -69,3 +69,33 @@ func TestAudiobookshelfSyncDurationAndScan(t *testing.T) {
 		t.Errorf("expected 1 new podcast detected, got %d", scanRes.NewPodcasts)
 	}
 }
+
+func TestSanitizePodcastNameTraversal(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"..", "podcast_escaped"},
+		{".", "podcast_escaped"},
+		{"...", "podcast_escaped"},
+		{"  ..  ", "podcast_escaped"},
+		{"../escaped", "podcast_escaped"},
+		{"", "podcast_escaped"},
+		{"   ", "podcast_escaped"},
+		{"Normal Podcast", "Normal Podcast"},
+		{"Podcast: Part 1", "Podcast_ Part 1"},
+		{"Show/With/Slash", "Show_With_Slash"},
+	}
+
+	baseDir := "/srv/podcasts"
+	for _, tc := range cases {
+		got := sanitizePodcastName(tc.input)
+		if got != tc.expected {
+			t.Errorf("sanitizePodcastName(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+		joined := filepath.Join(baseDir, got)
+		if !strings.HasPrefix(joined, baseDir+"/") && joined != baseDir {
+			t.Errorf("path escaped base directory: base=%q joined=%q input=%q", baseDir, joined, tc.input)
+		}
+	}
+}

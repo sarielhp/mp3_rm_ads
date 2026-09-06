@@ -455,3 +455,29 @@ func TestDeleteGeminiStudioFileNoop(t *testing.T) {
 	deleteGeminiStudioFile(context.Background(), "", "")
 	deleteGeminiStudioFile(context.Background(), "key", "")
 }
+
+func TestGeminiStudioNoKeyInURLError(t *testing.T) {
+	apiKey := "AIzaSySuperSecretKey12345"
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	tempDir := t.TempDir()
+	audioPath := filepath.Join(tempDir, "test.mp3")
+	_ = os.WriteFile(audioPath, []byte("audio"), 0644)
+
+	_, _, err := uploadAudioToGeminiStudio(ctx, apiKey, audioPath)
+	if err == nil {
+		t.Fatal("expected error with canceled context, got nil")
+	}
+	if strings.Contains(err.Error(), apiKey) {
+		t.Errorf("error leaked apiKey: %v", err)
+	}
+
+	_, err = callGeminiStudioProcessor(ctx, apiKey, "gemini-1.5-flash", "files/test")
+	if err == nil {
+		t.Fatal("expected error with canceled context, got nil")
+	}
+	if strings.Contains(err.Error(), apiKey) {
+		t.Errorf("error leaked apiKey: %v", err)
+	}
+}

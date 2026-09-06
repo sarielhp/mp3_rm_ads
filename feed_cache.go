@@ -267,7 +267,8 @@ func fetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]FeedEp
 	newETag := resp.Header.Get("ETag")
 	newLastMod := resp.Header.Get("Last-Modified")
 
-	body, err := io.ReadAll(resp.Body)
+	const maxFeedSize = 32 * 1024 * 1024
+	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedSize))
 	if err != nil {
 		return nil, "", "", false, err
 	}

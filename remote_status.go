@@ -89,7 +89,7 @@ func fetchRemoteActiveTask(targetHost, remoteWorkDir string, transport RemoteTra
 	}
 
 	status.ActiveTask = cleanRemoteRelPath(activePath, remoteWorkDir)
-	statContent, _ := transport.Exec(targetHost, fmt.Sprintf("cat %q 2>/dev/null", activePath))
+	statContent, _ := transport.Exec(targetHost, fmt.Sprintf("cat %s 2>/dev/null", shellQuoteHomePath(activePath)))
 	if strings.TrimSpace(statContent) != "" {
 		var activeSt EpisodeStatusFile
 		if json.Unmarshal([]byte(statContent), &activeSt) == nil {
@@ -285,7 +285,7 @@ func fetchRemoteReadyEpisodesAndBatches(targetHost, remoteWorkDir string, transp
 		batchIDs := splitLines(strings.TrimSpace(out))
 		for _, bid := range batchIDs {
 			bid = strings.TrimSpace(bid)
-			if bid == "" {
+			if bid == "" || !validateBatchID(bid) {
 				continue
 			}
 

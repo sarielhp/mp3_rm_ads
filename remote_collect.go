@@ -229,7 +229,7 @@ func pullStagedBatches(cfg *Config, targetHost, remoteWorkDir, localPodcastsDir 
 	batchEntries := splitLines(strings.TrimSpace(out))
 	for _, batchID := range batchEntries {
 		batchID = strings.TrimSpace(batchID)
-		if batchID == "" {
+		if batchID == "" || !validateBatchID(batchID) {
 			continue
 		}
 		tempPullDir := filepath.Join(os.TempDir(), "abs_pull", batchID)
@@ -248,7 +248,7 @@ func pullStagedBatches(cfg *Config, targetHost, remoteWorkDir, localPodcastsDir 
 						totalCutSaved += item.CutDurationSec
 					}
 				}
-				_, _ = transport.Exec(targetHost, fmt.Sprintf("rm -rf %s/%s", remoteStagingDir, batchID))
+				_, _ = transport.Exec(targetHost, fmt.Sprintf("rm -rf %s/%s", shellQuoteHomePath(remoteStagingDir), shellQuote(batchID)))
 			}
 		}
 		_ = os.RemoveAll(tempPullDir)

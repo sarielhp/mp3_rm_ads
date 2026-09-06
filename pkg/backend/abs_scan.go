@@ -110,7 +110,11 @@ func sanitizePodcastName(s string) string {
 		}
 		return r
 	}, s)
-	return strings.TrimSpace(cleaned)
+	cleaned = strings.TrimSpace(cleaned)
+	if cleaned == "" || cleaned == ".." || cleaned == "." || strings.Trim(cleaned, ".") == "" || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, ".._") {
+		return "podcast_escaped"
+	}
+	return cleaned
 }
 
 func StripHTML(s string) string {

@@ -192,3 +192,47 @@ func TestPodFetchEpisodesAndDownloads(t *testing.T) {
 		t.Errorf("unexpected cover file data: %s", string(data))
 	}
 }
+
+func TestPodFetchDownloadCoverBoundsOversizedImage(t *testing.T) {
+	imgSrv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		chunk := make([]byte, 1024*1024)
+		for i := 0; i < 15; i++ {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}))
+	defer imgSrv.Close()
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.URL.Path == "/api/v1/podcasts/1/cover" {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		if r.URL.Path == "/api/v1/podcasts/1" {
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"id": 1, "name": "Show", "directory": "show",
+				"image_url": imgSrv.URL + "/cover.jpg",
+			})
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer srv.Close()
+
+	be := NewPodFetch(Config{Host: srv.URL, APIKey: "key-123"})
+	tempDir := t.TempDir()
+	dest := filepath.Join(tempDir, "cover.jpg")
+	if err := be.DownloadCover("1", dest); err != nil {
+		t.Fatalf("DownloadCover failed: %v", err)
+	}
+	info, err := os.Stat(dest)
+	if err != nil {
+		t.Fatalf("stat failed: %v", err)
+	}
+	if info.Size() != 10*1024*1024 {
+		t.Errorf("expected cover size bounded to 10MB (10485760 bytes), got %d", info.Size())
+	}
+}

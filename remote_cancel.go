@@ -28,6 +28,9 @@ func runRemoteCancel(cfg *Config, host, batchID string, transport RemoteTranspor
 	remoteStagingDir := fmt.Sprintf("%s/staging", remoteWorkDir)
 
 	if batchID != "" {
+		if !validateBatchID(batchID) {
+			return fmt.Errorf("invalid batch ID format: %q", batchID)
+		}
 		tempDir := filepath.Join(os.TempDir(), "abs_cancel", batchID)
 		_ = os.MkdirAll(tempDir, 0755)
 		defer os.RemoveAll(tempDir)
@@ -44,7 +47,7 @@ func runRemoteCancel(cfg *Config, host, batchID string, transport RemoteTranspor
 			}
 		}
 
-		killCmd := fmt.Sprintf("pkill -f 'batch-worker.*%s' 2>/dev/null || true", batchID)
+		killCmd := fmt.Sprintf("pkill -f %s 2>/dev/null || true", shellQuote("batch-worker.*"+batchID))
 		_, _ = transport.Exec(targetHost, killCmd)
 
 		if !quiet {

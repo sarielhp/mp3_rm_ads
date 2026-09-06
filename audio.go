@@ -143,13 +143,12 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
 		}
 		defer func() {
-			delCmd := exec.Command("ssh", "-o", "BatchMode=yes", remoteHost, fmt.Sprintf("rm -f %s %s", remIn, remOut))
+			delCmd := exec.Command("ssh", "-o", "BatchMode=yes", remoteHost, buildRemoteCutCleanupCmd(remIn, remOut))
 			_ = delCmd.Run()
 		}()
 
 		remFFmpegCmd := exec.Command("ssh", "-o", "BatchMode=yes", remoteHost,
-			fmt.Sprintf("ffmpeg -y -loglevel error -i %s -filter_complex %q -map '[aout]' -c:a libmp3lame -b:a 192k %s",
-				remIn, filterComplex, remOut))
+			buildRemoteFFmpegCmd(remIn, filterComplex, remOut))
 		if err := remFFmpegCmd.Run(); err != nil {
 			fmt.Fprintf(os.Stderr, "remote ffmpeg failed: %v\n", err)
 			return cutAudioFFmpegWithHost(inputFile, keepSegments, outputFile, "")
@@ -202,4 +201,13 @@ func truncateAudio(inputPath, outputPath string, durationSec float64) bool {
 		return false
 	}
 	return true
+}
+
+func buildRemoteCutCleanupCmd(remIn, remOut string) string {
+	return fmt.Sprintf("rm -f %s %s", shellQuote(remIn), shellQuote(remOut))
+}
+
+func buildRemoteFFmpegCmd(remIn, filterComplex, remOut string) string {
+	return fmt.Sprintf("ffmpeg -y -loglevel error -i %s -filter_complex %s -map '[aout]' -c:a libmp3lame -b:a 192k %s",
+		shellQuote(remIn), shellQuote(filterComplex), shellQuote(remOut))
 }

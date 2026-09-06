@@ -93,11 +93,12 @@ func uploadAudioToGeminiStudio(ctx context.Context, apiKey, localAudioPath strin
 
 	go pipeMultipartAudio(pw, mpw, localAudioPath, mimeType)
 
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/upload/v1beta/files?key=%s", apiKey)
+	url := "https://generativelanguage.googleapis.com/upload/v1beta/files"
 	req, err := http.NewRequestWithContext(ctx, "POST", url, pr)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to create upload request: %w", err)
 	}
+	req.Header.Set("x-goog-api-key", apiKey)
 	req.Header.Set("X-Goog-Upload-Protocol", "multipart")
 	req.Header.Set("Content-Type", mpw.FormDataContentType())
 
@@ -129,11 +130,12 @@ func deleteGeminiStudioFile(ctx context.Context, apiKey, fileName string) {
 	if err != nil {
 		return
 	}
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/%s?key=%s", fileName, apiKey)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/%s", fileName)
 	req, err := http.NewRequestWithContext(ctx, "DELETE", url, nil)
 	if err != nil {
 		return
 	}
+	req.Header.Set("x-goog-api-key", apiKey)
 	client := &http.Client{Timeout: 30 * time.Second}
 	resp, err := client.Do(req)
 	if err == nil && resp != nil {
@@ -150,7 +152,7 @@ func callGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 	if modelName == "" {
 		modelName = defaultGeminiModel
 	}
-	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s", modelName, apiKey)
+	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName)
 
 	reqPayload := map[string]any{
 		"contents": []map[string]any{
@@ -184,6 +186,7 @@ func callGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 		return nil, fmt.Errorf("failed to create studio request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-goog-api-key", apiKey)
 
 	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Do(req)

@@ -41,7 +41,11 @@ func runRemoteClear(cfg *Config, host string, transport RemoteTransport, quiet b
 			}
 			audioPath := strings.TrimSuffix(statPath, ".json")
 			basePath := stripExt(audioPath)
-			delCmd := fmt.Sprintf("rm -f %q %q %q.cuts.json %q.transcript.json", audioPath, statPath, basePath, basePath)
+			delCmd := fmt.Sprintf("rm -f %s %s %s %s",
+				shellQuoteHomePath(audioPath),
+				shellQuoteHomePath(statPath),
+				shellQuoteHomePath(basePath+".cuts.json"),
+				shellQuoteHomePath(basePath+".transcript.json"))
 			_, _ = transport.Exec(targetHost, delCmd)
 			removedCount++
 		}

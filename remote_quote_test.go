@@ -1,7 +1,9 @@
 package main
 
 import (
+	"fmt"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"testing"
 )
@@ -110,5 +112,113 @@ func TestResolveManifestDestRejectsPathsOutsideTheLibrary(t *testing.T) {
 	}
 	if p, ok := resolveManifestDest(base, RemoteBatchJobItem{SourceFile: "/srv/podcasts/Show/ep.mp3"}); !ok || p != "/srv/podcasts/Show/ep.mp3" {
 		t.Errorf("a legitimate in-library source_file was rejected: %q ok=%v", p, ok)
+	}
+}
+
+func TestValidateBatchID(t *testing.T) {
+	valid := []string{
+		"batch-20260906-123456-abcdef12",
+		"test-batch-001",
+		"batch_pull_test",
+		"Job123",
+		"a-b_c",
+	}
+	for _, id := range valid {
+		if !validateBatchID(id) {
+			t.Errorf("validateBatchID(%q) = false, want true", id)
+		}
+	}
+
+	invalid := []string{
+		"",
+		" ",
+		".",
+		"..",
+		"../escape",
+		"../../var/log",
+		"x'; touch /tmp/pwned; #",
+		"$(reboot)",
+		"`whoami`",
+		"batch;rm -rf /",
+		"batch|pipe",
+		"batch&bg",
+		"batch\nnewline",
+		"batch with spaces",
+		"batch/slash",
+		"batch\\backslash",
+		"batch*wildcard",
+		"batch?query",
+	}
+	for _, id := range invalid {
+		if validateBatchID(id) {
+			t.Errorf("validateBatchID(%q) = true, want false", id)
+		}
+	}
+}
+
+func TestRunRemoteCancelRejectsHostileBatchID(t *testing.T) {
+	tempDir := t.TempDir()
+	mock := NewMockRemoteTransport(tempDir)
+	cfg := &Config{
+		RemoteHost:    "status-box",
+		RemoteWorkDir: filepath.Join(tempDir, "remote"),
+	}
+
+	hostileIDs := []string{
+		"../../tmp",
+		"x'; touch /tmp/abs_pwned; #",
+		"$(reboot)",
+		"`whoami`",
+		"batch; rm -rf /",
+	}
+
+	for _, id := range hostileIDs {
+		err := runRemoteCancel(cfg, "status-box", id, mock, true)
+		if err == nil {
+			t.Errorf("runRemoteCancel accepted hostile batch ID %q without error", id)
+		}
+		for _, cmd := range mock.ExecutedCmds {
+			if strings.Contains(cmd, "touch /tmp/abs_pwned") || strings.Contains(cmd, "reboot") {
+				t.Fatalf("hostile payload executed in command: %s", cmd)
+			}
+		}
+	}
+}
+
+func TestRemoteQuotedCommandsAvoidShellInjection(t *testing.T) {
+	for _, hostile := range hostileStrings {
+		catCmd := fmt.Sprintf("printf %%s %s", shellQuoteHomePath(hostile))
+		out, err := exec.Command("sh", "-c", catCmd).Output()
+		if err != nil {
+			t.Errorf("shell failed to execute quoted cat command for %q: %v", hostile, err)
+			continue
+		}
+		if string(out) != hostile && !strings.HasPrefix(hostile, "$HOME/") {
+			t.Errorf("shell evaluated command with side effects for %q: got %q", hostile, string(out))
+		}
+	}
+}
+
+func TestRemoteFFmpegCommandQuoting(t *testing.T) {
+	remIn := ".work/abs_123_456_in.part 1; reboot.mp3"
+	remOut := ".work/abs_123_456_out.mp3"
+	filter := "[0:a]atrim=start=0.000:end=10.000,asetpts=PTS-STARTPTS[a0];[a0]concat=n=1:v=0:a=1[aout]"
+
+	cleanupCmd := buildRemoteCutCleanupCmd(remIn, remOut)
+	if !strings.Contains(cleanupCmd, shellQuote(remIn)) {
+		t.Errorf("cleanupCmd did not shellQuote remIn: %s", cleanupCmd)
+	}
+
+	ffmpegCmd := buildRemoteFFmpegCmd(remIn, filter, remOut)
+	if !strings.Contains(ffmpegCmd, shellQuote(remIn)) {
+		t.Errorf("ffmpegCmd did not shellQuote remIn: %s", ffmpegCmd)
+	}
+	if !strings.Contains(ffmpegCmd, shellQuote(filter)) {
+		t.Errorf("ffmpegCmd did not shellQuote filter: %s", ffmpegCmd)
+	}
+
+	testScript := fmt.Sprintf("cmd=%s; [ \"$cmd\" != \"\" ]", shellQuote(ffmpegCmd))
+	if err := exec.Command("sh", "-c", testScript).Run(); err != nil {
+		t.Errorf("sh rejected shell-quoted ffmpeg command: %v", err)
 	}
 }

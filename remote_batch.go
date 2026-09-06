@@ -264,7 +264,7 @@ func verifyRemoteWorkerStartup(targetHost, remoteWorkDir string, transport Remot
 		if len(activeFiles) > 0 && activeFiles[0] != "" {
 			activeJsonPath := activeFiles[0]
 			activeTaskName = cleanRemoteRelPath(activeJsonPath, remoteWorkDir)
-			if data, err := transport.Exec(targetHost, fmt.Sprintf("cat %q", activeJsonPath)); err == nil && data != "" {
+			if data, err := transport.Exec(targetHost, fmt.Sprintf("cat %s", shellQuoteHomePath(activeJsonPath))); err == nil && data != "" {
 				var st EpisodeStatusFile
 				if json.Unmarshal([]byte(data), &st) == nil {
 					activeTaskDuration = st.Original.DurationSec

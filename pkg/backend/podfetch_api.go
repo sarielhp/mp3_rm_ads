@@ -275,7 +275,8 @@ func (c *PodFetchBackend) DownloadCover(podcastID, destPath string) error {
 			resp, err := client.Get(imgURL)
 			if err == nil && resp.StatusCode == http.StatusOK {
 				defer resp.Body.Close()
-				data, _ := io.ReadAll(resp.Body)
+				const maxImageSize = 10 * 1024 * 1024
+				data, _ := io.ReadAll(io.LimitReader(resp.Body, maxImageSize))
 				if len(data) > 0 {
 					_ = os.MkdirAll(filepath.Dir(destPath), 0755)
 					return os.WriteFile(destPath, data, 0644)

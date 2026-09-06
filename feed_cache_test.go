@@ -170,3 +170,21 @@ func TestFeedCacheExpiration(t *testing.T) {
 		t.Error("expected 49h old entry to be expired with 48h TTL")
 	}
 }
+
+func TestFetchFeedDirectBoundsBody(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		chunk := make([]byte, 1024*1024)
+		for i := 0; i < 35; i++ {
+			if _, err := w.Write(chunk); err != nil {
+				return
+			}
+		}
+	}))
+	defer ts.Close()
+
+	_, _, _, _, err := fetchFeedDirect(ts.URL, "", "")
+	if err == nil {
+		t.Error("expected XML parse error on truncated large feed, got nil")
+	}
+}

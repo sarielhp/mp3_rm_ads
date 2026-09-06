@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 )
@@ -144,4 +145,19 @@ func shellQuoteHomePath(s string) string {
 		return "$HOME/" + shellQuote(strings.TrimPrefix(s, "~/"))
 	}
 	return shellQuote(s)
+}
+
+func validateBatchID(batchID string) bool {
+	if batchID == "" || strings.Contains(batchID, "/") || strings.Contains(batchID, "\\") || strings.Contains(batchID, "..") {
+		return false
+	}
+	if filepath.Base(batchID) != batchID {
+		return false
+	}
+	for _, r := range batchID {
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
+			return false
+		}
+	}
+	return true
 }

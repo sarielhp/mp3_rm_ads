@@ -1,6 +1,8 @@
 package main
 
 import (
+	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -224,5 +226,34 @@ func TestMergeBounds(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestSanitizePodcastTitleTraversal(t *testing.T) {
+	cases := []struct {
+		input    string
+		expected string
+	}{
+		{"..", "Untitled Podcast"},
+		{".", "Untitled Podcast"},
+		{"...", "Untitled Podcast"},
+		{"  ..  ", "Untitled Podcast"},
+		{"../escaped", "Untitled Podcast"},
+		{"", "Untitled Podcast"},
+		{"   ", "Untitled Podcast"},
+		{"Normal Show", "Normal Show"},
+		{"Show: Episode 1", "Show_ Episode 1"},
+	}
+
+	baseDir := "/srv/podcasts"
+	for _, tc := range cases {
+		got := sanitizePodcastTitle(tc.input)
+		if got != tc.expected {
+			t.Errorf("sanitizePodcastTitle(%q) = %q, want %q", tc.input, got, tc.expected)
+		}
+		joined := filepath.Join(baseDir, got)
+		if !strings.HasPrefix(joined, baseDir+"/") {
+			t.Errorf("path escaped base directory: base=%q joined=%q input=%q", baseDir, joined, tc.input)
+		}
 	}
 }

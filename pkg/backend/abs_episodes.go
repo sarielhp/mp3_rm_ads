@@ -59,7 +59,8 @@ func (c *AudiobookshelfBackend) PodcastFeedEpisodes(feedURL string) ([]FeedEpiso
 				return
 			}
 
-			rawXML, err := io.ReadAll(resFeed.Body)
+			const maxFeedSize = 32 * 1024 * 1024
+			rawXML, err := io.ReadAll(io.LimitReader(resFeed.Body, maxFeedSize))
 			resFeed.Body.Close()
 			if err != nil {
 				return
