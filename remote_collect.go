@@ -208,7 +208,7 @@ func ackRemoteVerifiedEpisodes(targetHost, remoteWorkDir string, verifiedRelPath
 		quotedArgs = append(quotedArgs, shellQuote(p))
 	}
 	ackArgs := strings.Join(quotedArgs, " ")
-	ackCmd := fmt.Sprintf("abs remote ack %s || ~/.local/bin/abs remote ack %s", ackArgs, ackArgs)
+	ackCmd := fmt.Sprintf("abs offload ack %s || ~/.local/bin/abs offload ack %s || abs remote ack %s || ~/.local/bin/abs remote ack %s", ackArgs, ackArgs, ackArgs, ackArgs)
 	if _, errAck := transport.Exec(targetHost, ackCmd); errAck != nil {
 		for _, p := range verifiedRelPaths {
 			_, _ = transport.Exec(targetHost, remoteCleanupCommand(remoteWorkDir, p))

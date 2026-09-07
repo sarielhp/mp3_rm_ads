@@ -18,7 +18,7 @@ func printRemoteStatus(targetHost string, status RemoteServerStatus, readyEpisod
 
 	if len(readyEpisodes) > 0 {
 		fmt.Println()
-		fmt.Println(bold("Episodes ready for copy back (abs remote pull):"))
+		fmt.Println(bold("Episodes ready for copy back (abs offload pull):"))
 		for _, ep := range readyEpisodes {
 			fmt.Printf("  [✓] %s (ad saved: %.1fs)\n", bold(ep.RelPath), ep.CutDurationSec)
 		}

@@ -67,8 +67,8 @@ func runRemotePush(cfg *Config, args []string, host string, transport RemoteTran
 	if !quiet {
 		fmt.Println()
 		fmt.Printf("Successfully pushed %d episode(s) to %s:%s.\n", pushedCount, targetHost, remoteWorkDir)
-		fmt.Printf("  - Check status: abs remote status %s\n", targetHost)
-		fmt.Printf("  - Pull results: abs remote pull %s\n", targetHost)
+		fmt.Printf("  - Check status: abs offload status %s\n", targetHost)
+		fmt.Printf("  - Pull results: abs offload pull %s\n", targetHost)
 	}
 
 	return ensureRemoteEnvironmentAndWorker(cfg, targetHost, remoteWorkDir, transport, quiet)
@@ -240,9 +240,9 @@ func startRemoteWorkerProcess(targetHost, remoteWorkDir string, transport Remote
 		fmt.Printf("[+] Starting remote worker on %s...\n", targetHost)
 	}
 
-	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 	if _, err := transport.Exec(targetHost, workerCmd); err != nil {
-		altCmd := fmt.Sprintf("nohup abs remote scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+		altCmd := fmt.Sprintf("nohup abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
 }
@@ -293,7 +293,7 @@ func verifyRemoteWorkerStartup(targetHost, remoteWorkDir string, transport Remot
 		} else if workerStarted {
 			fmt.Printf("[✓] Remote worker successfully started and running on %s.\n", targetHost)
 		} else {
-			fmt.Printf("[-] Notice: Remote worker was launched on %s (check status with: abs remote status %s).\n", targetHost, targetHost)
+			fmt.Printf("[-] Notice: Remote worker was launched on %s (check status with: abs offload status %s).\n", targetHost, targetHost)
 		}
 	}
 }

@@ -136,12 +136,12 @@ Spawns a detached background player (prefers headless `mpv` with `--input-ipc-se
 
 ```bash
 # Process audio files or directories for ad removal
-abs proc episode.mp3
-abs proc /path/to/podcasts/
-abs proc recut episode.mp3
-abs proc export srt episode.transcript.json
+abs rm_ads episode.mp3
+abs rm_ads /path/to/podcasts/
+abs rm_ads recut episode.mp3
+abs rm_ads export srt episode.transcript.json
 
-# Library query and inspection (absorbs ls and transcript)
+# Library query and inspection (absorbs ls, transcript, and status diagnostics)
 abs info                    # List all podcasts in library
 abs info latest 10          # List latest 10 episodes across library
 abs info p0001              # Display podcast metadata and episode list
@@ -149,6 +149,8 @@ abs info e12345             # Display episode cuts and metadata
 abs info e12345 --cuts      # Show detailed cuts breakdown
 abs info e12345 --transcript # Display transcript text
 abs info e12345 --export srt # Export transcript to SRT
+abs info status             # Show library summary and worker status
+abs info check              # Test external services (Whisper, ABS, Kitty)
 
 # Podcast sync & server operations (absorbs fetch, server, policy)
 abs sync                    # Scan library for podcasts and new episodes
@@ -170,15 +172,11 @@ abs player pause
 abs player status
 abs player stop
 
-# Remote processing cluster
-abs remote status
-abs remote push
-abs remote pull
-abs remote worker
-
-# System status & health diagnostics (absorbs test)
-abs status                  # Show library summary and worker status
-abs status check            # Test external services (Whisper, ABS, Kitty)
+# Remote processing cluster offload
+abs offload status
+abs offload push
+abs offload pull
+abs offload worker
 
 # Configuration
 abs config show
@@ -191,17 +189,18 @@ abs tui
 
 ### Commands Overview
 
-| Command | Usage | Description |
-|---------|-------|-------------|
-| `proc` | `abs proc [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |
-| `info` | `abs info [options] [id\|latest [N]]` | Library query, inspection, cuts breakdown, and transcripts |
-| `sync` | `abs sync [command] [options]` | Podcast RSS feed sync, episode downloads, and retention policies |
-| `queue` | `abs queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
-| `player` | `abs player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
-| `remote` | `abs remote [command]` | Manage remote cluster batch processing and worker orchestration |
-| `status` | `abs status [command]` | Show library overview or run service health diagnostics (`check`) |
-| `config` | `abs config [command]` | View and manage application configuration, profiles, and cache |
-| `tui` | `abs tui [directory]` | Interactive TUI browser for podcasts and episodes |
+Every canonical command begins with a distinct letter (`c`, `i`, `o`, `p`, `q`, `r`, `s`, `t`), enabling unambiguous single-letter prefixes:
+
+| Command | Prefix | Usage | Description |
+|---------|--------|-------|-------------|
+| `config` | `c` | `abs config [command]` | View and manage application configuration, profiles, and cache |
+| `info` | `i` | `abs info [options] [id\|latest [N]\|status\|check]` | Library query, inspection, cuts breakdown, transcripts, and status diagnostics |
+| `offload` | `o` | `abs offload [command]` | Manage remote cluster batch processing and worker orchestration |
+| `player` | `p` | `abs player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
+| `queue` | `q` | `abs queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
+| `rm_ads` | `r` | `abs rm_ads [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |
+| `sync` | `s` | `abs sync [command] [options]` | Podcast RSS feed sync, episode downloads, and retention policies |
+| `tui` | `t` | `abs tui [directory]` | Interactive TUI browser for podcasts and episodes |
 
 ### Chunked Transcription
 
@@ -209,7 +208,7 @@ For long files that whisper fails to decode, use chunked transcription:
 
 ```bash
 # Enable chunking (10-minute chunks with 30s overlap)
-abs proc --use-chunks episode.mp3
+abs rm_ads --use-chunks episode.mp3
 
 # Or enable permanently in config:
 # "chunk_duration_sec": 600
@@ -221,8 +220,8 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 
 ```bash
 # Export transcript to SRT or plain text format
-abs proc export srt episode.transcript.json
-abs proc export txt episode.transcript.json
+abs rm_ads export srt episode.transcript.json
+abs rm_ads export txt episode.transcript.json
 
 # Or export via info command
 abs info e12345 --export srt
@@ -233,20 +232,20 @@ abs info e12345 --export txt
 
 ```bash
 # Re-cut using existing .cuts.json metadata
-abs proc recut episode.mp3
+abs rm_ads recut episode.mp3
 ```
 
 ### Force Options
 
 ```bash
 # Force re-transcribe
-abs proc -f whisper episode.mp3
+abs rm_ads -f whisper episode.mp3
 
 # Force re-run LLM detection
-abs proc -f llm episode.mp3
+abs rm_ads -f llm episode.mp3
 
 # Force all pipeline stages
-abs proc -f all episode.mp3
+abs rm_ads -f all episode.mp3
 ```
 
 ### LLM Profiles
@@ -256,7 +255,7 @@ abs proc -f all episode.mp3
 abs config llm list
 
 # Use specific profile
-abs proc --profile 2 episode.mp3
+abs rm_ads --profile 2 episode.mp3
 
 # Set default profile
 abs config llm default 2
@@ -266,13 +265,13 @@ abs config llm default 2
 
 ```bash
 # Test connection to Whisper server
-abs status check whisper
+abs info check whisper
 
 # Test connection to Audiobookshelf
-abs status check abs
+abs info check abs
 
 # Map podcast directories with Audiobookshelf metadata
-abs status check abs map
+abs info check abs map
 ```
 
 ## Output Files
