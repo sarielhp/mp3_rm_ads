@@ -154,18 +154,17 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"abs", "test", "whisper"}
+	os.Args = []string{"abs", "status", "check", "whisper"}
 	_, cli := parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
-	os.Args = []string{"abs", "test"}
+	os.Args = []string{"abs", "status", "check"}
 	_, cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
-		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default test command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
+		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default status check command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
-
 }
 
 func TestParseFlagsQuiet(t *testing.T) {

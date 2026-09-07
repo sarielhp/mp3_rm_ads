@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"time"
 )
@@ -30,7 +29,6 @@ type lsEpisodeItem struct {
 	episodeShortID string
 	episodeName    string
 	modTime        time.Time
-	pubTime        time.Time
 	sizeBytes      int64
 	origDuration   float64
 	cleanDuration  float64
@@ -51,56 +49,6 @@ type lsEpisodeJSON struct {
 	Status              string  `json:"status"`
 	HasTranscript       bool    `json:"has_transcript"`
 	Path                string  `json:"path"`
-}
-
-func runLsCommand(cfg Config, cli CLIOptions) error {
-	podcastsDir := cfg.PodcastsDir
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	limit := cli.Count
-	if limit <= 0 {
-		limit = 10
-	}
-
-	args := cli.Args
-	if cli.LsSubcmd == "latest" || (len(args) > 0 && args[0] == "latest") {
-		if len(args) > 0 && args[0] == "latest" {
-			args = args[1:]
-		}
-		if len(args) > 0 {
-			if n, err := strconv.Atoi(args[0]); err == nil && n > 0 {
-				limit = n
-			}
-		}
-		return listLatestEpisodes(podcastsDir, limit, cli)
-	}
-
-	if len(args) == 0 || (len(args) == 1 && (args[0] == "podcasts" || args[0] == "all")) {
-		return listAllPodcasts(podcastsDir, cli)
-	}
-
-	target := args[0]
-	if n, err := strconv.Atoi(target); err == nil && n > 0 && !podcastExistsByIndexOrID(podcastsDir, target) {
-		return listLatestEpisodes(podcastsDir, n, cli)
-	}
-
-	resolved, err := resolveAnyID(podcastsDir, target)
-	if err != nil {
-		return err
-	}
-
-	if resolved.IsPodcast() {
-		return listSinglePodcastEpisodes(resolved.Podcast.Dir, resolved.Podcast.Title, resolved.Podcast.ShortID, cli)
-	}
-
-	if resolved.IsEpisode() {
-		ep := resolved.Episode
-		return listSinglePodcastEpisodes(ep.PodcastDir, ep.PodcastTitle, ep.PodcastShortID, cli)
-	}
-
-	return fmt.Errorf("could not resolve %q", target)
 }
 
 func podcastExistsByIndexOrID(podcastsDir, query string) bool {
@@ -347,149 +295,6 @@ func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
 			dStr, item.podcastShortID, boldCyan(item.episodeShortID), pName, coloredStatus, durStr, truncateDisplayName(item.episodeName, 30))
 	}
 	fmt.Printf("%s\n\n", strings.Repeat("=", 105))
-}
-
-func listSinglePodcastEpisodes(podDir, title, shortID string, cli CLIOptions) error {
-	mp3s := findMP3Files(podDir)
-	if len(mp3s) == 0 {
-		if !cli.Quiet {
-			fmt.Printf("No audio files found for %s (%s).\n", title, shortID)
-		}
-		return nil
-	}
-
-	items := collectSinglePodcastEpisodes(mp3s, podDir, title, shortID)
-	sort.Slice(items, func(i, j int) bool {
-		return items[i].pubTime.After(items[j].pubTime)
-	})
-
-	if cli.JSON {
-		return outputSinglePodcastEpisodesJSON(items)
-	}
-
-	if cli.Quiet {
-		for _, item := range items {
-			fmt.Println(item.path)
-		}
-		return nil
-	}
-
-	printSinglePodcastEpisodesTable(items, title, shortID)
-	return nil
-}
-
-func outputSinglePodcastEpisodesJSON(items []lsEpisodeItem) error {
-	var jsonList []lsEpisodeJSON
-	for _, it := range items {
-		jsonList = append(jsonList, lsEpisodeJSON{
-			ID:                  it.episodeShortID,
-			PodcastID:           it.podcastShortID,
-			Title:               it.episodeName,
-			Date:                it.pubTime.Format("2006-01-02"),
-			OriginalDurationSec: it.origDuration,
-			CleanDurationSec:    it.cleanDuration,
-			Status:              it.statusStr,
-			HasTranscript:       it.hasTranscript,
-			Path:                it.path,
-		})
-	}
-	data, err := json.MarshalIndent(jsonList, "", "  ")
-	if err != nil {
-		return err
-	}
-	fmt.Println(string(data))
-	return nil
-}
-
-func collectSinglePodcastEpisodes(mp3s []string, podDir, title, shortID string) []lsEpisodeItem {
-	var items []lsEpisodeItem
-	for _, mp3 := range mp3s {
-		fi, err := os.Stat(mp3)
-		if err != nil {
-			continue
-		}
-		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
-		if strings.EqualFold(filepath.Base(mp3), "podcast.mp3") {
-			epName = filepath.Base(filepath.Dir(mp3))
-		}
-		st := getOrCreateEpisodeStatus(mp3)
-		statusStr, statusColor := getEpisodeStatusLabel(mp3)
-		origDur, cleanDur := getEpisodeDurations(mp3, st)
-		epShortID := getOrSetEpisodeShortID(podDir, shortID, mp3)
-
-		txPath := stripExt(mp3) + ".transcript.json"
-		_, errTx := os.Stat(txPath)
-
-		pubTime := getEpisodePublicationTime(mp3)
-		if pubTime.IsZero() {
-			pubTime = fi.ModTime()
-		}
-
-		items = append(items, lsEpisodeItem{
-			path:           mp3,
-			podcastDir:     podDir,
-			podcastTitle:   title,
-			podcastShortID: shortID,
-			episodeShortID: epShortID,
-			episodeName:    epName,
-			modTime:        fi.ModTime(),
-			pubTime:        pubTime,
-			sizeBytes:      fi.Size(),
-			origDuration:   origDur,
-			cleanDuration:  cleanDur,
-			hasTranscript:  errTx == nil,
-			statusStr:      statusStr,
-			statusColor:    statusColor,
-		})
-	}
-	return items
-}
-
-func printSinglePodcastEpisodesTable(items []lsEpisodeItem, title, shortID string) {
-	fmt.Printf("\nEpisodes for %s [%s] (%d total):\n", bold(displayName(title)), shortID, len(items))
-	fmt.Printf("%s\n", strings.Repeat("=", 99))
-	fmt.Printf("  %-6s │ %-10s │ %-8s │ %-8s │ %-10s │ %-3s │ %s\n",
-		"ID", "Date", "Orig", "Clean", "AdR", "Tx", "Title")
-	fmt.Printf("  %-6s ┼ %-10s ┼ %-8s ┼ %-8s ┼ %-10s ┼ %-3s ┼ %s\n",
-		strings.Repeat("─", 6), strings.Repeat("─", 10), strings.Repeat("─", 8),
-		strings.Repeat("─", 8), strings.Repeat("─", 10), strings.Repeat("─", 3), strings.Repeat("─", 38))
-
-	for _, item := range items {
-		origStr := formatClock(item.origDuration)
-		if item.origDuration <= 0 {
-			origStr = "-"
-		}
-		cleanStr := "-"
-		if item.statusStr == "Clean" {
-			if item.cleanDuration > 0 {
-				cleanStr = formatClock(item.cleanDuration)
-			} else if item.origDuration > 0 {
-				cleanStr = formatClock(item.origDuration)
-			}
-		}
-
-		shortStatus := formatShortStatus(item.statusStr)
-		coloredStatus := shortStatus
-		if item.statusColor == "green" {
-			coloredStatus = boldGreen(shortStatus)
-		} else if item.statusColor == "yellow" {
-			coloredStatus = boldYellow(shortStatus)
-		} else if item.statusColor == "cyan" {
-			coloredStatus = bold(shortStatus)
-		}
-
-		txFlag := "-"
-		if item.hasTranscript {
-			txFlag = boldGreen("✓")
-		}
-
-		t := truncateDisplayName(item.episodeName, 38)
-		dateStr := item.pubTime.Format("2006-01-02")
-
-		fmt.Printf("  %-6s │ %-10s │ %-8s │ %-8s │ %-10s │ %-3s │ %s\n",
-			boldCyan(item.episodeShortID), dateStr, origStr, cleanStr, coloredStatus, txFlag, t)
-	}
-	fmt.Printf("%s\n\n", strings.Repeat("=", 99))
 }
 
 func formatShortStatus(status string) string {

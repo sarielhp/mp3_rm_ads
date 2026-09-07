@@ -211,11 +211,6 @@ func handlePlayerDaemon(args []string) error {
 	return runPlayerDaemon(audioPath, title, podcast)
 }
 
-func runTranscriptCommand(cfg Config, cli CLIOptions) error {
-	cli.ShowTranscript = true
-	return runInfoCommand(cfg, cli)
-}
-
 func printTranscriptText(jsonPath string) error {
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {

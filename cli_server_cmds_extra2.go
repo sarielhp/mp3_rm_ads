@@ -150,8 +150,8 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed metrics (span, days interval, hours interval)"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "server"
-			opts.ServerSubcmd = "frequency"
+			*action = "sync"
+			opts.SyncSubcmd = "frequency"
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 && opts.Podcast == "" {
 				opts.Podcast = ctx.Args[0]
@@ -165,7 +165,7 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 	return clihelp.Command{
 		Name:        "disable-hourly",
 		Description: "Disable policy for hourly podcasts",
-		UsageLine:   "abs server disable-hourly [options]",
+		UsageLine:   "abs sync disable-hourly [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Podcast name, index, or ID"},
 		},
@@ -177,8 +177,8 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "server"
-			opts.ServerSubcmd = "disable-hourly"
+			*action = "sync"
+			opts.SyncSubcmd = "disable-hourly"
 			opts.DisableHourly = true
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 && opts.Podcast == "" {
@@ -193,7 +193,7 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 	return clihelp.Command{
 		Name:        "clean-orphans",
 		Description: "Delete orphaned ABS podcast entries",
-		UsageLine:   "abs server clean-orphans [options]",
+		UsageLine:   "abs sync clean-orphans [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview items without deleting"),
@@ -202,8 +202,8 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "server"
-			opts.ServerSubcmd = "clean-orphans"
+			*action = "sync"
+			opts.SyncSubcmd = "clean-orphans"
 			opts.Args = ctx.Args
 			return nil
 		},

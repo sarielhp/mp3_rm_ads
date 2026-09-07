@@ -8,9 +8,6 @@ import (
 
 func handleSyncCommand(config Config, cli CLIOptions) {
 	subcmd := cli.SyncSubcmd
-	if subcmd == "" {
-		subcmd = cli.ServerSubcmd
-	}
 	switch subcmd {
 	case "feeds":
 		if err := runFetchCommand(config, cli); err != nil {
@@ -19,7 +16,7 @@ func handleSyncCommand(config Config, cli CLIOptions) {
 		}
 	case "download":
 		handleServerDownload(config, cli)
-	case "prune", "keep":
+	case "prune":
 		handleServerKeep(config, cli)
 	case "policy":
 		if err := runPolicyCommand(config, cli); err != nil {
@@ -41,10 +38,6 @@ func handleSyncCommand(config Config, cli CLIOptions) {
 	default:
 		handleServerScan(config, cli)
 	}
-}
-
-func handleServerCommand(config Config, cli CLIOptions) {
-	handleSyncCommand(config, cli)
 }
 
 func handleServerOPML(config Config, cli CLIOptions) {

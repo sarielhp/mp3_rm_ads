@@ -49,10 +49,6 @@ func main() {
 	}
 
 	switch action {
-	case "test":
-		handleMainTest(config, cli)
-	case "export":
-		handleMainExport(cli)
 	case "config":
 		handleMainConfig(&config, cli)
 	case "status":
@@ -61,18 +57,9 @@ func main() {
 		handleMainTUI(&config, cli)
 	case "sync":
 		handleSyncCommand(config, cli)
-	case "server":
-		handleServerCommand(config, cli)
 	case "remote":
 		handleRemoteCommand(config, cli)
-	case "ls":
-		if err := runLsCommand(config, cli); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
-		}
-	case "batch-worker":
-		handleBatchWorkerCommand(config, cli)
-	case "proc", "recut":
+	case "proc":
 		handleMainProc(config, cli, action)
 	}
 }
@@ -82,16 +69,10 @@ func handleParityCommands(action string, config Config, cli CLIOptions) bool {
 	switch action {
 	case "info":
 		err = runInfoCommand(config, cli)
-	case "policy":
-		err = runPolicyCommand(config, cli)
 	case "queue":
 		err = runQueueCommand(config, cli)
-	case "fetch":
-		err = runFetchCommand(config, cli)
 	case "player":
 		err = runPlayerCommand(config, cli)
-	case "transcript":
-		err = runTranscriptCommand(config, cli)
 	default:
 		return false
 	}
@@ -286,7 +267,7 @@ func handleMainTUI(config *Config, cli CLIOptions) {
 }
 
 func handleMainProc(config Config, cli CLIOptions, action string) {
-	if action == "recut" || cli.ProcSubcmd == "recut" {
+	if cli.ProcSubcmd == "recut" {
 		cli.Recut = true
 	}
 	if cli.ProcSubcmd == "export" {

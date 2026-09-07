@@ -213,8 +213,8 @@ func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
 	if err := app.Execute([]string{"sync", "disable-hourly"}); err != nil {
 		t.Errorf("expected 'sync disable-hourly' to succeed: %v", err)
 	}
-	if opts.SyncSubcmd != "disable-hourly" && opts.ServerSubcmd != "disable-hourly" {
-		t.Errorf("expected SyncSubcmd 'disable-hourly', got %q", opts.ServerSubcmd)
+	if opts.SyncSubcmd != "disable-hourly" {
+		t.Errorf("expected SyncSubcmd 'disable-hourly', got %q", opts.SyncSubcmd)
 	}
 }
 

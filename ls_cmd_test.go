@@ -39,16 +39,16 @@ func TestLsLatestCommand(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{
-		LsSubcmd: "latest",
-		Count:    2,
+		InfoSubcmd: "latest",
+		Count:      2,
 	}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
@@ -85,19 +85,19 @@ func TestLsSinglePodcastCommand(t *testing.T) {
 	cli := CLIOptions{
 		Args: []string{id},
 	}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
 
-	if !strings.Contains(out, "Episodes for") || !strings.Contains(out, "ep1") {
+	if !strings.Contains(out, "Podcast: ShowA") || !strings.Contains(out, "ep1") {
 		t.Errorf("expected podcast episodes listing, got: %s", out)
 	}
 }
@@ -122,13 +122,13 @@ func TestLsAllPodcastsCommand(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
@@ -154,12 +154,12 @@ func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
 	os.Stdout = w
 
 	cliJSON := CLIOptions{Args: []string{"podcasts"}, JSON: true}
-	err := runLsCommand(cfg, cliJSON)
+	err := runInfoCommand(cfg, cliJSON)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 	if err != nil {
-		t.Fatalf("runLsCommand json failed: %v", err)
+		t.Fatalf("runInfoCommand json failed: %v", err)
 	}
 	outBytes, _ := io.ReadAll(r)
 	if !strings.Contains(string(outBytes), id1) || !strings.Contains(string(outBytes), "episode_count") {
@@ -172,12 +172,12 @@ func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
 	os.Stdout = w
 
 	cliQuiet := CLIOptions{Quiet: true}
-	err = runLsCommand(cfg, cliQuiet)
+	err = runInfoCommand(cfg, cliQuiet)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 	if err != nil {
-		t.Fatalf("runLsCommand quiet failed: %v", err)
+		t.Fatalf("runInfoCommand quiet failed: %v", err)
 	}
 	qBytes, _ := io.ReadAll(r)
 	if strings.TrimSpace(string(qBytes)) != id1 {
@@ -199,18 +199,18 @@ func TestLsSinglePodcastJSON(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{Args: []string{id1}, JSON: true}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
-	if !strings.Contains(out, "podcast_id") || !strings.Contains(out, id1) {
+	if !strings.Contains(out, "recent_episodes") || !strings.Contains(out, id1) {
 		t.Errorf("expected json episodes list, got: %s", out)
 	}
 }
@@ -230,16 +230,16 @@ func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{
-		LsSubcmd: "latest",
-		Count:    1,
+		InfoSubcmd: "latest",
+		Count:      1,
 	}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
@@ -273,25 +273,22 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 	cli := CLIOptions{
 		Args: []string{id},
 	}
-	err := runLsCommand(cfg, cli)
+	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()
 	os.Stdout = oldStdout
 
 	if err != nil {
-		t.Fatalf("runLsCommand failed: %v", err)
+		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
 
 	rawTitle := "פרק ראשון של הפודקאסט"
-	expectedTitle := displayName(rawTitle)
+	expectedTitle := truncate(displayName(rawTitle), 35)
 	if !strings.Contains(out, expectedTitle) {
 		t.Errorf("expected single podcast table to contain displayName reordered %q, got: %s", expectedTitle, out)
-	}
-	if expectedTitle != rawTitle && strings.Contains(out, rawTitle) {
-		t.Errorf("expected single podcast table not to contain raw Hebrew %q, got: %s", rawTitle, out)
 	}
 	expectedPodTitle := displayName("פודקאסט_בעברית")
 	if !strings.Contains(out, expectedPodTitle) {
@@ -327,43 +324,6 @@ func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
 
 	expectedEp := displayName("פרק בדיקה עם עברית")
 	expectedPod := displayName("חדשות הבוקר")
-
-	if !strings.Contains(out, expectedEp) {
-		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)
-	}
-	if !strings.Contains(out, expectedPod) {
-		t.Errorf("expected table to contain %q, got: %s", expectedPod, out)
-	}
-}
-
-func TestPrintSinglePodcastEpisodesTableHebrewDirect(t *testing.T) {
-	items := []lsEpisodeItem{
-		{
-			episodeShortID: "ep01",
-			episodeName:    "ראיון בלעדי עם מומחה",
-			pubTime:        time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC),
-			origDuration:   300.0,
-			cleanDuration:  270.0,
-			statusStr:      "Clean",
-			statusColor:    "green",
-			hasTranscript:  true,
-		},
-	}
-
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
-	printSinglePodcastEpisodesTable(items, "פודקאסט שיחות", "pc01")
-
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	outBytes, _ := io.ReadAll(r)
-	out := string(outBytes)
-
-	expectedEp := displayName("ראיון בלעדי עם מומחה")
-	expectedPod := displayName("פודקאסט שיחות")
 
 	if !strings.Contains(out, expectedEp) {
 		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)

@@ -11,54 +11,6 @@ import (
 	"github.com/sarielhp/clihelp/tree"
 )
 
-func normalizeCLIArgs(args []string) []string {
-	if len(args) == 0 {
-		return args
-	}
-
-	cmdIdx := -1
-	for i, arg := range args {
-		if !strings.HasPrefix(arg, "-") {
-			cmdIdx = i
-			break
-		}
-	}
-	if cmdIdx == -1 {
-		return args
-	}
-
-	firstArg := strings.ToLower(args[cmdIdx])
-	var repl []string
-	switch firstArg {
-	case "ls":
-		repl = []string{"info"}
-	case "transcript":
-		repl = []string{"info", "--transcript"}
-	case "recut":
-		repl = []string{"proc", "recut"}
-	case "export":
-		repl = []string{"proc", "export"}
-	case "test":
-		repl = []string{"status", "check"}
-	case "server":
-		repl = []string{"sync"}
-	case "fetch":
-		repl = []string{"sync", "download"}
-	case "policy":
-		repl = []string{"sync", "policy"}
-	case "batch-worker":
-		repl = []string{"remote", "worker"}
-	default:
-		return args
-	}
-
-	res := make([]string, 0, len(args)+len(repl)-1)
-	res = append(res, args[:cmdIdx]...)
-	res = append(res, repl...)
-	res = append(res, args[cmdIdx+1:]...)
-	return res
-}
-
 //go:embed VERSION
 var embeddedVersion string
 
@@ -244,10 +196,9 @@ func parseFlags() (string, CLIOptions) {
 	}
 
 	args := os.Args[1:]
-	normArgs := normalizeCLIArgs(args)
 
-	for i, a := range normArgs {
-		if a == "--tree" || (a == "help" && i+1 < len(normArgs) && normArgs[i+1] == "tree") {
+	for i, a := range args {
+		if a == "--tree" || (a == "help" && i+1 < len(args) && args[i+1] == "tree") {
 			app := buildCLIApp(&action, &opts)
 			tree.Render(os.Stdout, app, tree.Options{})
 			os.Exit(0)
@@ -255,7 +206,7 @@ func parseFlags() (string, CLIOptions) {
 	}
 
 	app := buildCLIApp(&action, &opts)
-	err := app.Execute(normArgs)
+	err := app.Execute(args)
 	if err != nil {
 		fatalError("Error: %v\n", err)
 	}
@@ -266,15 +217,15 @@ func parseFlags() (string, CLIOptions) {
 
 	opts.IsConfigCommand = (action == "config")
 	opts.IsDirCommand = (action == "dir")
-	opts.IsFileCommand = (action == "proc" || action == "recut")
+	opts.IsFileCommand = (action == "proc")
 	opts.IsTUICommand = (action == "tui")
-	opts.IsTimelineCommand = (action == "timeline" || (action == "server" && opts.ServerSubcmd == "timeline") || (action == "sync" && opts.SyncSubcmd == "timeline"))
-	opts.IsTestCommand = (action == "test" || (action == "status" && opts.StatusSubcmd == "check"))
-	opts.IsScanCommand = (action == "scan" || action == "new" || (action == "server" && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new")) || (action == "sync" && (opts.SyncSubcmd == "scan" || opts.SyncSubcmd == "new" || opts.SyncSubcmd == "feeds")))
+	opts.IsTimelineCommand = (action == "sync" && opts.SyncSubcmd == "timeline")
+	opts.IsTestCommand = (action == "status" && opts.StatusSubcmd == "check")
+	opts.IsScanCommand = (action == "sync" && (opts.SyncSubcmd == "scan" || opts.SyncSubcmd == "new" || opts.SyncSubcmd == "feeds"))
 	opts.IsStatusCommand = (action == "status")
 	opts.IsRemoteCommand = (action == "remote")
-	opts.IsBatchWorkerCommand = (action == "batch-worker" || (action == "remote" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != ""))
-	opts.IsSyncCommand = (action == "sync" || action == "server")
+	opts.IsBatchWorkerCommand = (action == "remote" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
+	opts.IsSyncCommand = (action == "sync")
 
 	return action, opts
 }
