@@ -59,6 +59,8 @@ func main() {
 		handleMainStatus(&config, cli)
 	case "tui":
 		handleMainTUI(&config, cli)
+	case "sync":
+		handleSyncCommand(config, cli)
 	case "server":
 		handleServerCommand(config, cli)
 	case "remote":
@@ -231,6 +233,10 @@ func handleMainWhisperConfig(config *Config, cli CLIOptions) {
 }
 
 func handleMainStatus(config *Config, cli CLIOptions) {
+	if cli.StatusSubcmd == "check" {
+		handleMainTest(*config, cli)
+		return
+	}
 	showDetailedPodcasts := false
 	targetDir := config.PodcastsDir
 	if len(cli.Args) > 0 {
@@ -280,8 +286,12 @@ func handleMainTUI(config *Config, cli CLIOptions) {
 }
 
 func handleMainProc(config Config, cli CLIOptions, action string) {
-	if action == "recut" {
+	if action == "recut" || cli.ProcSubcmd == "recut" {
 		cli.Recut = true
+	}
+	if cli.ProcSubcmd == "export" {
+		handleMainExport(cli)
+		return
 	}
 	if cli.ProcSubcmd == "collect" {
 		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {

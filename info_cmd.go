@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -77,11 +78,33 @@ func runInfoCommand(cfg Config, cli CLIOptions) error {
 		podcastsDir = "."
 	}
 
-	if len(cli.Args) == 0 {
-		return fmt.Errorf("missing target ID or query for info command")
+	limit := cli.Count
+	if limit <= 0 {
+		limit = 10
 	}
 
-	target := cli.Args[0]
+	args := cli.Args
+	if cli.InfoSubcmd == "latest" || (len(args) > 0 && args[0] == "latest") || cli.Latest {
+		if len(args) > 0 && args[0] == "latest" {
+			args = args[1:]
+		}
+		if len(args) > 0 {
+			if n, err := strconv.Atoi(args[0]); err == nil && n > 0 {
+				limit = n
+			}
+		}
+		return listLatestEpisodes(podcastsDir, limit, cli)
+	}
+
+	if len(args) == 0 || (len(args) == 1 && (args[0] == "podcasts" || args[0] == "all")) {
+		return listAllPodcasts(podcastsDir, cli)
+	}
+
+	target := args[0]
+	if n, err := strconv.Atoi(target); err == nil && n > 0 && !podcastExistsByIndexOrID(podcastsDir, target) {
+		return listLatestEpisodes(podcastsDir, n, cli)
+	}
+
 	resolved, err := resolveAnyID(podcastsDir, target)
 	if err != nil {
 		return err
@@ -92,14 +115,49 @@ func runInfoCommand(cfg Config, cli CLIOptions) error {
 	}
 
 	if resolved.IsEpisode() {
+		if cli.ShowTranscript || cli.ExportFormat != "" || cli.ExportTXT || cli.ExportSRT {
+			return runTranscriptForEpisode(resolved.Episode, cli)
+		}
 		return inspectEpisodeInfo(resolved.Episode, cli)
 	}
 
 	return fmt.Errorf("could not inspect %q", target)
 }
 
+func runTranscriptForEpisode(ep *ResolvedEpisode, cli CLIOptions) error {
+	jsonPath := stripExt(ep.Path) + ".transcript.json"
+	if _, err := os.Stat(jsonPath); err != nil {
+		return fmt.Errorf("transcript file not found for episode [%s]: %s", ep.ShortID, jsonPath)
+	}
+
+	format := strings.ToLower(cli.ExportFormat)
+	if cli.ExportTXT {
+		format = "txt"
+	} else if cli.ExportSRT {
+		format = "srt"
+	}
+
+	if format == "txt" {
+		out := convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
+		if !cli.Quiet {
+			fmt.Printf("Exported TXT: %s\n", out)
+		}
+		return nil
+	}
+
+	if format == "srt" {
+		out := convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
+		if !cli.Quiet {
+			fmt.Printf("Exported SRT: %s\n", out)
+		}
+		return nil
+	}
+
+	return printTranscriptText(jsonPath)
+}
+
 func inspectPodcastInfo(pod *ResolvedPodcast, cli CLIOptions) error {
-	dto := buildPodcastInfoDTO(pod)
+	dto := buildPodcastInfoDTO(pod, cli.Count)
 
 	if cli.JSON {
 		data, err := json.MarshalIndent(dto, "", "  ")
@@ -114,7 +172,7 @@ func inspectPodcastInfo(pod *ResolvedPodcast, cli CLIOptions) error {
 	return nil
 }
 
-func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string) (int, float64, int64, []RecentEpisodeDTO) {
+func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisodes int) (int, float64, int64, []RecentEpisodeDTO) {
 	cleanCount := 0
 	var totalDur float64
 	var totalSize int64
@@ -151,6 +209,9 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string) (int, flo
 
 	var recent []RecentEpisodeDTO
 	limit := 5
+	if maxEpisodes > 0 {
+		limit = maxEpisodes
+	}
 	if limit > len(epList) {
 		limit = len(epList)
 	}
@@ -204,9 +265,9 @@ func checkSQLiteSyncStatus() string {
 	return "Not connected"
 }
 
-func buildPodcastInfoDTO(pod *ResolvedPodcast) PodcastInfoJSON {
+func buildPodcastInfoDTO(pod *ResolvedPodcast, maxEpisodes int) PodcastInfoJSON {
 	mp3s := findMP3Files(pod.Dir)
-	cleanCount, totalDur, totalSize, recent := collectPodcastStatsAndRecent(pod, mp3s)
+	cleanCount, totalDur, totalSize, recent := collectPodcastStatsAndRecent(pod, mp3s, maxEpisodes)
 	author, feedURL, coverPath, desc, uuid := getPodcastMetadataFields(pod)
 	sqliteSync := checkSQLiteSyncStatus()
 

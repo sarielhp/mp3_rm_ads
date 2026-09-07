@@ -6,15 +6,45 @@ import (
 	"strings"
 )
 
-func handleServerCommand(config Config, cli CLIOptions) {
-	switch cli.ServerSubcmd {
+func handleSyncCommand(config Config, cli CLIOptions) {
+	subcmd := cli.SyncSubcmd
+	if subcmd == "" {
+		subcmd = cli.ServerSubcmd
+	}
+	switch subcmd {
+	case "feeds":
+		if err := runFetchCommand(config, cli); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+	case "download":
+		handleServerDownload(config, cli)
+	case "prune", "keep":
+		handleServerKeep(config, cli)
+	case "policy":
+		if err := runPolicyCommand(config, cli); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
 	case "opml":
 		handleServerOPML(config, cli)
-	case "scan":
-		handleServerScan(config, cli)
-	default:
+	case "rescan":
+		handleServerRescan(config, cli)
+	case "timeline":
+		handleServerTimeline(config, cli)
+	case "list":
+		handleServerList(config, cli)
+	case "get-info":
+		handleServerGetInfo(config, cli)
+	case "frequency", "disable-hourly", "clean-orphans":
 		handleServerCommandPart2(config, cli)
+	default:
+		handleServerScan(config, cli)
 	}
+}
+
+func handleServerCommand(config Config, cli CLIOptions) {
+	handleSyncCommand(config, cli)
 }
 
 func handleServerOPML(config Config, cli CLIOptions) {

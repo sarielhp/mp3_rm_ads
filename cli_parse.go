@@ -11,57 +11,52 @@ import (
 	"github.com/sarielhp/clihelp/tree"
 )
 
-func isCommandPathOrPrefix(app *clihelp.App, args []string) bool {
-	if len(args) == 0 {
-		return false
-	}
-	currentCmds := app.Commands
-	for idx, arg := range args {
-		arg = strings.ToLower(arg)
-		var found *clihelp.Command
-		for i := range currentCmds {
-			if strings.ToLower(currentCmds[i].Name) == arg {
-				found = &currentCmds[i]
-				break
-			}
-		}
-		if found != nil {
-			currentCmds = found.Subcommands
-			continue
-		}
-
-		hasPrefixMatch := false
-		for i := range currentCmds {
-			if strings.HasPrefix(strings.ToLower(currentCmds[i].Name), arg) {
-				hasPrefixMatch = true
-				break
-			}
-		}
-		if hasPrefixMatch {
-			if idx == len(args)-1 {
-				return true
-			}
-		}
-		return false
-	}
-	return true
-}
-
 func normalizeCLIArgs(args []string) []string {
 	if len(args) == 0 {
 		return args
 	}
 
-	firstArg := strings.ToLower(args[0])
-
-	var dummyAct string
-	var dummyOpts CLIOptions
-	dummyApp := buildCLIApp(&dummyAct, &dummyOpts)
-	if isCommandPathOrPrefix(dummyApp, []string{firstArg}) {
+	cmdIdx := -1
+	for i, arg := range args {
+		if !strings.HasPrefix(arg, "-") {
+			cmdIdx = i
+			break
+		}
+	}
+	if cmdIdx == -1 {
 		return args
 	}
 
-	return args
+	firstArg := strings.ToLower(args[cmdIdx])
+	var repl []string
+	switch firstArg {
+	case "ls":
+		repl = []string{"info"}
+	case "transcript":
+		repl = []string{"info", "--transcript"}
+	case "recut":
+		repl = []string{"proc", "recut"}
+	case "export":
+		repl = []string{"proc", "export"}
+	case "test":
+		repl = []string{"status", "check"}
+	case "server":
+		repl = []string{"sync"}
+	case "fetch":
+		repl = []string{"sync", "download"}
+	case "policy":
+		repl = []string{"sync", "policy"}
+	case "batch-worker":
+		repl = []string{"remote", "worker"}
+	default:
+		return args
+	}
+
+	res := make([]string, 0, len(args)+len(repl)-1)
+	res = append(res, args[:cmdIdx]...)
+	res = append(res, repl...)
+	res = append(res, args[cmdIdx+1:]...)
+	return res
 }
 
 //go:embed VERSION
@@ -98,23 +93,14 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		InteractiveFallback: true,
 		Commands: []clihelp.Command{
 			buildProcCommand(opts, action),
-			buildLsCommand(opts, action),
 			buildInfoCommand(opts, action),
-			buildPolicyCommand(opts, action),
+			buildSyncCommand(opts, action, &countVal, &keepVal),
 			buildQueueCommand(opts, action),
-			buildFetchCommand(opts, action),
 			buildPlayerCommand(opts, action),
-			buildTranscriptCommand(opts, action),
-			buildRecutCommand(opts, action),
-			buildExportCommand(opts, action),
-			buildTUICommand(opts, action),
-			buildStatusCommand(opts, action),
-			buildTestCommand(opts, action),
-			buildServerCommand(opts, action, &countVal, &keepVal),
-			buildConfigCommand(opts, action),
 			buildRemoteCommand(opts, action),
-			buildBatchWorkerCommand(opts, action),
-			buildHelpCommand(),
+			buildStatusCommand(opts, action),
+			buildConfigCommand(opts, action),
+			buildTUICommand(opts, action),
 		},
 	}
 }
@@ -137,25 +123,11 @@ func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
 	}
 }
 
-func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildStatusCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "status",
-		Description: "Show status overview of library and worker",
-		UsageLine:   "abs status [options] [podcasts]",
-		Args:        clihelp.MaximumNArgs(1),
-		Run: func(ctx *clihelp.Context) error {
-			*action = "status"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
-func buildTestCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "test",
+		Name:        "check",
 		Description: "Test external services (Whisper, ABS, Kitty)",
-		UsageLine:   "abs test [options] <target>",
+		UsageLine:   "abs status check [options] [target]",
 		Args:        clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
@@ -165,13 +137,41 @@ func buildTestCommand(opts *CLIOptions, action *string) clihelp.Command {
 			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "test"
+			*action = "status"
+			opts.StatusSubcmd = "check"
 			if len(ctx.Args) > 0 && ctx.Args[0] == "kitty" {
 				opts.Args = ctx.Args[1:]
 			} else {
 				opts.Args = ctx.Args
 			}
 			return resolveTestCommandArgs(ctx.Args, opts)
+		},
+	}
+}
+
+func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "status",
+		Description: "Show status overview of library and worker",
+		UsageLine:   "abs status [command] [options] [podcasts]",
+		Subcommands: []clihelp.Command{
+			buildStatusCheckSubcommand(opts, action),
+		},
+		Args: clihelp.RangeArgs(0, 2),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "status"
+			if len(ctx.Args) > 0 && ctx.Args[0] == "check" {
+				opts.StatusSubcmd = "check"
+				args := ctx.Args[1:]
+				if len(args) > 0 && args[0] == "kitty" {
+					opts.Args = args[1:]
+				} else {
+					opts.Args = args
+				}
+				return resolveTestCommandArgs(args, opts)
+			}
+			opts.Args = ctx.Args
+			return nil
 		},
 	}
 }
@@ -207,31 +207,6 @@ func resolveTestCommandArgs(args []string, opts *CLIOptions) error {
 	return nil
 }
 
-func buildHelpCommand() clihelp.Command {
-	return clihelp.Command{
-		Name:        "help",
-		Description: "Display usage help message for abs or a command",
-		UsageLine:   "abs help [command]",
-		Run: func(ctx *clihelp.Context) error {
-			if len(ctx.Args) > 0 {
-				topic := strings.ToLower(ctx.Args[0])
-				if topic == "tree" || topic == "--tree" || topic == "t" {
-					tree.Render(ctx.Stdout, ctx.App, tree.Options{})
-					os.Exit(0)
-				}
-				if !ctx.App.RenderCommand(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager}, ctx.Args...) {
-					fmt.Fprintf(os.Stderr, "Error: unknown command %q. Run 'abs help' for available commands.\n", ctx.Args[0])
-					os.Exit(1)
-				}
-			} else {
-				ctx.App.RenderGlobal(clihelp.Options{Theme: ctx.App.Theme, Pager: ctx.App.Pager})
-			}
-			os.Exit(0)
-			return nil
-		},
-	}
-}
-
 func hideOption(o clihelp.Option) clihelp.Option {
 	o.Hidden = true
 	return o
@@ -246,6 +221,7 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		hideOption(clihelp.Bool(&opts.UseChunks, "--use-chunks", false, "Split audio into chunks")),
 		hideOption(clihelp.Bool(&opts.ExtractKeywords, "--extract-keywords", false, "Extract keywords for transcription")),
 		hideOption(clihelp.String(&opts.TranscribeMin, "-t, --tminutes <minutes>", "", "Transcribe first N minutes")),
+		hideOption(clihelp.Bool(&opts.Recut, "--recut", false, "Recut audio using existing cuts metadata")),
 		clihelp.String(&opts.Force, "-f, --force <stage>", "", "Force: 'whisper', 'llm', or 'all'"),
 		clihelp.String(&opts.UseLLM, "--profile <id/name>", "", "Select LLM profile ID or name"),
 		hideOption(clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Remote FFmpeg host")),
@@ -270,8 +246,8 @@ func parseFlags() (string, CLIOptions) {
 	args := os.Args[1:]
 	normArgs := normalizeCLIArgs(args)
 
-	for _, a := range normArgs {
-		if a == "--tree" {
+	for i, a := range normArgs {
+		if a == "--tree" || (a == "help" && i+1 < len(normArgs) && normArgs[i+1] == "tree") {
 			app := buildCLIApp(&action, &opts)
 			tree.Render(os.Stdout, app, tree.Options{})
 			os.Exit(0)
@@ -292,12 +268,13 @@ func parseFlags() (string, CLIOptions) {
 	opts.IsDirCommand = (action == "dir")
 	opts.IsFileCommand = (action == "proc" || action == "recut")
 	opts.IsTUICommand = (action == "tui")
-	opts.IsTimelineCommand = (action == "timeline" || (action == "server" && opts.ServerSubcmd == "timeline"))
-	opts.IsTestCommand = (action == "test")
-	opts.IsScanCommand = (action == "scan" || action == "new" || (action == "server" && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new")))
+	opts.IsTimelineCommand = (action == "timeline" || (action == "server" && opts.ServerSubcmd == "timeline") || (action == "sync" && opts.SyncSubcmd == "timeline"))
+	opts.IsTestCommand = (action == "test" || (action == "status" && opts.StatusSubcmd == "check"))
+	opts.IsScanCommand = (action == "scan" || action == "new" || (action == "server" && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new")) || (action == "sync" && (opts.SyncSubcmd == "scan" || opts.SyncSubcmd == "new" || opts.SyncSubcmd == "feeds")))
 	opts.IsStatusCommand = (action == "status")
 	opts.IsRemoteCommand = (action == "remote")
-	opts.IsBatchWorkerCommand = (action == "batch-worker")
+	opts.IsBatchWorkerCommand = (action == "batch-worker" || (action == "remote" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != ""))
+	opts.IsSyncCommand = (action == "sync" || action == "server")
 
 	return action, opts
 }

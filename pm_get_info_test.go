@@ -14,23 +14,23 @@ func TestCLIServerGetInfoParsing(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"server", "get_info"}); err != nil {
-		t.Fatalf("failed to parse 'server get_info': %v", err)
+	if err := app.Execute([]string{"sync", "get-info"}); err != nil {
+		t.Fatalf("failed to parse 'sync get-info': %v", err)
 	}
-	if action != "server" || opts.ServerSubcmd != "get-info" || opts.Count != 100 {
-		t.Errorf("expected action=server, subcmd=get-info, count=100, got action=%s, subcmd=%s, count=%d",
-			action, opts.ServerSubcmd, opts.Count)
+	if action != "sync" || opts.SyncSubcmd != "get-info" || opts.Count != 100 {
+		t.Errorf("expected action=sync, subcmd=get-info, count=100, got action=%s, subcmd=%s, count=%d",
+			action, opts.SyncSubcmd, opts.Count)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "get-info", "50", "-p", "Dan Snow"}); err != nil {
-		t.Fatalf("failed to parse 'server get-info 50': %v", err)
+	if err := app.Execute([]string{"sync", "get-info", "50", "-p", "Dan Snow"}); err != nil {
+		t.Fatalf("failed to parse 'sync get-info 50': %v", err)
 	}
-	if action != "server" || opts.ServerSubcmd != "get-info" || opts.Count != 50 || opts.Podcast != "Dan Snow" {
-		t.Errorf("expected action=server, subcmd=get-info, count=50, podcast='Dan Snow', got action=%s, subcmd=%s, count=%d, podcast=%s",
-			action, opts.ServerSubcmd, opts.Count, opts.Podcast)
+	if action != "sync" || opts.SyncSubcmd != "get-info" || opts.Count != 50 || opts.Podcast != "Dan Snow" {
+		t.Errorf("expected action=sync, subcmd=get-info, count=50, podcast='Dan Snow', got action=%s, subcmd=%s, count=%d, podcast=%s",
+			action, opts.SyncSubcmd, opts.Count, opts.Podcast)
 	}
 }
 

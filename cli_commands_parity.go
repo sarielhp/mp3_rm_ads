@@ -7,41 +7,50 @@ import (
 func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "info",
-		Description: "Inspect podcast or episode metadata and cuts",
-		UsageLine:   "abs info [options] <id>",
-		Examples: []clihelp.Example{
-			{Line: "abs info e12345", Description: "Inspect episode metadata and cuts breakdown"},
+		Description: "Library query, inspection, cuts and transcripts",
+		UsageLine:   "abs info [options] [id|latest [N]]",
+		Subcommands: []clihelp.Command{
+			{
+				Name:        "latest",
+				Description: "List latest added episodes across all podcasts",
+				UsageLine:   "abs info latest [N] [options]",
+				Parameters: []clihelp.Param{
+					{Name: "[N]", Description: "Number of episodes to show (default: 10)"},
+				},
+				Args: clihelp.MaximumNArgs(1),
+				Options: []clihelp.Option{
+					clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of latest episodes to list"),
+					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
+					clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
+					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+				},
+				Run: func(ctx *clihelp.Context) error {
+					*action = "info"
+					opts.InfoSubcmd = "latest"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
 		},
-		Args: clihelp.ExactArgs(1),
+		Args: clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
-			clihelp.Bool(&opts.ShowCuts, "--cuts", false, "Display detailed breakdown of detected commercial cuts"),
+			clihelp.Bool(&opts.ShowCuts, "--cuts", false, "Display detailed cuts breakdown"),
+			clihelp.Bool(&opts.ShowTranscript, "--transcript", false, "Display episode transcript text"),
+			clihelp.String(&opts.ExportFormat, "--export <format>", "", "Export transcript to format ('srt' or 'txt')"),
+			clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Limit number of episodes to list"),
+			clihelp.Bool(&opts.Latest, "-l, --latest", false, "List latest episodes across library"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+			clihelp.String(&opts.Output, "-o, --output <path>", "", "Output destination for export"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "info"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
-func buildPolicyCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "policy",
-		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "abs policy [options] <podcast-id>",
-		Args:        clihelp.ExactArgs(1),
-		Options: []clihelp.Option{
-			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable or disable automatic downloads (true/false)"),
-			clihelp.String(&opts.DownloadPolicy, "--download-policy <mode>", "", "Download policy mode ('none', 'latest', 'latest_k', 'all')"),
-			clihelp.Int(&opts.DownloadK, "--download-k <num>", 0, "Number of latest episodes to download when policy is latest_k"),
-			clihelp.String(&opts.AutoCleanupStr, "--auto-cleanup <bool>", "", "Enable or disable automatic cleanup (true/false)"),
-			clihelp.Int(&opts.CleanupDays, "--cleanup-days <days>", 0, "Retention window in days for automatic cleanup"),
-			clihelp.String(&opts.AdRemovalMode, "--ad-removal <mode>", "", "Ad removal policy mode ('none', 'latest', 'all')"),
-			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "policy"
+			if len(ctx.Args) > 0 && ctx.Args[0] == "latest" {
+				opts.InfoSubcmd = "latest"
+				opts.Args = ctx.Args[1:]
+				return nil
+			}
 			opts.Args = ctx.Args
 			return nil
 		},
@@ -115,20 +124,6 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 	}
 }
 
-func buildFetchCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "fetch",
-		Description: "Fetch and sync latest RSS feeds for podcasts",
-		UsageLine:   "abs fetch [options] [podcast-id]",
-		Args:        clihelp.MaximumNArgs(1),
-		Run: func(ctx *clihelp.Context) error {
-			*action = "fetch"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
 func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "player",
@@ -195,27 +190,6 @@ func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Args: clihelp.RangeArgs(0, 2),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "player"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
-func buildTranscriptCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "transcript",
-		Description: "View or export transcript for an episode",
-		UsageLine:   "abs transcript [options] <id>",
-		Args:        clihelp.ExactArgs(1),
-		Options: []clihelp.Option{
-			clihelp.String(&opts.ExportFormat, "--export <format>", "", "Export format: 'txt' or 'srt'"),
-			hideOption(clihelp.Bool(&opts.ExportTXT, "--txt", false, "Export transcript to plain text file")),
-			hideOption(clihelp.Bool(&opts.ExportSRT, "--srt", false, "Export transcript to SubRip (SRT) subtitle file")),
-			clihelp.String(&opts.Output, "-o, --output <path>", "", "Custom output destination path"),
-			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress banner and print text only"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "transcript"
 			opts.Args = ctx.Args
 			return nil
 		},

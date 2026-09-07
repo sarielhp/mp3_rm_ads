@@ -40,6 +40,10 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 			err = runRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
 		}
 	case "worker":
+		if cli.BatchWorkerDir != "" {
+			handleBatchWorkerCommand(config, cli)
+			return
+		}
 		targetDir := ""
 		if len(cli.Args) > 0 {
 			targetDir = cli.Args[0]

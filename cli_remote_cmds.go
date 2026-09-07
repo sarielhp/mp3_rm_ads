@@ -139,6 +139,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 			Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory (defaults to ~/abs_remote)"}},
 			Args:        clihelp.MaximumNArgs(1),
 			Options: []clihelp.Option{
+				clihelp.String(&opts.BatchWorkerDir, "--batch-dir <path>", "", "Path to the staged batch directory"),
 				clihelp.Bool(&opts.Daemon, "-d, --daemon", false, "Run as recurring background daemon loop"),
 				clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 				clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
@@ -259,24 +260,6 @@ func buildRemoteCancelSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 		Run: func(ctx *clihelp.Context) error {
 			*action = "remote"
 			opts.RemoteSubcmd = "cancel"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
-func buildBatchWorkerCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "batch-worker",
-		Description: "Internal worker to process staged batch files",
-		UsageLine:   "abs batch-worker [options]",
-		Options: []clihelp.Option{
-			clihelp.String(&opts.BatchWorkerDir, "--batch-dir <path>", "", "Path to the staged batch directory"),
-			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "batch-worker"
 			opts.Args = ctx.Args
 			return nil
 		},

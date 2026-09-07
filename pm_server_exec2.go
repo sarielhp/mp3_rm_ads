@@ -10,7 +10,11 @@ import (
 )
 
 func handleServerCommandPart2(config Config, cli CLIOptions) {
-	switch cli.ServerSubcmd {
+	subcmd := cli.SyncSubcmd
+	if subcmd == "" {
+		subcmd = cli.ServerSubcmd
+	}
+	switch subcmd {
 	case "list":
 		handleServerList(config, cli)
 	case "download":

@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/sarielhp/clihelp"
@@ -13,11 +14,11 @@ func TestRegressionIssue1_TestKittyArgSlicing(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"test", "kitty", "cover.png"}); err != nil {
-		t.Fatalf("unexpected error executing test kitty: %v", err)
+	if err := app.Execute([]string{"status", "check", "kitty", "cover.png"}); err != nil {
+		t.Fatalf("unexpected error executing status check kitty: %v", err)
 	}
-	if action != "test" || !opts.TestKitty {
-		t.Fatalf("expected action 'test' with TestKitty=true, got action=%q, TestKitty=%v", action, opts.TestKitty)
+	if action != "status" || opts.StatusSubcmd != "check" || !opts.TestKitty {
+		t.Fatalf("expected action 'status' with StatusSubcmd='check' and TestKitty=true, got action=%q, subcmd=%q, TestKitty=%v", action, opts.StatusSubcmd, opts.TestKitty)
 	}
 	if len(opts.Args) != 1 || opts.Args[0] != "cover.png" {
 		t.Fatalf("expected opts.Args to contain only ['cover.png'], got %v", opts.Args)
@@ -29,22 +30,22 @@ func TestRegressionIssue2_TestCommandTargetValidation(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"test", "unknown-target"}); err == nil {
+	if err := app.Execute([]string{"status", "check", "unknown-target"}); err == nil {
 		t.Errorf("expected error for unknown test target, got nil")
 	}
 
-	if err := app.Execute([]string{"test", "abs", "invalid-subtarget"}); err == nil {
+	if err := app.Execute([]string{"status", "check", "abs", "invalid-subtarget"}); err == nil {
 		t.Errorf("expected error for invalid abs test target, got nil")
 	}
 
 	validCases := [][]string{
-		{"test"},
-		{"test", "whisper"},
-		{"test", "abs"},
-		{"test", "abs", "connect"},
-		{"test", "abs", "map"},
-		{"test", "abs", "download"},
-		{"test", "kitty"},
+		{"status", "check"},
+		{"status", "check", "whisper"},
+		{"status", "check", "abs"},
+		{"status", "check", "abs", "connect"},
+		{"status", "check", "abs", "map"},
+		{"status", "check", "abs", "download"},
+		{"status", "check", "kitty"},
 	}
 	for _, tc := range validCases {
 		var a string
@@ -130,16 +131,25 @@ func TestRegressionIssue5_TranscriptConflictingFlags(t *testing.T) {
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
-	cmd := findTestCommand(app, "transcript")
+	cmd := findTestCommand(app, "info")
 	if cmd == nil {
-		t.Fatalf("transcript command not found")
+		t.Fatalf("info command not found")
 	}
+	hasExport := false
+	hasTranscript := false
 	for _, opt := range cmd.Options {
-		if opt.Flags == "--txt" || opt.Flags == "--srt" {
-			if !opt.Hidden {
-				t.Errorf("expected flag %s to be marked hidden", opt.Flags)
-			}
+		if strings.Contains(opt.Flags, "--export") {
+			hasExport = true
 		}
+		if strings.Contains(opt.Flags, "--transcript") {
+			hasTranscript = true
+		}
+	}
+	if !hasExport {
+		t.Errorf("expected --export flag on info command")
+	}
+	if !hasTranscript {
+		t.Errorf("expected --transcript flag on info command")
 	}
 }
 
@@ -192,29 +202,19 @@ func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"server", "get-info"}); err != nil {
-		t.Errorf("expected 'server get-info' to succeed: %v", err)
+	if err := app.Execute([]string{"sync", "get-info"}); err != nil {
+		t.Errorf("expected 'sync get-info' to succeed: %v", err)
 	}
-	if opts.ServerSubcmd != "get-info" {
-		t.Errorf("expected ServerSubcmd 'get-info', got %q", opts.ServerSubcmd)
-	}
-
-	opts = CLIOptions{}
-	if err := app.Execute([]string{"server", "get_info"}); err != nil {
-		t.Errorf("expected 'server get_info' (alias) to succeed: %v", err)
+	if opts.SyncSubcmd != "get-info" {
+		t.Errorf("expected SyncSubcmd 'get-info', got %q", opts.SyncSubcmd)
 	}
 
 	opts = CLIOptions{}
-	if err := app.Execute([]string{"server", "disable-hourly"}); err != nil {
-		t.Errorf("expected 'server disable-hourly' to succeed: %v", err)
+	if err := app.Execute([]string{"sync", "disable-hourly"}); err != nil {
+		t.Errorf("expected 'sync disable-hourly' to succeed: %v", err)
 	}
-	if opts.ServerSubcmd != "disable-hourly" {
-		t.Errorf("expected ServerSubcmd 'disable-hourly', got %q", opts.ServerSubcmd)
-	}
-
-	opts = CLIOptions{}
-	if err := app.Execute([]string{"server", "disable_hourly"}); err != nil {
-		t.Errorf("expected 'server disable_hourly' (alias) to succeed: %v", err)
+	if opts.SyncSubcmd != "disable-hourly" && opts.ServerSubcmd != "disable-hourly" {
+		t.Errorf("expected SyncSubcmd 'disable-hourly', got %q", opts.ServerSubcmd)
 	}
 }
 

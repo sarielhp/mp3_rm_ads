@@ -52,20 +52,20 @@ func TestParseFlagsConfigPodcastsDir(t *testing.T) {
 func TestParseFlagsExport(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "export", "srt", "f.transcript.json"}
+	os.Args = []string{"abs", "proc", "export", "srt", "f.transcript.json"}
 	act, cli := parseFlags()
-	if act != "export" || !cli.ExportSRT || cli.ExportFormat != "srt" {
-		t.Errorf("expected export srt, got %s, %v, %s", act, cli.ExportSRT, cli.ExportFormat)
+	if act != "proc" || cli.ProcSubcmd != "export" || !cli.ExportSRT || cli.ExportFormat != "srt" {
+		t.Errorf("expected proc export srt, got %s, %s, %v, %s", act, cli.ProcSubcmd, cli.ExportSRT, cli.ExportFormat)
 	}
 }
 
 func TestParseFlagsRecut(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "recut", "f.mp3"}
+	os.Args = []string{"abs", "proc", "recut", "f.mp3"}
 	act, cli := parseFlags()
-	if act != "recut" || !cli.Recut {
-		t.Errorf("expected recut, got %s, %v", act, cli.Recut)
+	if act != "proc" || cli.ProcSubcmd != "recut" || !cli.Recut {
+		t.Errorf("expected proc recut, got %s, %s, %v", act, cli.ProcSubcmd, cli.Recut)
 	}
 }
 

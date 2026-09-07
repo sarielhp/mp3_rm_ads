@@ -229,6 +229,7 @@ type CLIOptions struct {
 	IsTimelineCommand    bool
 	IsTestCommand        bool
 	IsScanCommand        bool
+	IsSyncCommand        bool
 	IsStatusCommand      bool
 	IsRemoteCommand      bool
 	IsBatchWorkerCommand bool
@@ -306,6 +307,11 @@ type CLIOptions struct {
 	AdRemovalMode       string
 	QueueSubcmd         string
 	PlayerSubcmd        string
+	InfoSubcmd          string
+	SyncSubcmd          string
+	StatusSubcmd        string
+	ShowTranscript      bool
+	Latest              bool
 }
 
 type CostInfo struct {

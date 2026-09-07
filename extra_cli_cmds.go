@@ -212,73 +212,8 @@ func handlePlayerDaemon(args []string) error {
 }
 
 func runTranscriptCommand(cfg Config, cli CLIOptions) error {
-	podcastsDir := cfg.PodcastsDir
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	if len(cli.Args) == 0 {
-		return fmt.Errorf("missing episode identifier for transcript command")
-	}
-
-	target := cli.Args[0]
-	res, err := resolveAnyID(podcastsDir, target)
-	if err != nil {
-		return err
-	}
-
-	if !res.IsEpisode() {
-		return fmt.Errorf("identifier %q is a podcast; please specify an episode ID to view transcript", target)
-	}
-
-	ep := res.Episode
-	jsonPath := stripExt(ep.Path) + ".transcript.json"
-	if _, err := os.Stat(jsonPath); err != nil {
-		return fmt.Errorf("transcript file not found for episode [%s]: %s", ep.ShortID, jsonPath)
-	}
-
-	fmtCount := 0
-	if cli.ExportFormat != "" {
-		fmtCount++
-	}
-	if cli.ExportTXT {
-		fmtCount++
-	}
-	if cli.ExportSRT {
-		fmtCount++
-	}
-	if fmtCount > 1 {
-		return fmt.Errorf("conflicting export format flags; use canonical '--export <format>'")
-	}
-
-	format := strings.ToLower(cli.ExportFormat)
-	if cli.ExportTXT {
-		format = "txt"
-	} else if cli.ExportSRT {
-		format = "srt"
-	}
-
-	if format != "" && format != "txt" && format != "srt" {
-		return fmt.Errorf("invalid export format %q; expected 'txt' or 'srt'", format)
-	}
-
-	if format == "txt" {
-		out := convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
-		if !cli.Quiet {
-			fmt.Printf("Exported TXT: %s\n", out)
-		}
-		return nil
-	}
-
-	if format == "srt" {
-		out := convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
-		if !cli.Quiet {
-			fmt.Printf("Exported SRT: %s\n", out)
-		}
-		return nil
-	}
-
-	return printTranscriptText(jsonPath)
+	cli.ShowTranscript = true
+	return runInfoCommand(cfg, cli)
 }
 
 func printTranscriptText(jsonPath string) error {

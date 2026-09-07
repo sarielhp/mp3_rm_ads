@@ -138,17 +138,25 @@ Spawns a detached background player (prefers headless `mpv` with `--input-ipc-se
 # Process audio files or directories for ad removal
 abs proc episode.mp3
 abs proc /path/to/podcasts/
+abs proc recut episode.mp3
+abs proc export srt episode.transcript.json
 
-# List podcasts or latest episodes
-abs ls
-abs ls latest 10
-abs ls podcasts
+# Library query and inspection (absorbs ls and transcript)
+abs info                    # List all podcasts in library
+abs info latest 10          # List latest 10 episodes across library
+abs info p0001              # Display podcast metadata and episode list
+abs info e12345             # Display episode cuts and metadata
+abs info e12345 --cuts      # Show detailed cuts breakdown
+abs info e12345 --transcript # Display transcript text
+abs info e12345 --export srt # Export transcript to SRT
 
-# Inspect episode or podcast metadata and cuts
-abs info e12345
-
-# View or update download and AdR policy
-abs policy p0001 --ad-removal latest
+# Podcast sync & server operations (absorbs fetch, server, policy)
+abs sync                    # Scan library for podcasts and new episodes
+abs sync feeds              # Fetch latest RSS feeds
+abs sync download           # Download pending episodes
+abs sync prune              # Prune old episodes per retention policy
+abs sync policy p0001       # View or update download/AdR policy
+abs sync timeline           # Display online availability timestamps table
 
 # Manage AdR queue
 abs queue list
@@ -156,41 +164,44 @@ abs queue add e12345
 abs queue remove e12345
 abs queue clear
 
-# Interactive TUI browser
-abs tui
-
-# Library status overview
-abs status
-
 # Background playback
 abs player play e12345
 abs player pause
 abs player status
 abs player stop
+
+# Remote processing cluster
+abs remote status
+abs remote push
+abs remote pull
+abs remote worker
+
+# System status & health diagnostics (absorbs test)
+abs status                  # Show library summary and worker status
+abs status check            # Test external services (Whisper, ABS, Kitty)
+
+# Configuration
+abs config show
+abs config get <key>
+abs config set <key> <value>
+
+# Interactive TUI browser
+abs tui
 ```
 
 ### Commands Overview
 
 | Command | Usage | Description |
 |---------|-------|-------------|
-| `proc` | `abs proc [paths...]` | Process audio files or directories for ad removal |
-| `ls` | `abs ls [latest\|podcasts]` | List library podcasts, episodes, or latest downloads |
-| `info` | `abs info <id>` | Inspect podcast or episode metadata and cuts |
-| `policy` | `abs policy <podcast-id>` | View or update podcast download and AdR policy |
-| `queue` | `abs queue [command]` | Manage the ad removal (AdR) processing queue |
-| `fetch` | `abs fetch [podcast-id]` | Fetch and sync latest RSS feeds for podcasts |
+| `proc` | `abs proc [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |
+| `info` | `abs info [options] [id\|latest [N]]` | Library query, inspection, cuts breakdown, and transcripts |
+| `sync` | `abs sync [command] [options]` | Podcast RSS feed sync, episode downloads, and retention policies |
+| `queue` | `abs queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
 | `player` | `abs player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
-| `transcript` | `abs transcript <id>` | View or export transcript for an episode |
-| `recut` | `abs recut [paths...]` | Recut audio files using existing cuts metadata |
-| `export` | `abs export <srt\|txt>` | Export transcript JSON to SRT subtitles or plain text |
+| `remote` | `abs remote [command]` | Manage remote cluster batch processing and worker orchestration |
+| `status` | `abs status [command]` | Show library overview or run service health diagnostics (`check`) |
+| `config` | `abs config [command]` | View and manage application configuration, profiles, and cache |
 | `tui` | `abs tui [directory]` | Interactive TUI browser for podcasts and episodes |
-| `status` | `abs status [podcasts]` | Show status overview of library and worker |
-| `test` | `abs test <target>` | Test external services (Whisper, ABS, Kitty) |
-| `server` | `abs server [command]` | Manage and interact with Audiobookshelf server |
-| `config` | `abs config [command]` | View and manage application configuration |
-| `remote` | `abs remote [command]` | Manage remote batch processing offload |
-| `batch-worker` | `abs batch-worker` | Internal worker to process staged batch files |
-| `help` | `abs help [command]` | Display usage help message |
 
 ### Chunked Transcription
 
@@ -198,7 +209,7 @@ For long files that whisper fails to decode, use chunked transcription:
 
 ```bash
 # Enable chunking (10-minute chunks with 30s overlap)
-./abs --use-chunks episode.mp3
+abs proc --use-chunks episode.mp3
 
 # Or enable permanently in config:
 # "chunk_duration_sec": 600
@@ -209,60 +220,59 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 ### Export Options
 
 ```bash
-# Export to SRT format
-./abs --srt episode.mp3
+# Export transcript to SRT or plain text format
+abs proc export srt episode.transcript.json
+abs proc export txt episode.transcript.json
 
-# Export to TXT format
-./abs --txt episode.mp3
-
-# Export both
-./abs --srt --txt episode.mp3
+# Or export via info command
+abs info e12345 --export srt
+abs info e12345 --export txt
 ```
 
 ### Recut Mode
 
 ```bash
-# Re-cut using existing .cuts.json
-./abs --recut episode.mp3
+# Re-cut using existing .cuts.json metadata
+abs proc recut episode.mp3
 ```
 
 ### Force Options
 
 ```bash
 # Force re-transcribe
-./abs --force-transcribe episode.mp3
+abs proc -f whisper episode.mp3
 
 # Force re-run LLM detection
-./abs --force-llm episode.mp3
+abs proc -f llm episode.mp3
 
-# Force both
-./abs --force-transcribe --force-llm episode.mp3
+# Force all pipeline stages
+abs proc -f all episode.mp3
 ```
 
 ### LLM Profiles
 
 ```bash
 # List available profiles
-./abs --list-llms
+abs config llm list
 
 # Use specific profile
-./abs --use-llm 2 episode.mp3
+abs proc --profile 2 episode.mp3
 
 # Set default profile
-./abs --set-default 2
+abs config llm default 2
 ```
 
-### Audiobookshelf Integration
+### External Service Diagnostics
 
 ```bash
-# Set Audiobookshelf server details
-./abs --set-abs --abs-url http://localhost:8080 --abs-user admin --abs-pass password
+# Test connection to Whisper server
+abs status check whisper
 
 # Test connection to Audiobookshelf
-./abs --test-abs
+abs status check abs
 
-# Map podcast directories
-./abs --abs-map
+# Map podcast directories with Audiobookshelf metadata
+abs status check abs map
 ```
 
 ## Output Files

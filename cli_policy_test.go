@@ -9,53 +9,53 @@ func TestCLIScanAndNewCommands(t *testing.T) {
 	var opts CLIOptions
 
 	app := buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "scan"}); err != nil {
-		t.Fatalf("scan execution error: %v", err)
+	if err := app.Execute([]string{"sync"}); err != nil {
+		t.Fatalf("sync execution error: %v", err)
 	}
-	if action != "server" || opts.ServerSubcmd != "scan" {
-		t.Errorf("scan command failed: action=%s, subcmd=%s", action, opts.ServerSubcmd)
+	if action != "sync" {
+		t.Errorf("sync command failed: action=%s", action)
 	}
 	if opts.EpisodesOnly {
-		t.Errorf("scan without flags should not be EpisodesOnly")
+		t.Errorf("sync without flags should not be EpisodesOnly")
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "scan", "-k", "5"}); err != nil {
-		t.Fatalf("scan -k 5 error: %v", err)
+	if err := app.Execute([]string{"sync", "-k", "5"}); err != nil {
+		t.Fatalf("sync -k 5 error: %v", err)
 	}
 	if !opts.CountGiven || opts.Count != 5 {
-		t.Errorf("scan -k 5 override failed: CountGiven=%v, Count=%d", opts.CountGiven, opts.Count)
+		t.Errorf("sync -k 5 override failed: CountGiven=%v, Count=%d", opts.CountGiven, opts.Count)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "new"}); err != nil {
-		t.Fatalf("new execution error: %v", err)
+	if err := app.Execute([]string{"sync", "--episodes-only"}); err != nil {
+		t.Fatalf("sync --episodes-only execution error: %v", err)
 	}
-	if action != "server" || opts.ServerSubcmd != "scan" || !opts.EpisodesOnly {
-		t.Errorf("new command failed: action=%s, subcmd=%s, EpisodesOnly=%v", action, opts.ServerSubcmd, opts.EpisodesOnly)
+	if action != "sync" || !opts.EpisodesOnly {
+		t.Errorf("sync --episodes-only failed: action=%s, EpisodesOnly=%v", action, opts.EpisodesOnly)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "new", "-k", "2"}); err != nil {
-		t.Fatalf("new -k 2 error: %v", err)
+	if err := app.Execute([]string{"sync", "--episodes-only", "-k", "2"}); err != nil {
+		t.Fatalf("sync -k 2 error: %v", err)
 	}
 	if !opts.CountGiven || opts.Count != 2 || !opts.EpisodesOnly {
-		t.Errorf("new -k 2 override failed: CountGiven=%v, Count=%d, EpisodesOnly=%v", opts.CountGiven, opts.Count, opts.EpisodesOnly)
+		t.Errorf("sync -k 2 override failed: CountGiven=%v, Count=%d, EpisodesOnly=%v", opts.CountGiven, opts.Count, opts.EpisodesOnly)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"server", "new", "-p", "Tech"}); err != nil {
-		t.Fatalf("server new error: %v", err)
+	if err := app.Execute([]string{"sync", "--episodes-only", "-p", "Tech"}); err != nil {
+		t.Fatalf("sync error: %v", err)
 	}
-	if action != "server" || opts.ServerSubcmd != "scan" || !opts.EpisodesOnly || opts.Podcast != "Tech" {
-		t.Errorf("server new failed: action=%s, subcmd=%s, podcast=%s", action, opts.ServerSubcmd, opts.Podcast)
+	if action != "sync" || !opts.EpisodesOnly || opts.Podcast != "Tech" {
+		t.Errorf("sync failed: action=%s, podcast=%s", action, opts.Podcast)
 	}
 }
