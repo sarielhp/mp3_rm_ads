@@ -13,32 +13,32 @@ func TestCLIProcCollectAndNoCollectParsing(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"proc", "collect"}); err != nil {
-		t.Fatalf("failed to parse 'proc collect': %v", err)
+	if err := app.Execute([]string{"rm_ads", "collect"}); err != nil {
+		t.Fatalf("failed to parse 'rm_ads collect': %v", err)
 	}
-	if action != "proc" || opts.ProcSubcmd != "collect" {
-		t.Errorf("expected action=proc, ProcSubcmd=collect, got action=%s, ProcSubcmd=%s", action, opts.ProcSubcmd)
+	if action != "rm_ads" || opts.ProcSubcmd != "collect" {
+		t.Errorf("expected action=rm_ads, ProcSubcmd=collect, got action=%s, ProcSubcmd=%s", action, opts.ProcSubcmd)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"proc", "collect", "mybox", "-q", "-v"}); err != nil {
-		t.Fatalf("failed to parse 'proc collect mybox -q -v': %v", err)
+	if err := app.Execute([]string{"rm_ads", "collect", "mybox", "-q", "-v"}); err != nil {
+		t.Fatalf("failed to parse 'rm_ads collect mybox -q -v': %v", err)
 	}
-	if action != "proc" || opts.ProcSubcmd != "collect" || opts.RemoteHost != "mybox" || !opts.Quiet || !opts.Verbose {
-		t.Errorf("expected proc collect mybox -q -v, got action=%s, subcmd=%s, host=%s, quiet=%v, verbose=%v",
+	if action != "rm_ads" || opts.ProcSubcmd != "collect" || opts.RemoteHost != "mybox" || !opts.Quiet || !opts.Verbose {
+		t.Errorf("expected rm_ads collect mybox -q -v, got action=%s, subcmd=%s, host=%s, quiet=%v, verbose=%v",
 			action, opts.ProcSubcmd, opts.RemoteHost, opts.Quiet, opts.Verbose)
 	}
 
 	action = ""
 	opts = CLIOptions{}
 	app = buildCLIApp(&action, &opts)
-	if err := app.Execute([]string{"proc", "--no-collect"}); err != nil {
-		t.Fatalf("failed to parse 'proc --no-collect': %v", err)
+	if err := app.Execute([]string{"rm_ads", "--no-collect"}); err != nil {
+		t.Fatalf("failed to parse 'rm_ads --no-collect': %v", err)
 	}
-	if action != "proc" || !opts.NoCollect {
-		t.Errorf("expected action=proc, NoCollect=true, got action=%s, NoCollect=%v", action, opts.NoCollect)
+	if action != "rm_ads" || !opts.NoCollect {
+		t.Errorf("expected action=rm_ads, NoCollect=true, got action=%s, NoCollect=%v", action, opts.NoCollect)
 	}
 }
 

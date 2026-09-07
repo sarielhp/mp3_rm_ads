@@ -4,20 +4,20 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "proc",
+		Name:        "rm_ads",
 		Description: "Process audio files for ad removal",
-		UsageLine:   "abs proc [command]",
+		UsageLine:   "abs rm_ads [command]",
 		Subcommands: []clihelp.Command{
-			buildProcRecutSubcommand(opts, action),
-			buildProcExportSubcommand(opts, action),
-			buildProcCollectSubcommand(opts, action),
-			buildProcClearSubcommand(opts, action),
+			buildRmAdsRecutSubcommand(opts, action),
+			buildRmAdsExportSubcommand(opts, action),
+			buildRmAdsCollectSubcommand(opts, action),
+			buildRmAdsClearSubcommand(opts, action),
 		},
 		Options: getTranscriptionOptions(opts),
 		Run: func(ctx *clihelp.Context) error {
-			*action = "proc"
+			*action = "rm_ads"
 			if len(ctx.Args) > 0 {
 				switch ctx.Args[0] {
 				case "collect":
@@ -49,11 +49,11 @@ func buildProcCommand(opts *CLIOptions, action *string) clihelp.Command {
 	}
 }
 
-func buildProcCollectSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildRmAdsCollectSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "collect",
 		Description: "Pull completed batches from remote host",
-		UsageLine:   "abs proc collect [host] [options]",
+		UsageLine:   "abs rm_ads collect [host] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
 		},
@@ -63,7 +63,7 @@ func buildProcCollectSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "proc"
+			*action = "rm_ads"
 			opts.ProcSubcmd = "collect"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -73,11 +73,11 @@ func buildProcCollectSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	}
 }
 
-func buildProcClearSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildRmAdsClearSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "clear",
 		Description: "Stop remote workers and clear remote queue",
-		UsageLine:   "abs proc clear [host] [options]",
+		UsageLine:   "abs rm_ads clear [host] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
 		},
@@ -86,7 +86,7 @@ func buildProcClearSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "proc"
+			*action = "rm_ads"
 			opts.ProcSubcmd = "clear"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -96,11 +96,11 @@ func buildProcClearSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 	}
 }
 
-func buildProcRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildRmAdsRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "recut",
 		Description: "Recut audio files using existing cuts metadata",
-		UsageLine:   "abs proc recut [options] [path...]",
+		UsageLine:   "abs rm_ads recut [options] [path...]",
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
@@ -109,7 +109,7 @@ func buildProcRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of episodes to recut"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "proc"
+			*action = "rm_ads"
 			opts.ProcSubcmd = "recut"
 			opts.Recut = true
 			opts.Args = ctx.Args
@@ -118,16 +118,16 @@ func buildProcRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 	}
 }
 
-func buildProcExportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildRmAdsExportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "export",
 		Description: "Export transcript JSON to SRT subtitles or text",
-		UsageLine:   "abs proc export [command] [options] <path...>",
+		UsageLine:   "abs rm_ads export [command] [options] <path...>",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "srt",
 				Description: "Export transcript to SubRip (.srt) subtitle format",
-				UsageLine:   "abs proc export srt <path1> [path2 ...] [options]",
+				UsageLine:   "abs rm_ads export srt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
 				},
@@ -137,7 +137,7 @@ func buildProcExportSubcommand(opts *CLIOptions, action *string) clihelp.Command
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 				},
 				Run: func(ctx *clihelp.Context) error {
-					*action = "proc"
+					*action = "rm_ads"
 					opts.ProcSubcmd = "export"
 					opts.ExportFormat = "srt"
 					opts.ExportSRT = true
@@ -148,7 +148,7 @@ func buildProcExportSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			{
 				Name:        "txt",
 				Description: "Export transcript to plain text (.txt) format",
-				UsageLine:   "abs proc export txt <path1> [path2 ...] [options]",
+				UsageLine:   "abs rm_ads export txt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
 				},
@@ -158,7 +158,7 @@ func buildProcExportSubcommand(opts *CLIOptions, action *string) clihelp.Command
 					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 				},
 				Run: func(ctx *clihelp.Context) error {
-					*action = "proc"
+					*action = "rm_ads"
 					opts.ProcSubcmd = "export"
 					opts.ExportFormat = "txt"
 					opts.ExportTXT = true
@@ -174,7 +174,7 @@ func buildProcExportSubcommand(opts *CLIOptions, action *string) clihelp.Command
 		},
 		Args: clihelp.MinimumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
-			*action = "proc"
+			*action = "rm_ads"
 			opts.ProcSubcmd = "export"
 			opts.Args = ctx.Args
 			return nil

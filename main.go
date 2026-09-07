@@ -51,15 +51,13 @@ func main() {
 	switch action {
 	case "config":
 		handleMainConfig(&config, cli)
-	case "status":
-		handleMainStatus(&config, cli)
 	case "tui":
 		handleMainTUI(&config, cli)
 	case "sync":
 		handleSyncCommand(config, cli)
-	case "remote":
+	case "offload":
 		handleRemoteCommand(config, cli)
-	case "proc":
+	case "rm_ads":
 		handleMainProc(config, cli, action)
 	}
 }
@@ -68,6 +66,10 @@ func handleParityCommands(action string, config Config, cli CLIOptions) bool {
 	var err error
 	switch action {
 	case "info":
+		if cli.InfoSubcmd == "status" || cli.InfoSubcmd == "check" {
+			handleMainStatus(&config, cli)
+			return true
+		}
 		err = runInfoCommand(config, cli)
 	case "queue":
 		err = runQueueCommand(config, cli)

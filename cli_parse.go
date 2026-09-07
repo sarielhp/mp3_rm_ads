@@ -44,14 +44,13 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		Pager:               true,
 		InteractiveFallback: true,
 		Commands: []clihelp.Command{
-			buildProcCommand(opts, action),
-			buildInfoCommand(opts, action),
-			buildSyncCommand(opts, action, &countVal, &keepVal),
-			buildQueueCommand(opts, action),
-			buildPlayerCommand(opts, action),
-			buildRemoteCommand(opts, action),
-			buildStatusCommand(opts, action),
 			buildConfigCommand(opts, action),
+			buildInfoCommand(opts, action),
+			buildOffloadCommand(opts, action),
+			buildPlayerCommand(opts, action),
+			buildQueueCommand(opts, action),
+			buildRmAdsCommand(opts, action),
+			buildSyncCommand(opts, action, &countVal, &keepVal),
 			buildTUICommand(opts, action),
 		},
 	}
@@ -69,59 +68,6 @@ func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "tui"
-			opts.Args = ctx.Args
-			return nil
-		},
-	}
-}
-
-func buildStatusCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "check",
-		Description: "Test external services (Whisper, ABS, Kitty)",
-		UsageLine:   "abs status check [options] [target]",
-		Args:        clihelp.RangeArgs(0, 2),
-		Options: []clihelp.Option{
-			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
-			clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
-			clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
-			clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
-			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "status"
-			opts.StatusSubcmd = "check"
-			if len(ctx.Args) > 0 && ctx.Args[0] == "kitty" {
-				opts.Args = ctx.Args[1:]
-			} else {
-				opts.Args = ctx.Args
-			}
-			return resolveTestCommandArgs(ctx.Args, opts)
-		},
-	}
-}
-
-func buildStatusCommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "status",
-		Description: "Show status overview of library and worker",
-		UsageLine:   "abs status [command] [options] [podcasts]",
-		Subcommands: []clihelp.Command{
-			buildStatusCheckSubcommand(opts, action),
-		},
-		Args: clihelp.RangeArgs(0, 2),
-		Run: func(ctx *clihelp.Context) error {
-			*action = "status"
-			if len(ctx.Args) > 0 && ctx.Args[0] == "check" {
-				opts.StatusSubcmd = "check"
-				args := ctx.Args[1:]
-				if len(args) > 0 && args[0] == "kitty" {
-					opts.Args = args[1:]
-				} else {
-					opts.Args = args
-				}
-				return resolveTestCommandArgs(args, opts)
-			}
 			opts.Args = ctx.Args
 			return nil
 		},
@@ -217,14 +163,14 @@ func parseFlags() (string, CLIOptions) {
 
 	opts.IsConfigCommand = (action == "config")
 	opts.IsDirCommand = (action == "dir")
-	opts.IsFileCommand = (action == "proc")
+	opts.IsFileCommand = (action == "rm_ads")
 	opts.IsTUICommand = (action == "tui")
 	opts.IsTimelineCommand = (action == "sync" && opts.SyncSubcmd == "timeline")
-	opts.IsTestCommand = (action == "status" && opts.StatusSubcmd == "check")
+	opts.IsTestCommand = (action == "info" && opts.InfoSubcmd == "check")
 	opts.IsScanCommand = (action == "sync" && (opts.SyncSubcmd == "scan" || opts.SyncSubcmd == "new" || opts.SyncSubcmd == "feeds"))
-	opts.IsStatusCommand = (action == "status")
-	opts.IsRemoteCommand = (action == "remote")
-	opts.IsBatchWorkerCommand = (action == "remote" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
+	opts.IsStatusCommand = (action == "info" && opts.InfoSubcmd == "status")
+	opts.IsRemoteCommand = (action == "offload")
+	opts.IsBatchWorkerCommand = (action == "offload" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
 	opts.IsSyncCommand = (action == "sync")
 
 	return action, opts

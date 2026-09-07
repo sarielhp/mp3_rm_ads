@@ -8,29 +8,11 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "info",
 		Description: "Library query, inspection, cuts and transcripts",
-		UsageLine:   "abs info [options] [id|latest [N]]",
+		UsageLine:   "abs info [options] [id|latest [N]|status|check]",
 		Subcommands: []clihelp.Command{
-			{
-				Name:        "latest",
-				Description: "List latest added episodes across all podcasts",
-				UsageLine:   "abs info latest [N] [options]",
-				Parameters: []clihelp.Param{
-					{Name: "[N]", Description: "Number of episodes to show (default: 10)"},
-				},
-				Args: clihelp.MaximumNArgs(1),
-				Options: []clihelp.Option{
-					clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of latest episodes to list"),
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress formatting/headers"),
-					clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "info"
-					opts.InfoSubcmd = "latest"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
+			buildInfoLatestSubcommand(opts, action),
+			buildInfoStatusSubcommand(opts, action),
+			buildInfoCheckSubcommand(opts, action),
 		},
 		Args: clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
@@ -46,13 +28,102 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "info"
-			if len(ctx.Args) > 0 && ctx.Args[0] == "latest" {
-				opts.InfoSubcmd = "latest"
-				opts.Args = ctx.Args[1:]
-				return nil
+			if len(ctx.Args) > 0 {
+				switch ctx.Args[0] {
+				case "latest":
+					opts.InfoSubcmd = "latest"
+					opts.Args = ctx.Args[1:]
+					return nil
+				case "status":
+					opts.InfoSubcmd = "status"
+					opts.Args = ctx.Args[1:]
+					return nil
+				case "check":
+					opts.InfoSubcmd = "check"
+					opts.StatusSubcmd = "check"
+					opts.IsTestCommand = true
+					args := ctx.Args[1:]
+					if len(args) > 0 && args[0] == "kitty" {
+						opts.Args = args[1:]
+					} else {
+						opts.Args = args
+					}
+					return resolveTestCommandArgs(args, opts)
+				}
 			}
 			opts.Args = ctx.Args
 			return nil
+		},
+	}
+}
+
+func buildInfoLatestSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "latest",
+		Description: "List latest added episodes across all podcasts",
+		UsageLine:   "abs info latest [N] [options]",
+		Parameters: []clihelp.Param{
+			{Name: "[N]", Description: "Number of episodes to show (default: 10)"},
+		},
+		Args: clihelp.MaximumNArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of latest episodes to list"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "info"
+			opts.InfoSubcmd = "latest"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildInfoStatusSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "status",
+		Description: "Show status overview of library and worker",
+		UsageLine:   "abs info status [options] [podcasts]",
+		Args:        clihelp.RangeArgs(0, 2),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "info"
+			opts.InfoSubcmd = "status"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "check",
+		Description: "Test external services (Whisper, ABS, Kitty)",
+		UsageLine:   "abs info check [options] [target]",
+		Args:        clihelp.RangeArgs(0, 2),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
+			clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
+			clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
+			clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
+			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "info"
+			opts.InfoSubcmd = "check"
+			opts.StatusSubcmd = "check"
+			opts.IsTestCommand = true
+			if len(ctx.Args) > 0 && ctx.Args[0] == "kitty" {
+				opts.Args = ctx.Args[1:]
+			} else {
+				opts.Args = ctx.Args
+			}
+			return resolveTestCommandArgs(ctx.Args, opts)
 		},
 	}
 }

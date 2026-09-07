@@ -32,7 +32,7 @@ func TestResolveAudioFiles(t *testing.T) {
 func TestParseFlags(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "proc", "-q", "-f", "whisper", "f.mp3"}
+	os.Args = []string{"abs", "rm_ads", "-q", "-f", "whisper", "f.mp3"}
 	_, cli := parseFlags()
 	if !cli.Quiet || cli.Force != "whisper" {
 		t.Error("parseFlags failed")
@@ -52,20 +52,20 @@ func TestParseFlagsConfigPodcastsDir(t *testing.T) {
 func TestParseFlagsExport(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "proc", "export", "srt", "f.transcript.json"}
+	os.Args = []string{"abs", "rm_ads", "export", "srt", "f.transcript.json"}
 	act, cli := parseFlags()
-	if act != "proc" || cli.ProcSubcmd != "export" || !cli.ExportSRT || cli.ExportFormat != "srt" {
-		t.Errorf("expected proc export srt, got %s, %s, %v, %s", act, cli.ProcSubcmd, cli.ExportSRT, cli.ExportFormat)
+	if act != "rm_ads" || cli.ProcSubcmd != "export" || !cli.ExportSRT || cli.ExportFormat != "srt" {
+		t.Errorf("expected rm_ads export srt, got %s, %s, %v, %s", act, cli.ProcSubcmd, cli.ExportSRT, cli.ExportFormat)
 	}
 }
 
 func TestParseFlagsRecut(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
-	os.Args = []string{"abs", "proc", "recut", "f.mp3"}
+	os.Args = []string{"abs", "rm_ads", "recut", "f.mp3"}
 	act, cli := parseFlags()
-	if act != "proc" || cli.ProcSubcmd != "recut" || !cli.Recut {
-		t.Errorf("expected proc recut, got %s, %s, %v", act, cli.ProcSubcmd, cli.Recut)
+	if act != "rm_ads" || cli.ProcSubcmd != "recut" || !cli.Recut {
+		t.Errorf("expected rm_ads recut, got %s, %s, %v", act, cli.ProcSubcmd, cli.Recut)
 	}
 }
 

@@ -1,8 +1,12 @@
 package main
 
 import (
+	"bytes"
 	"os"
+	"strings"
 	"testing"
+
+	"github.com/sarielhp/clihelp"
 )
 
 func TestFindMP3Files(t *testing.T) {
@@ -207,5 +211,80 @@ func TestCountWordsWhitespace(t *testing.T) {
 func TestFormatTimeZero(t *testing.T) {
 	if formatTime(0) != "00:00.0" {
 		t.Error("wrong")
+	}
+}
+
+func TestTopLevelCommandsUniqueFirstLetters(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	seen := make(map[byte]string)
+	for _, cmd := range app.Commands {
+		if cmd.Name == "" {
+			continue
+		}
+		first := cmd.Name[0]
+		if existing, ok := seen[first]; ok {
+			t.Errorf("command %q has conflicting first letter '%c' with command %q", cmd.Name, first, existing)
+		}
+		seen[first] = cmd.Name
+	}
+	if len(app.Commands) != 8 {
+		t.Errorf("expected 8 canonical top-level commands, got %d", len(app.Commands))
+	}
+}
+
+func checkUsageOutputNoRepeatedSections(t *testing.T, path []string, out string) {
+	sections := []string{"Flags:", "Global Flags:", "Subcommands:", "Parameters:"}
+	for _, sec := range sections {
+		if cnt := strings.Count(out, sec); cnt > 1 {
+			t.Errorf("command %v has repeated section %q (%d occurrences):\n%s", path, sec, cnt, out)
+		}
+	}
+	lines := strings.Split(out, "\n")
+	flagLines := make(map[string]bool)
+	inFlags := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "Flags:" {
+			inFlags = true
+			continue
+		}
+		if inFlags && (trimmed == "" || strings.HasSuffix(trimmed, ":")) {
+			inFlags = false
+		}
+		if inFlags && strings.HasPrefix(trimmed, "-") {
+			flagPart := strings.Fields(trimmed)[0]
+			if flagLines[flagPart] {
+				t.Errorf("command %v has repeated flag %q:\n%s", path, flagPart, out)
+			}
+			flagLines[flagPart] = true
+		}
+	}
+}
+
+func TestUsageHelpNoRepeatedText(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	for _, cmd := range app.Commands {
+		var buf bytes.Buffer
+		renderOpts := clihelp.Options{Writer: &buf, Width: 80}
+		if !app.RenderCommand(renderOpts, cmd.Name) {
+			t.Errorf("failed to render help for %s", cmd.Name)
+			continue
+		}
+		checkUsageOutputNoRepeatedSections(t, []string{cmd.Name}, buf.String())
+
+		for _, sub := range cmd.Subcommands {
+			buf.Reset()
+			if !app.RenderCommand(renderOpts, cmd.Name, sub.Name) {
+				t.Errorf("failed to render help for %s %s", cmd.Name, sub.Name)
+				continue
+			}
+			checkUsageOutputNoRepeatedSections(t, []string{cmd.Name, sub.Name}, buf.String())
+		}
 	}
 }

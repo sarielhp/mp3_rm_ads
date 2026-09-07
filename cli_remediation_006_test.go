@@ -14,11 +14,11 @@ func TestRegressionIssue1_TestKittyArgSlicing(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"status", "check", "kitty", "cover.png"}); err != nil {
-		t.Fatalf("unexpected error executing status check kitty: %v", err)
+	if err := app.Execute([]string{"info", "check", "kitty", "cover.png"}); err != nil {
+		t.Fatalf("unexpected error executing info check kitty: %v", err)
 	}
-	if action != "status" || opts.StatusSubcmd != "check" || !opts.TestKitty {
-		t.Fatalf("expected action 'status' with StatusSubcmd='check' and TestKitty=true, got action=%q, subcmd=%q, TestKitty=%v", action, opts.StatusSubcmd, opts.TestKitty)
+	if action != "info" || opts.StatusSubcmd != "check" || !opts.TestKitty {
+		t.Fatalf("expected action 'info' with StatusSubcmd='check' and TestKitty=true, got action=%q, subcmd=%q, TestKitty=%v", action, opts.StatusSubcmd, opts.TestKitty)
 	}
 	if len(opts.Args) != 1 || opts.Args[0] != "cover.png" {
 		t.Fatalf("expected opts.Args to contain only ['cover.png'], got %v", opts.Args)
@@ -30,22 +30,22 @@ func TestRegressionIssue2_TestCommandTargetValidation(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"status", "check", "unknown-target"}); err == nil {
+	if err := app.Execute([]string{"info", "check", "unknown-target"}); err == nil {
 		t.Errorf("expected error for unknown test target, got nil")
 	}
 
-	if err := app.Execute([]string{"status", "check", "abs", "invalid-subtarget"}); err == nil {
+	if err := app.Execute([]string{"info", "check", "abs", "invalid-subtarget"}); err == nil {
 		t.Errorf("expected error for invalid abs test target, got nil")
 	}
 
 	validCases := [][]string{
-		{"status", "check"},
-		{"status", "check", "whisper"},
-		{"status", "check", "abs"},
-		{"status", "check", "abs", "connect"},
-		{"status", "check", "abs", "map"},
-		{"status", "check", "abs", "download"},
-		{"status", "check", "kitty"},
+		{"info", "check"},
+		{"info", "check", "whisper"},
+		{"info", "check", "abs"},
+		{"info", "check", "abs", "connect"},
+		{"info", "check", "abs", "map"},
+		{"info", "check", "abs", "download"},
+		{"info", "check", "kitty"},
 	}
 	for _, tc := range validCases {
 		var a string
@@ -83,9 +83,9 @@ func TestRegressionIssue4_HelpUnknownCommand(t *testing.T) {
 		t.Errorf("expected RenderCommand to return false for nonexistent command, got true")
 	}
 
-	matchedValid := app.RenderCommand(clihelp.Options{}, "proc")
+	matchedValid := app.RenderCommand(clihelp.Options{}, "rm_ads")
 	if !matchedValid {
-		t.Errorf("expected RenderCommand to return true for 'proc', got false")
+		t.Errorf("expected RenderCommand to return true for 'rm_ads', got false")
 	}
 }
 
@@ -233,12 +233,12 @@ func TestRegressionIssue9_ProcHelpLineLimitAndBrevity(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	procCmd := findTestCommand(app, "proc")
+	procCmd := findTestCommand(app, "rm_ads")
 	if procCmd == nil {
-		t.Fatalf("proc command not found")
+		t.Fatalf("rm_ads command not found")
 	}
 	if len(procCmd.Description) > 45 {
-		t.Errorf("proc description exceeds 45 chars: %d (%q)", len(procCmd.Description), procCmd.Description)
+		t.Errorf("rm_ads description exceeds 45 chars: %d (%q)", len(procCmd.Description), procCmd.Description)
 	}
 
 	visibleFlags := 0
@@ -251,6 +251,6 @@ func TestRegressionIssue9_ProcHelpLineLimitAndBrevity(t *testing.T) {
 		}
 	}
 	if visibleFlags > 8 {
-		t.Errorf("expected at most 8 visible flags in proc command help, got %d", visibleFlags)
+		t.Errorf("expected at most 8 visible flags in rm_ads command help, got %d", visibleFlags)
 	}
 }

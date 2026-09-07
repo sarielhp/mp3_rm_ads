@@ -137,7 +137,7 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 	return clihelp.Command{
 		Name:        "frequency",
 		Description: "Analyze podcast release cadence and save frequency metadata",
-		UsageLine:   "abs server frequency [<podcast>] [options]",
+		UsageLine:   "abs sync frequency [<podcast>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to analyze"},
 		},

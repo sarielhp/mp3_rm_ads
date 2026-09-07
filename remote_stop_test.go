@@ -20,7 +20,7 @@ func TestRemoteCommandWithoutSubcommandsShowsUsage(t *testing.T) {
 	os.Stdout = w
 	os.Stderr = w
 
-	_ = app.Execute([]string{"remote"})
+	_ = app.Execute([]string{"offload"})
 
 	_ = w.Close()
 	os.Stdout = oldStdout
@@ -32,7 +32,7 @@ func TestRemoteCommandWithoutSubcommandsShowsUsage(t *testing.T) {
 	if action != "" {
 		t.Errorf("expected action to be empty when run without subcommands, got %q", action)
 	}
-	if !strings.Contains(out, "Usage:  abs remote <subcommand> [args]") && !strings.Contains(out, "abs remote") {
+	if !strings.Contains(out, "Usage:  abs offload <subcommand> [args]") && !strings.Contains(out, "abs offload") {
 		t.Errorf("expected remote usage output, got:\n%s", out)
 	}
 	if !strings.Contains(out, "Subcommands:") {
@@ -48,10 +48,10 @@ func TestRemoteStopSubcommandParsing(t *testing.T) {
 	opts := CLIOptions{}
 	app := buildCLIApp(&action, &opts)
 
-	_ = app.Execute([]string{"remote", "stop", "server1.example.com", "-q"})
+	_ = app.Execute([]string{"offload", "stop", "server1.example.com", "-q"})
 
-	if action != "remote" {
-		t.Fatalf("expected action 'remote', got %q", action)
+	if action != "offload" {
+		t.Fatalf("expected action 'offload', got %q", action)
 	}
 	if opts.RemoteSubcmd != "stop" {
 		t.Errorf("expected RemoteSubcmd 'stop', got %q", opts.RemoteSubcmd)

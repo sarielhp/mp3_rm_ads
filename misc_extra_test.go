@@ -154,13 +154,13 @@ func TestParseFlagsTestWhisperCommand(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"abs", "status", "check", "whisper"}
+	os.Args = []string{"abs", "info", "check", "whisper"}
 	_, cli := parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
 	}
 
-	os.Args = []string{"abs", "status", "check"}
+	os.Args = []string{"abs", "info", "check"}
 	_, cli = parseFlags()
 	if !cli.IsTestCommand || !cli.TestWhisper {
 		t.Errorf("expected IsTestCommand=true, TestWhisper=true for default status check command, got %v, %v", cli.IsTestCommand, cli.TestWhisper)
@@ -171,13 +171,13 @@ func TestParseFlagsQuiet(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"abs", "proc", "-q", "file.mp3"}
+	os.Args = []string{"abs", "rm_ads", "-q", "file.mp3"}
 	_, cli := parseFlags()
 	if !cli.Quiet {
 		t.Error("expected Quiet=true for -q")
 	}
 
-	os.Args = []string{"abs", "proc", "--quiet", "file.mp3"}
+	os.Args = []string{"abs", "rm_ads", "--quiet", "file.mp3"}
 	_, cli = parseFlags()
 	if !cli.Quiet {
 		t.Error("expected Quiet=true for --quiet")
@@ -188,10 +188,10 @@ func TestParseFlagsDryRun(t *testing.T) {
 	orig := os.Args
 	defer func() { os.Args = orig }()
 
-	os.Args = []string{"abs", "proc", "--dry-run", "file.mp3"}
+	os.Args = []string{"abs", "rm_ads", "--dry-run", "file.mp3"}
 	act, cli := parseFlags()
-	if act != "proc" || !cli.DryRun {
-		t.Errorf("expected proc with DryRun=true, got act=%s, DryRun=%v", act, cli.DryRun)
+	if act != "rm_ads" || !cli.DryRun {
+		t.Errorf("expected rm_ads with DryRun=true, got act=%s, DryRun=%v", act, cli.DryRun)
 	}
 }
 

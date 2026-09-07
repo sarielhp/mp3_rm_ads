@@ -4,16 +4,16 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func buildRemoteCommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildOffloadCommand(opts *CLIOptions, action *string) clihelp.Command {
 	var subcmds []clihelp.Command
 	subcmds = append(subcmds, buildRemoteSyncSubcommands(opts, action)...)
 	subcmds = append(subcmds, buildRemoteWorkerSubcommands(opts, action)...)
 	subcmds = append(subcmds, buildRemoteControlSubcommands(opts, action)...)
 
 	return clihelp.Command{
-		Name:        "remote",
+		Name:        "offload",
 		Description: "Manage remote batch transcription offload",
-		UsageLine:   "abs remote [command]",
+		UsageLine:   "abs offload [command]",
 		Subcommands: subcmds,
 	}
 }
@@ -31,7 +31,7 @@ func buildRemoteDeploySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "deploy",
 		Description: "Deploy current abs binary and configuration to a remote host",
-		UsageLine:   "abs remote deploy [host] [options]",
+		UsageLine:   "abs offload deploy [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -39,7 +39,7 @@ func buildRemoteDeploySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "deploy"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -53,7 +53,7 @@ func buildRemotePushSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "push",
 		Description: "Package and push audio files to remote staging for background processing",
-		UsageLine:   "abs remote push <path1> [path2 ...] [options]",
+		UsageLine:   "abs offload push <path1> [path2 ...] [options]",
 		Parameters:  []clihelp.Param{{Name: "<path1> [path2 ...]", Description: "Audio files or directories to push for remote processing"}},
 		Options: []clihelp.Option{
 			clihelp.String(&opts.RemoteHost, "--host <host>", "", "Target remote SSH host"),
@@ -62,7 +62,7 @@ func buildRemotePushSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "push"
 			opts.Args = ctx.Args
 			return nil
@@ -74,7 +74,7 @@ func buildRemotePullSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "pull",
 		Description: "Collect completed batch results from remote host and update local library",
-		UsageLine:   "abs remote pull [host] [options]",
+		UsageLine:   "abs offload pull [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -82,7 +82,7 @@ func buildRemotePullSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "pull"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -96,7 +96,7 @@ func buildRemoteScanSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "scan",
 		Description: "Scan remote mirror directory for pending episodes and process them",
-		UsageLine:   "abs remote scan [path] [options]",
+		UsageLine:   "abs offload scan [path] [options]",
 		Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/abs_remote)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -105,7 +105,7 @@ func buildRemoteScanSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "scan"
 			opts.Args = ctx.Args
 			return nil
@@ -118,7 +118,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "start",
 			Description: "Start and verify remote worker processing on a remote host",
-			UsageLine:   "abs remote start [host] [options]",
+			UsageLine:   "abs offload start [host] [options]",
 			Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 			Args:        clihelp.MaximumNArgs(1),
 			Options: []clihelp.Option{
@@ -126,7 +126,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 				clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 			},
 			Run: func(ctx *clihelp.Context) error {
-				*action = "remote"
+				*action = "offload"
 				opts.RemoteSubcmd = "start"
 				opts.Args = ctx.Args
 				return nil
@@ -135,7 +135,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "worker",
 			Description: "Run remote worker scanner loop on mirror directory",
-			UsageLine:   "abs remote worker [path] [options]",
+			UsageLine:   "abs offload worker [path] [options]",
 			Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory (defaults to ~/abs_remote)"}},
 			Args:        clihelp.MaximumNArgs(1),
 			Options: []clihelp.Option{
@@ -145,7 +145,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 				clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 			},
 			Run: func(ctx *clihelp.Context) error {
-				*action = "remote"
+				*action = "offload"
 				opts.RemoteSubcmd = "worker"
 				opts.Args = ctx.Args
 				return nil
@@ -154,14 +154,14 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "ack",
 			Description: "Acknowledge pulled episodes on remote: delete audio files and archive",
-			UsageLine:   "abs remote ack <path1> [path2 ...] [options]",
+			UsageLine:   "abs offload ack <path1> [path2 ...] [options]",
 			Parameters:  []clihelp.Param{{Name: "<path1> [path2 ...]", Description: "Relative paths of episodes within remote work directory"}},
 			Args:        clihelp.MinimumNArgs(1),
 			Options: []clihelp.Option{
 				clihelp.String(&opts.RemoteWorkDir, "--dir <path>", "", "Remote mirror root directory"),
 			},
 			Run: func(ctx *clihelp.Context) error {
-				*action = "remote"
+				*action = "offload"
 				opts.RemoteSubcmd = "ack"
 				opts.Args = ctx.Args
 				return nil
@@ -183,7 +183,7 @@ func buildRemoteStatusSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "status",
 		Description: "Check remote server status, background workers, and active batches",
-		UsageLine:   "abs remote status [host] [options]",
+		UsageLine:   "abs offload status [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -191,7 +191,7 @@ func buildRemoteStatusSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "status"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -205,14 +205,14 @@ func buildRemoteClearSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "clear",
 		Description: "Stop remote workers and empty all scheduled/pending jobs from remote queue",
-		UsageLine:   "abs remote clear [host] [options]",
+		UsageLine:   "abs offload clear [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "clear"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -226,7 +226,7 @@ func buildRemoteStopSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "stop",
 		Description: "Stop remote worker process and Whisper server on remote host",
-		UsageLine:   "abs remote stop [host] [options]",
+		UsageLine:   "abs offload stop [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -234,7 +234,7 @@ func buildRemoteStopSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "stop"
 			if len(ctx.Args) > 0 {
 				opts.RemoteHost = ctx.Args[0]
@@ -248,7 +248,7 @@ func buildRemoteCancelSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "cancel",
 		Description: "Cancel a remote batch job or all active workers",
-		UsageLine:   "abs remote cancel [host] [batch_id] [options]",
+		UsageLine:   "abs offload cancel [host] [batch_id] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host"},
 			{Name: "[batch_id]", Description: "Optional batch ID to cancel"},
@@ -258,7 +258,7 @@ func buildRemoteCancelSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "remote"
+			*action = "offload"
 			opts.RemoteSubcmd = "cancel"
 			opts.Args = ctx.Args
 			return nil
