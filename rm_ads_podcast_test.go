@@ -540,3 +540,151 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		}
 	}
 }
+
+func TestResolveMatchingEpisodeAudioFile(t *testing.T) {
+	tmp := t.TempDir()
+	podDir := filepath.Join(tmp, "My Show")
+	epDir := filepath.Join(podDir, "Episode 1 Subfolder")
+	if err := os.MkdirAll(epDir, 0755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	mp3Path := filepath.Join(epDir, "podcast.mp3")
+	if err := os.WriteFile(mp3Path, []byte("test audio"), 0644); err != nil {
+		t.Fatalf("write file failed: %v", err)
+	}
+
+	cases := []string{
+		mp3Path,
+		"My Show/Episode 1 Subfolder/podcast.mp3",
+		"podcasts/My Show/Episode 1 Subfolder/podcast.mp3",
+		"/podcasts/My Show/Episode 1 Subfolder/podcast.mp3",
+		"Episode 1 Subfolder/podcast.mp3",
+	}
+
+	for _, c := range cases {
+		ep := backend.Episode{
+			AudioFile: &backend.PodcastAudioFile{
+				Metadata: &backend.AudioFileMetadata{
+					Path:     c,
+					Filename: "podcast.mp3",
+				},
+			},
+		}
+		got, ok := resolveMatchingEpisodeAudioFile(podDir, ep)
+		if !ok || got != mp3Path {
+			t.Errorf("for path %q, expected (%s, true), got (%s, %v)", c, mp3Path, got, ok)
+		}
+	}
+}
+
+func TestFindLocalPathForFeedEpisode_SubfolderFuzzy(t *testing.T) {
+	tmp := t.TempDir()
+	podDir := filepath.Join(tmp, "Haaretz Weekly")
+	subDir := filepath.Join(podDir, "-קיבלתי את המידע מיד אחרי הטבח. לקח לי שנה וחצי לוודא שנתניהו הוזהר לפני 7.10- - פרק 670")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	mp3Path := filepath.Join(subDir, "podcast.mp3")
+	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
+		t.Fatalf("write mp3 failed: %v", err)
+	}
+
+	fe := backend.FeedEpisode{
+		Title: "\"קיבלתי את המידע מיד אחרי הטבח. לקח לי שנה וחצי לוודא שנתניהו הוזהר לפני 7.10\" | פרק 670",
+	}
+
+	got, ok := findLocalPathForFeedEpisode(podDir, fe, nil)
+	if !ok || got != mp3Path {
+		t.Fatalf("expected (%s, true), got (%s, %v)", mp3Path, got, ok)
+	}
+}
+
+func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
+	tmp := t.TempDir()
+	podDir := filepath.Join(tmp, "Haaretz Show")
+	subDir := filepath.Join(podDir, "-קיבלתי את המידע מיד אחרי הטבח- - פרק 670")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
+	}
+	mp3Path := filepath.Join(subDir, "podcast.mp3")
+	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
+		t.Fatalf("write mp3 failed: %v", err)
+	}
+	statPath := statusPathFor(mp3Path)
+	_ = saveEpisodeStatus(statPath, &EpisodeStatusFile{
+		MediaFile: "podcast.mp3",
+		Status:    StateDownloaded,
+		Original:  EpisodeAudioMeta{DurationSec: 100},
+	})
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.URL.Path == "/api/podcasts/feed":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{
+				"podcast": map[string]interface{}{
+					"episodes": []map[string]interface{}{
+						{
+							"title":        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
+							"pubDate":      "Tue, 08 Sep 2026 11:17:17 GMT",
+							"guid":         "guid-670",
+							"enclosureUrl": "https://example.com/audio.mp3",
+						},
+					},
+				},
+			})
+		case r.URL.Path == "/api/libraries":
+			_ = json.NewEncoder(w).Encode(map[string]interface{}{"libraries": []interface{}{map[string]interface{}{"id": "lib-1", "mediaType": "podcast"}}})
+		case r.URL.Path == "/api/libraries/lib-1/items", strings.HasPrefix(r.URL.Path, "/api/items/"):
+			itemMap := map[string]interface{}{
+				"id": "item-h",
+				"media": map[string]interface{}{
+					"metadata": map[string]interface{}{"title": "Haaretz Show", "feedUrl": "https://example.com/feed.xml"},
+					"episodes": []interface{}{
+						map[string]interface{}{
+							"title":        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
+							"guid":         "guid-670",
+							"enclosureURL": "https://example.com/audio.mp3",
+							"audioFile": map[string]interface{}{
+								"metadata": map[string]interface{}{
+									"path":     "Haaretz Show/-קיבלתי את המידע מיד אחרי הטבח- - פרק 670/podcast.mp3",
+									"filename": "podcast.mp3",
+								},
+							},
+						},
+					},
+				},
+			}
+			if strings.HasPrefix(r.URL.Path, "/api/items/") {
+				_ = json.NewEncoder(w).Encode(itemMap)
+			} else {
+				_ = json.NewEncoder(w).Encode(map[string]interface{}{"results": []interface{}{itemMap}})
+			}
+		default:
+			t.Errorf("unexpected backend request: %s", r.URL.Path)
+			w.WriteHeader(http.StatusBadRequest)
+		}
+	}))
+	defer srv.Close()
+
+	b := backend.NewAudiobookshelf(backend.Config{
+		Host:        srv.URL,
+		Token:       "test-tok",
+		PodcastsDir: tmp,
+		Quiet:       true,
+	})
+
+	resolved := &ResolvedPodcast{
+		Dir:        podDir,
+		Title:      "Haaretz Show",
+		ShortID:    "h123",
+		FolderName: "Haaretz Show",
+		UUID:       "item-h",
+	}
+
+	cfg := Config{PodcastsDir: tmp, AudiobookshelfURL: srv.URL, AudiobookshelfToken: "test-tok"}
+	targetPath, ok := findTargetEpisodeFromBackend(b, resolved, cfg, true)
+	if !ok || targetPath != mp3Path {
+		t.Fatalf("expected targetPath=%s (ok=true), got %s (ok=%v)", mp3Path, targetPath, ok)
+	}
+}

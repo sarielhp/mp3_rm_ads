@@ -6,6 +6,7 @@ import (
 	"sort"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/sariel/abs/pkg/backend"
 )
@@ -82,10 +83,16 @@ func handlePodcastRmAdsWorkflow(pod *ResolvedPodcast, cli CLIOptions, config Con
 		return nil
 	}
 
-	epFilename := filepath.Base(targetAudioPath)
+	epFilename := queueItemFilename(pod.Dir, targetAudioPath)
+	displayEp := filepath.Base(targetAudioPath)
+	if strings.EqualFold(stripExt(displayEp), "podcast") {
+		if t := episodeTitleFromPath(targetAudioPath); t != "" {
+			displayEp = t
+		}
+	}
 	if cli.DryRun {
 		if !cli.Quiet {
-			fmt.Printf("[Dry run] Would queue and process %s for ad removal.\n", epFilename)
+			fmt.Printf("[Dry run] Would queue and process %s for ad removal.\n", displayName(displayEp))
 		}
 		return nil
 	}
@@ -203,6 +210,10 @@ func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, confi
 		}
 	}
 
+	if uncleanedPath, ok := findLatestUncleanedLocalEpisode(pod.Dir, pod.Title, true); ok && uncleanedPath != "" {
+		return uncleanedPath, true
+	}
+
 	if !quiet {
 		fmt.Printf("All episodes for podcast %s already have ads removed.\n", displayName(pod.Title))
 	}
@@ -275,6 +286,95 @@ func isMatchingBackendPodcast(p *backend.Podcast, itemID string, pod *ResolvedPo
 	return strings.EqualFold(filepath.Base(p.Path), filepath.Base(pod.Dir))
 }
 
+func normalizeForFuzzyMatch(s string) string {
+	return strings.Map(func(r rune) rune {
+		if unicode.IsPunct(r) || unicode.IsSpace(r) || unicode.IsSymbol(r) {
+			return -1
+		}
+		return unicode.ToLower(r)
+	}, s)
+}
+
+func isFuzzyEpisodeMatch(a, b string) bool {
+	if a == "" || b == "" {
+		return false
+	}
+	na := normalizeForFuzzyMatch(a)
+	nb := normalizeForFuzzyMatch(b)
+	if na == "" || nb == "" {
+		return false
+	}
+	if na == nb {
+		return true
+	}
+	shorter, longer := na, nb
+	if len(shorter) > len(longer) {
+		shorter, longer = longer, shorter
+	}
+	if len([]rune(shorter)) >= 10 && strings.Contains(longer, shorter) {
+		return true
+	}
+	return false
+}
+
+func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string, bool) {
+	if ep.AudioFile == nil || ep.AudioFile.Metadata == nil {
+		return "", false
+	}
+	podRoot := filepath.Dir(podDir)
+	podBase := filepath.Base(podDir)
+
+	checkCandidatePath := func(raw string) string {
+		if raw == "" {
+			return ""
+		}
+		if fileExists(raw) {
+			return raw
+		}
+		if p := filepath.Join(podDir, raw); fileExists(p) {
+			return p
+		}
+		if p := filepath.Join(podRoot, raw); fileExists(p) {
+			return p
+		}
+		clean := strings.TrimPrefix(raw, "/podcasts/")
+		clean = strings.TrimPrefix(clean, "podcasts/")
+		clean = strings.TrimPrefix(clean, "/")
+		if p := filepath.Join(podRoot, clean); fileExists(p) {
+			return p
+		}
+		if p := filepath.Join(podDir, clean); fileExists(p) {
+			return p
+		}
+		if strings.HasPrefix(clean, podBase+"/") {
+			rel := strings.TrimPrefix(clean, podBase+"/")
+			if p := filepath.Join(podDir, rel); fileExists(p) {
+				return p
+			}
+		}
+		epDirName := filepath.Base(filepath.Dir(raw))
+		if epDirName != "." && epDirName != "/" && epDirName != "" {
+			if p := filepath.Join(podDir, epDirName, filepath.Base(raw)); fileExists(p) {
+				return p
+			}
+		}
+		return ""
+	}
+
+	if p := checkCandidatePath(ep.AudioFile.Metadata.Path); p != "" {
+		return p, true
+	}
+	if p := checkCandidatePath(ep.AudioFile.Metadata.RelPath); p != "" {
+		return p, true
+	}
+	if ep.AudioFile.Metadata.Filename != "" {
+		if p := filepath.Join(podDir, ep.AudioFile.Metadata.Filename); fileExists(p) {
+			return p, true
+		}
+	}
+	return "", false
+}
+
 func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *backend.Podcast) (string, bool) {
 	if path, ok := findMatchingEpisodeInItem(podDir, fe, item); ok {
 		return path, true
@@ -283,10 +383,18 @@ func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *ba
 	safeTitle := sanitizePodcastTitle(fe.Title)
 	for _, mp3 := range findMP3Files(podDir) {
 		base := stripExt(filepath.Base(mp3))
-		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) {
+		title := episodeTitleFromPath(mp3)
+		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
+			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
+			strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
+			isFuzzyEpisodeMatch(title, fe.Title) {
 			return mp3, true
 		}
-		if dt, _ := loadEpisodeDetails(podDir, filepath.Base(mp3)); dt != nil {
+		detailKey := filepath.Base(mp3)
+		if strings.EqualFold(base, "podcast") && title != "" {
+			detailKey = title + ".mp3"
+		}
+		if dt, _ := loadEpisodeDetails(podDir, detailKey); dt != nil {
 			if (fe.GUID != "" && dt.Subtitle == fe.GUID) ||
 				(fe.Title != "" && strings.EqualFold(dt.Title, fe.Title)) {
 				return mp3, true
@@ -308,16 +416,11 @@ func findMatchingEpisodeInItem(podDir string, fe backend.FeedEpisode, item *back
 	for _, ep := range item.Media.Episodes {
 		matched := (feURL != "" && ep.EnclosureURL != "" && feURL == ep.EnclosureURL) ||
 			(fe.GUID != "" && ep.GUID != "" && fe.GUID == ep.GUID) ||
-			(fe.Title != "" && ep.Title != "" && strings.EqualFold(strings.TrimSpace(fe.Title), strings.TrimSpace(ep.Title)))
+			(fe.Title != "" && ep.Title != "" && strings.EqualFold(strings.TrimSpace(fe.Title), strings.TrimSpace(ep.Title))) ||
+			(fe.Title != "" && ep.Title != "" && isFuzzyEpisodeMatch(ep.Title, fe.Title))
 		if matched && ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
-			if ep.AudioFile.Metadata.Path != "" && fileExists(ep.AudioFile.Metadata.Path) {
-				return ep.AudioFile.Metadata.Path, true
-			}
-			if ep.AudioFile.Metadata.Filename != "" {
-				p := filepath.Join(podDir, ep.AudioFile.Metadata.Filename)
-				if fileExists(p) {
-					return p, true
-				}
+			if p, ok := resolveMatchingEpisodeAudioFile(podDir, ep); ok {
+				return p, true
 			}
 		}
 	}
@@ -354,7 +457,11 @@ func downloadSingleFeedEpisode(b backend.Backend, item *backend.Podcast, podDir 
 	safeTitle := sanitizePodcastTitle(fe.Title)
 	for _, f := range findMP3Files(podDir) {
 		base := stripExt(filepath.Base(f))
-		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) {
+		title := episodeTitleFromPath(f)
+		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
+			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
+			strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
+			isFuzzyEpisodeMatch(title, fe.Title) {
 			return f, nil
 		}
 	}
@@ -417,7 +524,7 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 }
 
 func processSingleQueuedTarget(podDir, targetAudioPath, action string, cli CLIOptions, config Config) error {
-	epFilename := filepath.Base(targetAudioPath)
+	epFilename := queueItemFilename(podDir, targetAudioPath)
 	targetHost := resolveRemoteProcessingTargetHost(cli, config)
 
 	if targetHost != "" {
@@ -432,7 +539,15 @@ func processSingleQueuedTarget(podDir, targetAudioPath, action string, cli CLIOp
 	}
 
 	removeEpisodeFromQueueFile(podDir, epFilename)
+	removeEpisodeFromQueueFile(podDir, filepath.Base(targetAudioPath))
 	return nil
+}
+
+func queueItemFilename(podDir, audioPath string) string {
+	if rel, err := filepath.Rel(podDir, audioPath); err == nil && rel != "." && !strings.HasPrefix(rel, "..") {
+		return rel
+	}
+	return filepath.Base(audioPath)
 }
 
 func pollAndPullRemoteEpisode(config Config, cli CLIOptions, targetHost, targetAudioPath string) error {

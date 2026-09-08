@@ -151,7 +151,10 @@ func collectPodcastQueueItems(p podcastDirEntry) []queueEpisodeItem {
 	for _, fn := range filenames {
 		mp3Path := filepath.Join(p.dir, fn)
 		epID := getOrSetEpisodeShortID(p.dir, p.shortID, mp3Path)
-		title := stripExt(fn)
+		title := episodeTitleFromPath(mp3Path)
+		if title == "" {
+			title = stripExt(fn)
+		}
 
 		list = append(list, queueEpisodeItem{
 			PodcastID:  p.shortID,
