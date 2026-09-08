@@ -312,6 +312,7 @@ type CLIOptions struct {
 	StatusSubcmd        string
 	ShowTranscript      bool
 	Latest              bool
+	ShowExamples        bool
 }
 
 type CostInfo struct {

@@ -3,10 +3,12 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/fatih/color"
 	"github.com/sarielhp/clihelp"
 	"github.com/sarielhp/clihelp/tree"
 )
@@ -43,6 +45,27 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		AbbrevCommands:      true,
 		Pager:               true,
 		InteractiveFallback: true,
+		PersistentOptions: []clihelp.Option{
+			clihelp.Bool(&opts.ShowExamples, "-E, --examples", false, "Show command examples"),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs sync",
+				Description: "Synchronize feeds and download new episodes from server",
+			},
+			{
+				Line:        "abs sync opml export podcasts.opml",
+				Description: "Export server podcast RSS feeds into an OPML file",
+			},
+			{
+				Line:        "abs queue run",
+				Description: "Process ad removal on queued episodes",
+			},
+			{
+				Line:        "abs tui",
+				Description: "Launch interactive terminal UI browser",
+			},
+		},
 		Commands: []clihelp.Command{
 			buildConfigCommand(opts, action),
 			buildInfoCommand(opts, action),
@@ -152,6 +175,10 @@ func parseFlags() (string, CLIOptions) {
 	}
 
 	app := buildCLIApp(&action, &opts)
+	if handleExamplesCLI(os.Stdout, app, args) {
+		os.Exit(0)
+	}
+
 	err := app.Execute(args)
 	if err != nil {
 		fatalError("Error: %v\n", err)
@@ -174,4 +201,136 @@ func parseFlags() (string, CLIOptions) {
 	opts.IsSyncCommand = (action == "sync")
 
 	return action, opts
+}
+
+func isExamplesFlag(arg string) bool {
+	if arg == "-E" || arg == "--examples" {
+		return true
+	}
+	if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "--") && strings.Contains(arg, "E") {
+		return true
+	}
+	return false
+}
+
+func isExamplesRequest(args []string) bool {
+	for _, a := range args {
+		if isExamplesFlag(a) {
+			return true
+		}
+	}
+	if len(args) > 0 && args[0] == "examples" {
+		return true
+	}
+	if len(args) >= 2 && args[0] == "help" && args[1] == "examples" {
+		return true
+	}
+	return false
+}
+
+func extractCommandTokens(args []string) []string {
+	var tokens []string
+	for _, a := range args {
+		if isExamplesFlag(a) || a == "help" || a == "examples" || strings.HasPrefix(a, "-") {
+			continue
+		}
+		tokens = append(tokens, a)
+	}
+	return tokens
+}
+
+func resolveTargetCommand(app *clihelp.App, tokens []string) (*clihelp.Command, []string) {
+	for start := 0; start < len(tokens); start++ {
+		for end := len(tokens); end > start; end-- {
+			if cmd := app.LookupCommand(tokens[start:end]...); cmd != nil {
+				return cmd, tokens[start:end]
+			}
+		}
+	}
+	return nil, nil
+}
+
+func collectExamples(app *clihelp.App, cmd *clihelp.Command) []clihelp.Example {
+	if cmd != nil {
+		if len(cmd.Examples) > 0 {
+			return cmd.Examples
+		}
+		var subEx []clihelp.Example
+		for _, sub := range cmd.Subcommands {
+			subEx = append(subEx, collectExamples(app, &sub)...)
+		}
+		return subEx
+	}
+	if app != nil && len(app.Examples) > 0 {
+		return app.Examples
+	}
+	var appEx []clihelp.Example
+	for _, c := range app.Commands {
+		appEx = append(appEx, collectExamples(app, &c)...)
+	}
+	return appEx
+}
+
+func cliExampleTheme() clihelp.Theme {
+	return clihelp.Theme{
+		Hdr:            color.New(color.FgYellow, color.Bold),
+		Body:           color.New(color.FgWhite),
+		Accent:         color.New(color.FgCyan, color.Bold),
+		Subcommand:     color.New(color.FgGreen),
+		Flag:           color.New(color.FgCyan),
+		ExampleCmd:     color.New(color.FgGreen, color.Bold),
+		ExampleFlag:    color.New(color.FgCyan),
+		ExampleArg:     color.New(color.FgWhite),
+		ExampleComment: color.New(color.FgHiBlack),
+		ExampleDesc:    color.New(color.FgHiBlack),
+	}
+}
+
+func printCommandExamples(w io.Writer, app *clihelp.App, cmd *clihelp.Command, path []string) {
+	examples := collectExamples(app, cmd)
+	if len(examples) == 0 {
+		name := "abs"
+		if len(path) > 0 {
+			name = "abs " + strings.Join(path, " ")
+		}
+		fmt.Fprintf(w, "No examples available for %s.\nRun '%s --help' for usage.\n", name, name)
+		return
+	}
+
+	th := cliExampleTheme()
+	if th.Hdr != nil {
+		th.Hdr.Fprintln(w, "Examples:")
+	} else {
+		fmt.Fprintln(w, "Examples:")
+	}
+
+	for i, ex := range examples {
+		if i > 0 {
+			fmt.Fprintln(w)
+		}
+		for _, l := range strings.Split(ex.Line, "\n") {
+			colored := clihelp.ColorizeExampleLineWithApp(app, cmd, l, th)
+			fmt.Fprintf(w, "  %s\n", colored)
+		}
+		if ex.Description != "" {
+			if th.ExampleDesc != nil {
+				th.ExampleDesc.Fprintf(w, "    %s\n", ex.Description)
+			} else {
+				fmt.Fprintf(w, "    %s\n", ex.Description)
+			}
+		}
+	}
+}
+
+func handleExamplesCLI(w io.Writer, app *clihelp.App, args []string) bool {
+	if !isExamplesRequest(args) {
+		return false
+	}
+	if w == nil {
+		w = os.Stdout
+	}
+	tokens := extractCommandTokens(args)
+	cmd, path := resolveTargetCommand(app, tokens)
+	printCommandExamples(w, app, cmd, path)
+	return true
 }

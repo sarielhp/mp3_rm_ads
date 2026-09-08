@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -211,5 +213,81 @@ func TestParseOPMLXML(t *testing.T) {
 	}
 	if feeds[1].Title != "Hard Fork" || feeds[1].URL != "https://feeds.simplecast.com/54nAGcIl" {
 		t.Errorf("unexpected feed 1: %+v", feeds[1])
+	}
+}
+
+func TestOPMLExportHelpContent(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	cmd := buildSyncOPMLExportSubcommand(&opts, &action)
+
+	if len(cmd.Examples) == 0 {
+		t.Fatal("expected buildSyncOPMLExportSubcommand to have examples")
+	}
+	if len(cmd.Notes) == 0 {
+		t.Fatal("expected buildSyncOPMLExportSubcommand to have notes")
+	}
+
+	var hasAntennaPod, hasWhatItDoes bool
+	for _, n := range cmd.Notes {
+		if strings.Contains(n.Heading, "AntennaPod") || strings.Contains(n.Text, "AntennaPod") {
+			hasAntennaPod = true
+		}
+		if strings.Contains(n.Heading, "What This Command Does") {
+			hasWhatItDoes = true
+		}
+	}
+	if !hasAntennaPod {
+		t.Error("expected notes to contain AntennaPod import instructions")
+	}
+	if !hasWhatItDoes {
+		t.Error("expected notes to explain what this command does")
+	}
+}
+
+func TestOPMLExportExamplesFlag(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	testCases := [][]string{
+		{"sync", "opml", "export", "-E"},
+		{"sync", "opml", "export", "--examples"},
+		{"sync", "opml", "-E"},
+		{"-E"},
+	}
+
+	for _, tc := range testCases {
+		var buf bytes.Buffer
+		handled := handleExamplesCLI(&buf, app, tc)
+		if !handled {
+			t.Errorf("expected handleExamplesCLI to handle %v", tc)
+		}
+		out := buf.String()
+		if !strings.Contains(out, "Examples:") {
+			t.Errorf("expected %v output to contain 'Examples:', got:\n%s", tc, out)
+		}
+	}
+}
+
+func TestShowOPMLExportUsage(t *testing.T) {
+	rescueStdout := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+
+	showOPMLExportUsage()
+
+	w.Close()
+	os.Stdout = rescueStdout
+
+	var buf bytes.Buffer
+	_, _ = io.Copy(&buf, r)
+	out := buf.String()
+
+	if !strings.Contains(out, "AntennaPod") {
+		t.Errorf("expected showOPMLExportUsage output to mention AntennaPod, got:\n%s", out)
+	}
+	if !strings.Contains(out, "Examples:") {
+		t.Errorf("expected showOPMLExportUsage output to contain Examples, got:\n%s", out)
 	}
 }

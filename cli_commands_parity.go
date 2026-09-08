@@ -208,6 +208,16 @@ func buildQueueRunSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 			clihelp.String(&opts.Force, "-f, --force <type>", "", "Force re-processing (all, whisper, llm)"),
 			clihelp.String(&opts.UseLLM, "--use-llm <name|id>", "", "Select specific LLM profile"),
 		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs queue run",
+				Description: "Process ad removal on all queued episodes",
+			},
+			{
+				Line:        "abs queue run <podcast-id>",
+				Description: "Process ad removal for queued episodes of a specific podcast",
+			},
+		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
 			opts.QueueSubcmd = "run"
@@ -228,6 +238,16 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 			buildQueueRemoveSubcommand(opts, action),
 			buildQueueClearSubcommand(opts, action),
 			buildQueueRunSubcommand(opts, action),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs queue list",
+				Description: "List all episodes currently in the ad removal queue",
+			},
+			{
+				Line:        "abs queue run",
+				Description: "Process ad removal on all queued episodes",
+			},
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"

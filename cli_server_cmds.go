@@ -12,6 +12,20 @@ func buildSyncCommand(opts *CLIOptions, action *string, countVal, keepVal *int) 
 		Description: "Sync podcast RSS feeds, episodes, and server policies",
 		UsageLine:   "abs sync [command] [options] [podcast-id]",
 		Subcommands: buildSyncSubcommands(opts, action, countVal, keepVal),
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs sync",
+				Description: "Sync all subscribed podcasts and download new episodes",
+			},
+			{
+				Line:        "abs sync -p 'Huberman Lab' -k 3",
+				Description: "Download 3 latest episodes for a specific podcast",
+			},
+			{
+				Line:        "abs sync opml export podcasts.opml",
+				Description: "Export server podcast RSS feeds to an OPML file",
+			},
+		},
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify a podcast by name, index, or ID"),
 			clihelp.Int(countVal, "-k, --count <number>", -1, "Explicit number of episodes to download"),

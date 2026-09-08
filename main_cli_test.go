@@ -237,17 +237,23 @@ func TestTopLevelCommandsUniqueFirstLetters(t *testing.T) {
 
 func checkUsageOutputNoRepeatedSections(t *testing.T, path []string, out string) {
 	sections := []string{"Flags:", "Global Flags:", "Subcommands:", "Parameters:"}
+	lines := strings.Split(out, "\n")
 	for _, sec := range sections {
-		if cnt := strings.Count(out, sec); cnt > 1 {
+		cnt := 0
+		for _, line := range lines {
+			if strings.TrimSpace(line) == sec {
+				cnt++
+			}
+		}
+		if cnt > 1 {
 			t.Errorf("command %v has repeated section %q (%d occurrences):\n%s", path, sec, cnt, out)
 		}
 	}
-	lines := strings.Split(out, "\n")
 	flagLines := make(map[string]bool)
 	inFlags := false
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
-		if trimmed == "Flags:" {
+		if trimmed == "Flags:" || trimmed == "Global Flags:" {
 			inFlags = true
 			continue
 		}

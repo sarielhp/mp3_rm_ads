@@ -59,53 +59,97 @@ func buildSyncTimelineSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	}
 }
 
+func buildSyncOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "import",
+		Description: "Import podcast subscriptions from an OPML file into the server",
+		UsageLine:   "abs sync opml import <file> [options]",
+		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to the OPML file to import"}},
+		Args:        clihelp.ExactArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs sync opml import subscriptions.opml",
+				Description: "Import podcasts from subscriptions.opml into the server",
+			},
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "sync"
+			opts.SyncSubcmd = "opml"
+			opts.ServerSubcmd = "opml"
+			opts.OPMLSubcmd = "import"
+			if len(ctx.Args) > 0 {
+				opts.OPMLFile = ctx.Args[0]
+			}
+			return nil
+		},
+	}
+}
+
+func buildSyncOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "export",
+		Description: "Export podcast RSS feeds provided by the server into an OPML file",
+		UsageLine:   "abs sync opml export <file> [options]",
+		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to write the exported OPML file"}},
+		Args:        clihelp.ExactArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs sync opml export podcasts.opml",
+				Description: "Export all server podcast feeds into podcasts.opml",
+			},
+			{
+				Line:        "abs sync opml export ~/Downloads/podcasts.opml --verbose",
+				Description: "Export feeds with detailed progress and show each feed URL",
+			},
+		},
+		Notes: []clihelp.Note{
+			{
+				Heading: "What This Command Does",
+				Text:    "Queries the active podcast server (Audiobookshelf or PodFetch) for all hosted podcast RSS feeds and compiles them into a standard OPML 2.0 XML file. This allows subscribing to your entire library on the server in any podcast player app in one swoop without adding feeds one by one.",
+			},
+			{
+				Heading: "Importing Into AntennaPod",
+				Text:    "To import all server podcasts into AntennaPod at once:\n1. Run 'abs sync opml export podcasts.opml' and transfer the file to your mobile device (via Nextcloud, Syncthing, email, or USB).\n2. Open AntennaPod on your device.\n3. Navigate to Subscriptions -> tap the top-right menu (⋮) -> 'Import/Export'.\n4. Select 'OPML import' and choose the exported 'podcasts.opml' file.\n5. AntennaPod will subscribe to all server-provided podcast feeds in one single step.",
+			},
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "sync"
+			opts.SyncSubcmd = "opml"
+			opts.ServerSubcmd = "opml"
+			opts.OPMLSubcmd = "export"
+			if len(ctx.Args) > 0 {
+				opts.OPMLFile = ctx.Args[0]
+			}
+			return nil
+		},
+	}
+}
+
 func buildSyncOPMLSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "opml",
 		Description: "Import or export podcast subscriptions using OPML files",
 		UsageLine:   "abs sync opml <command> [args]",
 		Subcommands: []clihelp.Command{
+			buildSyncOPMLImportSubcommand(opts, action),
+			buildSyncOPMLExportSubcommand(opts, action),
+		},
+		Examples: []clihelp.Example{
 			{
-				Name:        "import",
-				Description: "Import podcast subscriptions from an OPML file",
-				UsageLine:   "abs sync opml import <file> [options]",
-				Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to the OPML file to import"}},
-				Args:        clihelp.ExactArgs(1),
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "sync"
-					opts.SyncSubcmd = "opml"
-					opts.ServerSubcmd = "opml"
-					opts.OPMLSubcmd = "import"
-					if len(ctx.Args) > 0 {
-						opts.OPMLFile = ctx.Args[0]
-					}
-					return nil
-				},
+				Line:        "abs sync opml export podcasts.opml",
+				Description: "Export all server podcast feeds into an OPML file",
 			},
 			{
-				Name:        "export",
-				Description: "Export podcast RSS feeds into an OPML file",
-				UsageLine:   "abs sync opml export <file> [options]",
-				Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to write the exported OPML file"}},
-				Args:        clihelp.ExactArgs(1),
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-					clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "sync"
-					opts.SyncSubcmd = "opml"
-					opts.ServerSubcmd = "opml"
-					opts.OPMLSubcmd = "export"
-					if len(ctx.Args) > 0 {
-						opts.OPMLFile = ctx.Args[0]
-					}
-					return nil
-				},
+				Line:        "abs sync opml import subscriptions.opml",
+				Description: "Import podcasts from an OPML file into the server",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
