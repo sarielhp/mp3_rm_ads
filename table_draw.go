@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type TableAlign int
@@ -180,7 +181,7 @@ func podcastTableColumns(titleWidth int) []TableColumn {
 		{Header: "⬇️", Width: 5, Align: AlignCenter},
 		{Header: "✂️", Width: 5, Align: AlignCenter},
 		{Header: "⏳", Width: 4, Align: AlignCenter},
-		{Header: "📅 Last", Width: 10, Align: AlignCenter},
+		{Header: "📅 Last", Width: 16, Align: AlignCenter},
 	}
 }
 
@@ -200,6 +201,7 @@ func buildPodcastRowCells(item lsPodcastItem, titleWidth int) []string {
 	pName := truncateDisplayName(item.Title, titleWidth)
 	dlStr := compactDownloadPolicy(item.DownloadPolicy, 3)
 	adStr := compactAdRemoval(item.AdRemoval)
+	lastDateStr := formatRelativeDateStr(item.LastEpisode)
 	return []string{
 		boldCyan(item.ShortID),
 		pName,
@@ -208,12 +210,12 @@ func buildPodcastRowCells(item lsPodcastItem, titleWidth int) []string {
 		dlStr,
 		adStr,
 		item.Retention,
-		item.LastEpisode,
+		lastDateStr,
 	}
 }
 
 func buildLatestEpisodeRowCells(item lsEpisodeItem, podWidth, titleWidth int) []string {
-	dStr := item.modTime.Format("2006-01-02 15:04")
+	dStr := formatRelativeDateTime(item.modTime)
 	pName := truncateDisplayName(item.podcastTitle, podWidth)
 	shortStatus := formatShortStatus(item.statusStr)
 	coloredStatus := shortStatus
@@ -238,6 +240,86 @@ func buildLatestEpisodeRowCells(item lsEpisodeItem, podWidth, titleWidth int) []
 		durStr,
 		epName,
 	}
+}
+
+func formatRelativeDateAt(t time.Time, now time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+
+	loc := now.Location()
+	tLoc := t.In(loc)
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	targetDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, loc)
+
+	if targetDay.After(today) {
+		return tLoc.Format("2006-01-02")
+	}
+
+	diffHours := today.Sub(targetDay).Hours()
+	days := int(diffHours+12) / 24
+
+	switch {
+	case days == 0:
+		return "today"
+	case days == 1:
+		return "yesterday"
+	case days >= 2 && days <= 7:
+		return fmt.Sprintf("last week (-%d d)", days)
+	default:
+		return tLoc.Format("2006-01-02")
+	}
+}
+
+func formatRelativeDateStrAt(dateStr string, now time.Time) string {
+	if dateStr == "" || dateStr == "-" {
+		return "-"
+	}
+	for _, layout := range []string{"2006-01-02", "2006-01-02 15:04", time.RFC3339} {
+		if pt, err := time.ParseInLocation(layout, dateStr, now.Location()); err == nil {
+			return formatRelativeDateAt(pt, now)
+		}
+	}
+	return dateStr
+}
+
+func formatRelativeDateStr(dateStr string) string {
+	return formatRelativeDateStrAt(dateStr, time.Now())
+}
+
+func formatRelativeDateTimeAt(t time.Time, now time.Time) string {
+	if t.IsZero() {
+		return "-"
+	}
+
+	loc := now.Location()
+	tLoc := t.In(loc)
+
+	today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+	targetDay := time.Date(tLoc.Year(), tLoc.Month(), tLoc.Day(), 0, 0, 0, 0, loc)
+
+	if targetDay.After(today) {
+		return tLoc.Format("2006-01-02 15:04")
+	}
+
+	diffHours := today.Sub(targetDay).Hours()
+	days := int(diffHours+12) / 24
+
+	switch {
+	case days == 0:
+		return fmt.Sprintf("today %s", tLoc.Format("15:04"))
+	case days == 1:
+		return fmt.Sprintf("yesterday %s", tLoc.Format("15:04"))
+	case days >= 2 && days <= 7:
+		return fmt.Sprintf("last week (-%d d)", days)
+	default:
+		return tLoc.Format("2006-01-02 15:04")
+	}
+}
+
+func formatRelativeDateTime(t time.Time) string {
+	return formatRelativeDateTimeAt(t, time.Now())
 }
 
 func queueTableColumns(titleWidth, fileWidth int) []TableColumn {

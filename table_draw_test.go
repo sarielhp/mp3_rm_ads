@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestStringDisplayWidth(t *testing.T) {
@@ -119,5 +120,81 @@ func TestCompactAdRemoval(t *testing.T) {
 	}
 	if compactAdRemoval("latest") != "New" {
 		t.Errorf("expected 'New'")
+	}
+}
+
+func TestFormatRelativeDate(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
+
+	cases := []struct {
+		input time.Time
+		want  string
+	}{
+		{time.Time{}, "-"},
+		{time.Date(2026, 9, 8, 9, 0, 0, 0, loc), "today"},
+		{time.Date(2026, 9, 7, 23, 59, 0, 0, loc), "yesterday"},
+		{time.Date(2026, 9, 6, 10, 0, 0, 0, loc), "last week (-2 d)"},
+		{time.Date(2026, 9, 5, 12, 0, 0, 0, loc), "last week (-3 d)"},
+		{time.Date(2026, 9, 4, 8, 0, 0, 0, loc), "last week (-4 d)"},
+		{time.Date(2026, 9, 1, 10, 0, 0, 0, loc), "last week (-7 d)"},
+		{time.Date(2026, 8, 31, 10, 0, 0, 0, loc), "2026-08-31"},
+		{time.Date(2026, 9, 9, 10, 0, 0, 0, loc), "2026-09-09"},
+	}
+
+	for _, tc := range cases {
+		got := formatRelativeDateAt(tc.input, now)
+		if got != tc.want {
+			t.Errorf("formatRelativeDateAt(%v) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestFormatRelativeDateStr(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
+
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"", "-"},
+		{"-", "-"},
+		{"invalid", "invalid"},
+		{"2026-09-08", "today"},
+		{"2026-09-07", "yesterday"},
+		{"2026-09-04", "last week (-4 d)"},
+		{"2026-08-31", "2026-08-31"},
+		{"2026-09-07T12:00:00Z", "yesterday"},
+	}
+
+	for _, tc := range cases {
+		got := formatRelativeDateStrAt(tc.input, now)
+		if got != tc.want {
+			t.Errorf("formatRelativeDateStrAt(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}
+
+func TestFormatRelativeDateTime(t *testing.T) {
+	loc := time.UTC
+	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
+
+	cases := []struct {
+		input time.Time
+		want  string
+	}{
+		{time.Time{}, "-"},
+		{time.Date(2026, 9, 8, 9, 15, 0, 0, loc), "today 09:15"},
+		{time.Date(2026, 9, 7, 20, 0, 0, 0, loc), "yesterday 20:00"},
+		{time.Date(2026, 9, 4, 8, 0, 0, 0, loc), "last week (-4 d)"},
+		{time.Date(2026, 8, 31, 10, 5, 0, 0, loc), "2026-08-31 10:05"},
+	}
+
+	for _, tc := range cases {
+		got := formatRelativeDateTimeAt(tc.input, now)
+		if got != tc.want {
+			t.Errorf("formatRelativeDateTimeAt(%v) = %q, want %q", tc.input, got, tc.want)
+		}
 	}
 }
