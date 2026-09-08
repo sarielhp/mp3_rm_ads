@@ -111,17 +111,16 @@ func callLLMChat(profile LLMProfile, sysPrompt, userPrompt string, maxTokens int
 	return llmResp.Choices[0].Message.Content, nil
 }
 
-func detectAdsLLM(transcriptText string, profile LLMProfile) []AdSegment {
+func detectAdsLLM(transcriptText string, profile LLMProfile) ([]AdSegment, error) {
 	if profile.URL == "" {
-		return nil
+		return nil, nil
 	}
 	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
 	content, err := callLLMChat(profile, systemPrompt, userPrompt, 0, 30*time.Second, false)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("LLM ad detection failed: %w", err)
 	}
-	return extractJSONArray(content)
+	return extractJSONArray(content), nil
 }
 
 func extractJSONArray(content string) []AdSegment {

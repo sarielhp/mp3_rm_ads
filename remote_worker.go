@@ -106,7 +106,10 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 	saveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
 
 	formattedTranscript := formatTranscript(transcriptionData, origDuration)
-	adSegments := detectAdsLLM(formattedTranscript, selectedProfile)
+	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
+	if err != nil {
+		return fmt.Errorf("ad detection failed: %w", err)
+	}
 	if len(adSegments) > 0 {
 		adSegments = mergeIntervals(adSegments)
 	}

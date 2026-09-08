@@ -141,3 +141,42 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 			len(before), len(after))
 	}
 }
+
+func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
+	dir := t.TempDir()
+	mp3 := filepath.Join(dir, "ep.mp3")
+	writeRealMP3(t, mp3, 10)
+	writeSaneTranscript(t, filepath.Join(dir, "ep.transcript.json"), 10)
+
+	failingProfile := LLMProfile{
+		ID:    2,
+		Name:  "failing",
+		Type:  "openrouter",
+		URL:   "http://127.0.0.1:1/invalid",
+		Model: "test-model",
+	}
+
+	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
+		CLIOptions{Quiet: true}, Config{}, "proc", time.Now(), failingProfile)
+
+	if !hasError {
+		t.Errorf("expected hasError=true when LLM ad detection fails")
+	}
+
+	cutsFile := filepath.Join(dir, "ep.cuts.json")
+	if fileExists(cutsFile) {
+		t.Errorf("ep.cuts.json should not exist when LLM ad detection fails")
+	}
+
+	if isEpisodeCompleted(mp3) {
+		t.Errorf("episode must not be considered completed when ad detection fails")
+	}
+
+	st, err := loadEpisodeStatus(statusPathFor(mp3))
+	if err != nil || st == nil {
+		t.Fatalf("expected status file to exist: %v", err)
+	}
+	if st.Status != StateFailed {
+		t.Errorf("expected status %s, got %s", StateFailed, st.Status)
+	}
+}

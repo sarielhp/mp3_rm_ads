@@ -94,8 +94,11 @@ func TestExtractKeywordsLLM(t *testing.T) {
 }
 
 func TestDetectAdsLLM(t *testing.T) {
-	if r := detectAdsLLM("t", LLMProfile{URL: "http://invalid:1", Model: "m"}); r != nil {
-		t.Error("should be nil")
+	if r, err := detectAdsLLM("t", LLMProfile{URL: "http://invalid:1", Model: "m"}); r != nil || err == nil {
+		t.Error("expected nil segments and non-nil error")
+	}
+	if r, err := detectAdsLLM("t", LLMProfile{URL: ""}); r != nil || err != nil {
+		t.Error("expected nil segments and nil error for empty URL")
 	}
 }
 

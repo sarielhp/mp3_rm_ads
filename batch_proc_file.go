@@ -126,7 +126,16 @@ func runLocalAdDetectionAndCutStep(transcriptionData *TranscriptionData, sourceA
 		fmt.Println()
 		fmt.Println(boldYellow("Step 2/3: Detecting ad/sponsor segments via LLM (" + selectedProfile.Model + ")..."))
 	}
-	adSegments := detectAdsLLM(formattedTranscript, selectedProfile)
+	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
+	if err != nil {
+		if !cli.Quiet {
+			fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
+		}
+		_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+			st.Status = StateFailed
+		})
+		return false
+	}
 	if len(adSegments) > 0 {
 		adSegments = mergeIntervals(adSegments)
 	}

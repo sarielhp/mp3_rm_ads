@@ -226,7 +226,10 @@ func transcribeAndDetectAdsRemoteScan(audioFile string, origDuration float64, cf
 	saveJSONTranscript(audioFile, transData, transcriptJSON, quiet, map[string]string{})
 
 	formattedTranscript := formatTranscript(transData, origDuration)
-	adSegments := detectAdsLLM(formattedTranscript, profile)
+	adSegments, err := detectAdsLLM(formattedTranscript, profile)
+	if err != nil {
+		return nil, nil, fmt.Errorf("ad detection failed: %w", err)
+	}
 	if len(adSegments) > 0 {
 		adSegments = mergeIntervals(adSegments)
 	}
