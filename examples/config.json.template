@@ -33,19 +33,11 @@
     },
     {
       "id": 3,
-      "name": "Remote cloud8 (faster-whisper)",
-      "url": "http://cloud8:8000/v1/audio/transcriptions",
-      "speed_factor": 7.0,
-      "wake_command": "wake_cloud8",
-      "engine": "remote"
-    },
-    {
-      "id": 4,
-      "name": "Gemini 1.5 Flash (Google Cloud)",
+      "name": "Gemini Flash (Google AI Studio Free)",
       "url": "",
       "speed_factor": 60.0,
       "engine": "gemini",
-      "model": "gemini-1.5-flash"
+      "model": "gemini-flash-latest"
     }
   ],
   "podcasts_dir": "/path/to/podcasts",

@@ -35,17 +35,9 @@ var defaultWhisperProfiles = []WhisperProfile{
 	},
 	{
 		ID:          3,
-		Name:        "Remote cloud8 (faster-whisper)",
-		Engine:      WhisperEngineRemote,
-		URL:         "http://cloud8:8000/v1/audio/transcriptions",
-		SpeedFactor: 7.0,
-		WakeCommand: "wake_cloud8",
-	},
-	{
-		ID:          4,
-		Name:        "Gemini 1.5 Flash (Google Cloud)",
+		Name:        "Gemini Flash (Google AI Studio Free)",
 		Engine:      WhisperEngineGemini,
-		Model:       "gemini-1.5-flash",
+		Model:       "gemini-flash-latest",
 		SpeedFactor: 60.0,
 	},
 }
