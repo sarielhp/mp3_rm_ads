@@ -49,11 +49,13 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 	}
 
 	if isGeminiEngine(config, cli) {
-		success := runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
-		if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
-			os.Remove(sourceAudioFile)
+		success, handled := handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
+		if handled {
+			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
+				os.Remove(sourceAudioFile)
+			}
+			return !success, processed, false
 		}
-		return !success, processed, false
 	}
 
 	transData, t0Step1, ok, hasErr := runLocalTranscriptionStep(sourceAudioFile, jsonFile, mainMP3File, totalDuration, config, cli, selectedProfile, fileStartTime)
@@ -66,6 +68,25 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		os.Remove(sourceAudioFile)
 	}
 	return !cutSuccess, processed, false
+}
+
+func handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) (bool, bool) {
+	if runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime) {
+		return true, true
+	}
+	if !cli.Quiet {
+		fmt.Println()
+		fmt.Println(boldYellow("Warning: Gemini processing failed. Falling back to local Whisper transcription..."))
+	}
+	fallbackCfg := prepareWhisperFallbackConfig(config)
+	fallbackCli := cli
+	fallbackCli.WhisperEngine = string(fallbackCfg.WhisperEngine)
+	transData, t0Step1, ok, hasErr := runLocalTranscriptionStep(sourceAudioFile, jsonFile, mainMP3File, totalDuration, fallbackCfg, fallbackCli, selectedProfile, fileStartTime)
+	if hasErr || !ok {
+		return false, true
+	}
+	cutSuccess := runLocalAdDetectionAndCutStep(transData, sourceAudioFile, mainMP3File, precutFile, outputFile, totalDuration, fallbackCfg, fallbackCli, selectedProfile, fileStartTime, t0Step1)
+	return cutSuccess, true
 }
 
 func runLocalTranscriptionStep(sourceAudioFile, jsonFile, mainMP3File string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) (*TranscriptionData, time.Time, bool, bool) {

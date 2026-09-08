@@ -320,3 +320,23 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	t0Step3 := time.Now()
 	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, cli, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
 }
+
+func prepareWhisperFallbackConfig(cfg Config) Config {
+	fallback := cfg
+	for _, wp := range cfg.WhisperProfiles {
+		engine := wp.Engine
+		if engine == "" {
+			engine = inferWhisperEngine(wp)
+		}
+		if engine != WhisperEngineGemini {
+			fallback.ActiveWhisperID = wp.ID
+			fallback.WhisperEngine = engine
+			if wp.URL != "" {
+				fallback.WhisperURL = wp.URL
+			}
+			return fallback
+		}
+	}
+	fallback.WhisperEngine = WhisperEngineLocal
+	return fallback
+}

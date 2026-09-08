@@ -481,3 +481,26 @@ func TestGeminiStudioNoKeyInURLError(t *testing.T) {
 		t.Errorf("error leaked apiKey: %v", err)
 	}
 }
+
+func TestPrepareWhisperFallbackConfig(t *testing.T) {
+	cfg := Config{
+		ActiveWhisperID: 3,
+		WhisperEngine:   WhisperEngineGemini,
+		WhisperProfiles: []WhisperProfile{
+			{ID: 1, Name: "Cloud8", Engine: WhisperEngineRemote, URL: "http://cloud8:8000"},
+			{ID: 2, Name: "Local GPU", Engine: WhisperEngineLocal, URL: "http://192.168.1.230:8088/inference"},
+			{ID: 3, Name: "Gemini", Engine: WhisperEngineGemini},
+		},
+	}
+
+	fallback := prepareWhisperFallbackConfig(cfg)
+	if fallback.WhisperEngine == WhisperEngineGemini {
+		t.Errorf("expected fallback engine to not be gemini, got %v", fallback.WhisperEngine)
+	}
+	if fallback.ActiveWhisperID == 3 {
+		t.Errorf("expected fallback ID to not be 3, got %d", fallback.ActiveWhisperID)
+	}
+	if fallback.ActiveWhisperID != 1 && fallback.ActiveWhisperID != 2 {
+		t.Errorf("expected fallback ID to be 1 or 2, got %d", fallback.ActiveWhisperID)
+	}
+}

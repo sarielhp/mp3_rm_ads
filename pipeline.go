@@ -259,7 +259,19 @@ func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptio
 	}
 	if wp.Engine == WhisperEngineGemini {
 		td, _, err := ProcessWithGeminiConfig(context.Background(), sourceAudioFile, config, defaultGeminiChunkSec)
-		return td, err
+		if err == nil {
+			return td, nil
+		}
+		if !cli.Quiet {
+			fmt.Printf("\nWarning: Gemini transcription failed (%v). Falling back to local Whisper...\n", err)
+		}
+		fallbackCfg := prepareWhisperFallbackConfig(config)
+		fallbackWp := getActiveWhisperProfile(fallbackCfg)
+		if fallbackWp.Engine == WhisperEngineLocal {
+			return runWhisperCLITranscription(sourceAudioFile, fallbackWp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
+		}
+		wp = fallbackWp
+		config = fallbackCfg
 	}
 
 	chunkDuration := config.ChunkDurationSec
