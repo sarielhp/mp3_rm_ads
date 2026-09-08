@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -212,6 +213,10 @@ func resolveWhisperCLIBinary(bin string) string {
 }
 
 func runWhisperCLITranscription(audioPath string, profile WhisperProfile, quiet, verbose bool, prompt, lang string) (*TranscriptionData, error) {
+	return runWhisperCLITranscriptionContext(context.Background(), audioPath, profile, quiet, verbose, prompt, lang)
+}
+
+func runWhisperCLITranscriptionContext(ctx context.Context, audioPath string, profile WhisperProfile, quiet, verbose bool, prompt, lang string) (*TranscriptionData, error) {
 	bin := resolveWhisperCLIBinary(profile.CliBinary)
 	modelPath, err := resolveWhisperModelPath(profile.Model)
 	if err != nil {
@@ -233,7 +238,7 @@ func runWhisperCLITranscription(audioPath string, profile WhisperProfile, quiet,
 		prompt = profile.Prompt
 	}
 	args := buildWhisperCLIArgs(audioPath, modelPath, outJsonBase, lang, prompt, profile.Processors, profile.Threads, profile.Greedy)
-	cmd := exec.Command(bin, args...)
+	cmd := exec.CommandContext(ctx, bin, args...)
 	var errBuf bytes.Buffer
 	if verbose && !quiet {
 		cmd.Stderr = os.Stderr
@@ -247,6 +252,9 @@ func runWhisperCLITranscription(audioPath string, profile WhisperProfile, quiet,
 		fmt.Printf("   Transcribing with local GPU (whisper-cli %s)...\n", filepath.Base(modelPath))
 	}
 	if err := cmd.Run(); err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		detail := strings.TrimSpace(errBuf.String())
 		if detail != "" {
 			return nil, fmt.Errorf("whisper-cli execution failed: %w: %s", err, detail)

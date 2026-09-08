@@ -269,6 +269,10 @@ func handleMainTUI(config *Config, cli CLIOptions) {
 }
 
 func handleMainProc(config Config, cli CLIOptions, action string) {
+	if cli.ProcSubcmd == "audit" {
+		runAuditTranscripts(config, cli)
+		return
+	}
 	if cli.ProcSubcmd == "recut" {
 		cli.Recut = true
 	}

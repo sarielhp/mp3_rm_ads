@@ -24,6 +24,7 @@ const (
 	StateDone                  EpisodeState = "done"
 	StateArchived              EpisodeState = "archived"
 	StateFailed                EpisodeState = "failed"
+	StateNeedsAdR              EpisodeState = "needs_adr"
 )
 
 type EpisodeAudioMeta struct {
@@ -40,21 +41,25 @@ type EpisodeAdCut struct {
 }
 
 type EpisodeStatusFile struct {
-	ID            string           `json:"id,omitempty"`
-	Version       int              `json:"version"`
-	MediaFile     string           `json:"media_file"`
-	Status        EpisodeState     `json:"status"`
-	CurrentStep   string           `json:"current_step,omitempty"`
-	StepStartedAt string           `json:"step_started_at,omitempty"`
-	CreatedAt     string           `json:"created_at"`
-	UpdatedAt     string           `json:"updated_at"`
-	PublishedAt   string           `json:"published_at,omitempty"`
-	WorkerHost    string           `json:"worker_host,omitempty"`
-	Original      EpisodeAudioMeta `json:"original,omitempty"`
-	Cleaned       EpisodeAudioMeta `json:"cleaned,omitempty"`
-	Ads           []EpisodeAdCut   `json:"ads,omitempty"`
-	LastError     string           `json:"last_error,omitempty"`
-	Priority      int              `json:"priority,omitempty"`
+	ID                    string           `json:"id,omitempty"`
+	Version               int              `json:"version"`
+	MediaFile             string           `json:"media_file"`
+	Status                EpisodeState     `json:"status"`
+	CurrentStep           string           `json:"current_step,omitempty"`
+	StepStartedAt         string           `json:"step_started_at,omitempty"`
+	CreatedAt             string           `json:"created_at"`
+	UpdatedAt             string           `json:"updated_at"`
+	PublishedAt           string           `json:"published_at,omitempty"`
+	WorkerHost            string           `json:"worker_host,omitempty"`
+	Original              EpisodeAudioMeta `json:"original,omitempty"`
+	Cleaned               EpisodeAudioMeta `json:"cleaned,omitempty"`
+	Ads                   []EpisodeAdCut   `json:"ads,omitempty"`
+	LastError             string           `json:"last_error,omitempty"`
+	Priority              int              `json:"priority,omitempty"`
+	AdDetectionSuccessful *bool            `json:"ad_detection_successful,omitempty"`
+	AdDetectionStatus     string           `json:"ad_detection_status,omitempty"`
+	AdDetectionError      string           `json:"ad_detection_error,omitempty"`
+	AdDetectionModel      string           `json:"ad_detection_model,omitempty"`
 }
 
 func statusPathFor(audioPath string) string {
@@ -202,6 +207,12 @@ func isEpisodeCompleted(audioPath string) bool {
 	statPath := statusPathFor(audioPath)
 	st, err := loadEpisodeStatus(statPath)
 	if err == nil && st != nil {
+		if st.AdDetectionSuccessful != nil && !*st.AdDetectionSuccessful {
+			return false
+		}
+		if st.Status == StateNeedsAdR || st.Status == StateFailed {
+			return false
+		}
 		if st.Status == StateDone || st.Status == StateCopiedBack || st.Status == StateArchived {
 			return true
 		}

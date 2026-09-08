@@ -12,6 +12,40 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func podfetchHasColumn(db *sql.DB, table, column string) bool {
+	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
+	if err != nil {
+		return false
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var cid int
+		var name, colType string
+		var notnull, pk int
+		var dfltValue sql.NullString
+		if err := rows.Scan(&cid, &name, &colType, &notnull, &dfltValue, &pk); err == nil {
+			if strings.EqualFold(name, column) {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func podfetchPodcastsDirCol(db *sql.DB) string {
+	if podfetchHasColumn(db, "podcasts", "directory_name") {
+		return "directory_name"
+	}
+	return "directory"
+}
+
+func podfetchEpisodeFileCol(db *sql.DB) string {
+	if podfetchHasColumn(db, "podcast_episodes", "file_episode_path") {
+		return "file_episode_path"
+	}
+	return "local_url"
+}
+
 func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 	verifyPodfetchNotDisabled("fetchPodFetchPodcastsDB")
 	if dbPath == "" {
@@ -27,7 +61,9 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 	}
 	defer db.Close()
 
-	rows, err := db.Query("SELECT id, name, directory, rssfeed, image_url, summary, author FROM podcasts ORDER BY id ASC")
+	dirCol := podfetchPodcastsDirCol(db)
+	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, image_url, summary, author FROM podcasts ORDER BY id ASC", dirCol)
+	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
 	}
@@ -35,19 +71,19 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 
 	var podcasts []Podcast
 	for rows.Next() {
-		var id int64
+		var idVal interface{}
 		var name, directory, rssfeed, imageURL, summary, author sql.NullString
-		if err := rows.Scan(&id, &name, &directory, &rssfeed, &imageURL, &summary, &author); err != nil {
+		if err := rows.Scan(&idVal, &name, &directory, &rssfeed, &imageURL, &summary, &author); err != nil {
 			continue
 		}
 
-		idStr := strconv.FormatInt(id, 10)
-		dir := directory.String
+		idStr := fmt.Sprintf("%v", idVal)
+		dir := strings.TrimPrefix(directory.String, "podcasts/")
 		if dir == "" {
 			dir = sanitizePodcastName(name.String)
 		}
 
-		eps, _ := fetchPodFetchEpisodesForPodcastDB(db, id)
+		eps, _ := fetchPodFetchEpisodesForPodcastDB(db, idStr)
 
 		pod := Podcast{
 			ID:        idStr,
@@ -71,9 +107,23 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 	return podcasts, nil
 }
 
-func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID int64) ([]Episode, error) {
+func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode, error) {
 	verifyPodfetchNotDisabled("fetchPodFetchEpisodesForPodcastDB")
-	rows, err := db.Query("SELECT id, episode_id, name, url, date_of_recording, total_time, local_url, description, status FROM podcast_episodes WHERE podcast_id = ? ORDER BY id DESC", podcastID)
+	fileCol := podfetchEpisodeFileCol(db)
+	hasStatus := podfetchHasColumn(db, "podcast_episodes", "status")
+	hasDesc := podfetchHasColumn(db, "podcast_episodes", "description")
+
+	statusExpr := "'D'"
+	if hasStatus {
+		statusExpr = "status"
+	}
+	descExpr := "''"
+	if hasDesc {
+		descExpr = "description"
+	}
+
+	query := fmt.Sprintf("SELECT id, episode_id, name, url, date_of_recording, total_time, %s, %s, %s FROM podcast_episodes WHERE podcast_id = ? ORDER BY id DESC", fileCol, descExpr, statusExpr)
+	rows, err := db.Query(query, podcastID)
 	if err != nil {
 		return nil, err
 	}
@@ -81,15 +131,15 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID int64) ([]Episode, 
 
 	var episodes []Episode
 	for rows.Next() {
-		var id int64
+		var idVal interface{}
 		var epID, name, url, dateOfRec, localURL, description, status sql.NullString
 		var totalTime sql.NullFloat64
 
-		if err := rows.Scan(&id, &epID, &name, &url, &dateOfRec, &totalTime, &localURL, &description, &status); err != nil {
+		if err := rows.Scan(&idVal, &epID, &name, &url, &dateOfRec, &totalTime, &localURL, &description, &status); err != nil {
 			continue
 		}
 
-		idStr := strconv.FormatInt(id, 10)
+		idStr := fmt.Sprintf("%v", idVal)
 		guid := epID.String
 		if guid == "" {
 			guid = idStr
@@ -109,13 +159,14 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID int64) ([]Episode, 
 			EnclosureURL: url.String,
 		}
 
-		if localURL.String != "" {
+		cleanPath := strings.TrimPrefix(localURL.String, "podcasts/")
+		if cleanPath != "" {
 			ep.AudioFile = &PodcastAudioFile{
 				Duration: dur,
 				Metadata: &AudioFileMetadata{
-					Filename: filepath.Base(localURL.String),
-					Path:     localURL.String,
-					RelPath:  localURL.String,
+					Filename: filepath.Base(cleanPath),
+					Path:     cleanPath,
+					RelPath:  cleanPath,
 				},
 			}
 		}
@@ -137,22 +188,23 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 	}
 	defer db.Close()
 
-	var numID int64
+	dirCol := podfetchPodcastsDirCol(db)
+	var idVal interface{}
 	var name, directory, rssfeed, imageURL, summary, author sql.NullString
 
-	query := "SELECT id, name, directory, rssfeed, image_url, summary, author FROM podcasts WHERE id = ? OR name = ? OR directory = ? LIMIT 1"
-	err = db.QueryRow(query, id, id, id).Scan(&numID, &name, &directory, &rssfeed, &imageURL, &summary, &author)
+	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, image_url, summary, author FROM podcasts WHERE id = ? OR name = ? OR %s = ? LIMIT 1", dirCol, dirCol)
+	err = db.QueryRow(query, id, id, id).Scan(&idVal, &name, &directory, &rssfeed, &imageURL, &summary, &author)
 	if err != nil {
 		return nil, err
 	}
 
-	idStr := strconv.FormatInt(numID, 10)
-	dir := directory.String
+	idStr := fmt.Sprintf("%v", idVal)
+	dir := strings.TrimPrefix(directory.String, "podcasts/")
 	if dir == "" {
 		dir = sanitizePodcastName(name.String)
 	}
 
-	eps, _ := fetchPodFetchEpisodesForPodcastDB(db, numID)
+	eps, _ := fetchPodFetchEpisodesForPodcastDB(db, idStr)
 
 	pod := &Podcast{
 		ID:        idStr,
@@ -181,8 +233,10 @@ func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast
 	}
 	defer db.Close()
 
+	dirCol := podfetchPodcastsDirCol(db)
 	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
-	res, err := db.Exec("INSERT INTO podcasts (name, directory, rssfeed, created_at) VALUES (?, ?, ?, ?)", title, directory, feedURL, nowStr)
+	query := fmt.Sprintf("INSERT INTO podcasts (name, %s, rssfeed, created_at) VALUES (?, ?, ?, ?)", dirCol)
+	res, err := db.Exec(query, title, directory, feedURL, nowStr)
 	if err != nil {
 		return nil, err
 	}
@@ -232,7 +286,9 @@ func deletePodFetchPodcastDB(dbPath, podcastID string) error {
 	if _, err := tx.Exec("DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID); err != nil {
 		return err
 	}
-	if _, err := tx.Exec("DELETE FROM podcasts WHERE id = ? OR name = ? OR directory = ?", podcastID, podcastID, podcastID); err != nil {
+	dirCol := podfetchPodcastsDirCol(db)
+	query := fmt.Sprintf("DELETE FROM podcasts WHERE id = ? OR name = ? OR %s = ?", dirCol)
+	if _, err := tx.Exec(query, podcastID, podcastID, podcastID); err != nil {
 		return err
 	}
 	return tx.Commit()
@@ -246,6 +302,10 @@ func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) 
 	}
 	defer db.Close()
 
+	if !podfetchHasColumn(db, "podcast_episodes", "status") {
+		return nil, nil
+	}
+
 	query := "SELECT id, name, episode_id, url FROM podcast_episodes WHERE (status = 'P' OR status = 'DOWNLOADING') AND (podcast_id = ? OR ? = '')"
 	rows, err := db.Query(query, podcastID, podcastID)
 	if err != nil {
@@ -255,11 +315,11 @@ func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) 
 
 	var dls []ActiveDownload
 	for rows.Next() {
-		var id int64
+		var idVal interface{}
 		var name, epID, url sql.NullString
-		if err := rows.Scan(&id, &name, &epID, &url); err == nil {
+		if err := rows.Scan(&idVal, &name, &epID, &url); err == nil {
 			dls = append(dls, ActiveDownload{
-				ID:                  strconv.FormatInt(id, 10),
+				ID:                  fmt.Sprintf("%v", idVal),
 				EpisodeDisplayTitle: name.String,
 				Title:               name.String,
 				EpisodeID:           epID.String,
@@ -280,8 +340,10 @@ func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
 
 	base := filepath.Base(filePath)
 	likePattern := "%" + base
+	fileCol := podfetchEpisodeFileCol(db)
 
-	_, err = db.Exec("UPDATE podcast_episodes SET total_time = ? WHERE local_url = ? OR local_url LIKE ?", int(duration), filePath, likePattern)
+	query := fmt.Sprintf("UPDATE podcast_episodes SET total_time = ? WHERE %s = ? OR %s LIKE ?", fileCol, fileCol)
+	_, err = db.Exec(query, int(duration), filePath, likePattern)
 	return err
 }
 

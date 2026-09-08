@@ -14,12 +14,17 @@ func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 			buildRmAdsExportSubcommand(opts, action),
 			buildRmAdsCollectSubcommand(opts, action),
 			buildRmAdsClearSubcommand(opts, action),
+			buildRmAdsAuditSubcommand(opts, action),
 		},
 		Options: getTranscriptionOptions(opts),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "rm_ads"
 			if len(ctx.Args) > 0 {
 				switch ctx.Args[0] {
+				case "audit":
+					opts.ProcSubcmd = "audit"
+					opts.Args = ctx.Args[1:]
+					return nil
 				case "collect":
 					opts.ProcSubcmd = "collect"
 					if len(ctx.Args) > 1 {
@@ -176,6 +181,30 @@ func buildRmAdsExportSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 		Run: func(ctx *clihelp.Context) error {
 			*action = "rm_ads"
 			opts.ProcSubcmd = "export"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "audit",
+		Description: "Scan and heal suspiciously short or incomplete episode transcripts",
+		UsageLine:   "abs rm_ads audit [paths...] [options]",
+		Parameters: []clihelp.Param{
+			{Name: "[paths...]", Description: "Podcast directories or audio files to audit (defaults to configured podcasts_dir)"},
+		},
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.DryRun, "-d, --dry-run", false, "Report suspicious transcripts without modifying or deleting files"),
+			clihelp.String(&opts.AuditMinRatioStr, "--min-ratio <ratio>", "", "Minimum speech coverage ratio of audio duration (default: 0.15)"),
+			clihelp.Int(&opts.AuditMinChars, "--min-chars <num>", 50, "Minimum character count for non-empty transcript"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress non-warning output"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Print detailed inspection of every file"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "rm_ads"
+			opts.ProcSubcmd = "audit"
 			opts.Args = ctx.Args
 			return nil
 		},

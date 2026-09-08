@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -48,7 +49,15 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		return false, processed, false
 	}
 
-	if isGeminiEngine(config, cli) {
+	if canRunSpeculativeRace(config, cli) {
+		success, handled := handleSpeculativeStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
+		if handled {
+			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
+				os.Remove(sourceAudioFile)
+			}
+			return !success, processed, false
+		}
+	} else if isGeminiEngine(config, cli) {
 		success, handled := handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
 		if handled {
 			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
@@ -68,6 +77,80 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		os.Remove(sourceAudioFile)
 	}
 	return !cutSuccess, processed, false
+}
+
+func canRunSpeculativeRace(config Config, cli CLIOptions) bool {
+	if !config.IsSpeculativeTranscriptionEnabled() {
+		return false
+	}
+	if !config.IsGeminiAPIKeyEnabled() || config.GetGeminiAPIKey() == "" {
+		return false
+	}
+	if cli.WhisperEngine != "" && cli.WhisperEngine != string(WhisperEngineGemini) {
+		return false
+	}
+	return true
+}
+
+func handleSpeculativeStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) (bool, bool) {
+	t0Step1 := time.Now()
+	speedFactor := config.WhisperSpeedFactor
+	if speedFactor <= 0 {
+		speedFactor = 7.0
+	}
+	id3Tags := extractID3Tags(sourceAudioFile)
+	isHebrew := isHebrewAudio(sourceAudioFile, id3Tags, config.WhisperLanguage)
+	whisperPrompt := config.WhisperPrompt
+	if whisperPrompt == "" {
+		whisperPrompt = extractMetadataPrompt(sourceAudioFile, id3Tags, selectedProfile, cli)
+	}
+	dockerContainer := config.WhisperDockerContainer
+	if dockerContainer == "" {
+		dockerContainer = detectWhisperDockerContainer(config.WhisperURL)
+	}
+
+	td, ads, geminiWon, err := runSpeculativeParallelRace(context.Background(), sourceAudioFile, config, cli, totalDuration, speedFactor, whisperPrompt, config.WhisperLanguage, dockerContainer, isHebrew)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Speculative transcription error: %v\n", err)
+		return false, false
+	}
+
+	if cli.SaveTranscript {
+		saveJSONTranscript(mainMP3File, td, jsonFile, cli.Quiet, id3Tags)
+	}
+
+	if handleExportOrPreviewReturns(td, totalDuration, fileStartTime, sourceAudioFile, jsonFile, cli) {
+		return true, true
+	}
+
+	if geminiWon {
+		return finalizeGeminiRaceWinner(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, td, ads, selectedProfile, cli, fileStartTime, t0Step1)
+	}
+
+	detectAndSanitizeTranscriptLanguage(td, config.WhisperLanguage, true, cli.Quiet)
+	if !validateTranscriptSanity(td, totalDuration, cli.Quiet) {
+		return false, true
+	}
+
+	cutSuccess := runLocalAdDetectionAndCutStep(td, sourceAudioFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime, t0Step1)
+	return cutSuccess, true
+}
+
+func finalizeGeminiRaceWinner(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, td *TranscriptionData, ads []AdSegment, selectedProfile LLMProfile, cli CLIOptions, fileStartTime, t0Step1 time.Time) (bool, bool) {
+	if len(ads) > 0 {
+		ads = mergeIntervals(ads)
+	}
+	t0Step2 := time.Now()
+	_ = updateTranscriptAdDetectionStatus(jsonFile, true, "completed", "gemini-flash", "", len(ads))
+	updateStatusAdDetection(mainMP3File, true, "completed", "gemini-flash", "")
+	if len(ads) == 0 {
+		handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile, totalDuration, selectedProfile, cli, fileStartTime, t0Step1, t0Step2)
+		return true, true
+	}
+	cutsResult := saveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, cli.Quiet)
+	t0Step3 := time.Now()
+	cutSuccess := executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, Config{}, cli, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
+	return cutSuccess, true
 }
 
 func handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) (bool, bool) {
@@ -126,16 +209,24 @@ func runLocalAdDetectionAndCutStep(transcriptionData *TranscriptionData, sourceA
 		fmt.Println()
 		fmt.Println(boldYellow("Step 2/3: Detecting ad/sponsor segments via LLM (" + selectedProfile.Model + ")..."))
 	}
+	jsonFile := cli.TranscriptPath
+	if jsonFile == "" {
+		jsonFile = stripExt(mainMP3File) + ".transcript.json"
+	}
 	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
 	if err != nil {
 		if !cli.Quiet {
 			fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
 		}
+		_ = updateTranscriptAdDetectionStatus(jsonFile, false, "failed", selectedProfile.Model, err.Error(), 0)
+		updateStatusAdDetection(mainMP3File, false, "failed", selectedProfile.Model, err.Error())
 		_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
 			st.Status = StateFailed
 		})
 		return false
 	}
+	_ = updateTranscriptAdDetectionStatus(jsonFile, true, "completed", selectedProfile.Model, "", len(adSegments))
+	updateStatusAdDetection(mainMP3File, true, "completed", selectedProfile.Model, "")
 	if len(adSegments) > 0 {
 		adSegments = mergeIntervals(adSegments)
 	}

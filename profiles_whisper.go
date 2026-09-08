@@ -63,6 +63,9 @@ func printWhisperProfile(wp WhisperProfile, isDefault bool) {
 	if wp.SpeedFactor > 0 {
 		fmt.Printf("      - Speed Factor: %.1f\n", wp.SpeedFactor)
 	}
+	if len(wp.Languages) > 0 {
+		fmt.Printf("      - Languages:    %s\n", strings.Join(wp.Languages, ", "))
+	}
 	if wp.Language != "" {
 		fmt.Printf("      - Language:     %s\n", wp.Language)
 	}

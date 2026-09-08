@@ -256,6 +256,15 @@ func runWhisperTranscription(sourceAudioFile string, config Config, cli CLIOptio
 	if cli.WhisperModel != "" {
 		wp.Model = cli.WhisperModel
 	}
+	if isHebrewAudio(sourceAudioFile, nil, whisperLang) {
+		if whisperLang == "" {
+			whisperLang = "he"
+		}
+		wp = resolveLocalWhisperProfile(config, true)
+		if !cli.Quiet {
+			fmt.Printf("   Hebrew detected: routing to %s (%s)\n", wp.Name, whisperEngineBadge(wp.Engine))
+		}
+	}
 
 	if wp.Engine == WhisperEngineLocal {
 		return runWhisperCLITranscription(sourceAudioFile, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)

@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -18,6 +19,10 @@ const wavSampleRate = 16000
 const wavBytesPerSec = wavSampleRate * 2
 
 func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*TranscriptionData, error) {
+	return transcribeWhisperContext(context.Background(), audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
+}
+
+func transcribeWhisperContext(ctx context.Context, audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*TranscriptionData, error) {
 	maxRetries := 5
 	retryDelay := 5
 	readTimeout := int(totalDuration*1.5) + 600
@@ -30,14 +35,20 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 	}
 
 	for attempt := 1; attempt <= maxRetries; attempt++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
 		bodyReader, contentType, err := buildWhisperMultipartBody(audioPath, prompt, language, pcmData)
 		if err != nil {
 			return nil, err
 		}
 
-		data, err := executeWhisperAttempt(client, whisperURL, contentType, bodyReader, quiet, verbose)
+		data, err := executeWhisperAttemptContext(ctx, client, whisperURL, contentType, bodyReader, quiet, verbose)
 		if err == nil {
 			return data, nil
+		}
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
 		}
 
 		if attempt < maxRetries {
@@ -45,7 +56,11 @@ func transcribeWhisper(audioPath, whisperURL string, quiet, verbose bool, totalD
 				fmt.Printf("\nWhisper server error (attempt %d/%d): %v\n", attempt, maxRetries, err)
 				fmt.Printf("   Retrying in %d seconds...\n", retryDelay)
 			}
-			time.Sleep(time.Duration(retryDelay) * time.Second)
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(time.Duration(retryDelay) * time.Second):
+			}
 		} else {
 			return nil, fmt.Errorf("failed to connect to Whisper GPU server at '%s' after %d attempts: %w", whisperURL, maxRetries, err)
 		}
@@ -127,14 +142,14 @@ func readLimitedBody(r io.Reader, maxBytes int64) ([]byte, error) {
 	return body, nil
 }
 
-func executeWhisperAttempt(client *http.Client, uri, contentType string, bodyReader io.ReadCloser, quiet, verbose bool) (*TranscriptionData, error) {
+func executeWhisperAttemptContext(ctx context.Context, client *http.Client, uri, contentType string, bodyReader io.ReadCloser, quiet, verbose bool) (*TranscriptionData, error) {
 	defer bodyReader.Close()
 
 	progressDone := make(chan struct{})
 	defer close(progressDone)
 
 	startTime := time.Now()
-	req, err := http.NewRequest("POST", uri, bodyReader)
+	req, err := http.NewRequestWithContext(ctx, "POST", uri, bodyReader)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}

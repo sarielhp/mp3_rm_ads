@@ -24,6 +24,7 @@ var defaultWhisperProfiles = []WhisperProfile{
 		Processors:  4,
 		Threads:     4,
 		Greedy:      true,
+		Languages:   []string{"en"},
 	},
 	{
 		ID:              2,
@@ -32,6 +33,7 @@ var defaultWhisperProfiles = []WhisperProfile{
 		URL:             "http://127.0.0.1:8088/inference",
 		SpeedFactor:     7.0,
 		DockerContainer: "whisper",
+		Languages:       []string{"en", "he"},
 	},
 	{
 		ID:          3,
@@ -39,6 +41,7 @@ var defaultWhisperProfiles = []WhisperProfile{
 		Engine:      WhisperEngineGemini,
 		Model:       "gemini-flash-latest",
 		SpeedFactor: 60.0,
+		Languages:   []string{"en", "he", "*"},
 	},
 }
 
@@ -365,6 +368,15 @@ func normalizeWhisperProfile(wp WhisperProfile) WhisperProfile {
 		}
 		if wp.Threads <= 0 {
 			wp.Threads = 4
+		}
+	}
+	if len(wp.Languages) == 0 {
+		if wp.Engine == WhisperEngineLocal && (strings.Contains(wp.Model, ".en") || wp.Model == "tiny.en") {
+			wp.Languages = []string{"en"}
+		} else if wp.Engine == WhisperEngineDocker {
+			wp.Languages = []string{"en", "he"}
+		} else if wp.Engine == WhisperEngineGemini {
+			wp.Languages = []string{"en", "he", "*"}
 		}
 	}
 	return wp

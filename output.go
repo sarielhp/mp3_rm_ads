@@ -211,3 +211,47 @@ func findMP3Files(dir string) []string {
 	}
 	return files
 }
+
+func updateTranscriptAdDetectionStatus(jsonFile string, successful bool, status, model, errMsg string, adCount int) error {
+	if !fileExists(jsonFile) {
+		return nil
+	}
+	raw, err := os.ReadFile(jsonFile)
+	if err != nil {
+		return err
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return err
+	}
+	data["ad_detection_successful"] = successful
+	data["ad_detection_status"] = status
+	if model != "" {
+		data["ad_detection_model"] = model
+	}
+	if errMsg != "" {
+		data["ad_detection_error"] = errMsg
+	} else {
+		delete(data, "ad_detection_error")
+	}
+	if successful {
+		data["ad_segments_count"] = adCount
+	}
+	content, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(jsonFile, append(content, '\n'), 0644)
+}
+
+func updateStatusAdDetection(mainMP3File string, successful bool, status, model, errMsg string) {
+	_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
+		st.AdDetectionSuccessful = &successful
+		st.AdDetectionStatus = status
+		st.AdDetectionModel = model
+		st.AdDetectionError = errMsg
+		if !successful {
+			st.Status = StateNeedsAdR
+		}
+	})
+}

@@ -311,6 +311,8 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	}
 
 	t0Step2 := time.Now()
+	_ = updateTranscriptAdDetectionStatus(jsonFile, true, "completed", "gemini-flash", "", len(ads))
+	updateStatusAdDetection(mainMP3File, true, "completed", "gemini-flash", "")
 	if len(ads) == 0 {
 		handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile, totalDuration, selectedProfile, cli, fileStartTime, t0Step1, t0Step2)
 		return true
