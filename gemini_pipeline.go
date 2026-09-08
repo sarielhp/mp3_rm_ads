@@ -253,7 +253,7 @@ func ProcessWithGeminiConfig(ctx context.Context, audioPath string, config Confi
 	apiKey := config.GetGeminiAPIKey()
 	backendLabel := "Vertex AI"
 	if apiKey != "" {
-		backendLabel = "Google AI Studio (free API)"
+		backendLabel = "Google AI Studio"
 	}
 
 	if len(prepared) > 1 {
