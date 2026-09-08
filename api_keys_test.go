@@ -262,3 +262,33 @@ func TestResolveOpenRouterAPIKeyFromAuth(t *testing.T) {
 		t.Errorf("expected empty key when disabled, got %q", disabledKey)
 	}
 }
+
+func TestResolveGeminiAPIKeyFreeAndPaid(t *testing.T) {
+	tempDir := t.TempDir()
+	origHome := os.Getenv("HOME")
+	origEnv := os.Getenv("GEMINI_API_KEY")
+	defer func() {
+		os.Setenv("HOME", origHome)
+		if origEnv != "" {
+			os.Setenv("GEMINI_API_KEY", origEnv)
+		} else {
+			os.Unsetenv("GEMINI_API_KEY")
+		}
+	}()
+	os.Setenv("HOME", tempDir)
+	os.Unsetenv("GEMINI_API_KEY")
+
+	authDir := filepath.Join(tempDir, ".config", "auth")
+	_ = os.MkdirAll(authDir, 0700)
+
+	_ = os.WriteFile(filepath.Join(authDir, "gemini_api_key_paid"), []byte("paid-key-123\n"), 0600)
+	var cfg Config
+	if key := resolveGeminiAPIKey(cfg); key != "paid-key-123" {
+		t.Errorf("expected paid-key-123, got %q", key)
+	}
+
+	_ = os.WriteFile(filepath.Join(authDir, "gemini_api_key_free"), []byte("free-key-456\n"), 0600)
+	if key := resolveGeminiAPIKey(cfg); key != "free-key-456" {
+		t.Errorf("expected free-key-456 to take precedence over paid, got %q", key)
+	}
+}
