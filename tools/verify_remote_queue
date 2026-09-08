@@ -16,7 +16,7 @@ unless target_host
   warn "Error: No remote host specified. Provide host as an argument or set 'remote_host' in config.json."
   exit 1
 end
-podcasts_dir = config["podcasts_dir"] || "/media/podcasts/clean"
+podcasts_dir = config["podcasts_dir"] || File.expand_path("~/podcasts")
 remote_dir = "$HOME/abs_remote"
 
 puts "======================================================================"

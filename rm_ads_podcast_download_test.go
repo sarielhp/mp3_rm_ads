@@ -89,42 +89,45 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 	}
 }
 
-func TestFindLocalPathForFeedEpisode_SiblingClean(t *testing.T) {
+func TestFindLocalPathForFeedEpisode_ShowPrefixAndSubdir(t *testing.T) {
 	tmp := t.TempDir()
-	podParent := filepath.Join(tmp, "podcasts")
-	podfetchDir := filepath.Join(podParent, "podfetch", "The Show")
-	cleanDir := filepath.Join(podParent, "clean", "The Show")
+	podDir := filepath.Join(tmp, "The Show")
 
-	if err := os.MkdirAll(podfetchDir, 0755); err != nil {
-		t.Fatalf("mkdir podfetch failed: %v", err)
-	}
-	if err := os.MkdirAll(cleanDir, 0755); err != nil {
-		t.Fatalf("mkdir clean failed: %v", err)
+	subDir := filepath.Join(podDir, "Episode 1")
+	if err := os.MkdirAll(subDir, 0755); err != nil {
+		t.Fatalf("mkdir failed: %v", err)
 	}
 
-	cleanMp3 := filepath.Join(cleanDir, "The Show - Episode 1.mp3")
-	if err := os.WriteFile(cleanMp3, []byte("audio"), 0644); err != nil {
+	ep1Mp3 := filepath.Join(subDir, "podcast.mp3")
+	if err := os.WriteFile(ep1Mp3, []byte("audio1"), 0644); err != nil {
 		t.Fatalf("write file failed: %v", err)
 	}
 
-	fe := backend.FeedEpisode{
-		Title: "Episode 1",
+	ep2Mp3 := filepath.Join(podDir, "The Show - Episode 2.mp3")
+	if err := os.WriteFile(ep2Mp3, []byte("audio2"), 0644); err != nil {
+		t.Fatalf("write file failed: %v", err)
 	}
 
-	path, ok := findLocalPathForFeedEpisode(podfetchDir, fe, nil)
-	if !ok || path != cleanMp3 {
-		t.Fatalf("expected to resolve cleanMp3 in sibling directory %s, got (%s, %v)", cleanMp3, path, ok)
+	fe1 := backend.FeedEpisode{Title: "Episode 1"}
+	path1, ok1 := findLocalPathForFeedEpisode(podDir, fe1, nil)
+	if !ok1 || path1 != ep1Mp3 {
+		t.Fatalf("expected to resolve subfolder episode %s, got (%s, %v)", ep1Mp3, path1, ok1)
+	}
+
+	fe2 := backend.FeedEpisode{Title: "Episode 2"}
+	path2, ok2 := findLocalPathForFeedEpisode(podDir, fe2, nil)
+	if !ok2 || path2 != ep2Mp3 {
+		t.Fatalf("expected to resolve show-prefixed episode %s, got (%s, %v)", ep2Mp3, path2, ok2)
 	}
 }
 
 func TestResolveMatchingEpisodeAudioFile_ABSContainerPath(t *testing.T) {
 	tmp := t.TempDir()
-	podParent := filepath.Join(tmp, "podcasts")
-	cleanDir := filepath.Join(podParent, "clean", "The News")
-	if err := os.MkdirAll(cleanDir, 0755); err != nil {
+	podDir := filepath.Join(tmp, "The News")
+	if err := os.MkdirAll(podDir, 0755); err != nil {
 		t.Fatalf("mkdir failed: %v", err)
 	}
-	mp3Path := filepath.Join(cleanDir, "ep.mp3")
+	mp3Path := filepath.Join(podDir, "ep.mp3")
 	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
 		t.Fatalf("write file failed: %v", err)
 	}
@@ -132,20 +135,13 @@ func TestResolveMatchingEpisodeAudioFile_ABSContainerPath(t *testing.T) {
 	ep := backend.Episode{
 		AudioFile: &backend.PodcastAudioFile{
 			Metadata: &backend.AudioFileMetadata{
-				Path: "/podcasts/clean/The News/ep.mp3",
+				Path: "/podcasts/The News/ep.mp3",
 			},
 		},
 	}
 
-	got, ok := resolveMatchingEpisodeAudioFile(cleanDir, ep)
+	got, ok := resolveMatchingEpisodeAudioFile(podDir, ep)
 	if !ok || got != mp3Path {
 		t.Fatalf("expected (%s, true), got (%s, %v)", mp3Path, got, ok)
-	}
-
-	podfetchDir := filepath.Join(podParent, "podfetch", "The News")
-	_ = os.MkdirAll(podfetchDir, 0755)
-	got2, ok2 := resolveMatchingEpisodeAudioFile(podfetchDir, ep)
-	if !ok2 || got2 != mp3Path {
-		t.Fatalf("expected sibling resolution (%s, true), got (%s, %v)", mp3Path, got2, ok2)
 	}
 }

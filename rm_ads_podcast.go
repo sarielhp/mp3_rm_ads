@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -336,36 +335,12 @@ func isFuzzyEpisodeMatch(a, b string) bool {
 	return false
 }
 
-func getCandidatePodcastDirs(podDir string) []string {
-	if podDir == "" {
-		return nil
-	}
-	cleanPodDir := filepath.Clean(podDir)
-	dirs := []string{cleanPodDir}
-	seen := map[string]bool{cleanPodDir: true}
-
-	podRoot := filepath.Dir(cleanPodDir)
-	podBase := filepath.Base(cleanPodDir)
-	podParent := filepath.Dir(podRoot)
-
-	for _, sibling := range []string{"clean", "podfetch", "raw"} {
-		cand := filepath.Clean(filepath.Join(podParent, sibling, podBase))
-		if !seen[cand] {
-			if fi, err := os.Stat(cand); err == nil && fi.IsDir() {
-				dirs = append(dirs, cand)
-				seen[cand] = true
-			}
-		}
-	}
-	return dirs
-}
-
 func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string, bool) {
 	if ep.AudioFile == nil || ep.AudioFile.Metadata == nil {
 		return "", false
 	}
 	podBase := filepath.Base(podDir)
-	searchDirs := getCandidatePodcastDirs(podDir)
+	podRoot := filepath.Dir(podDir)
 
 	checkCandidatePath := func(raw string) string {
 		if raw == "" {
@@ -374,43 +349,35 @@ func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string,
 		if fileExists(raw) {
 			return raw
 		}
-		for _, d := range searchDirs {
-			if p := filepath.Join(d, raw); fileExists(p) {
+		if p := filepath.Join(podDir, raw); fileExists(p) {
+			return p
+		}
+		if p := filepath.Join(podDir, filepath.Base(raw)); fileExists(p) {
+			return p
+		}
+		epDirName := filepath.Base(filepath.Dir(raw))
+		if epDirName != "." && epDirName != "/" && epDirName != "" && epDirName != podBase {
+			if p := filepath.Join(podDir, epDirName, filepath.Base(raw)); fileExists(p) {
 				return p
-			}
-			if p := filepath.Join(d, filepath.Base(raw)); fileExists(p) {
-				return p
-			}
-			epDirName := filepath.Base(filepath.Dir(raw))
-			if epDirName != "." && epDirName != "/" && epDirName != "" && epDirName != filepath.Base(d) {
-				if p := filepath.Join(d, epDirName, filepath.Base(raw)); fileExists(p) {
-					return p
-				}
 			}
 		}
 
-		podRoot := filepath.Dir(podDir)
 		if p := filepath.Join(podRoot, raw); fileExists(p) {
 			return p
 		}
-		clean := strings.TrimPrefix(raw, "/podcasts/")
-		clean = strings.TrimPrefix(clean, "podcasts/")
-		clean = strings.TrimPrefix(clean, "/")
-		if p := filepath.Join(podRoot, clean); fileExists(p) {
+		trimmed := strings.TrimPrefix(raw, "/podcasts/")
+		trimmed = strings.TrimPrefix(trimmed, "podcasts/")
+		trimmed = strings.TrimPrefix(trimmed, "/")
+		if p := filepath.Join(podRoot, trimmed); fileExists(p) {
 			return p
 		}
-		if p := filepath.Join(filepath.Dir(podRoot), clean); fileExists(p) {
+		if p := filepath.Join(podDir, trimmed); fileExists(p) {
 			return p
 		}
-		for _, d := range searchDirs {
-			if p := filepath.Join(d, clean); fileExists(p) {
+		if strings.HasPrefix(trimmed, podBase+"/") {
+			rel := strings.TrimPrefix(trimmed, podBase+"/")
+			if p := filepath.Join(podDir, rel); fileExists(p) {
 				return p
-			}
-			if strings.HasPrefix(clean, podBase+"/") {
-				rel := strings.TrimPrefix(clean, podBase+"/")
-				if p := filepath.Join(d, rel); fileExists(p) {
-					return p
-				}
 			}
 		}
 		return ""
@@ -423,10 +390,8 @@ func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string,
 		return p, true
 	}
 	if ep.AudioFile.Metadata.Filename != "" {
-		for _, d := range searchDirs {
-			if p := filepath.Join(d, ep.AudioFile.Metadata.Filename); fileExists(p) {
-				return p, true
-			}
+		if p := filepath.Join(podDir, ep.AudioFile.Metadata.Filename); fileExists(p) {
+			return p, true
 		}
 	}
 	return "", false
@@ -440,30 +405,28 @@ func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *ba
 	podBase := filepath.Base(podDir)
 	safeTitle := sanitizePodcastTitle(fe.Title)
 	feStripped := stripShowPrefix(fe.Title, podBase)
-	for _, searchDir := range getCandidatePodcastDirs(podDir) {
-		for _, mp3 := range findMP3Files(searchDir) {
-			base := stripExt(filepath.Base(mp3))
-			title := episodeTitleFromPath(mp3)
-			baseStripped := stripShowPrefix(base, podBase)
-			titleStripped := stripShowPrefix(title, podBase)
-			if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
-				strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
-				strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
-				strings.EqualFold(baseStripped, feStripped) ||
-				strings.EqualFold(titleStripped, feStripped) ||
-				isFuzzyEpisodeMatch(title, fe.Title) ||
-				isFuzzyEpisodeMatch(titleStripped, feStripped) {
+	for _, mp3 := range findMP3Files(podDir) {
+		base := stripExt(filepath.Base(mp3))
+		title := episodeTitleFromPath(mp3)
+		baseStripped := stripShowPrefix(base, podBase)
+		titleStripped := stripShowPrefix(title, podBase)
+		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
+			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
+			strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
+			strings.EqualFold(baseStripped, feStripped) ||
+			strings.EqualFold(titleStripped, feStripped) ||
+			isFuzzyEpisodeMatch(title, fe.Title) ||
+			isFuzzyEpisodeMatch(titleStripped, feStripped) {
+			return mp3, true
+		}
+		detailKey := filepath.Base(mp3)
+		if strings.EqualFold(base, "podcast") && title != "" {
+			detailKey = title + ".mp3"
+		}
+		if dt, _ := loadEpisodeDetails(podDir, detailKey); dt != nil {
+			if (fe.GUID != "" && dt.Subtitle == fe.GUID) ||
+				(fe.Title != "" && strings.EqualFold(dt.Title, fe.Title)) {
 				return mp3, true
-			}
-			detailKey := filepath.Base(mp3)
-			if strings.EqualFold(base, "podcast") && title != "" {
-				detailKey = title + ".mp3"
-			}
-			if dt, _ := loadEpisodeDetails(searchDir, detailKey); dt != nil {
-				if (fe.GUID != "" && dt.Subtitle == fe.GUID) ||
-					(fe.Title != "" && strings.EqualFold(dt.Title, fe.Title)) {
-					return mp3, true
-				}
 			}
 		}
 	}

@@ -23,7 +23,7 @@ func TestImportOPML(t *testing.T) {
 						"name":      "Podcasts",
 						"mediaType": "podcast",
 						"folders": []map[string]interface{}{
-							{"id": "folder-1", "fullPath": "/podcasts/clean"},
+							{"id": "folder-1", "fullPath": "/podcasts/audio"},
 						},
 					},
 				},
@@ -100,7 +100,7 @@ func TestImportOPMLSkipsSelfFeeds(t *testing.T) {
 						"name":      "Podcasts",
 						"mediaType": "podcast",
 						"folders": []map[string]interface{}{
-							{"id": "folder-1", "fullPath": "/podcasts/clean"},
+							{"id": "folder-1", "fullPath": "/podcasts/audio"},
 						},
 					},
 				},
