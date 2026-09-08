@@ -14,7 +14,7 @@ func TestContainsHebrew(t *testing.T) {
 		{"Hello World", false},
 		{"5-4 Podcast episode", false},
 		{"חיות כיס", true},
-		{"/media/podcasts/קוד פתוח/ep1.mp3", true},
+		{"/var/podcasts/קוד פתוח/ep1.mp3", true},
 		{"Episode 10: שיחה על כלכלה", true},
 		{"", false},
 	}

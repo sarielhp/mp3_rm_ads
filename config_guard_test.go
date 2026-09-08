@@ -8,7 +8,7 @@ import (
 )
 
 const realUserConfig = `{
-  "podcasts_dir": "/srv/media/podcasts",
+  "podcasts_dir": "/srv/audio/podcasts",
   "audiobookshelf_url": "https://abs.example.internal",
   "audiobookshelf_user": "someone",
   "audiobookshelf_pass": "USER-SECRET-VALUE",
@@ -79,7 +79,7 @@ func TestEnvOverridesAreNotPersistedToDisk(t *testing.T) {
 	testConfigPath = path
 	t.Cleanup(func() { testConfigPath = old; setConfigLoadFailed(false); setConfigFileSnapshotNil() })
 
-	onDisk := `{"podcasts_dir":"/srv/media/podcasts",` +
+	onDisk := `{"podcasts_dir":"/srv/audio/podcasts",` +
 		`"whisper_url":"http://real-whisper:8088/inference",` +
 		`"audiobookshelf_pass":"REAL-PASSWORD"}`
 	if err := os.WriteFile(path, []byte(onDisk), 0600); err != nil {
@@ -137,5 +137,44 @@ func TestConfigIsWrittenPrivately(t *testing.T) {
 	if fi.Mode().Perm()&0o077 != 0 {
 		t.Errorf("config holding credentials is mode %04o; it must not be group/other readable",
 			fi.Mode().Perm())
+	}
+}
+
+func TestNoHardcodedMediaPodcasts(t *testing.T) {
+	forbidden := "/media/" + "podcasts"
+	err := filepath.Walk(".", func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if info.IsDir() {
+			base := info.Name()
+			if base == ".git" || base == ".work" || base == ".bws" || base == "scratch" {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
+		if info.Name() == "abs" || strings.HasPrefix(info.Name(), ".") {
+			return nil
+		}
+		ext := filepath.Ext(path)
+		isCodeOrScript := ext == ".go" || ext == ".rb" || ext == ".sh" || ext == ".json" || ext == ".jsonc" || ext == ".template" || strings.HasPrefix(path, "tools/")
+		if !isCodeOrScript {
+			return nil
+		}
+
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), forbidden) {
+			t.Errorf("found forbidden hardcoded path %q in %s", forbidden, path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walking repo failed: %v", err)
 	}
 }
