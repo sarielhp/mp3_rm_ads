@@ -61,9 +61,6 @@ func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
 	reqHost := ""
 	if cli.Remote {
 		reqHost = config.RemoteHost
-		if reqHost == "" {
-			reqHost = "cloud8"
-		}
 	}
 	h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
 	if err != nil || !isRem || h == "" {

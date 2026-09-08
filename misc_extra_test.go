@@ -17,9 +17,9 @@ func TestSetRemoteFFmpegHost(t *testing.T) {
 	testConfigPath = filepath.Join(t.TempDir(), "config.json")
 	defer func() { testConfigPath = "" }()
 	cfg := defaultConfig
-	setRemoteFFmpegHost(&cfg, "cloud8")
-	if cfg.RemoteFFmpegHost != "cloud8" {
-		t.Errorf("expected cloud8, got %s", cfg.RemoteFFmpegHost)
+	setRemoteFFmpegHost(&cfg, "test-remote")
+	if cfg.RemoteFFmpegHost != "test-remote" {
+		t.Errorf("expected test-remote, got %s", cfg.RemoteFFmpegHost)
 	}
 	setRemoteFFmpegHost(&cfg, "")
 	if cfg.RemoteFFmpegHost != "" {

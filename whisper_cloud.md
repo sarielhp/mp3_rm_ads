@@ -1,6 +1,6 @@
-# Cloud8 Whisper Service Reference
+# Remote Whisper Service Reference
 
-This document describes the Whisper speech-to-text service running on the `cloud8` Google Cloud VM.
+This document describes the Whisper speech-to-text service running on a remote VM or server.
 
 ---
 
@@ -21,82 +21,82 @@ The transcription service runs inside a Docker container configured to run on st
 
 ## 2. Network & Access
 
-The service is fully private and is only accessible through your secure **Tailscale** network.
+The service is fully private and is accessible through your secure network or VPN.
 
-* **Tailscale Hostname:** `cloud8`
-* **Tailscale IP Address:** `100.75.239.72`
+* **Remote Host:** `<remote-host>`
 * **Port:** `8000`
-* **Base API URL:** `http://cloud8:8000`
-* **Transcription API Endpoint:** `http://cloud8:8000/v1/audio/transcriptions`
-* **Translation API Endpoint:** `http://cloud8:8000/v1/audio/translations`
+* **Base API URL:** `http://<remote-host>:8000`
+* **Transcription API Endpoint:** `http://<remote-host>:8000/v1/audio/transcriptions`
+* **Translation API Endpoint:** `http://<remote-host>:8000/v1/audio/translations`
 
 ---
 
 ## 3. Basic Operations
 
-### Accessing the VM via SSH
-Since Tailscale SSH is configured, you can log directly into the VM from any machine logged into your Tailnet:
+### Connect to Remote Host
 ```bash
-ssh cloud8
-```
-*(As a backup, you can also connect via the Google Cloud SDK: `gcloud compute ssh cloud8 --zone=us-central1-a --project=<your-gcp-project>`)*
-
-### Managing the Docker Container
-Once connected to the `cloud8` VM, use standard Docker commands to manage the container named `whisper`:
-
-* **Check container status:**
-  ```bash
-  sudo docker ps -f name=whisper
-  ```
-* **View live transcription logs:**
-  ```bash
-  sudo docker logs -f whisper
-  ```
-* **Restart the Whisper server:**
-  ```bash
-  sudo docker restart whisper
-  ```
-* **View container configuration details:**
-  ```bash
-  sudo docker inspect whisper
-  ```
-
----
-
-## 4. API Usage Examples
-
-You can interact with the API directly using `curl` or any OpenAI-compatible client library.
-
-### Check Service Health
-```bash
-curl -i http://cloud8:8000/health
-```
-*Expected response:* `HTTP/1.1 200 OK` with body `OK`.
-
-### List Supported Models
-```bash
-curl -s http://cloud8:8000/v1/models | jq
+ssh <remote-host>
 ```
 
-### Transcribe an Audio File (Plain Text Output)
+Once connected to the VM, use standard Docker commands to manage the container named `whisper`:
+
+#### Check Container Status
 ```bash
-curl -s -X POST "http://cloud8:8000/v1/audio/transcriptions" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@/path/to/your/audio.wav" \
-  -F "model=Systran/faster-whisper-large-v3" \
-  -F "response_format=text"
+docker ps -f name=whisper
 ```
 
-### Transcribe and Translate to English (JSON Output)
+#### View Live Logs
 ```bash
-curl -s -X POST "http://cloud8:8000/v1/audio/translations" \
-  -H "Content-Type: multipart/form-data" \
-  -F "file=@/path/to/your/audio.wav" \
-  -F "model=Systran/faster-whisper-large-v3"
+docker logs -f whisper
+```
+
+#### Restart Service
+```bash
+docker restart whisper
+```
+
+#### Stop / Start Container
+```bash
+docker stop whisper
+docker start whisper
 ```
 
 ---
 
-## 5. Local Orchestration Script
+## 4. API Testing & Usage Examples
 
-For automated usage (waking the VM, running transcription, saving files, and putting the VM to sleep), utilize your cloud management script (e.g. `cloud8 wake` / `cloud8 sleep`) configured in your `config.json`.
+### Health Check
+```bash
+curl -i http://<remote-host>:8000/health
+```
+*(Should return HTTP `200 OK`)*
+
+### Verify Loaded Models
+```bash
+curl -s http://<remote-host>:8000/v1/models | jq
+```
+
+### Run Transcription via API
+```bash
+curl -s -X POST "http://<remote-host>:8000/v1/audio/transcriptions" \
+     -H "Content-Type: multipart/form-data" \
+     -F file="@/path/to/audio.mp3" \
+     -F model="Systran/faster-whisper-large-v3" \
+     -F language="en" \
+     -F response_format="verbose_json"
+```
+
+### Run Translation via API
+```bash
+curl -s -X POST "http://<remote-host>:8000/v1/audio/translations" \
+     -H "Content-Type: multipart/form-data" \
+     -F file="@/path/to/audio.mp3" \
+     -F model="Systran/faster-whisper-large-v3" \
+     -F response_format="verbose_json"
+```
+
+---
+
+## 5. Automation Integration
+
+For automated usage (waking the VM, running transcription, saving files, and putting the VM to sleep), configure your wake command and remote host in `config.json`.

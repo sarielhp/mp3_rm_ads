@@ -310,6 +310,9 @@ func executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFi
 	if cli.RemoteFFmpegHost != "" {
 		remoteHost = cli.RemoteFFmpegHost
 	}
+	if cli.Local {
+		remoteHost = ""
+	}
 
 	if !cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
 		_ = os.Remove(tempOutputFile)

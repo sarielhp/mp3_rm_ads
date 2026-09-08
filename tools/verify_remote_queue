@@ -11,7 +11,11 @@ Dir.chdir(root_dir)
 cfg_file = File.expand_path("~/.config/abs/config.json")
 config = File.exist?(cfg_file) ? JSON.parse(File.read(cfg_file)) : {}
 
-target_host = ARGV[0] || config["remote_host"] || "cloud8"
+target_host = ARGV[0] || (config["remote_host"] && !config["remote_host"].empty? ? config["remote_host"] : nil)
+unless target_host
+  warn "Error: No remote host specified. Provide host as an argument or set 'remote_host' in config.json."
+  exit 1
+end
 podcasts_dir = config["podcasts_dir"] || "/media/podcasts/clean"
 remote_dir = "$HOME/abs_remote"
 

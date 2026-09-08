@@ -193,9 +193,6 @@ func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
 	reqHost := ""
 	if cli.Remote {
 		reqHost = config.RemoteHost
-		if reqHost == "" {
-			reqHost = "cloud8"
-		}
 	}
 	h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
 	if err == nil && isRem {

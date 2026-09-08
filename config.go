@@ -77,7 +77,7 @@ var defaultConfig = Config{
 		{ID: 3, Name: "OpenRouter - DeepSeek V4 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "deepseek/deepseek-v4-flash"},
 		{ID: 4, Name: "OpenRouter - Gemini 2.5 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "google/gemini-2.5-flash"},
 	},
-	RemoteFFmpegHost: "cloud8",
+	RemoteFFmpegHost: "",
 }
 
 func ensureConfigExists() {

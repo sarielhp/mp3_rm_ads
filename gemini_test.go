@@ -487,7 +487,7 @@ func TestPrepareWhisperFallbackConfig(t *testing.T) {
 		ActiveWhisperID: 3,
 		WhisperEngine:   WhisperEngineGemini,
 		WhisperProfiles: []WhisperProfile{
-			{ID: 1, Name: "Cloud8", Engine: WhisperEngineRemote, URL: "http://cloud8:8000"},
+			{ID: 1, Name: "Remote Server", Engine: WhisperEngineRemote, URL: "http://remote-whisper:8000"},
 			{ID: 2, Name: "Local GPU", Engine: WhisperEngineLocal, URL: "http://192.168.1.230:8088/inference"},
 			{ID: 3, Name: "Gemini", Engine: WhisperEngineGemini},
 		},
@@ -508,7 +508,7 @@ func TestPrepareWhisperFallbackConfig(t *testing.T) {
 		ActiveWhisperID: 2,
 		WhisperEngine:   WhisperEngineGemini,
 		WhisperProfiles: []WhisperProfile{
-			{ID: 1, Name: "Cloud8", Engine: WhisperEngineRemote, URL: "http://cloud8:8000"},
+			{ID: 1, Name: "Remote Server", Engine: WhisperEngineRemote, URL: "http://remote-whisper:8000"},
 			{ID: 2, Name: "Gemini", Engine: WhisperEngineGemini},
 		},
 	}

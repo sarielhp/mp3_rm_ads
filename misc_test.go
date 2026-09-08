@@ -263,7 +263,7 @@ func TestCutAudioFFmpegEmpty(t *testing.T) {
 	if cutAudioFFmpeg("in", nil, "out") {
 		t.Error("should be false")
 	}
-	if cutAudioFFmpegWithHost("in", nil, "out", "cloud8") {
+	if cutAudioFFmpegWithHost("in", nil, "out", "test-remote") {
 		t.Error("should be false")
 	}
 }

@@ -35,7 +35,7 @@ func TestInferWhisperEngine(t *testing.T) {
 			expected: WhisperEngineDocker,
 		},
 		{
-			wp:       WhisperProfile{URL: "http://cloud8:8000/v1/audio/transcriptions"},
+			wp:       WhisperProfile{URL: "http://remote-whisper:8000/v1/audio/transcriptions"},
 			expected: WhisperEngineRemote,
 		},
 	}
@@ -62,8 +62,8 @@ func TestParseWhisperProfileSpec(t *testing.T) {
 		t.Errorf("docker spec parse error: %+v", wpDocker)
 	}
 
-	wpRemote := parseWhisperProfileSpec("Remote Engine|remote|http://cloud8:8000|7.0|wake_cmd|en|prompt", 3)
-	if wpRemote.Engine != WhisperEngineRemote || wpRemote.URL != "http://cloud8:8000" || wpRemote.WakeCommand != "wake_cmd" {
+	wpRemote := parseWhisperProfileSpec("Remote Engine|remote|http://remote-whisper:8000|7.0|wake_cmd|en|prompt", 3)
+	if wpRemote.Engine != WhisperEngineRemote || wpRemote.URL != "http://remote-whisper:8000" || wpRemote.WakeCommand != "wake_cmd" {
 		t.Errorf("remote spec parse error: %+v", wpRemote)
 	}
 

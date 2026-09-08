@@ -85,6 +85,9 @@ func executeRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, 
 	if cli.RemoteFFmpegHost != "" {
 		remoteHost = cli.RemoteFFmpegHost
 	}
+	if cli.Local {
+		remoteHost = ""
+	}
 	if !cutAudioFFmpegWithHost(sourceAudioFile, keepSegments, tempOutputFile, remoteHost) {
 		os.Remove(tempOutputFile)
 		os.RemoveAll(workDir)

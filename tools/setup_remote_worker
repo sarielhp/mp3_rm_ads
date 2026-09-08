@@ -1,0 +1,45 @@
+#!/usr/bin/env ruby
+# frozen_string_literal: true
+
+require "json"
+require "open3"
+
+cfg_file = File.expand_path("~/.config/abs/config.json")
+config = File.exist?(cfg_file) ? JSON.parse(File.read(cfg_file)) : {}
+
+target_host = ARGV[0] || (config["remote_host"] && !config["remote_host"].empty? ? config["remote_host"] : nil)
+unless target_host
+  warn "Usage: #{$PROGRAM_NAME} <hostname>"
+  warn "Or configure 'remote_host' in ~/.config/abs/config.json"
+  exit 1
+end
+
+PACKAGES = %w[
+  ffmpeg
+  libmp3lame0
+  mp3splt
+  rsync
+  curl
+  jq
+].freeze
+
+def run_remote(host, cmd)
+  puts "==> Running on #{host}: #{cmd}"
+  stdout, stderr, status = Open3.capture3("ssh", "-o", "BatchMode=yes", host, cmd)
+  unless status.success?
+    warn "Error executing command on #{host}: #{stderr}"
+    exit 1
+  end
+  puts stdout unless stdout.empty?
+end
+
+puts "--- Configuring #{target_host} for Remote Audio Processing ---"
+
+run_remote(target_host, "sudo apt-get update -y")
+run_remote(target_host, "DEBIAN_FRONTEND=noninteractive sudo apt-get install -y #{PACKAGES.join(" ")}")
+
+puts "\n--- Verifying Installed Utilities on #{target_host} ---"
+run_remote(target_host, "ffmpeg -version | head -n 2")
+run_remote(target_host, "which ffmpeg ffprobe mp3splt rsync jq curl")
+
+puts "\n[✓] #{target_host} is fully provisioned and ready for remote audio processing!"
