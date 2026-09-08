@@ -30,6 +30,10 @@ type opmlRoot struct {
 }
 
 func BuildOPMLXML(feeds []OPMLFeed) ([]byte, error) {
+	return BuildOPMLXMLWithTitle(feeds, "Audiobookshelf Podcast Feeds", "Audiobookshelf Podcasts")
+}
+
+func BuildOPMLXMLWithTitle(feeds []OPMLFeed, headTitle, groupText string) ([]byte, error) {
 	var itemOutlines []opmlOutline
 	for _, f := range feeds {
 		title := f.Title
@@ -45,7 +49,7 @@ func BuildOPMLXML(feeds []OPMLFeed) ([]byte, error) {
 	}
 
 	groupOutline := opmlOutline{
-		Text:     "Audiobookshelf Podcasts",
+		Text:     groupText,
 		Outlines: itemOutlines,
 	}
 
@@ -55,7 +59,7 @@ func BuildOPMLXML(feeds []OPMLFeed) ([]byte, error) {
 			Title       string `xml:"title,omitempty"`
 			DateCreated string `xml:"dateCreated,omitempty"`
 		}{
-			Title:       "Audiobookshelf Podcast Feeds",
+			Title:       headTitle,
 			DateCreated: time.Now().UTC().Format(time.RFC1123Z),
 		},
 		Body: struct {

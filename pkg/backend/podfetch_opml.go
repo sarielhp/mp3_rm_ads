@@ -19,18 +19,24 @@ func (c *PodFetchBackend) FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, e
 		if title == "" {
 			title = item.ID
 		}
-		feedURL := item.Media.Metadata.FeedURL
-		if feedURL == "" {
+		feedURL := ""
+		if c.Host != "" {
 			slug, err := c.OpenRSSFeed(item.ID, c.Host)
 			if err == nil && slug != "" {
 				feedURL = slug
 			}
+		}
+		if feedURL == "" {
+			feedURL = item.Media.Metadata.FeedURL
 		}
 		if feedURL != "" {
 			feeds = append(feeds, OPMLFeed{
 				Title: title,
 				URL:   feedURL,
 			})
+			if !silent && verbose {
+				fmt.Printf("  [OK] %s -> %s\n", title, feedURL)
+			}
 		}
 	}
 	return feeds, nil
@@ -41,7 +47,7 @@ func (c *PodFetchBackend) ExportOPML(opts OPMLExportOptions) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	return BuildOPMLXML(feeds)
+	return BuildOPMLXMLWithTitle(feeds, "PodFetch Podcast Feeds", "PodFetch Podcasts")
 }
 
 func (c *PodFetchBackend) ImportOPML(data []byte, opts OPMLImportOptions) (OPMLImportResult, error) {

@@ -111,7 +111,7 @@ func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
 }
 
 func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error) {
-	verifyAudiobookshelfAllowed("getABSClient")
+	verifyAudiobookshelfAllowedWithConfig(cfg, "getABSClient")
 	token := cfg.AudiobookshelfToken
 	if token == "" {
 		token = backend.GetTokenFromDB(cfg.AudiobookshelfDBPath)

@@ -147,20 +147,24 @@ func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, cli CLIOptions, config C
 
 func getActiveBackendForPodcast(config Config, quiet bool) backend.Backend {
 	if isPodfetchActive(config) {
-		b, err := getBackend(config, quiet)
-		if err == nil {
-			return b
+		if config.PodfetchURL != "" || config.PodfetchDBPath != "" {
+			b, err := getBackend(config, quiet)
+			if err == nil {
+				return b
+			}
 		}
 		return nil
 	}
 	if isAudiobookshelfActive(config) {
-		b, err := getABSClient(config, quiet)
-		if err == nil {
-			return b
-		}
-		b2, err2 := getBackend(config, quiet)
-		if err2 == nil {
-			return b2
+		if config.AudiobookshelfURL != "" || config.AudiobookshelfDBPath != "" {
+			b, err := getABSClient(config, quiet)
+			if err == nil {
+				return b
+			}
+			b2, err2 := getBackend(config, quiet)
+			if err2 == nil {
+				return b2
+			}
 		}
 	}
 	return nil
