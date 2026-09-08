@@ -328,12 +328,23 @@ func prepareWhisperFallbackConfig(cfg Config) Config {
 		if engine == "" {
 			engine = inferWhisperEngine(wp)
 		}
+		if engine == WhisperEngineGemini || engine == WhisperEngineRemote {
+			continue
+		}
+		if engine == WhisperEngineLocal || engine == WhisperEngineDocker || isLocalHost(extractHost(wp.URL)) {
+			fallback.ActiveWhisperID = wp.ID
+			resolveActiveWhisperProfile(&fallback)
+			return fallback
+		}
+	}
+	for _, wp := range cfg.WhisperProfiles {
+		engine := wp.Engine
+		if engine == "" {
+			engine = inferWhisperEngine(wp)
+		}
 		if engine != WhisperEngineGemini {
 			fallback.ActiveWhisperID = wp.ID
-			fallback.WhisperEngine = engine
-			if wp.URL != "" {
-				fallback.WhisperURL = wp.URL
-			}
+			resolveActiveWhisperProfile(&fallback)
 			return fallback
 		}
 	}

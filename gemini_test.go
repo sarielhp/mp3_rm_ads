@@ -500,7 +500,20 @@ func TestPrepareWhisperFallbackConfig(t *testing.T) {
 	if fallback.ActiveWhisperID == 3 {
 		t.Errorf("expected fallback ID to not be 3, got %d", fallback.ActiveWhisperID)
 	}
-	if fallback.ActiveWhisperID != 1 && fallback.ActiveWhisperID != 2 {
-		t.Errorf("expected fallback ID to be 1 or 2, got %d", fallback.ActiveWhisperID)
+	if fallback.ActiveWhisperID != 2 {
+		t.Errorf("expected fallback ID to be 2 (Local GPU), got %d", fallback.ActiveWhisperID)
+	}
+
+	cfgRemoteOnly := Config{
+		ActiveWhisperID: 2,
+		WhisperEngine:   WhisperEngineGemini,
+		WhisperProfiles: []WhisperProfile{
+			{ID: 1, Name: "Cloud8", Engine: WhisperEngineRemote, URL: "http://cloud8:8000"},
+			{ID: 2, Name: "Gemini", Engine: WhisperEngineGemini},
+		},
+	}
+	fallbackRemote := prepareWhisperFallbackConfig(cfgRemoteOnly)
+	if fallbackRemote.ActiveWhisperID != 1 {
+		t.Errorf("expected remote fallback ID to be 1, got %d", fallbackRemote.ActiveWhisperID)
 	}
 }
