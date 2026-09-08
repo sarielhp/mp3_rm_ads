@@ -63,7 +63,7 @@
     ["~/.texlive2026/texmf-var", "/home/sariel/.texlive2026/texmf-var"],
     ["~/.texlive2026/texmf-config", "/home/sariel/.texlive2026/texmf-config"],
     ["~/.local/share/fonts", "/home/sariel/.local/share/fonts"],
-    ["~/.cache/fontconfig", "/home/sariel/.cache/fontconfig"],"/media/podcasts/clean/","/home/sariel/.config/abs/"
+    ["~/.cache/fontconfig", "/home/sariel/.cache/fontconfig"]
   ],
   "binds_ro": [
     ["/bin", "/bin"],
