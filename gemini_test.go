@@ -517,3 +517,18 @@ func TestPrepareWhisperFallbackConfig(t *testing.T) {
 		t.Errorf("expected remote fallback ID to be 1, got %d", fallbackRemote.ActiveWhisperID)
 	}
 }
+
+func TestFormatGeminiErrorBody(t *testing.T) {
+	jsonErr := []byte(`{"error":{"code":503,"message":"Model high demand","status":"UNAVAILABLE"}}`)
+	got := formatGeminiErrorBody(jsonErr)
+	expected := "Model high demand (UNAVAILABLE)"
+	if got != expected {
+		t.Errorf("expected %q, got %q", expected, got)
+	}
+
+	plainErr := []byte("plain error message")
+	gotPlain := formatGeminiErrorBody(plainErr)
+	if gotPlain != "plain error message" {
+		t.Errorf("expected %q, got %q", "plain error message", gotPlain)
+	}
+}

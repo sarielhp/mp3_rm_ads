@@ -17,6 +17,7 @@ func TestBuildWhisperCLIArgs(t *testing.T) {
 		"-t", "4",
 		"-oj",
 		"-of", "out_base",
+		"-np",
 		"-bs", "1",
 		"-bo", "1",
 		"-nf",

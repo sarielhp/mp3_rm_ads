@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -90,6 +91,7 @@ func buildWhisperCLIArgs(audioPath, modelPath, outJsonBase, lang, prompt string,
 		"-t", strconv.Itoa(threads),
 		"-oj",
 		"-of", outJsonBase,
+		"-np",
 	}
 	if greedy {
 		args = append(args, "-bs", "1", "-bo", "1", "-nf")
@@ -231,15 +233,24 @@ func runWhisperCLITranscription(audioPath string, profile WhisperProfile, quiet,
 		prompt = profile.Prompt
 	}
 	args := buildWhisperCLIArgs(audioPath, modelPath, outJsonBase, lang, prompt, profile.Processors, profile.Threads, profile.Greedy)
-	cmd := execCommand(bin, args...)
-	if quiet {
-		cmd.Stdout = nil
-		cmd.Stderr = nil
-	}
+	cmd := exec.Command(bin, args...)
+	var errBuf bytes.Buffer
 	if verbose && !quiet {
+		cmd.Stderr = os.Stderr
+		cmd.Stdout = os.Stdout
 		fmt.Printf("   Executing whisper-cli: %s %s\n", bin, strings.Join(args, " "))
+	} else {
+		cmd.Stderr = &errBuf
+		cmd.Stdout = nil
+	}
+	if !quiet {
+		fmt.Printf("   Transcribing with local GPU (whisper-cli %s)...\n", filepath.Base(modelPath))
 	}
 	if err := cmd.Run(); err != nil {
+		detail := strings.TrimSpace(errBuf.String())
+		if detail != "" {
+			return nil, fmt.Errorf("whisper-cli execution failed: %w: %s", err, detail)
+		}
 		return nil, fmt.Errorf("whisper-cli execution failed: %w", err)
 	}
 	data, err := os.ReadFile(outJsonFile)

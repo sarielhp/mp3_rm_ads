@@ -111,7 +111,7 @@ func uploadAudioToGeminiStudio(ctx context.Context, apiKey, localAudioPath strin
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return "", "", fmt.Errorf("gemini file upload HTTP %d: %s", resp.StatusCode, string(body))
+		return "", "", fmt.Errorf("gemini file upload HTTP %d: %s", resp.StatusCode, formatGeminiErrorBody(body))
 	}
 
 	var res geminiStudioFileUploadResponse
@@ -197,10 +197,27 @@ func callGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 
 	body, _ := io.ReadAll(resp.Body)
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini studio generateContent HTTP %d: %s", resp.StatusCode, string(body))
+		return nil, fmt.Errorf("gemini studio generateContent HTTP %d: %s", resp.StatusCode, formatGeminiErrorBody(body))
 	}
 
 	return parseGeminiStudioResponse(body)
+}
+
+func formatGeminiErrorBody(body []byte) string {
+	var errResp struct {
+		Error struct {
+			Message string `json:"message"`
+			Status  string `json:"status"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
+		msg := strings.TrimSpace(errResp.Error.Message)
+		if errResp.Error.Status != "" {
+			return fmt.Sprintf("%s (%s)", msg, errResp.Error.Status)
+		}
+		return msg
+	}
+	return strings.TrimSpace(string(body))
 }
 
 func parseGeminiStudioResponse(body []byte) (*geminiResponsePayload, error) {
