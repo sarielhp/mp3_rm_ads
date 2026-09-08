@@ -17,6 +17,15 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		return
 	}
 
+	if action == "rm_ads" {
+		if pod, ok := resolvePodcastTarget(config.PodcastsDir, cli); ok {
+			if err := handlePodcastRmAdsWorkflow(pod, cli, config, action); err != nil {
+				fatalError("%v\n", err)
+			}
+			return
+		}
+	}
+
 	applyForceCLIOptions(&cli)
 
 	args, ok := resolveTargetAudioArgs(cli, config)
