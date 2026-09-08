@@ -39,6 +39,9 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		case "clear":
 			subcmd = "clear"
 			args = args[1:]
+		case "run":
+			subcmd = "run"
+			args = args[1:]
 		default:
 			subcmd = "list"
 		}
@@ -69,8 +72,14 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			target = args[0]
 		}
 		return handleQueueClear(podcastsDir, target)
+	case "run":
+		target := ""
+		if len(args) > 0 {
+			target = args[0]
+		}
+		return handleQueueRun(cfg, cli, target)
 	default:
-		return fmt.Errorf("unknown queue action %q (use list, add, remove, or clear)", subcmd)
+		return fmt.Errorf("unknown queue action %q (use list, add, remove, clear, or run)", subcmd)
 	}
 }
 
@@ -316,5 +325,136 @@ func handleQueueClear(podcastsDir, target string) error {
 		}
 	}
 	fmt.Printf("Queue cleared across %d podcast(s).\n", clearedCount)
+	return nil
+}
+
+func handleQueueRun(cfg Config, cli CLIOptions, target string) error {
+	podcastsDir := cfg.PodcastsDir
+	if podcastsDir == "" {
+		podcastsDir = "."
+	}
+
+	items, err := resolveQueueRunItems(podcastsDir, target)
+	if err != nil {
+		return err
+	}
+	if len(items) == 0 {
+		if !cli.Quiet {
+			fmt.Println("AdR queue is currently empty.")
+		}
+		return nil
+	}
+
+	if !cli.Quiet {
+		fmt.Printf("Found %d episode(s) in AdR queue.\n", len(items))
+	}
+
+	if cli.DryRun {
+		for _, it := range items {
+			fmt.Printf("[dry-run] Would process ad removal for: [%s] %s (%s)\n", it.EpisodeID, displayName(it.Title), it.Filename)
+		}
+		return nil
+	}
+
+	applyForceCLIOptions(&cli)
+	return executeQueueRun(items, cli, cfg)
+}
+
+func resolveQueueRunItems(podcastsDir, target string) ([]queueEpisodeItem, error) {
+	if target != "" {
+		return resolveTargetQueueItems(podcastsDir, target)
+	}
+	var allItems []queueEpisodeItem
+	entries := scanPodcastDirs(podcastsDir)
+	for _, p := range entries {
+		items := collectPodcastQueueItems(p)
+		allItems = append(allItems, items...)
+	}
+	return allItems, nil
+}
+
+func resolveTargetQueueItems(podcastsDir, target string) ([]queueEpisodeItem, error) {
+	res, err := resolveAnyID(podcastsDir, target)
+	if err != nil {
+		return nil, err
+	}
+	if res.IsPodcast() {
+		p := podcastDirEntry{
+			dir:        res.Podcast.Dir,
+			folderName: res.Podcast.FolderName,
+			title:      res.Podcast.Title,
+			shortID:    res.Podcast.ShortID,
+		}
+		return collectPodcastQueueItems(p), nil
+	}
+	if res.IsEpisode() {
+		p := podcastDirEntry{
+			dir:        res.Episode.PodcastDir,
+			folderName: filepath.Base(res.Episode.PodcastDir),
+			title:      res.Episode.PodcastTitle,
+			shortID:    res.Episode.PodcastShortID,
+		}
+		items := collectPodcastQueueItems(p)
+		var matched []queueEpisodeItem
+		for _, it := range items {
+			if strings.EqualFold(it.Filename, res.Episode.Filename) {
+				matched = append(matched, it)
+			}
+		}
+		if len(matched) == 0 {
+			return nil, fmt.Errorf("episode %q [%s] is not in the AdR queue", res.Episode.Filename, res.Episode.ShortID)
+		}
+		return matched, nil
+	}
+	return nil, fmt.Errorf("unrecognized target %q", target)
+}
+
+func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error {
+	total := len(items)
+	processedCount := 0
+	var failedEpisodes []string
+
+	for i, it := range items {
+		if !cli.Quiet {
+			fmt.Printf("\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, displayName(it.Title), boldCyan(it.EpisodeID))
+		}
+
+		if !fileExists(it.AudioPath) {
+			if !cli.Quiet {
+				fmt.Printf("Audio file not found on disk: %s (removing from queue)\n", it.Filename)
+			}
+			removeEpisodeFromQueueFile(it.PodcastDir, it.Filename)
+			continue
+		}
+
+		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && isEpisodeClean(it.AudioPath) {
+			if !cli.Quiet {
+				fmt.Printf("Episode already has ads removed: %s (removing from queue)\n", it.Filename)
+			}
+			removeEpisodeFromQueueFile(it.PodcastDir, it.Filename)
+			continue
+		}
+
+		err := processSingleQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli, cfg)
+		if err != nil {
+			if !cli.Quiet {
+				fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", it.Filename, err)
+			}
+			failedEpisodes = append(failedEpisodes, it.Filename)
+			continue
+		}
+		processedCount++
+	}
+
+	if !cli.Quiet {
+		fmt.Printf("\nFinished queue run: %d/%d episode(s) processed successfully.\n", processedCount, total)
+		if len(failedEpisodes) > 0 {
+			fmt.Printf("Failed episode(s): %s\n", strings.Join(failedEpisodes, ", "))
+		}
+	}
+
+	if len(failedEpisodes) > 0 {
+		return fmt.Errorf("%d episode(s) failed during queue run", len(failedEpisodes))
+	}
 	return nil
 }

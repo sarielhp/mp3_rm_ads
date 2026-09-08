@@ -195,3 +195,129 @@ func TestPrintQueueTableHebrew(t *testing.T) {
 		t.Errorf("expected queue table to contain %q, got: %s", expected, out)
 	}
 }
+
+func TestQueueRun_Empty(t *testing.T) {
+	tempDir := t.TempDir()
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("expected nil error on empty queue run, got: %v", err)
+	}
+}
+
+func TestQueueRun_DryRun(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "DryShow", []string{"Ep1", "Ep2"})
+	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
+	addEpisodeToQueueFile(podDir, filepath.Base(paths[1]))
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", DryRun: true, Quiet: true}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("runQueueCommand dry-run failed: %v", err)
+	}
+
+	qFile := filepath.Join(podDir, "queue.json")
+	data, _ := os.ReadFile(qFile)
+	var entries []string
+	_ = json.Unmarshal(data, &entries)
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 episodes to remain in queue after dry run, got %d", len(entries))
+	}
+}
+
+func TestQueueRun_CleansAndDequeues(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "QueueShow", []string{"Ep1", "Ep2"})
+	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
+	addEpisodeToQueueFile(podDir, filepath.Base(paths[1]))
+
+	markEpisodeClean(t, paths[0])
+	markEpisodeClean(t, paths[1])
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", Quiet: true, Local: true}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("runQueueCommand run failed: %v", err)
+	}
+
+	qFile := filepath.Join(podDir, "queue.json")
+	data, _ := os.ReadFile(qFile)
+	var entries []string
+	_ = json.Unmarshal(data, &entries)
+	if len(entries) != 0 {
+		t.Fatalf("expected 0 episodes in queue after processing clean episodes, got %d", len(entries))
+	}
+}
+
+func TestQueueRun_SpecificTarget(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1Dir, paths1 := createTestPodcastWithEpisodes(t, tempDir, "PodA", []string{"EpA"})
+	pod2Dir, paths2 := createTestPodcastWithEpisodes(t, tempDir, "PodB", []string{"EpB"})
+
+	addEpisodeToQueueFile(pod1Dir, filepath.Base(paths1[0]))
+	addEpisodeToQueueFile(pod2Dir, filepath.Base(paths2[0]))
+
+	markEpisodeClean(t, paths1[0])
+	markEpisodeClean(t, paths2[0])
+
+	pod1Cfg := loadPodcastConfig(pod1Dir)
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", Args: []string{pod1Cfg.ID}, Quiet: true, Local: true}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("runQueueCommand target failed: %v", err)
+	}
+
+	q1, _ := os.ReadFile(filepath.Join(pod1Dir, "queue.json"))
+	var entries1 []string
+	_ = json.Unmarshal(q1, &entries1)
+	if len(entries1) != 0 {
+		t.Fatalf("expected PodA queue to be empty, got %v", entries1)
+	}
+
+	q2, _ := os.ReadFile(filepath.Join(pod2Dir, "queue.json"))
+	var entries2 []string
+	_ = json.Unmarshal(q2, &entries2)
+	if len(entries2) != 1 {
+		t.Fatalf("expected PodB queue to still have 1 entry, got %v", entries2)
+	}
+}
+
+func TestQueueRun_MissingFileAutoDequeued(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir, _ := createTestPodcastWithEpisodes(t, tempDir, "MissingShow", []string{})
+	addEpisodeToQueueFile(podDir, "nonexistent.mp3")
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("runQueueCommand failed on missing file: %v", err)
+	}
+
+	qFile := filepath.Join(podDir, "queue.json")
+	data, _ := os.ReadFile(qFile)
+	var entries []string
+	_ = json.Unmarshal(data, &entries)
+	if len(entries) != 0 {
+		t.Fatalf("expected missing file to be removed from queue, got %v", entries)
+	}
+}
+
+func TestQueueRun_CLIHelpParsing(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	if err := app.Execute([]string{"queue", "run", "pod-1", "--dry-run", "--quiet"}); err != nil {
+		t.Fatalf("expected queue run to parse: %v", err)
+	}
+	if action != "queue" || opts.QueueSubcmd != "run" {
+		t.Fatalf("expected action=queue, subcmd=run, got action=%s, subcmd=%s", action, opts.QueueSubcmd)
+	}
+	if !opts.DryRun || !opts.Quiet {
+		t.Fatalf("expected dry-run and quiet to be true")
+	}
+	if len(opts.Args) != 1 || opts.Args[0] != "pod-1" {
+		t.Fatalf("expected args ['pod-1'], got %v", opts.Args)
+	}
+}

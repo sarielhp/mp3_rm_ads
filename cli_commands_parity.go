@@ -128,64 +128,106 @@ func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 	}
 }
 
+func buildQueueListSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "list",
+		Description: "List queued episodes across library or podcast",
+		UsageLine:   "abs queue list [podcast-id] [options]",
+		Args:        clihelp.MaximumNArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress table formatting and print paths only"),
+			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "queue"
+			opts.QueueSubcmd = "list"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildQueueAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "add",
+		Description: "Add episodes or podcast uncleaned episodes to queue",
+		UsageLine:   "abs queue add <id...>",
+		Args:        clihelp.MinimumNArgs(1),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "queue"
+			opts.QueueSubcmd = "add"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildQueueRemoveSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "remove",
+		Description: "Remove one or more episodes from the queue",
+		UsageLine:   "abs queue remove <id...>",
+		Args:        clihelp.MinimumNArgs(1),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "queue"
+			opts.QueueSubcmd = "remove"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildQueueClearSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "clear",
+		Description: "Clear queue for a specific podcast or all podcasts",
+		UsageLine:   "abs queue clear [podcast-id]",
+		Args:        clihelp.MaximumNArgs(1),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "queue"
+			opts.QueueSubcmd = "clear"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func buildQueueRunSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "run",
+		Description: "Process ad removal for queued episodes",
+		UsageLine:   "abs queue run [podcast-id] [options]",
+		Args:        clihelp.MaximumNArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Quiet mode"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Verbose output"),
+			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Simulate processing without making changes"),
+			clihelp.Bool(&opts.Local, "--local", false, "Force local execution instead of remote"),
+			clihelp.Bool(&opts.Remote, "--remote", false, "Force remote execution"),
+			clihelp.String(&opts.RemoteHost, "--remote-host <host>", "", "Specify remote processing host"),
+			clihelp.String(&opts.Force, "-f, --force <type>", "", "Force re-processing (all, whisper, llm)"),
+			clihelp.String(&opts.UseLLM, "--use-llm <name|id>", "", "Select specific LLM profile"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "queue"
+			opts.QueueSubcmd = "run"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
 func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "queue",
 		Description: "Manage the ad removal (AdR) processing queue",
 		UsageLine:   "abs queue [command]",
 		Subcommands: []clihelp.Command{
-			{
-				Name:        "list",
-				Description: "List queued episodes across library or podcast",
-				UsageLine:   "abs queue list [podcast-id] [options]",
-				Args:        clihelp.MaximumNArgs(1),
-				Options: []clihelp.Option{
-					clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress table formatting and print paths only"),
-					clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
-				},
-				Run: func(ctx *clihelp.Context) error {
-					*action = "queue"
-					opts.QueueSubcmd = "list"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "add",
-				Description: "Add episodes or podcast uncleaned episodes to queue",
-				UsageLine:   "abs queue add <id...>",
-				Args:        clihelp.MinimumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "queue"
-					opts.QueueSubcmd = "add"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "remove",
-				Description: "Remove one or more episodes from the queue",
-				UsageLine:   "abs queue remove <id...>",
-				Args:        clihelp.MinimumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "queue"
-					opts.QueueSubcmd = "remove"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
-			{
-				Name:        "clear",
-				Description: "Clear queue for a specific podcast or all podcasts",
-				UsageLine:   "abs queue clear [podcast-id]",
-				Args:        clihelp.MaximumNArgs(1),
-				Run: func(ctx *clihelp.Context) error {
-					*action = "queue"
-					opts.QueueSubcmd = "clear"
-					opts.Args = ctx.Args
-					return nil
-				},
-			},
+			buildQueueListSubcommand(opts, action),
+			buildQueueAddSubcommand(opts, action),
+			buildQueueRemoveSubcommand(opts, action),
+			buildQueueClearSubcommand(opts, action),
+			buildQueueRunSubcommand(opts, action),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
