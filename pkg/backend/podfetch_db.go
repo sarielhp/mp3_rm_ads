@@ -46,6 +46,13 @@ func podfetchEpisodeFileCol(db *sql.DB) string {
 	return "local_url"
 }
 
+func podfetchColOrEmpty(db *sql.DB, table, col string) string {
+	if podfetchHasColumn(db, table, col) {
+		return col
+	}
+	return "'' AS " + col
+}
+
 func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 	verifyPodfetchNotDisabled("fetchPodFetchPodcastsDB")
 	if dbPath == "" {
@@ -62,7 +69,10 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 	defer db.Close()
 
 	dirCol := podfetchPodcastsDirCol(db)
-	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, image_url, summary, author FROM podcasts ORDER BY id ASC", dirCol)
+	imgCol := podfetchColOrEmpty(db, "podcasts", "image_url")
+	sumCol := podfetchColOrEmpty(db, "podcasts", "summary")
+	autCol := podfetchColOrEmpty(db, "podcasts", "author")
+	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, %s, %s, %s FROM podcasts ORDER BY id ASC", dirCol, imgCol, sumCol, autCol)
 	rows, err := db.Query(query)
 	if err != nil {
 		return nil, err
@@ -189,10 +199,13 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 	defer db.Close()
 
 	dirCol := podfetchPodcastsDirCol(db)
+	imgCol := podfetchColOrEmpty(db, "podcasts", "image_url")
+	sumCol := podfetchColOrEmpty(db, "podcasts", "summary")
+	autCol := podfetchColOrEmpty(db, "podcasts", "author")
 	var idVal interface{}
 	var name, directory, rssfeed, imageURL, summary, author sql.NullString
 
-	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, image_url, summary, author FROM podcasts WHERE id = ? OR name = ? OR %s = ? LIMIT 1", dirCol, dirCol)
+	query := fmt.Sprintf("SELECT id, name, %s, rssfeed, %s, %s, %s FROM podcasts WHERE id = ? OR name = ? OR %s = ? LIMIT 1", dirCol, imgCol, sumCol, autCol, dirCol)
 	err = db.QueryRow(query, id, id, id).Scan(&idVal, &name, &directory, &rssfeed, &imageURL, &summary, &author)
 	if err != nil {
 		return nil, err

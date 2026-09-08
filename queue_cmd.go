@@ -172,18 +172,23 @@ func printQueueTable(items []queueEpisodeItem) {
 	}
 
 	fmt.Printf("\nAdR Queue (%d queued):\n", len(items))
-	fmt.Printf("%s\n", strings.Repeat("=", 80))
-	fmt.Printf("  %-5s │ %-6s │ %-30s │ %s\n", "Pod", "Ep", "Title", "File")
-	fmt.Printf("  %-5s ┼ %-6s ┼ %-30s ┼ %s\n",
-		strings.Repeat("─", 5), strings.Repeat("─", 6), strings.Repeat("─", 30), strings.Repeat("─", 30))
+	titleWidth := 30
+	fileWidth := 30
+	cols := queueTableColumns(titleWidth, fileWidth)
+
+	fmt.Println(renderTableTop(cols))
+	fmt.Println(renderTableHeader(cols))
+	fmt.Println(renderTableDivider(cols))
 
 	for _, it := range items {
-		t := truncate(displayName(it.Title), 30)
-		fn := truncate(displayName(it.Filename), 30)
-		fmt.Printf("  %-5s │ %-6s │ %-30s │ %s\n",
-			it.PodcastID, boldCyan(it.EpisodeID), t, fn)
+		t := truncateDisplayName(it.Title, titleWidth)
+		fn := truncateDisplayName(it.Filename, fileWidth)
+		cells := []string{it.PodcastID, boldCyan(it.EpisodeID), t, fn}
+		fmt.Println(renderTableRow(cells, cols))
 	}
-	fmt.Printf("%s\n\n", strings.Repeat("=", 80))
+
+	fmt.Println(renderTableBottom(cols))
+	fmt.Println()
 }
 
 func handleQueueAdd(podcastsDir string, targets []string) error {
