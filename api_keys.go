@@ -36,8 +36,11 @@ func readGeminiKeyFiles() string {
 		return ""
 	}
 	for _, rel := range []string{
+		filepath.Join(".config", "auth", "gemini_ai_studio_key_free"),
 		filepath.Join(".config", "auth", "gemini_api_key_free"),
+		filepath.Join(".config", "auth", "gemini_ai_studio_key"),
 		filepath.Join(".config", "auth", "gemini_api_key"),
+		filepath.Join(".config", "auth", "gemini_ai_studio_key_paid"),
 		filepath.Join(".config", "auth", "gemini_api_key_paid"),
 		filepath.Join(".config", "gemini", "api_key"),
 		filepath.Join(".config", "gemini", "gemini_api_key"),
@@ -58,8 +61,11 @@ func wipeGeminiKeyFiles() {
 		return
 	}
 	for _, rel := range []string{
+		filepath.Join(".config", "auth", "gemini_ai_studio_key_free"),
 		filepath.Join(".config", "auth", "gemini_api_key_free"),
+		filepath.Join(".config", "auth", "gemini_ai_studio_key"),
 		filepath.Join(".config", "auth", "gemini_api_key"),
+		filepath.Join(".config", "auth", "gemini_ai_studio_key_paid"),
 		filepath.Join(".config", "auth", "gemini_api_key_paid"),
 		filepath.Join(".config", "gemini", "api_key"),
 		filepath.Join(".config", "gemini", "gemini_api_key"),

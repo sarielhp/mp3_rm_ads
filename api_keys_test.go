@@ -291,4 +291,9 @@ func TestResolveGeminiAPIKeyFreeAndPaid(t *testing.T) {
 	if key := resolveGeminiAPIKey(cfg); key != "free-key-456" {
 		t.Errorf("expected free-key-456 to take precedence over paid, got %q", key)
 	}
+
+	_ = os.WriteFile(filepath.Join(authDir, "gemini_ai_studio_key_free"), []byte("studio-free-789\n"), 0600)
+	if key := resolveGeminiAPIKey(cfg); key != "studio-free-789" {
+		t.Errorf("expected studio-free-789 to take precedence, got %q", key)
+	}
 }
