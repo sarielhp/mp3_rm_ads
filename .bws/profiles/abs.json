@@ -1,0 +1,60 @@
+{
+  "name": "abs",
+  "description": "Dynamic capability profile for abs (Audiobookshelf & Podcast Manager)",
+  "binds_rw": [
+    [
+      "~/.cache/abs",
+      "@@HOME@@/.cache/abs"
+    ],
+    [
+      "~/.config/abs",
+      "@@HOME@@/.config/abs"
+    ],
+    [
+      "~/.config/mp3_rm_ads",
+      "@@HOME@@/.config/mp3_rm_ads"
+    ],
+    [
+      "/home/media",
+      "/home/media"
+    ],
+    [
+      "/home/media",
+      "/media"
+    ]
+  ],
+  "features": {
+    "enable_dbus": true,
+    "dbus_talk": [
+      "org.freedesktop.DBus",
+      "org.mpris.MediaPlayer2.*"
+    ]
+  },
+  "pass_env": [
+    "WHISPER_URL",
+    "ABS_URL",
+    "AUDIOBOOKSHELF_URL",
+    "PODFETCH_URL",
+    "GEMINI_API_KEY",
+    "OPENROUTER_API_KEY"
+  ],
+  "tests": [
+    {
+      "name": "abs library status",
+      "cmd": [
+        "./abs",
+        "info",
+        "status"
+      ],
+      "type": "smoke"
+    },
+    {
+      "name": "abs config inspection",
+      "cmd": [
+        "./abs",
+        "config"
+      ],
+      "type": "smoke"
+    }
+  ]
+}
