@@ -49,7 +49,8 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		return false, processed, false
 	}
 
-	if canRunSpeculativeRace(config, cli) {
+	needsTranscription := !fileExists(jsonFile) || cli.ForceTranscribe
+	if needsTranscription && canRunSpeculativeRace(config, cli) {
 		success, handled := handleSpeculativeStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
 		if handled {
 			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
@@ -57,7 +58,7 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 			}
 			return !success, processed, false
 		}
-	} else if isGeminiEngine(config, cli) {
+	} else if needsTranscription && isGeminiEngine(config, cli) {
 		success, handled := handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile, totalDuration, config, cli, selectedProfile, fileStartTime)
 		if handled {
 			if strings.HasSuffix(sourceAudioFile, ".truncated.wav") {
