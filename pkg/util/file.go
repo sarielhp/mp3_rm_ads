@@ -6,9 +6,30 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 )
+
+func FindMP3Files(dir string) []string {
+	var files []string
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return files
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			if entry.Name() == ".work" || strings.HasPrefix(entry.Name(), ".") {
+				continue
+			}
+			subFiles := FindMP3Files(filepath.Join(dir, entry.Name()))
+			files = append(files, subFiles...)
+		} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".mp3") {
+			files = append(files, filepath.Join(dir, entry.Name()))
+		}
+	}
+	return files
+}
 
 var RenameFn = os.Rename
 
