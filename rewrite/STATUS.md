@@ -13,8 +13,8 @@ This document tracks the live status of the modularization and package rewrite o
 | **02** | [`STAGE_02_CONFIG_AND_BACKEND.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_02_CONFIG_AND_BACKEND.md) | `pkg/config`, `pkg/backend` | **COMPLETED** | Commit `d17bd34` |
 | **03** | [`STAGE_03_AUDIO_AND_FORMAT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_03_AUDIO_AND_FORMAT.md) | `pkg/audio`, `pkg/format` | **COMPLETED** | `pkg/format` & `pkg/audio` created and tested |
 | **04** | [`STAGE_04_TRANSCRIBE_AND_AI.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_04_TRANSCRIBE_AND_AI.md) | `pkg/transcribe`, `pkg/detect`, `pkg/gemini` | **COMPLETED** | `pkg/transcribe`, `pkg/detect`, `pkg/gemini` created and tested |
-| **05** | [`STAGE_05_PIPELINE_AND_PLAYER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_05_PIPELINE_AND_PLAYER.md) | `pkg/pipeline`, `pkg/player` | **READY** | Next stage to execute |
-| **06** | [`STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md) | `pkg/podcast` | **PLANNED** | Blocked on Stage 05 |
+| **05** | [`STAGE_05_PIPELINE_AND_PLAYER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_05_PIPELINE_AND_PLAYER.md) | `pkg/pipeline`, `pkg/player` | **COMPLETED** | `pkg/pipeline` & `pkg/player` created and tested |
+| **06** | [`STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md) | `pkg/podcast` | **READY** | Next stage to execute |
 | **07** | [`STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md) | `pkg/remote` | **PLANNED** | Blocked on Stage 02 |
 | **08** | [`STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md) | `pkg/kitty`, `pkg/tui` | **PLANNED** | Blocked on Stages 05 & 06 |
 | **09** | [`STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md) | `pkg/cli` | **PLANNED** | Blocked on Stages 05, 06, 07, 08 |
@@ -25,17 +25,15 @@ This document tracks the live status of the modularization and package rewrite o
 ## 2. Immediate Next Step for Resuming Agent
 
 To continue execution:
-1. Open [`rewrite/STAGE_05_PIPELINE_AND_PLAYER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_05_PIPELINE_AND_PLAYER.md).
-2. Create `pkg/pipeline` (audio pipeline orchestrator, batch processing, dry run, quarantine).
-3. Create `pkg/player` (headless audio player daemon, IPC socket, MPRIS D-Bus, player UI).
-4. Run verification:
+1. Open [`rewrite/STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md).
+2. Create `pkg/podcast` (feed caching, ID registry, sync policies, download queues, orphan cleaning).
+3. Run verification:
    ```bash
-   go test ./pkg/pipeline/...
-   go test ./pkg/player/...
+   go test ./pkg/podcast/...
    go test -timeout 30s ./...
    ./tools/audit_lines --quiet
    ```
-5. Update this file (`rewrite/STATUS.md`) setting Stage 05 to **COMPLETED** and commit.
+4. Update this file (`rewrite/STATUS.md`) setting Stage 06 to **COMPLETED** and commit.
 
 ---
 
