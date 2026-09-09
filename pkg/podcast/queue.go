@@ -83,6 +83,12 @@ func DefaultDownloadQueue() *DownloadQueue {
 	return globalDownloadQueue
 }
 
+func (q *DownloadQueue) SetFilePath(path string) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.filePath = path
+}
+
 func (q *DownloadQueue) SetTestHook(hook func(item DownloadQueueItem) error) {
 	q.testHookMu.Lock()
 	defer q.testHookMu.Unlock()
