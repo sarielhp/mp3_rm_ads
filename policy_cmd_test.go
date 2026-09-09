@@ -112,3 +112,70 @@ func TestPolicyUpdate(t *testing.T) {
 		t.Errorf("expected AdRemoval latest, got %s", podCfg.AdRemoval)
 	}
 }
+
+func TestPolicyShorthandNumber(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "Shorthand_Show")
+	_ = os.MkdirAll(podDir, 0755)
+
+	podID := getOrSetPodcastShortID(podDir, "Shorthand Show")
+	cfg := Config{PodcastsDir: tempDir}
+
+	cli1 := CLIOptions{
+		Args: []string{podID, "1"},
+	}
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+	err := runPolicyCommand(cfg, cli1)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	_, _ = io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand with shorthand 1 failed: %v", err)
+	}
+
+	podCfg1 := loadPodcastConfig(podDir)
+	if !podCfg1.IsAutoDownloadEnabled() {
+		t.Errorf("expected AutoDownload true for shorthand 1")
+	}
+	if podCfg1.DownloadPolicy != DownloadPolicyLatestK {
+		t.Errorf("expected DownloadPolicy %q, got %q", DownloadPolicyLatestK, podCfg1.DownloadPolicy)
+	}
+	if podCfg1.DownloadK != 1 {
+		t.Errorf("expected DownloadK 1, got %d", podCfg1.DownloadK)
+	}
+	if podCfg1.AdRemoval != AdRemovalAll {
+		t.Errorf("expected AdRemoval %q, got %q", AdRemovalAll, podCfg1.AdRemoval)
+	}
+
+	cli5 := CLIOptions{
+		Args: []string{podID, "5"},
+	}
+	r, w, _ = os.Pipe()
+	oldStdout = os.Stdout
+	os.Stdout = w
+	err = runPolicyCommand(cfg, cli5)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	_, _ = io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand with shorthand 5 failed: %v", err)
+	}
+
+	podCfg5 := loadPodcastConfig(podDir)
+	if podCfg5.DownloadK != 5 {
+		t.Errorf("expected DownloadK 5, got %d", podCfg5.DownloadK)
+	}
+
+	cliInvalid := CLIOptions{Args: []string{podID, "0"}}
+	if err := runPolicyCommand(cfg, cliInvalid); err == nil {
+		t.Errorf("expected error for count 0")
+	}
+	cliInvalidStr := CLIOptions{Args: []string{podID, "abc"}}
+	if err := runPolicyCommand(cfg, cliInvalidStr); err == nil {
+		t.Errorf("expected error for non-integer count")
+	}
+}

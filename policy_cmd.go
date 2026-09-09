@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strconv"
 	"strings"
 )
 
@@ -29,6 +30,10 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("missing podcast identifier for policy command")
 	}
 
+	if err := parseShorthandNumberPolicy(&cli); err != nil {
+		return err
+	}
+
 	target := cli.Args[0]
 	resolved, err := resolveAnyID(podcastsDir, target)
 	if err != nil {
@@ -47,6 +52,29 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 	}
 
 	return updatePodcastPolicy(pod, cli)
+}
+
+func parseShorthandNumberPolicy(cli *CLIOptions) error {
+	if len(cli.Args) <= 1 {
+		return nil
+	}
+	k, err := strconv.Atoi(cli.Args[1])
+	if err != nil || k <= 0 {
+		return fmt.Errorf("invalid episode count %q: must be a positive integer", cli.Args[1])
+	}
+	if cli.AutoDownloadStr == "" {
+		cli.AutoDownloadStr = "true"
+	}
+	if cli.DownloadPolicy == "" {
+		cli.DownloadPolicy = DownloadPolicyLatestK
+	}
+	if cli.DownloadK <= 0 {
+		cli.DownloadK = k
+	}
+	if cli.AdRemovalMode == "" {
+		cli.AdRemovalMode = AdRemovalAll
+	}
+	return nil
 }
 
 func checkHasPolicyUpdates(cli CLIOptions) bool {

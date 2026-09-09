@@ -1,6 +1,8 @@
 package main
 
 import (
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
@@ -189,6 +191,22 @@ func TestBatchWorkerExecution(t *testing.T) {
 
 	epFile := filepath.Join(inDir, "episode1.mp3")
 	_ = os.WriteFile(epFile, []byte("fake mp3 stream content"), 0644)
+
+	mockLLM := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte(`{"choices":[{"message":{"content":"[]"}}]}`))
+	}))
+	defer mockLLM.Close()
+
+	testConfigPath = filepath.Join(tempDir, "config.json")
+	defer func() { testConfigPath = "" }()
+	saveConfig(Config{
+		ActiveProfileID: 1,
+		Profiles: []LLMProfile{
+			{ID: 1, Name: "mock", Type: "openai", URL: mockLLM.URL + "/v1/chat/completions"},
+		},
+	})
 
 	manifest := RemoteBatchManifest{
 		BatchID:    "test-batch-001",

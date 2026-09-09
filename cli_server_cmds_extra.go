@@ -122,11 +122,12 @@ func buildSyncPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "policy",
 		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "abs sync policy <podcast-id> [options]",
+		UsageLine:   "abs sync policy <podcast-id> [<number>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "<podcast-id>", Description: "Target podcast identifier"},
+			{Name: "[<number>]", Description: "Shorthand: auto-download latest K episodes with ad-removal all"},
 		},
-		Args: clihelp.ExactArgs(1),
+		Args: clihelp.RangeArgs(1, 2),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable automatic downloads (true/false)"),
 			clihelp.String(&opts.DownloadPolicy, "--download-policy <mode>", "", "Policy mode ('none', 'latest', 'latest_k', 'all')"),
@@ -135,6 +136,20 @@ func buildSyncPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.Int(&opts.CleanupDays, "--cleanup-days <days>", 0, "Retention window in days"),
 			clihelp.String(&opts.AdRemovalMode, "--ad-removal <mode>", "", "Ad removal policy mode ('none', 'latest', 'all')"),
 			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs sync policy 42 1",
+				Description: "Shorthand: auto-download latest 1 episode and remove all ads",
+			},
+			{
+				Line:        "abs sync policy 'Huberman Lab' 3",
+				Description: "Shorthand: auto-download latest 3 episodes and remove all ads",
+			},
+			{
+				Line:        "abs sync policy 42 --download-policy all --ad-removal all",
+				Description: "Configure podcast 42 to download all episodes and remove ads",
+			},
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "sync"
