@@ -307,3 +307,35 @@ func (c *Config) IsSpeculativeTranscriptionEnabled() bool {
 	}
 	return true
 }
+
+func (c *Config) GetGeminiModel() string {
+	if c != nil && c.GeminiModel != "" {
+		return c.GeminiModel
+	}
+	return "gemini-flash-latest"
+}
+
+func (c *Config) GetGeminiProjectID() string {
+	if c != nil && c.GeminiProjectID != "" {
+		return c.GeminiProjectID
+	}
+	return "vm-on-cloud-sariel"
+}
+
+func (c *Config) GetGeminiStagingBucket() string {
+	if c != nil && c.GeminiStagingBucket != "" {
+		s := c.GeminiStagingBucket
+		if len(s) >= 5 && s[:5] == "gs://" {
+			return s[5:]
+		}
+		return s
+	}
+	return "abs-audio-staging-sariel"
+}
+
+func (c *Config) GetGeminiLocation() string {
+	if c != nil && c.GeminiLocation != "" {
+		return c.GeminiLocation
+	}
+	return "us-central1"
+}

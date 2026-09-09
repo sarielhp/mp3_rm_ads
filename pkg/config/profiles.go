@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/sariel/abs/pkg/types"
+	"github.com/sariel/abs/pkg/util"
 )
 
 var DefaultWhisperProfiles = []types.WhisperProfile{
@@ -184,4 +185,63 @@ func SetDefaultWhisperProfile(cfg *types.Config, targetID int) error {
 		}
 	}
 	return fmt.Errorf("whisper profile ID [%d] not found in configuration", targetID)
+}
+
+func NormalizeWhisperProfile(p types.WhisperProfile) types.WhisperProfile {
+	if p.Engine == "" {
+		p.Engine = InferWhisperEngine(p)
+	}
+	if p.SpeedFactor <= 0 {
+		p.SpeedFactor = 70.0
+	}
+	return p
+}
+
+func GetActiveWhisperProfile(cfg *types.Config) types.WhisperProfile {
+	if cfg == nil {
+		return types.WhisperProfile{}
+	}
+	for _, wp := range cfg.WhisperProfiles {
+		if wp.ID == cfg.ActiveWhisperID {
+			return NormalizeWhisperProfile(wp)
+		}
+	}
+	if len(cfg.WhisperProfiles) > 0 {
+		return NormalizeWhisperProfile(cfg.WhisperProfiles[0])
+	}
+	return types.WhisperProfile{
+		ID:          1,
+		Name:        "Default Whisper",
+		Engine:      types.WhisperEngineLocal,
+		SpeedFactor: 70.0,
+	}
+}
+
+func PrepareWhisperFallbackConfig(cfg types.Config) types.Config {
+	fallback := cfg
+	for _, wp := range cfg.WhisperProfiles {
+		engine := wp.Engine
+		if engine == "" {
+			engine = InferWhisperEngine(wp)
+		}
+		if engine == types.WhisperEngineGemini || engine == types.WhisperEngineRemote {
+			continue
+		}
+		if engine == types.WhisperEngineLocal || engine == types.WhisperEngineDocker || util.IsLocalHost(util.ExtractHost(wp.URL)) {
+			fallback.ActiveWhisperID = wp.ID
+			return fallback
+		}
+	}
+	for _, wp := range cfg.WhisperProfiles {
+		engine := wp.Engine
+		if engine == "" {
+			engine = InferWhisperEngine(wp)
+		}
+		if engine != types.WhisperEngineGemini {
+			fallback.ActiveWhisperID = wp.ID
+			return fallback
+		}
+	}
+	fallback.WhisperEngine = types.WhisperEngineLocal
+	return fallback
 }
