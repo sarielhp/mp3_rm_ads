@@ -8,10 +8,10 @@ This document tracks the live status of the modularization and package rewrite o
 
 | Stage | Document | Target Packages | Status | Completed In / Notes |
 |:---:|:---|:---|:---:|:---|
-| **00** | [`00_ARCHITECTURE_AND_DAG.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/00_ARCHITECTURE_AND_DAG.md) | Blueprint & Architecture | **PLANNED** | Full file mapping & DAG defined |
-| **01** | [`STAGE_01_UTILITIES_AND_TYPES.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_01_UTILITIES_AND_TYPES.md) | `pkg/types`, `pkg/util` | **READY** | Next stage to execute |
-| **02** | [`STAGE_02_CONFIG_AND_BACKEND.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_02_CONFIG_AND_BACKEND.md) | `pkg/config`, `pkg/backend` | **PLANNED** | Blocked on Stage 01 |
-| **03** | [`STAGE_03_AUDIO_AND_FORMAT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_03_AUDIO_AND_FORMAT.md) | `pkg/audio`, `pkg/format` | **PLANNED** | Blocked on Stage 01 |
+| **00** | [`00_ARCHITECTURE_AND_DAG.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/00_ARCHITECTURE_AND_DAG.md) | Blueprint & Architecture | **COMPLETED** | Commit `3bd884d` |
+| **01** | [`STAGE_01_UTILITIES_AND_TYPES.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_01_UTILITIES_AND_TYPES.md) | `pkg/types`, `pkg/util` | **COMPLETED** | `pkg/types` & `pkg/util` created and tested |
+| **02** | [`STAGE_02_CONFIG_AND_BACKEND.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_02_CONFIG_AND_BACKEND.md) | `pkg/config`, `pkg/backend` | **READY** | Next stage to execute |
+| **03** | [`STAGE_03_AUDIO_AND_FORMAT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_03_AUDIO_AND_FORMAT.md) | `pkg/audio`, `pkg/format` | **PLANNED** | Ready to execute after/with Stage 02 |
 | **04** | [`STAGE_04_TRANSCRIBE_AND_AI.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_04_TRANSCRIBE_AND_AI.md) | `pkg/transcribe`, `pkg/detect`, `pkg/gemini` | **PLANNED** | Blocked on Stages 02 & 03 |
 | **05** | [`STAGE_05_PIPELINE_AND_PLAYER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_05_PIPELINE_AND_PLAYER.md) | `pkg/pipeline`, `pkg/player` | **PLANNED** | Blocked on Stages 03 & 04 |
 | **06** | [`STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md) | `pkg/podcast` | **PLANNED** | Blocked on Stages 02 & 05 |
@@ -24,19 +24,18 @@ This document tracks the live status of the modularization and package rewrite o
 
 ## 2. Immediate Next Step for Resuming Agent
 
-To begin execution:
-1. Open [`rewrite/STAGE_01_UTILITIES_AND_TYPES.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_01_UTILITIES_AND_TYPES.md).
-2. Execute **Step 1.1**: Create `pkg/types` and extract domain structs from `types.go`, `gemini_types.go`, and `remote_types.go`.
-3. Execute **Step 1.2**: Create `pkg/util` and extract `sync`, `strings`, `shell`, `math`, `color`, and `lock`.
-4. Bridge root callers to import `pkg/types` and `pkg/util`.
-5. Run verification:
+To continue execution:
+1. Open [`rewrite/STAGE_02_CONFIG_AND_BACKEND.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_02_CONFIG_AND_BACKEND.md).
+2. Create `pkg/config` and extract configuration loading, saving, paths, profiles, and podcast configs.
+3. Wire `pkg/backend` with `pkg/config`.
+4. Run verification:
    ```bash
-   go test ./pkg/types/...
-   go test ./pkg/util/...
+   go test ./pkg/config/...
+   go test ./pkg/backend/...
    go test -timeout 30s ./...
    ./tools/audit_lines --quiet
    ```
-6. Update this file (`rewrite/STATUS.md`) setting Stage 01 to **COMPLETED** and commit.
+5. Update this file (`rewrite/STATUS.md`) setting Stage 02 to **COMPLETED** and commit.
 
 ---
 

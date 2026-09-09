@@ -1,9 +1,9 @@
 package main
 
-import "sync"
+import "github.com/sariel/abs/pkg/util"
 
-type syncMutex struct{ sync.Mutex }
-type syncMu struct{ sync.Mutex }
-type syncWG struct{ sync.WaitGroup }
-type syncRWMutex struct{ sync.RWMutex }
-type syncOnce struct{ sync.Once }
+type syncMutex = util.SyncMutex
+type syncMu = util.SyncMu
+type syncWG = util.SyncWG
+type syncRWMutex = util.SyncRWMutex
+type syncOnce = util.SyncOnce
