@@ -1,0 +1,88 @@
+package config
+
+import (
+	"net"
+	"os"
+	"path/filepath"
+	"strings"
+)
+
+const (
+	ConfigDirName       = ".config/abs"
+	LegacyConfigDirName = ".config/mp3_rm_ads"
+	ConfigFileName      = "config.json"
+	OpencodeConfigFile  = ".config/opencode/opencode.json"
+)
+
+var testConfigPath string
+
+func SetTestConfigPath(p string) {
+	testConfigPath = p
+}
+
+func UserTmpDir() string {
+	username := os.Getenv("USER")
+	if username == "" {
+		username = os.Getenv("LOGNAME")
+	}
+	if username == "" {
+		username = "user"
+	}
+	dir := filepath.Join(os.TempDir(), username, "abs")
+	_ = os.MkdirAll(dir, 0755)
+	return dir
+}
+
+func ConfigDir() string {
+	if testConfigPath != "" {
+		return filepath.Dir(testConfigPath)
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return UserTmpDir()
+	}
+	return filepath.Join(home, ConfigDirName)
+}
+
+func ConfigPath() string {
+	if testConfigPath != "" {
+		return testConfigPath
+	}
+	return filepath.Join(ConfigDir(), ConfigFileName)
+}
+
+func LegacyConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, LegacyConfigDirName, ConfigFileName)
+}
+
+func OpencodeConfigPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, OpencodeConfigFile)
+}
+
+func LocalIP() string {
+	addrs, err := net.InterfaceAddrs()
+	if err != nil {
+		return "127.0.0.1"
+	}
+	for _, addr := range addrs {
+		if ipnet, ok := addr.(*net.IPNet); ok && !ipnet.IP.IsLoopback() && ipnet.IP.To4() != nil {
+			ip := ipnet.IP.String()
+			if !ipnet.IP.IsMulticast() && !ipnet.IP.IsLinkLocalUnicast() {
+				return ip
+			}
+		}
+	}
+	return "127.0.0.1"
+}
+
+func ReplaceIP(url, ip string) string {
+	return strings.Replace(url, "192.168.1.230", ip, 1)
+}
