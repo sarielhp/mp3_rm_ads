@@ -10,7 +10,7 @@ import (
 	"sort"
 	"strings"
 	"time"
-	
+
 	"github.com/fatih/color"
 	"github.com/sariel/abs/pkg/audio"
 	"github.com/sariel/abs/pkg/backend"
@@ -23,39 +23,39 @@ import (
 	"github.com/sariel/abs/pkg/podcast"
 	"github.com/sariel/abs/pkg/remote"
 	"github.com/sariel/abs/pkg/transcribe"
-		"github.com/sariel/abs/pkg/types"
+	"github.com/sariel/abs/pkg/types"
 	"github.com/sariel/abs/pkg/util"
 )
 
 type (
-	Config             = types.Config
-	CLIOptions         = types.CLIOptions
-	LLMProfile         = types.LLMProfile
-	AdSegment          = types.AdSegment
-	TranscriptionData  = types.TranscriptionData
-	CutsData           = types.CutsData
-	CutEntry           = types.CutEntry
-	EpisodeStatusFile  = types.EpisodeStatusFile
-	EpisodeAudioMeta   = types.EpisodeAudioMeta
-	EpisodeAdCut       = types.EpisodeAdCut
-	PlayerTrack        = types.PlayerTrack
-	PlayerStatus       = types.PlayerStatusDTO
-	Podcast            = backend.Podcast
-	PodcastConfig      = config.PodcastConfig
-	FeedEpisode        = backend.FeedEpisode
-	Episode            = backend.Episode
-	WhisperEngine      = types.WhisperEngine
-	WhisperProfile     = types.WhisperProfile
-	RemoteTransport    = remote.RemoteTransport
-	RemoteBatchJobItem = types.RemoteBatchJobItem
-	RemoteDoneManifest = remote.RemoteDoneManifest
+	Config              = types.Config
+	CLIOptions          = types.CLIOptions
+	LLMProfile          = types.LLMProfile
+	AdSegment           = types.AdSegment
+	TranscriptionData   = types.TranscriptionData
+	CutsData            = types.CutsData
+	CutEntry            = types.CutEntry
+	EpisodeStatusFile   = types.EpisodeStatusFile
+	EpisodeAudioMeta    = types.EpisodeAudioMeta
+	EpisodeAdCut        = types.EpisodeAdCut
+	PlayerTrack         = types.PlayerTrack
+	PlayerStatus        = types.PlayerStatusDTO
+	Podcast             = backend.Podcast
+	PodcastConfig       = config.PodcastConfig
+	FeedEpisode         = backend.FeedEpisode
+	Episode             = backend.Episode
+	WhisperEngine       = types.WhisperEngine
+	WhisperProfile      = types.WhisperProfile
+	RemoteTransport     = remote.RemoteTransport
+	RemoteBatchJobItem  = types.RemoteBatchJobItem
+	RemoteDoneManifest  = remote.RemoteDoneManifest
 	DefaultSSHTransport = remote.DefaultSSHTransport
-	RemoteDoneItem     = remote.RemoteDoneItem
-		ResolvedPodcast    = podcast.ResolvedPodcast
-	ResolvedEpisode    = podcast.ResolvedEpisode
-	ResolvedID         = podcast.ResolvedID
-	fileLockWrapper    = util.FileLockWrapper
-	syncWG             = util.SyncWG
+	RemoteDoneItem      = remote.RemoteDoneItem
+	ResolvedPodcast     = podcast.ResolvedPodcast
+	ResolvedEpisode     = podcast.ResolvedEpisode
+	ResolvedID          = podcast.ResolvedID
+	fileLockWrapper     = util.FileLockWrapper
+	syncWG              = util.SyncWG
 )
 
 type tuiPodcast struct {
@@ -125,33 +125,33 @@ func fatalError(formatStr string, args ...interface{}) {
 	os.Exit(1)
 }
 
-func bold(s string) string               { return util.Bold(s) }
-func boldYellow(s string) string         { return util.BoldYellow(s) }
-func boldGreen(s string) string          { return util.BoldGreen(s) }
-func boldCyan(s string) string           { return util.BoldCyan(s) }
-func repeatStr(s string, n int) string   { return util.RepeatStr(s, n) }
-func truncate(s string, max int) string  { return util.Truncate(s, max) }
+func bold(s string) string              { return util.Bold(s) }
+func boldYellow(s string) string        { return util.BoldYellow(s) }
+func boldGreen(s string) string         { return util.BoldGreen(s) }
+func boldCyan(s string) string          { return util.BoldCyan(s) }
+func repeatStr(s string, n int) string  { return util.RepeatStr(s, n) }
+func truncate(s string, max int) string { return util.Truncate(s, max) }
 func truncateDisplayName(s string, max int) string {
 	return util.TruncateDisplayName(s, max)
 }
-func displayName(s string) string        { return util.DisplayName(s) }
-func stripExt(path string) string        { return util.StripExt(path) }
-func fileExists(path string) bool        { return util.FileExists(path) }
-func safeMove(src, dst string) error     { return util.SafeMove(src, dst) }
-func workDirFor(path string) string      { return util.WorkDirFor(path) }
-func verifyTempFile(path string)         { util.VerifyTempFile(path) }
+func displayName(s string) string    { return util.DisplayName(s) }
+func stripExt(path string) string    { return util.StripExt(path) }
+func fileExists(path string) bool    { return util.FileExists(path) }
+func safeMove(src, dst string) error { return util.SafeMove(src, dst) }
+func workDirFor(path string) string  { return util.WorkDirFor(path) }
+func verifyTempFile(path string)     { util.VerifyTempFile(path) }
 func execCommand(name string, args ...string) *exec.Cmd {
 	return exec.Command(name, args...)
 }
-func copyFileErr(src, dst string) error  { return util.CopyFileErr(src, dst) }
-func copyFile(src, dst string) error     { return util.CopyFileErr(src, dst) }
+func copyFileErr(src, dst string) error { return util.CopyFileErr(src, dst) }
+func copyFile(src, dst string) error    { return util.CopyFileErr(src, dst) }
 func acquireFileLock(path string) (*fileLockWrapper, error) {
 	return util.AcquireFileLock(path)
 }
-func findMP3Files(dir string) []string   { return util.FindMP3Files(dir) }
-func stripHTML(s string) string          { return backend.StripHTML(s) }
+func findMP3Files(dir string) []string     { return util.FindMP3Files(dir) }
+func stripHTML(s string) string            { return backend.StripHTML(s) }
 func formatDurationShort(d float64) string { return format.FormatClock(d) }
-func printSeparator()                    { fmt.Println(strings.Repeat("─", 50)) }
+func printSeparator()                      { fmt.Println(strings.Repeat("─", 50)) }
 
 func wrapText(text string, maxW int) []string {
 	if maxW <= 0 {
@@ -177,9 +177,9 @@ func wrapText(text string, maxW int) []string {
 	return lines
 }
 
-func formatClock(sec float64) string     { return format.FormatClock(sec) }
-func formatTime(sec float64) string      { return format.FormatTime(sec) }
-func formatSRTTime(sec float64) string   { return format.FormatSRTTime(sec) }
+func formatClock(sec float64) string             { return format.FormatClock(sec) }
+func formatTime(sec float64) string              { return format.FormatTime(sec) }
+func formatSRTTime(sec float64) string           { return format.FormatSRTTime(sec) }
 func mergeIntervals(ads []AdSegment) []AdSegment { return format.MergeIntervals(ads) }
 
 func saveCutsJSON(mainFile string, totalDuration float64, adSegments []AdSegment, profile *LLMProfile, quiet bool) types.CutsResult {
@@ -208,7 +208,7 @@ func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputF
 }
 
 func extractID3Tags(path string) map[string]string { return audio.ExtractID3Tags(path) }
-func buildWavHeader(dataLen int) []byte             { return transcribe.BuildWavHeader(dataLen) }
+func buildWavHeader(dataLen int) []byte            { return transcribe.BuildWavHeader(dataLen) }
 
 func loadConfig() Config {
 	cfg, err := config.LoadConfig()
@@ -235,10 +235,10 @@ func savePodcastConfig(dir string, cfg PodcastConfig) error {
 	return config.SavePodcastConfig(dir, cfg)
 }
 
-func normalizeAdRemovalMode(mode string) string      { return config.NormalizeAdRemovalMode(mode) }
-func adRemovalModeLabel(mode string) string          { return config.AdRemovalModeLabel(mode) }
-func adRemovalModeBadge(mode string) string          { return config.AdRemovalModeBadge(mode) }
-func normalizeDownloadPolicy(policy string) string   { return config.NormalizeDownloadPolicy(policy) }
+func normalizeAdRemovalMode(mode string) string    { return config.NormalizeAdRemovalMode(mode) }
+func adRemovalModeLabel(mode string) string        { return config.AdRemovalModeLabel(mode) }
+func adRemovalModeBadge(mode string) string        { return config.AdRemovalModeBadge(mode) }
+func normalizeDownloadPolicy(policy string) string { return config.NormalizeDownloadPolicy(policy) }
 func downloadPolicyBadge(policy string, k int) string {
 	return config.DownloadPolicyBadge(policy, k)
 }
@@ -319,7 +319,6 @@ func fetchFeedDirect(feedURL, absBaseURL, itemID string) ([]backend.FeedEpisode,
 }
 
 func statusPathFor(audioFile string) string { return pipeline.StatusPathFor(audioFile) }
-
 
 func updateEpisodeStatus(path string, mutate func(*EpisodeStatusFile)) error {
 	return pipeline.UpdateEpisodeStatus(path, mutate)
@@ -572,9 +571,9 @@ func StartPlayerTrack(audioPath, title, podcast string) error {
 	return player.StartPlayerTrack(audioPath, title, podcast)
 }
 
-func PausePlayerSocket() (bool, error) { return player.PausePlayerSocket() }
-func ResumePlayerSocket() error        { return player.ResumePlayerSocket() }
-func StopPlayerSocket() error          { return player.StopPlayerSocket() }
+func PausePlayerSocket() (bool, error)          { return player.PausePlayerSocket() }
+func ResumePlayerSocket() error                 { return player.ResumePlayerSocket() }
+func StopPlayerSocket() error                   { return player.StopPlayerSocket() }
 func QueryPlayerStatus() (*PlayerStatus, error) { return player.QueryPlayerStatus() }
 
 func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
@@ -668,7 +667,6 @@ func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg Config, 
 	return gemini.ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDurSec)
 }
 
-
 func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) {
 	remote.SyncAudiobookshelfDuration(cfg, filePath, duration)
 }
@@ -706,7 +704,6 @@ func loadEpisodeStatus(path string) (*EpisodeStatusFile, error) {
 	return pipeline.LoadEpisodeStatus(path)
 }
 
-
 func defaultPodcastConfig() PodcastConfig {
 	return config.DefaultPodcastConfig(nil)
 }
@@ -718,4 +715,3 @@ func addDoneEpisode(manifestPath string, item RemoteDoneItem) error {
 func setRemoteTransport(t remote.RemoteTransport) {
 	remote.SetRemoteTransport(t)
 }
-

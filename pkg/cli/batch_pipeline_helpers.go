@@ -211,7 +211,14 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 }
 
 func Execute(args []string) int {
-	action, cli := parseFlags()
+	action, cli, err := parseFlagsArgs(args)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+	if action == "" {
+		return 0
+	}
 	ensureConfigExists()
 	config := loadConfig()
 
@@ -236,4 +243,3 @@ func Execute(args []string) int {
 	}
 	return 0
 }
-

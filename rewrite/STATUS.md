@@ -18,18 +18,23 @@ This document tracks the live status of the modularization and package rewrite o
 | **07** | [`STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md) | `pkg/remote` | **COMPLETED** | `pkg/remote` created and tested |
 | **08** | [`STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md) | `pkg/kitty`, `pkg/tui` | **COMPLETED** | `pkg/kitty` & `pkg/tui` created, visual tour & tests pass |
 | **09** | [`STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md) | `pkg/cli` | **COMPLETED** | `pkg/cli` created and fully tested |
-| **10** | [`STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md) | `cmd/abs`, Cleanup | **READY** | Final entrypoint, file cleanup, verification |
+| **10** | [`STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md) | `cmd/abs`, Cleanup | **COMPLETED** | Minimal entrypoint, root cleanup, full CI quality gate passed |
 
 ---
 
-## 2. Immediate Next Step for Resuming Agent
+## 2. Status Overview
 
-To continue execution:
-1. Open [`rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md).
-2. Create `cmd/abs/main.go` and replace root `main.go` with minimal entrypoint delegating to `pkg/cli.Execute(os.Args[1:])`.
-3. Remove redundant root `.go` files that are now in `pkg/`.
-4. Run full verification gates (`./tools/check --full`, `./tools/audit_lines --strict`, `./tools/visual_audit`).
-5. Update `rewrite/STATUS.md` and commit.
+**All 10 Stages of the Package Refactoring Plan are 100% COMPLETE.**
+
+- Modular packages created under `pkg/` (`types`, `util`, `config`, `backend`, `audio`, `format`, `transcribe`, `detect`, `gemini`, `pipeline`, `player`, `podcast`, `remote`, `kitty`, `tui`, `cli`).
+- Minimal entrypoints created at `main.go` and `cmd/abs/main.go` delegating to `pkg/cli.Execute(os.Args[1:])`.
+- All legacy root `.go` files removed.
+- Full verification passed:
+  - Unit & integration tests pass across all 17 packages (`go test -timeout 30s ./...`).
+  - Strict line audit passed: 0 functions > 80 lines, 0 files > 800 lines (`./tools/audit_lines --strict`).
+  - Static analysis clean: `go vet` and `staticcheck` pass with 0 new findings (`./tools/lint`).
+  - Master visual tour passed: 19/19 TUI screens verified (`./tools/visual_audit`).
+  - Full CI quality gate passed (`./tools/check --full`).
 
 ---
 

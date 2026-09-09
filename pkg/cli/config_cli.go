@@ -5,7 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sariel/abs/pkg/config")
+	"github.com/sariel/abs/pkg/config"
+)
 
 func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {

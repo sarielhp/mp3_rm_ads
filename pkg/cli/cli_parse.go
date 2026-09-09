@@ -152,34 +152,32 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 	}
 }
 
-func parseFlags() (string, CLIOptions) {
+func parseFlagsArgs(args []string) (string, CLIOptions, error) {
 	var action string
 	opts := CLIOptions{
 		SaveTranscript: true,
 	}
 
-	args := os.Args[1:]
-
 	for i, a := range args {
 		if a == "--tree" || (a == "help" && i+1 < len(args) && args[i+1] == "tree") {
 			app := buildCLIApp(&action, &opts)
 			tree.Render(os.Stdout, app, tree.Options{})
-			os.Exit(0)
+			return "", opts, nil
 		}
 	}
 
 	app := buildCLIApp(&action, &opts)
 	if handleExamplesCLI(os.Stdout, app, args) {
-		os.Exit(0)
+		return "", opts, nil
 	}
 
 	err := app.Execute(args)
 	if err != nil {
-		fatalError("Error: %v\n", err)
+		return "", opts, err
 	}
 
 	if action == "" {
-		os.Exit(0)
+		return "", opts, nil
 	}
 
 	opts.IsConfigCommand = (action == "config")
@@ -194,6 +192,17 @@ func parseFlags() (string, CLIOptions) {
 	opts.IsBatchWorkerCommand = (action == "offload" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
 	opts.IsSyncCommand = (action == "sync")
 
+	return action, opts, nil
+}
+
+func parseFlags() (string, CLIOptions) {
+	action, opts, err := parseFlagsArgs(os.Args[1:])
+	if err != nil {
+		fatalError("Error: %v\n", err)
+	}
+	if action == "" {
+		os.Exit(0)
+	}
 	return action, opts
 }
 

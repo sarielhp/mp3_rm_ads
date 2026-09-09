@@ -16,21 +16,21 @@ import (
 )
 
 type DownloadQueueItem struct {
-	ID           string                `json:"id"`
-	PodcastTitle string                `json:"podcast_title"`
-	PodcastDir   string                `json:"podcast_dir,omitempty"`
-	PodcastID    string                `json:"podcast_id,omitempty"`
-	EpisodeTitle string                `json:"episode_title"`
-	GUID         string                `json:"guid,omitempty"`
-	EnclosureURL string                `json:"enclosure_url,omitempty"`
-	PubDate      string                `json:"pub_date,omitempty"`
-	PublishedAt  int64                 `json:"published_at,omitempty"`
-	DurationSec  float64               `json:"duration_sec,omitempty"`
-	Status       string                `json:"status"`
-	OwnerPID     int                   `json:"owner_pid,omitempty"`
-	Error        string                `json:"error,omitempty"`
-	AddedAt      time.Time             `json:"added_at"`
-	EpisodeObj   *backend.FeedEpisode  `json:"episode_obj,omitempty"`
+	ID           string               `json:"id"`
+	PodcastTitle string               `json:"podcast_title"`
+	PodcastDir   string               `json:"podcast_dir,omitempty"`
+	PodcastID    string               `json:"podcast_id,omitempty"`
+	EpisodeTitle string               `json:"episode_title"`
+	GUID         string               `json:"guid,omitempty"`
+	EnclosureURL string               `json:"enclosure_url,omitempty"`
+	PubDate      string               `json:"pub_date,omitempty"`
+	PublishedAt  int64                `json:"published_at,omitempty"`
+	DurationSec  float64              `json:"duration_sec,omitempty"`
+	Status       string               `json:"status"`
+	OwnerPID     int                  `json:"owner_pid,omitempty"`
+	Error        string               `json:"error,omitempty"`
+	AddedAt      time.Time            `json:"added_at"`
+	EpisodeObj   *backend.FeedEpisode `json:"episode_obj,omitempty"`
 }
 
 type DownloadQueuePersist struct {

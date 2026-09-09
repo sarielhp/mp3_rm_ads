@@ -167,31 +167,33 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 
 ## File Organization
 
-| File | Purpose | Lines |
-|------|---------|-------|
-| `main.go` | Entry point, CLI parsing, usage | ~374 |
-| `profiles.go` | LLM profile management, timing summaries | ~179 |
-| `pipeline.go` | Main processing pipeline (transcribe → detect → cut) | ~297 |
-| `output.go` | Output/export functions (SRT, TXT, JSON transcript) | ~169 |
-| `opencode.go` | OpenCode config import | ~103 |
-| `types.go` | Shared data structures | ~143 |
-| `config.go` | Config loading/saving, profile cost, IP detection | ~274 |
-| `transcribe.go` | Whisper HTTP API, chunked transcription, WAV builder | ~560 |
-| `ads.go` | LLM ad detection, keyword extraction, JSON parsing | ~283 |
-| `audio.go` | ffmpeg wrappers (cut, convert, truncate, probe) | ~118 |
-| `format.go` | Time formatting, SRT/TXT conversion, interval merging | ~497 |
-| `docker.go` | Docker container detection, log polling, progress | ~338 |
-| `tui.go` | Interactive TUI browser (podcast list → episodes → detail) | ~598 |
+The codebase is organized into modular Go packages under `pkg/` with a lean entrypoint:
 
-## Test Files
+| Directory / Package | Purpose |
+|---------------------|---------|
+| `main.go`, `cmd/abs/main.go` | Lean entrypoints delegating directly to `pkg/cli.Execute(os.Args[1:])` |
+| `pkg/types` | Core domain types, state enums, configuration data structures, manifests |
+| `pkg/util` | Cross-cutting utilities: safe atomic file operations, locks, shell quoting, ANSI colors |
+| `pkg/config` | Configuration loading/saving, profile cost estimation, environment overrides, podcast configs |
+| `pkg/backend` | Podcast server backend implementations: Audiobookshelf (ABS) and PodFetch REST/SQLite |
+| `pkg/audio` | Audio processing via ffmpeg/ffprobe: duration probing, cutting, filtering, ID3 tags |
+| `pkg/format` | Formatting routines: time formatters, cut intervals merging, SRT/TXT export |
+| `pkg/transcribe` | Whisper API client, audio WAV preparation, chunking, Docker container log progress |
+| `pkg/detect` | AI-driven ad detection via LLMs (Ollama, OpenRouter), prompt generation, speculative racing |
+| `pkg/gemini` | Direct audio transcription and processing with Gemini Flash 2.5 API |
+| `pkg/pipeline` | Core processing pipeline: transcription → detection → cutting, episode status tracking |
+| `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/abs_player.sock`), MPRIS |
+| `pkg/podcast` | Podcast feed cache, episode download management, retention/download policies, ID registry |
+| `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
+| `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
+| `pkg/tui` | Full-featured interactive terminal UI (Bubbletea/Lipgloss) spanning 19 screens and modes |
+| `pkg/cli` | Command-line router (`clihelp`), top-level flags, subcommands (`sync`, `queue`, `info`, `config`, etc.) |
 
-| File | Purpose | Tests |
-|------|---------|-------|
-| `main_test.go` | Core utility tests (format, merge, sort, etc.) | 86 |
-| `config_test.go` | Config management tests | 11 |
-| `format_test.go` | Format/export tests (SRT, TXT, JSON) | 14 |
-| `save_cuts_test.go` | saveCutsJSON tests | 64 |
-| `misc_test.go` | Edge case tests (Docker, LLM, error paths) | 41 |
+## Test Suite
+
+- All packages contain focused, isolated unit and integration tests in `*_test.go` files
+- Tests use `t.TempDir()` for strict isolation and never write to real filesystem paths
+- Run `go test -timeout 30s ./...` to execute the full test suite across all 17 packages
 
 ## External Dependencies
 

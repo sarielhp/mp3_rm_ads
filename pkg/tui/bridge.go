@@ -62,13 +62,13 @@ const (
 
 var globalPlayer = player.GetGlobalPlayer()
 
-func isKittyTerminal() bool { return kitty.IsKittyTerminal() }
+func isKittyTerminal() bool  { return kitty.IsKittyTerminal() }
 func isKittySupported() bool { return kitty.IsKittySupported() }
 func encodeKittyGraphicsFile(filePath string, cols, rows int) (string, error) {
 	return kitty.EncodeKittyGraphicsFile(filePath, cols, rows)
 }
-func kittyClearGraphics() string { return kitty.KittyClearGraphics() }
-func findCoverImage(dir string) string { return kitty.FindCoverImage(dir) }
+func kittyClearGraphics() string        { return kitty.KittyClearGraphics() }
+func findCoverImage(dir string) string  { return kitty.FindCoverImage(dir) }
 func detectImageFormat(path string) int { return kitty.DetectImageFormat(path) }
 func mergeSegments(segs []TranscriptionSegment) []TranscriptionSegment {
 	return transcribe.MergeSegments(segs)
@@ -87,9 +87,9 @@ func prewarmPodcastCovers(podcasts []tuiPodcast, cols, rows int) {
 	}()
 }
 
-func formatClock(sec float64) string { return format.FormatClock(sec) }
-func formatTime(sec float64) string { return format.FormatTime(sec) }
-func formatSRTTime(sec float64) string { return format.FormatSRTTime(sec) }
+func formatClock(sec float64) string      { return format.FormatClock(sec) }
+func formatTime(sec float64) string       { return format.FormatTime(sec) }
+func formatSRTTime(sec float64) string    { return format.FormatSRTTime(sec) }
 func formatPlayerTime(sec float64) string { return player.FormatPlayerTime(sec) }
 func convertJSONToSRT(inputFile string, data *TranscriptionData, customPath string, quiet bool) string {
 	res, _ := format.ConvertJSONToSRT(inputFile, data, customPath, quiet)
@@ -105,7 +105,7 @@ func writeFileAtomic(path string, data []byte, perm uint32) error {
 	return util.WriteFileAtomic(path, data, os.FileMode(perm))
 }
 func displayName(s string) string { return util.DisplayName(s) }
-func stripHTML(s string) string { return backend.StripHTML(s) }
+func stripHTML(s string) string   { return backend.StripHTML(s) }
 func acquireFileLockWithTimeout(path string, timeout time.Duration) (*fileLockWrapper, error) {
 	return util.AcquireFileLockWithTimeout(path, timeout)
 }
@@ -117,13 +117,15 @@ func loadPodcastConfig(dir string) PodcastConfig {
 func savePodcastConfig(dir string, cfg PodcastConfig) error {
 	return config.SavePodcastConfig(dir, cfg)
 }
-func adRemovalModeLabel(mode string) string { return config.AdRemovalModeLabel(mode) }
-func cycleAdRemovalMode(mode string) string { return config.CycleAdRemovalMode(mode) }
-func downloadPolicyLabel(policy string, k int) string { return config.DownloadPolicyLabel(policy, k) }
-func normalizeAdRemovalMode(mode string) string { return config.NormalizeAdRemovalMode(mode) }
-func cacheDirForPodcast(dir string) string { return podcast.CacheDirForPodcast(dir) }
+func adRemovalModeLabel(mode string) string                    { return config.AdRemovalModeLabel(mode) }
+func cycleAdRemovalMode(mode string) string                    { return config.CycleAdRemovalMode(mode) }
+func downloadPolicyLabel(policy string, k int) string          { return config.DownloadPolicyLabel(policy, k) }
+func normalizeAdRemovalMode(mode string) string                { return config.NormalizeAdRemovalMode(mode) }
+func cacheDirForPodcast(dir string) string                     { return podcast.CacheDirForPodcast(dir) }
 func loadPodcastCache(dir string) (*CachedPodcastIndex, error) { return podcast.LoadPodcastCache(dir) }
-func savePodcastCache(dir string, cache *CachedPodcastIndex) error { return podcast.SavePodcastCache(dir, cache) }
+func savePodcastCache(dir string, cache *CachedPodcastIndex) error {
+	return podcast.SavePodcastCache(dir, cache)
+}
 func loadEpisodeDetails(podDir, epFilename string) (*CachedEpisodeDetails, error) {
 	return podcast.LoadEpisodeDetails(podDir, epFilename)
 }

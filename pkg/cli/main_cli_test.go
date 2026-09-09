@@ -42,7 +42,7 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestSelectProfile(t *testing.T) {
-	cfg := Config{ActiveProfileID: 2, Profiles: []LLMProfile{{1, "One", "", "", "m1", ""}, {2, "Two", "", "", "m2", ""}}}
+	cfg := Config{ActiveProfileID: 2, Profiles: []LLMProfile{{ID: 1, Name: "One", Model: "m1"}, {ID: 2, Name: "Two", Model: "m2"}}}
 	if p := selectProfile(cfg, ""); p.ID != 2 {
 		t.Error("default profile")
 	}
@@ -53,7 +53,6 @@ func TestSelectProfile(t *testing.T) {
 		t.Error("by name")
 	}
 }
-
 
 func TestTopLevelCommandsUniqueFirstLetters(t *testing.T) {
 	var action string
