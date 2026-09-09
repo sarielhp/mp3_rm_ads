@@ -1,0 +1,343 @@
+package cli
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"sort"
+	"strings"
+	"time"
+)
+
+type lsPodcastItem struct {
+	ShortID        string `json:"id"`
+	Title          string `json:"title"`
+	EpisodeCount   int    `json:"episode_count"`
+	CleanCount     int    `json:"clean_count"`
+	DownloadPolicy string `json:"download_policy"`
+	AdRemoval      string `json:"ad_removal"`
+	Retention      string `json:"retention"`
+	LastEpisode    string `json:"last_episode"`
+}
+
+type lsEpisodeItem struct {
+	path           string
+	podcastDir     string
+	podcastTitle   string
+	podcastShortID string
+	episodeShortID string
+	episodeName    string
+	modTime        time.Time
+	sizeBytes      int64
+	origDuration   float64
+	cleanDuration  float64
+	hasTranscript  bool
+	statusStr      string
+	statusColor    string
+}
+
+type lsEpisodeJSON struct {
+	ID                  string  `json:"id"`
+	PodcastID           string  `json:"podcast_id"`
+	PodcastTitle        string  `json:"podcast_title,omitempty"`
+	Title               string  `json:"title"`
+	Date                string  `json:"date"`
+	OriginalDurationSec float64 `json:"original_duration_sec,omitempty"`
+	CleanDurationSec    float64 `json:"clean_duration_sec,omitempty"`
+	DurationSec         float64 `json:"duration_sec,omitempty"`
+	Status              string  `json:"status"`
+	HasTranscript       bool    `json:"has_transcript"`
+	Path                string  `json:"path"`
+}
+
+func podcastExistsByIndexOrID(podcastsDir, query string) bool {
+	res, err := resolveAnyID(podcastsDir, query)
+	return err == nil && res != nil
+}
+
+func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
+	entries := scanPodcastDirs(podcastsDir)
+	if len(entries) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No podcasts found.")
+		}
+		return nil
+	}
+
+	items := collectPodcastListItems(entries)
+
+	if cli.JSON {
+		data, err := json.MarshalIndent(items, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if cli.Quiet {
+		for _, item := range items {
+			fmt.Println(item.ShortID)
+		}
+		return nil
+	}
+
+	printPodcastsTable(items)
+	return nil
+}
+
+func collectPodcastListItems(entries []podcastDirEntry) []lsPodcastItem {
+	var items []lsPodcastItem
+	for _, p := range entries {
+		mp3s := findMP3Files(p.dir)
+		cfg := loadPodcastConfig(p.dir)
+		cleanCount := 0
+		var newestTime time.Time
+
+		for _, mp3 := range mp3s {
+			if isEpisodeClean(mp3) {
+				cleanCount++
+			}
+			pt := getEpisodePublicationTime(mp3)
+			if pt.After(newestTime) {
+				newestTime = pt
+			}
+		}
+
+		retention := "-"
+		if cfg.AutoCleanupDays > 0 {
+			retention = fmt.Sprintf("%dd", cfg.AutoCleanupDays)
+		}
+
+		lastEpStr := "-"
+		if !newestTime.IsZero() {
+			lastEpStr = newestTime.Format("2006-01-02")
+		}
+
+		items = append(items, lsPodcastItem{
+			ShortID:        p.shortID,
+			Title:          p.title,
+			EpisodeCount:   len(mp3s),
+			CleanCount:     cleanCount,
+			DownloadPolicy: cfg.DownloadPolicy,
+			AdRemoval:      cfg.AdRemoval,
+			Retention:      retention,
+			LastEpisode:    lastEpStr,
+		})
+	}
+	return items
+}
+
+func printPodcastsTable(items []lsPodcastItem) {
+	fmt.Printf("\nPodcasts in Library (%d total):\n", len(items))
+	titleWidth := 22
+	cols := podcastTableColumns(titleWidth)
+
+	fmt.Println(renderTableTop(cols))
+	fmt.Println(renderTableHeader(cols))
+	fmt.Println(renderTableDivider(cols))
+
+	for _, item := range items {
+		cells := buildPodcastRowCells(item, titleWidth)
+		fmt.Println(renderTableRow(cells, cols))
+	}
+
+	fmt.Println(renderTableBottom(cols))
+	fmt.Println("  🎙️ Episodes   ✨ Clean   ⬇️ Download   ✂️ Ad Removal   ⏳ Retention   📅 Last Ep")
+}
+
+func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
+	podEntries := scanPodcastDirs(podcastsDir)
+	podIDMap := make(map[string]string)
+	podTitleMap := make(map[string]string)
+	for _, p := range podEntries {
+		podIDMap[p.dir] = p.shortID
+		podTitleMap[p.dir] = p.title
+	}
+
+	allMp3s := findMP3Files(podcastsDir)
+	if len(allMp3s) == 0 {
+		if !cli.Quiet {
+			fmt.Println("No podcast audio files (.mp3) found.")
+		}
+		return nil
+	}
+
+	items := collectLatestEpisodeItems(allMp3s, podTitleMap, podIDMap)
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].modTime.After(items[j].modTime)
+	})
+
+	if limit > len(items) {
+		limit = len(items)
+	}
+	latest := items[:limit]
+
+	if cli.JSON {
+		return outputLatestEpisodesJSON(latest)
+	}
+
+	if cli.Quiet {
+		for _, item := range latest {
+			fmt.Println(item.path)
+		}
+		return nil
+	}
+
+	printLatestEpisodesTable(latest, limit)
+	return nil
+}
+
+func outputLatestEpisodesJSON(items []lsEpisodeItem) error {
+	var jsonList []lsEpisodeJSON
+	for _, it := range items {
+		jsonList = append(jsonList, lsEpisodeJSON{
+			ID:            it.episodeShortID,
+			PodcastID:     it.podcastShortID,
+			PodcastTitle:  it.podcastTitle,
+			Title:         it.episodeName,
+			Date:          it.modTime.Format("2006-01-02 15:04"),
+			Status:        it.statusStr,
+			DurationSec:   it.origDuration,
+			HasTranscript: it.hasTranscript,
+			Path:          it.path,
+		})
+	}
+	data, err := json.MarshalIndent(jsonList, "", "  ")
+	if err != nil {
+		return err
+	}
+	fmt.Println(string(data))
+	return nil
+}
+
+func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[string]string) []lsEpisodeItem {
+	var items []lsEpisodeItem
+	for _, mp3 := range allMp3s {
+		fi, err := os.Stat(mp3)
+		if err != nil {
+			continue
+		}
+		podDir := filepath.Dir(mp3)
+		epName := strings.TrimSuffix(filepath.Base(mp3), filepath.Ext(mp3))
+		if strings.EqualFold(filepath.Base(mp3), "podcast.mp3") {
+			epName = filepath.Base(podDir)
+			podDir = filepath.Dir(podDir)
+		}
+		podTitle := podTitleMap[podDir]
+		if podTitle == "" {
+			podTitle = filepath.Base(podDir)
+		}
+		shortID := podIDMap[podDir]
+		if shortID == "" {
+			shortID = generatePodcastShortID(podTitle)
+		}
+
+		epShortID := getOrSetEpisodeShortID(podDir, shortID, mp3)
+		statusStr, statusColor := getEpisodeStatusLabel(mp3)
+		st := getOrCreateEpisodeStatus(mp3)
+		origDur, cleanDur := getEpisodeDurations(mp3, st)
+		txPath := stripExt(mp3) + ".transcript.json"
+		_, errTx := os.Stat(txPath)
+
+		items = append(items, lsEpisodeItem{
+			path:           mp3,
+			podcastDir:     podDir,
+			podcastTitle:   podTitle,
+			podcastShortID: shortID,
+			episodeShortID: epShortID,
+			episodeName:    epName,
+			modTime:        fi.ModTime(),
+			sizeBytes:      fi.Size(),
+			origDuration:   origDur,
+			cleanDuration:  cleanDur,
+			hasTranscript:  errTx == nil,
+			statusStr:      statusStr,
+			statusColor:    statusColor,
+		})
+	}
+	return items
+}
+
+func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
+	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
+	podWidth := 16
+	titleWidth := 24
+	cols := latestEpisodeTableColumns(podWidth, titleWidth)
+
+	fmt.Println(renderTableTop(cols))
+	fmt.Println(renderTableHeader(cols))
+	fmt.Println(renderTableDivider(cols))
+
+	for _, item := range latest {
+		cells := buildLatestEpisodeRowCells(item, podWidth, titleWidth)
+		fmt.Println(renderTableRow(cells, cols))
+	}
+
+	fmt.Println(renderTableBottom(cols))
+	fmt.Println()
+}
+
+func formatShortStatus(status string) string {
+	switch status {
+	case "Needs Ad Removal", "NeedsAd", "NeedAd", "NeedAdR":
+		return "✂ NeedAdR"
+	case "Queued Remote", "Queued":
+		return "⏳ Queued"
+	case "In Progress", "Active":
+		return "⚡ Active"
+	case "Clean":
+		return "✓ Clean"
+	default:
+		return status
+	}
+}
+
+func isEpisodeClean(mp3Path string) bool {
+	st := getOrCreateEpisodeStatus(mp3Path)
+	return st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path)
+}
+
+func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float64) {
+	origDur := 0.0
+	cleanDur := 0.0
+	if st != nil {
+		origDur = st.Original.DurationSec
+		cleanDur = st.Cleaned.DurationSec
+		if cleanDur == 0 && (st.Status == StateDone || st.Status == StateCopiedBack) {
+			cleanDur = origDur
+		}
+	}
+	if origDur == 0 {
+		cutsFile := stripExt(mp3Path) + ".cuts.json"
+		if data, err := os.ReadFile(cutsFile); err == nil {
+			var cd CutsData
+			if json.Unmarshal(data, &cd) == nil && cd.OriginalDurationSec > 0 {
+				origDur = cd.OriginalDurationSec
+				cleanDur = cd.OriginalDurationSec - cd.TotalCutDurationSec
+			}
+		}
+	}
+	if origDur == 0 {
+		origDur = getAudioDuration(mp3Path)
+		if st != nil && (st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path)) {
+			cleanDur = origDur
+		}
+	}
+	return origDur, cleanDur
+}
+
+func getEpisodeStatusLabel(mp3Path string) (string, string) {
+	st := getOrCreateEpisodeStatus(mp3Path)
+	if st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path) {
+		return "Clean", "green"
+	}
+	if st.Status == StateQueuedRemote {
+		return "Queued Remote", "cyan"
+	}
+	if st.Status == StateTranscribingRemotely || st.Status == StateCuttingRemotely || st.Status == StateTranscribingLocally || st.Status == StateCuttingLocally {
+		return "In Progress", "yellow"
+	}
+	return "NeedAdR", "yellow"
+}

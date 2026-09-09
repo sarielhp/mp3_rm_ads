@@ -1,0 +1,355 @@
+package cli
+
+import (
+	"io"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+	"time"
+)
+
+func TestLsLatestCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "Daily_Show")
+	pod2 := filepath.Join(tempDir, "News_Hour")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+
+	ep1 := filepath.Join(pod1, "ep1.mp3")
+	ep2 := filepath.Join(pod2, "ep2.mp3")
+	ep3 := filepath.Join(pod2, "ep3.mp3")
+
+	_ = os.WriteFile(ep1, []byte("audio1"), 0644)
+	time.Sleep(10 * time.Millisecond)
+	_ = os.WriteFile(ep2, []byte("audio2"), 0644)
+	time.Sleep(10 * time.Millisecond)
+	_ = os.WriteFile(ep3, []byte("audio3"), 0644)
+
+	_ = saveEpisodeStatus(statusPathFor(ep3), &EpisodeStatusFile{
+		Status: StateDone,
+	})
+
+	cfg := Config{
+		PodcastsDir: tempDir,
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		InfoSubcmd: "latest",
+		Count:      2,
+	}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	if !strings.Contains(out, "Latest 2 Episodes Across All Podcasts") {
+		t.Errorf("expected Latest 2 header, got: %s", out)
+	}
+	if !strings.Contains(out, "ep3") {
+		t.Errorf("expected newest episode ep3 to be listed, got: %s", out)
+	}
+	if !strings.Contains(out, "Clean") {
+		t.Errorf("expected ep3 status Clean, got: %s", out)
+	}
+}
+
+func TestLsSinglePodcastCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "ShowA")
+	_ = os.MkdirAll(pod1, 0755)
+	ep1 := filepath.Join(pod1, "ep1.mp3")
+	_ = os.WriteFile(ep1, []byte("audio"), 0644)
+
+	id := getOrSetPodcastShortID(pod1, "ShowA")
+
+	cfg := Config{
+		PodcastsDir: tempDir,
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		Args: []string{id},
+	}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	if !strings.Contains(out, "Podcast: ShowA") || !strings.Contains(out, "ep1") {
+		t.Errorf("expected podcast episodes listing, got: %s", out)
+	}
+}
+
+func TestLsAllPodcastsCommand(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "Alpha_Show")
+	pod2 := filepath.Join(tempDir, "Beta_Cast")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+
+	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
+	_ = os.WriteFile(filepath.Join(pod2, "ep2.mp3"), []byte("audio"), 0644)
+
+	id1 := getOrSetPodcastShortID(pod1, "Alpha Show")
+	id2 := getOrSetPodcastShortID(pod2, "Beta Cast")
+
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	if !strings.Contains(out, "Podcasts in Library") || !strings.Contains(out, id1) || !strings.Contains(out, id2) {
+		t.Errorf("expected podcasts list with IDs %s and %s, got: %s", id1, id2, out)
+	}
+}
+
+func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "Gamma_Show")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
+	id1 := getOrSetPodcastShortID(pod1, "Gamma Show")
+
+	cfg := Config{PodcastsDir: tempDir}
+
+	// JSON test
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cliJSON := CLIOptions{Args: []string{"podcasts"}, JSON: true}
+	err := runInfoCommand(cfg, cliJSON)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+	if err != nil {
+		t.Fatalf("runInfoCommand json failed: %v", err)
+	}
+	outBytes, _ := io.ReadAll(r)
+	if !strings.Contains(string(outBytes), id1) || !strings.Contains(string(outBytes), "episode_count") {
+		t.Errorf("expected json output with id and episode_count, got: %s", string(outBytes))
+	}
+
+	// Quiet test
+	r, w, _ = os.Pipe()
+	oldStdout = os.Stdout
+	os.Stdout = w
+
+	cliQuiet := CLIOptions{Quiet: true}
+	err = runInfoCommand(cfg, cliQuiet)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+	if err != nil {
+		t.Fatalf("runInfoCommand quiet failed: %v", err)
+	}
+	qBytes, _ := io.ReadAll(r)
+	if strings.TrimSpace(string(qBytes)) != id1 {
+		t.Errorf("expected quiet output %q, got: %s", id1, string(qBytes))
+	}
+}
+
+func TestLsSinglePodcastJSON(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "Delta_Show")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
+	id1 := getOrSetPodcastShortID(pod1, "Delta Show")
+
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{Args: []string{id1}, JSON: true}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+	if !strings.Contains(out, "recent_episodes") || !strings.Contains(out, id1) {
+		t.Errorf("expected json episodes list, got: %s", out)
+	}
+}
+
+func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
+	tempDir := t.TempDir()
+	pod := filepath.Join(tempDir, "Hebrew_Podcast")
+	_ = os.MkdirAll(pod, 0755)
+
+	epHebrew := filepath.Join(pod, "פרק 1 - שלום עולם.mp3")
+	_ = os.WriteFile(epHebrew, []byte("audio"), 0644)
+
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		InfoSubcmd: "latest",
+		Count:      1,
+	}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	rawTitle := "פרק 1 - שלום עולם"
+	expectedTitle := displayName(rawTitle)
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected latest episodes table to contain displayName reordered %q, got: %s", expectedTitle, out)
+	}
+	if expectedTitle != rawTitle && strings.Contains(out, rawTitle) {
+		t.Errorf("expected latest episodes table not to contain raw Hebrew %q, got: %s", rawTitle, out)
+	}
+}
+
+func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
+	tempDir := t.TempDir()
+	pod := filepath.Join(tempDir, "פודקאסט_בעברית")
+	_ = os.MkdirAll(pod, 0755)
+
+	epHebrew := filepath.Join(pod, "פרק ראשון של הפודקאסט.mp3")
+	_ = os.WriteFile(epHebrew, []byte("audio"), 0644)
+
+	id := getOrSetPodcastShortID(pod, "פודקאסט_בעברית")
+	cfg := Config{PodcastsDir: tempDir}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	cli := CLIOptions{
+		Args: []string{id},
+	}
+	err := runInfoCommand(cfg, cli)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	if err != nil {
+		t.Fatalf("runInfoCommand failed: %v", err)
+	}
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	rawTitle := "פרק ראשון של הפודקאסט"
+	expectedTitle := truncate(displayName(rawTitle), 35)
+	if !strings.Contains(out, expectedTitle) {
+		t.Errorf("expected single podcast table to contain displayName reordered %q, got: %s", expectedTitle, out)
+	}
+	expectedPodTitle := displayName("פודקאסט_בעברית")
+	if !strings.Contains(out, expectedPodTitle) {
+		t.Errorf("expected header to contain displayName reordered podcast title %q, got: %s", expectedPodTitle, out)
+	}
+}
+
+func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
+	items := []lsEpisodeItem{
+		{
+			podcastTitle:   "חדשות הבוקר",
+			podcastShortID: "hds1",
+			episodeShortID: "ep01",
+			episodeName:    "פרק בדיקה עם עברית",
+			modTime:        time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC),
+			origDuration:   120.0,
+			statusStr:      "Needs Ad Removal",
+			statusColor:    "yellow",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+
+	printLatestEpisodesTable(items, 1)
+
+	_ = w.Close()
+	os.Stdout = oldStdout
+
+	outBytes, _ := io.ReadAll(r)
+	out := string(outBytes)
+
+	expectedEp := displayName("פרק בדיקה עם עברית")
+	expectedPod := displayName("חדשות הבוקר")
+
+	if !strings.Contains(out, expectedEp) {
+		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)
+	}
+	if !strings.Contains(out, expectedPod) {
+		t.Errorf("expected table to contain %q, got: %s", expectedPod, out)
+	}
+}
+
+func TestFormatShortStatusAdR(t *testing.T) {
+	cases := []struct {
+		input string
+		want  string
+	}{
+		{"NeedAdR", "✂ NeedAdR"},
+		{"NeedsAd", "✂ NeedAdR"},
+		{"NeedAd", "✂ NeedAdR"},
+		{"Needs Ad Removal", "✂ NeedAdR"},
+		{"Clean", "✓ Clean"},
+		{"Queued", "⏳ Queued"},
+		{"Active", "⚡ Active"},
+	}
+	for _, tc := range cases {
+		got := formatShortStatus(tc.input)
+		if got != tc.want {
+			t.Errorf("formatShortStatus(%q) = %q, want %q", tc.input, got, tc.want)
+		}
+	}
+}

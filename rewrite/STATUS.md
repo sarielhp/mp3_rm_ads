@@ -17,23 +17,19 @@ This document tracks the live status of the modularization and package rewrite o
 | **06** | [`STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md) | `pkg/podcast` | **COMPLETED** | `pkg/podcast` created and tested |
 | **07** | [`STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md) | `pkg/remote` | **COMPLETED** | `pkg/remote` created and tested |
 | **08** | [`STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md) | `pkg/kitty`, `pkg/tui` | **COMPLETED** | `pkg/kitty` & `pkg/tui` created, visual tour & tests pass |
-| **09** | [`STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md) | `pkg/cli` | **READY** | Next stage to execute |
-| **10** | [`STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md) | `cmd/abs`, Cleanup | **PLANNED** | Final verification & gate |
+| **09** | [`STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md) | `pkg/cli` | **COMPLETED** | `pkg/cli` created and fully tested |
+| **10** | [`STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md) | `cmd/abs`, Cleanup | **READY** | Final entrypoint, file cleanup, verification |
 
 ---
 
 ## 2. Immediate Next Step for Resuming Agent
 
 To continue execution:
-1. Open [`rewrite/STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md).
-2. Create `pkg/cli` (command dispatcher, CLI flags, usage/help, table printers, subcommands).
-3. Run verification:
-   ```bash
-   go test ./pkg/cli/...
-   go test -timeout 30s ./...
-   ./tools/audit_lines --quiet
-   ```
-4. Update this file (`rewrite/STATUS.md`) setting Stage 09 to **COMPLETED** and commit.
+1. Open [`rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md).
+2. Create `cmd/abs/main.go` and replace root `main.go` with minimal entrypoint delegating to `pkg/cli.Execute(os.Args[1:])`.
+3. Remove redundant root `.go` files that are now in `pkg/`.
+4. Run full verification gates (`./tools/check --full`, `./tools/audit_lines --strict`, `./tools/visual_audit`).
+5. Update `rewrite/STATUS.md` and commit.
 
 ---
 
