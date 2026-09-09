@@ -128,3 +128,28 @@ func ConvertJSONToTXT(inputFile string, data *types.TranscriptionData, totalDura
 	}
 	return txtFile, nil
 }
+
+func SaveJSONTranscript(mainFile string, data *types.TranscriptionData, jsonFile string, quiet bool, id3Tags map[string]string) error {
+	outputData := make(map[string]interface{})
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	_ = json.Unmarshal(raw, &outputData)
+
+	for k, v := range id3Tags {
+		outputData["id3_"+k] = v
+	}
+
+	content, err := json.MarshalIndent(outputData, "", "  ")
+	if err != nil {
+		return err
+	}
+	if err := util.WriteFileAtomic(jsonFile, append(content, '\n'), 0644); err != nil {
+		return err
+	}
+	if !quiet {
+		fmt.Printf("Saved raw Whisper JSON data (.json) to: '%s'\n", jsonFile)
+	}
+	return nil
+}

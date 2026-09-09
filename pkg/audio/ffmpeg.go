@@ -231,3 +231,32 @@ func copyFileDirect(src, dst string) error {
 	_, err = io.Copy(out, in)
 	return err
 }
+
+func CutAudioFilterComplex(absInput string, keepSegments [][2]float64, absOutput string) bool {
+	filterComplex := BuildCutFilterComplex(keepSegments)
+	cmd := exec.Command("ffmpeg", "-y", "-loglevel", "error",
+		"-i", absInput,
+		"-filter_complex", filterComplex,
+		"-map", "[aout]",
+		"-c:a", "libmp3lame",
+		"-b:a", "192k",
+		absOutput)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "ffmpeg filter complex failed: %v, output: %s\n", err, string(out))
+		return false
+	}
+	return true
+}
+
+func CutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile string) bool {
+	if len(keepSegments) == 0 {
+		return false
+	}
+	if !KeepFractionIsPlausible(inputFile, keepSegments) {
+		return false
+	}
+	absInput, _ := filepath.Abs(inputFile)
+	absOutput, _ := filepath.Abs(outputFile)
+	return CutAudioFilterComplex(absInput, keepSegments, absOutput)
+}

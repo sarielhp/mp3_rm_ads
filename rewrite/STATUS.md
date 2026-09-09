@@ -15,8 +15,8 @@ This document tracks the live status of the modularization and package rewrite o
 | **04** | [`STAGE_04_TRANSCRIBE_AND_AI.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_04_TRANSCRIBE_AND_AI.md) | `pkg/transcribe`, `pkg/detect`, `pkg/gemini` | **COMPLETED** | `pkg/transcribe`, `pkg/detect`, `pkg/gemini` created and tested |
 | **05** | [`STAGE_05_PIPELINE_AND_PLAYER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_05_PIPELINE_AND_PLAYER.md) | `pkg/pipeline`, `pkg/player` | **COMPLETED** | `pkg/pipeline` & `pkg/player` created and tested |
 | **06** | [`STAGE_06_PODCAST_MANAGEMENT.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_06_PODCAST_MANAGEMENT.md) | `pkg/podcast` | **COMPLETED** | `pkg/podcast` created and tested |
-| **07** | [`STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md) | `pkg/remote` | **READY** | Next stage to execute |
-| **08** | [`STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md) | `pkg/kitty`, `pkg/tui` | **PLANNED** | Blocked on Stages 05 & 06 |
+| **07** | [`STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md) | `pkg/remote` | **COMPLETED** | `pkg/remote` created and tested |
+| **08** | [`STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md) | `pkg/kitty`, `pkg/tui` | **READY** | Next stage to execute |
 | **09** | [`STAGE_09_CLI_AND_COMMANDS.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_09_CLI_AND_COMMANDS.md) | `pkg/cli` | **PLANNED** | Blocked on Stages 05, 06, 07, 08 |
 | **10** | [`STAGE_10_ENTRYPOINT_AND_CLEANUP.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_10_ENTRYPOINT_AND_CLEANUP.md) | `cmd/abs`, Cleanup | **PLANNED** | Final verification & gate |
 
@@ -25,16 +25,15 @@ This document tracks the live status of the modularization and package rewrite o
 ## 2. Immediate Next Step for Resuming Agent
 
 To continue execution:
-1. Open [`rewrite/STAGE_07_REMOTE_WORKER.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_07_REMOTE_WORKER.md).
-2. Create `pkg/remote` (SSH executor, batch dispatching, remote worker queue, compliance auditing).
+1. Open [`rewrite/STAGE_08_TUI_AND_KITTY.md`](file:///home/sariel/prog/26/podcasts/abs/rewrite/STAGE_08_TUI_AND_KITTY.md).
+2. Create `pkg/kitty` and `pkg/tui` (TUI screens, bubbletea models, kitty graphics).
 3. Run verification:
    ```bash
-   go test ./pkg/remote/...
+   go test ./pkg/kitty/... ./pkg/tui/...
    go test -timeout 30s ./...
    ./tools/audit_lines --quiet
-   ./tools/verify_remote_queue
    ```
-4. Update this file (`rewrite/STATUS.md`) setting Stage 07 to **COMPLETED** and commit.
+4. Update this file (`rewrite/STATUS.md`) setting Stage 08 to **COMPLETED** and commit.
 
 ---
 

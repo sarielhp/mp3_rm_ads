@@ -415,3 +415,7 @@ func ProcessJSONFile(inputFile string, cli types.CLIOptions) {
 		format.ConvertJSONToTXT(inputFile, nil, 0, cli.TranscriptPath, cli.Quiet)
 	}
 }
+
+func SaveJSONTranscript(mainFile string, data *types.TranscriptionData, jsonFile string, quiet bool, id3Tags map[string]string) error {
+	return format.SaveJSONTranscript(mainFile, data, jsonFile, quiet, id3Tags)
+}

@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/sariel/abs/pkg/backend"
+	"github.com/sariel/abs/pkg/pipeline"
 	"github.com/sariel/abs/pkg/util"
 )
 
@@ -185,4 +186,41 @@ func CacheStats() (dir string, entries int, bytes int64) {
 		})
 	}
 	return dir, entries, bytes
+}
+
+func GetEpisodePublicationTime(filePath string) time.Time {
+	statPath := pipeline.StatusPathFor(filePath)
+	if st, err := pipeline.LoadEpisodeStatus(statPath); err == nil && st != nil && st.PublishedAt != "" {
+		if t, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !t.IsZero() {
+			return t
+		}
+	}
+	dir := filepath.Dir(filePath)
+	fn := filepath.Base(filePath)
+	if cached, _ := LoadPodcastCache(dir); cached != nil {
+		for _, ep := range cached.Episodes {
+			if (ep.Filename == fn || ep.Path == filePath) && ep.PublishedAt > 0 {
+				return time.UnixMilli(ep.PublishedAt)
+			}
+		}
+		basePrefix := util.StripExt(fn)
+		if idx := strings.LastIndex(basePrefix, " ("); idx != -1 && strings.HasSuffix(basePrefix, ")") {
+			basePrefix = strings.TrimSpace(basePrefix[:idx])
+		}
+		for _, ep := range cached.Episodes {
+			epPrefix := util.StripExt(ep.Filename)
+			if idx := strings.LastIndex(epPrefix, " ("); idx != -1 && strings.HasSuffix(epPrefix, ")") {
+				epPrefix = strings.TrimSpace(epPrefix[:idx])
+			}
+			if (epPrefix == basePrefix || strings.HasPrefix(ep.Filename, basePrefix) || strings.HasPrefix(fn, epPrefix)) && ep.PublishedAt > 0 {
+				return time.UnixMilli(ep.PublishedAt)
+			}
+		}
+	}
+	if !strings.Contains(filePath, "abs_remote") && !strings.Contains(filePath, "/.work/") {
+		if fi, err := os.Stat(filePath); err == nil {
+			return fi.ModTime()
+		}
+	}
+	return time.Time{}
 }
