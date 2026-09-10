@@ -276,24 +276,22 @@ func (c *PodFetchBackend) findEpisodeIDForDownload(podcastID string, ep FeedEpis
 			}
 		}
 	}
-	if ep.GUID != "" {
-		return ep.GUID, false, nil
-	}
-	if ep.Title != "" {
-		return ep.Title, false, nil
-	}
-	return "", false, fmt.Errorf("episode %q not found in podfetch catalog", ep.Title)
+	// An RSS GUID is not a PodFetch episode id, and PodFetch answers a download
+	// request for an id it does not recognise with HTTP 200 and no action. So
+	// guessing here does not fail loudly, it fails silently: the run reports the
+	// episode queued and nothing is ever downloaded. Say so instead.
+	return "", false, fmt.Errorf("episode %q is not in the podfetch catalog; refresh the feed first", ep.Title)
 }
 
 func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpisode) error {
 	if c.Host == "" {
 		return nil
 	}
-	var lastErr error
+	var failures []string
 	for _, ep := range episodes {
 		epID, isDone, err := c.findEpisodeIDForDownload(podcastID, ep)
 		if err != nil {
-			lastErr = err
+			failures = append(failures, err.Error())
 			continue
 		}
 		if isDone {
@@ -308,12 +306,15 @@ func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpis
 			_, err = c.Request(fmt.Sprintf("/api/v1/podcasts/%s/download", podcastID), "POST", payload)
 		}
 		if err != nil {
-			lastErr = err
+			failures = append(failures, fmt.Sprintf("queue %q: %v", ep.Title, err))
 		} else {
 			c.addPendingDownload(podcastID, epID)
 		}
 	}
-	return lastErr
+	if len(failures) > 0 {
+		return fmt.Errorf("%s", strings.Join(failures, "; "))
+	}
+	return nil
 }
 
 func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) error {

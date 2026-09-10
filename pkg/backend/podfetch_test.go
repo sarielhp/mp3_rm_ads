@@ -139,6 +139,10 @@ func setupMockPodFetchEpisodesServer(downloadInvoked *bool, deletedEpisode *stri
 		case strings.HasPrefix(r.URL.Path, "/api/v1/podcasts/1/episodes/"):
 			*deletedEpisode = filepath.Base(r.URL.Path)
 			w.WriteHeader(http.StatusOK)
+		case r.URL.Path == "/api/v1/podcasts/1/episodes" && r.Method == "GET":
+			_ = json.NewEncoder(w).Encode([]podFetchEpisodeDTO{
+				{EpisodeID: "ep-1", Name: "Feed Ep 1", URL: "https://example.com/f1.mp3"},
+			})
 		case r.URL.Path == "/api/v1/podcasts/1/downloads":
 			_ = json.NewEncoder(w).Encode([]podFetchEpisodeDTO{
 				{ID: 99, Name: "Downloading Ep", EpisodeID: "ep-99", URL: "https://example.com/dl.mp3"},
@@ -167,6 +171,15 @@ func TestPodFetchEpisodesAndDownloads(t *testing.T) {
 
 	if err := be.DownloadEpisodes("1", eps); err != nil || !downloadInvoked {
 		t.Fatalf("DownloadEpisodes failed: %v, invoked: %v", err, downloadInvoked)
+	}
+
+	// PodFetch answers a download request for an id it does not recognise with
+	// HTTP 200 and no action, so an episode missing from its catalog has to be
+	// reported here rather than passed on as if it had been queued.
+	downloadInvoked = false
+	stranger := []FeedEpisode{{Title: "Never Ingested", GUID: "urn:example:unknown", EnclosureURL: "https://example.com/unknown.mp3"}}
+	if err := be.DownloadEpisodes("1", stranger); err == nil || downloadInvoked {
+		t.Fatalf("expected an uncatalogued episode to be reported, got err=%v invoked=%v", err, downloadInvoked)
 	}
 
 	if err := be.DeletePodcastEpisode("1", "ep-55"); err != nil || deletedEpisode != "ep-55" {

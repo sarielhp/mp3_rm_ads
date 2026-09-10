@@ -136,15 +136,16 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 	if cli.Quiet {
 		return
 	}
-	selected, episodes, failed := 0, 0, 0
+	selected, episodes, failed, unknown := 0, 0, 0, 0
 	for i := range plans {
-		switch {
-		case plans[i].Err != nil:
+		if plans[i].Err != nil {
 			failed++
-		case len(plans[i].Episodes) > 0:
+		}
+		if len(plans[i].Episodes) > 0 {
 			selected++
 			episodes += len(plans[i].Episodes)
 		}
+		unknown += len(plans[i].Unknown)
 	}
 	fmt.Printf("Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
 		len(plans), elapsed.Seconds(), episodes, selected)
@@ -154,11 +155,18 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 	fmt.Println(".")
 
 	for i := range plans {
-		if plans[i].Err != nil {
+		switch {
+		case plans[i].Err != nil:
 			fmt.Printf("  ! %s: %v\n", plans[i].Title(), plans[i].Err)
-		} else if cli.Verbose && len(plans[i].Episodes) == 0 {
+		case len(plans[i].Unknown) > 0:
+			fmt.Printf("  ? %s: %d episode(s) the server has not indexed yet\n",
+				plans[i].Title(), len(plans[i].Unknown))
+		case cli.Verbose && len(plans[i].Episodes) == 0:
 			fmt.Printf("  - %s: up to date\n", plans[i].Title())
 		}
+	}
+	if unknown > 0 {
+		fmt.Printf("%d episode(s) cannot be requested until the server indexes them; run 'abs server feeds update'.\n", unknown)
 	}
 }
 

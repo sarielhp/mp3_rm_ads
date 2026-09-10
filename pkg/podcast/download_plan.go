@@ -16,10 +16,12 @@ import (
 
 // DownloadPlan is what one podcast turned out to need: the episodes selected
 // for download and the reasons they were selected, or the error that stopped
-// the feed from being read at all.
+// the feed from being read at all. Unknown holds selected episodes the server
+// cannot be asked for because it has never ingested them.
 type DownloadPlan struct {
 	Item     backend.Podcast
 	Episodes []backend.FeedEpisode
+	Unknown  []backend.FeedEpisode
 	Reasons  []string
 	Err      error
 }
@@ -71,7 +73,33 @@ func PlanPodcastDownloads(client backend.Backend, item backend.Podcast, index *P
 	}
 
 	plan.Episodes, plan.Reasons = ResolveEpisodesToDownload(item, sortedCatalog, downloadedIndices, isDownloaded, opts)
+	if catalogBound(client) {
+		plan.Episodes, plan.Unknown = splitByCatalog(plan.Episodes, index)
+	}
 	return plan
+}
+
+// catalogBound reports whether a backend can only download episodes that are
+// already in its own catalog. PodFetch is: it answers a download request for an
+// episode it has never ingested with HTTP 200 and does nothing, so a run that
+// hands it a brand new feed episode reports success and downloads nothing.
+// Getting the episode into its catalog is a feed refresh, not a download.
+func catalogBound(client backend.Backend) bool {
+	return client != nil && client.Name() == "podfetch"
+}
+
+// splitByCatalog separates the selected episodes the server already knows from
+// the ones it does not, so a run can say which episodes it is not going to be
+// able to fetch and why instead of silently failing to fetch them.
+func splitByCatalog(selected []backend.FeedEpisode, index *PodcastEpisodeIndex) (known, unknown []backend.FeedEpisode) {
+	for _, ep := range selected {
+		if index.Knows(ep) {
+			known = append(known, ep)
+		} else {
+			unknown = append(unknown, ep)
+		}
+	}
+	return known, unknown
 }
 
 // PlanDownloads plans every target podcast concurrently, reporting progress as
