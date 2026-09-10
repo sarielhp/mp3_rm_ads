@@ -9,7 +9,6 @@ import (
 	"unicode"
 
 	"abs/pkg/config"
-	"abs/pkg/tui"
 	"abs/pkg/types"
 )
 
@@ -208,51 +207,4 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	cutsResult := saveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, cli.Quiet)
 	t0Step3 := time.Now()
 	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, cli, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
-}
-
-func Execute(args []string) int {
-	action, cli, err := parseFlagsArgs(args)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
-	}
-	if action == "" {
-		return 0
-	}
-	ensureConfigExists()
-	config := loadConfig()
-
-	if handled, hErr := handleParityCommands(action, config, cli); handled {
-		if hErr != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", hErr)
-			return 1
-		}
-		return 0
-	}
-
-	switch action {
-	case "config":
-		if err := handleMainConfig(&config, cli); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return 1
-		}
-	case "tui":
-		if err := tui.RunTUI(&config, cli.PodcastsDir); err != nil {
-			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
-			return 1
-		}
-	case "server", "sync":
-		if err := handleServerCommand(config, cli); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return 1
-		}
-	case "offload":
-		handleRemoteCommand(config, cli)
-	case "rm_ads":
-		if err := handleMainProc(config, cli, action); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			return 1
-		}
-	}
-	return 0
 }

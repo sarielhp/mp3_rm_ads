@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"github.com/sarielhp/clihelp"
 )
 
 func runPlayerCommand(cfg Config, cli CLIOptions) error {
@@ -181,4 +183,76 @@ func printTranscriptText(jsonPath string) error {
 
 	fmt.Println(string(data))
 	return nil
+}
+
+func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "player",
+		Description: "Control background audio playback",
+		UsageLine:   "abs player [command]",
+		Subcommands: []clihelp.Command{
+			{
+				Name:        "play",
+				Description: "Play an episode or resume playback",
+				UsageLine:   "abs player play [id]",
+				Args:        clihelp.RangeArgs(0, 1),
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "play"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+			{
+				Name:        "stop",
+				Description: "Stop background audio playback",
+				UsageLine:   "abs player stop",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "stop"
+					return nil
+				},
+			},
+			{
+				Name:        "pause",
+				Description: "Toggle playback pause state",
+				UsageLine:   "abs player pause",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "pause"
+					return nil
+				},
+			},
+			{
+				Name:        "status",
+				Description: "Display player status and progress",
+				UsageLine:   "abs player status",
+				Args:        clihelp.NoArgs,
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "status"
+					return nil
+				},
+			},
+			{
+				Name:        "daemon",
+				Hidden:      true,
+				Description: "Internal background player daemon",
+				Run: func(ctx *clihelp.Context) error {
+					*action = "player"
+					opts.PlayerSubcmd = "daemon"
+					opts.Args = ctx.Args
+					return nil
+				},
+			},
+		},
+		Args: clihelp.RangeArgs(0, 2),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "player"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
 }

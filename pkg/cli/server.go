@@ -1,7 +1,12 @@
 package cli
 
 import (
+	"abs/pkg/backend"
+	"abs/pkg/podcast"
+	"fmt"
 	"os"
+	"strconv"
+	"strings"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -57,4 +62,139 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 			return nil
 		},
 	}
+}
+
+func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal *int) []clihelp.Command {
+	return []clihelp.Command{
+		buildServerFeedsSubcommand(opts, action),
+		buildServerDownloadSubcommand(opts, action, countVal, keepVal),
+		buildServerPruneSubcommand(opts, action, keepVal),
+		buildServerPolicySubcommand(opts, action),
+		buildServerListSubcommand(opts, action),
+		buildServerGetInfoSubcommand(opts, action),
+		buildServerRescanSubcommand(opts, action),
+		buildServerTimelineSubcommand(opts, action),
+		buildServerOPMLSubcommand(opts, action),
+		buildServerFrequencySubcommand(opts, action),
+		buildServerDisableHourlySubcommand(opts, action),
+		buildServerCleanOrphansSubcommand(opts, action),
+	}
+}
+
+func handleServerCommand(config Config, cli CLIOptions) error {
+	subcmd := cli.ServerSubcmd
+	if subcmd == "" {
+		subcmd = cli.SyncSubcmd
+	}
+	switch subcmd {
+	case "":
+		showServerUsage()
+		return nil
+	case "feeds":
+		return handleServerFeeds(config, cli)
+	case "download":
+		return handleServerDownload(config, cli)
+	case "prune", "keep":
+		return handleServerKeep(config, cli)
+	case "policy":
+		return runPolicyCommand(config, cli)
+	case "list":
+		return handleServerList(config, cli)
+	case "get-info", "get_info":
+		return handleServerGetInfo(config, cli)
+	case "rescan":
+		return handleServerRescan(config, cli)
+	case "timeline":
+		return handleServerTimeline(config, cli)
+	case "opml":
+		return handleServerOPML(config, cli)
+	case "frequency":
+		return handleServerFrequency(config, cli)
+	case "disable-hourly", "disable_hourly":
+		return handleServerDisableHourly(config, cli)
+	case "clean-orphans":
+		return handleServerCleanOrphans(config, cli)
+	default:
+		return fmt.Errorf("unknown server subcommand %q", subcmd)
+	}
+}
+
+func showServerUsage() {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+	_ = app.RenderCommand(clihelp.Options{}, "server")
+}
+
+func matchBackendPodcast(podcasts []backend.Podcast, target string) *backend.Podcast {
+	clean := strings.TrimSpace(target)
+	if clean == "" {
+		return nil
+	}
+	if idx, err := strconv.Atoi(clean); err == nil && idx >= 1 && idx <= len(podcasts) {
+		return &podcasts[idx-1]
+	}
+	for i := range podcasts {
+		if podcasts[i].ID == clean || podcasts[i].Media.ID == clean {
+			return &podcasts[i]
+		}
+	}
+	lower := strings.ToLower(clean)
+	for i := range podcasts {
+		if strings.ToLower(podcasts[i].Media.Metadata.Title) == lower {
+			return &podcasts[i]
+		}
+	}
+	for i := range podcasts {
+		if strings.Contains(strings.ToLower(podcasts[i].Media.Metadata.Title), lower) {
+			return &podcasts[i]
+		}
+	}
+	for i := range podcasts {
+		short := podcast.GeneratePodcastShortID(podcasts[i].Media.Metadata.Title)
+		if strings.EqualFold(short, clean) {
+			return &podcasts[i]
+		}
+	}
+	return nil
+}
+
+func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
+	podcasts, err := b.Podcasts()
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
+	}
+	return filterServerTargets(podcasts, cli)
+}
+
+func serverTargetName(cli CLIOptions) string {
+	target := cli.Podcast
+	if target == "" && len(cli.Args) > 0 {
+		if cli.Args[0] != "update" {
+			target = cli.Args[0]
+		} else if len(cli.Args) > 1 {
+			target = cli.Args[1]
+		}
+	}
+	return target
+}
+
+func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
+	if target := serverTargetName(cli); target != "" {
+		matched := matchBackendPodcast(podcasts, target)
+		if matched == nil {
+			return nil, fmt.Errorf("podcast matching %q not found on server", target)
+		}
+		return []backend.Podcast{*matched}, nil
+	}
+	var active []backend.Podcast
+	for _, p := range podcasts {
+		if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
+			active = append(active, p)
+		}
+	}
+	if len(active) > 0 {
+		return active, nil
+	}
+	return podcasts, nil
 }
