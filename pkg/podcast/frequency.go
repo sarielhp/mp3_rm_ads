@@ -18,6 +18,11 @@ type PodcastFreqResult struct {
 	Err         error
 }
 
+// freqCacheEpisodeLimit caps how much publication history is cached per feed.
+// The analysis only needs enough recent episodes to establish a cadence, and
+// some feeds carry thousands.
+const freqCacheEpisodeLimit = 100
+
 func GetEpisodesForFrequency(client backend.Backend, item backend.Podcast, podcastsDir string, refresh bool, feedCache *FeedCacheManager) ([]backend.FeedEpisode, error) {
 	if feedCache == nil {
 		feedCache = DefaultFeedCache()
@@ -27,8 +32,10 @@ func GetEpisodesForFrequency(client backend.Backend, item backend.Podcast, podca
 
 	if !refresh {
 		if feedURL != "" {
-			if entry := feedCache.Get(feedURL); entry != nil && len(entry.Episodes) > 0 && !entry.IsExpired(FeedCacheDefaultTTL) {
-				return entry.Episodes, nil
+			if entry := feedCache.Get(feedURL); entry != nil && !entry.IsExpired(FeedCacheDefaultTTL) {
+				if eps := entry.FeedEpisodes(); len(eps) > 0 {
+					return eps, nil
+				}
 			}
 		}
 		if podDir != "" {
@@ -40,13 +47,16 @@ func GetEpisodesForFrequency(client backend.Backend, item backend.Podcast, podca
 
 	if client != nil && feedURL != "" {
 		if feedEpisodes, err := client.PodcastFeedEpisodes(feedURL); err == nil && len(feedEpisodes) > 0 {
-			takeCount := min(100, len(feedEpisodes))
+			takeCount := min(freqCacheEpisodeLimit, len(feedEpisodes))
 			cachedEps := feedEpisodes[:takeCount]
 			feedCache.Put(feedURL, &FeedCacheEntry{
 				FeedURL:     feedURL,
 				LastChecked: time.Now(),
-				Episodes:    cachedEps,
+				PubDates:    pubDatesFromEpisodes(cachedEps),
 			})
+			// Without this the entry lived only for the current process, so the
+			// cache never spared a later run any work.
+			_ = feedCache.Save()
 			return cachedEps, nil
 		}
 	}

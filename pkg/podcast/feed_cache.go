@@ -50,9 +50,51 @@ type FeedCacheEntry struct {
 	// EpisodeCount is how many episodes the feed carried at the last check. It
 	// lets an unchanged feed be reported without re-transferring its body.
 	EpisodeCount int `json:"episode_count,omitempty"`
+
+	// PubDates is the compact publication history the frequency analysis reads
+	// back. Episodes, its predecessor, held whole episode records: descriptions
+	// included, none of which any caller reads. It is still read so existing
+	// caches keep working, but it is no longer written.
+	PubDates []FeedCachePubDate `json:"pub_dates,omitempty"`
+}
+
+// FeedCachePubDate is all the frequency analysis needs of an episode.
+type FeedCachePubDate struct {
+	Title       string `json:"title,omitempty"`
+	PublishedAt int64  `json:"published_at"`
 }
 
 const FeedCacheDefaultTTL = 48 * time.Hour
+
+// FeedCacheRetention is how long an entry survives without being revisited. It
+// is far longer than the freshness TTL, so a feed checked only occasionally
+// keeps its validators, but bounded so the cache cannot grow without limit as
+// subscriptions come and go.
+const FeedCacheRetention = 30 * 24 * time.Hour
+
+// FeedEpisodes reconstructs the episodes stored for the frequency analysis.
+// Only titles and publication times are retained.
+func (e *FeedCacheEntry) FeedEpisodes() []backend.FeedEpisode {
+	if e == nil {
+		return nil
+	}
+	if len(e.PubDates) == 0 {
+		return e.Episodes
+	}
+	eps := make([]backend.FeedEpisode, 0, len(e.PubDates))
+	for _, pd := range e.PubDates {
+		eps = append(eps, backend.FeedEpisode{Title: pd.Title, PublishedAt: pd.PublishedAt})
+	}
+	return eps
+}
+
+func pubDatesFromEpisodes(episodes []backend.FeedEpisode) []FeedCachePubDate {
+	dates := make([]FeedCachePubDate, 0, len(episodes))
+	for _, ep := range episodes {
+		dates = append(dates, FeedCachePubDate{Title: ep.Title, PublishedAt: ep.PublishedAt})
+	}
+	return dates
+}
 
 func (e *FeedCacheEntry) IsExpired(ttl time.Duration) bool {
 	if e == nil || e.LastChecked.IsZero() {
@@ -101,6 +143,9 @@ func NewFeedCacheManager(cachePath string) *FeedCacheManager {
 		entries:   make(map[string]*FeedCacheEntry),
 	}
 	mgr.load()
+	// Persist a prune straight away: a run that only reads the cache would
+	// otherwise leave the pruned entries on disk indefinitely.
+	_ = mgr.Save()
 	return mgr
 }
 
@@ -113,9 +158,36 @@ func (m *FeedCacheManager) load() {
 		return
 	}
 	var loaded map[string]*FeedCacheEntry
-	if err := json.Unmarshal(data, &loaded); err == nil {
-		m.entries = loaded
+	if err := json.Unmarshal(data, &loaded); err != nil {
+		return
 	}
+	m.entries = loaded
+	m.dirty = pruneFeedEntries(loaded, FeedCacheRetention)
+}
+
+// pruneFeedEntries drops entries nothing has revisited inside the retention
+// window and folds legacy whole-episode records into the compact publication
+// history that replaced them. Nothing ever evicted anything before, so a
+// long-lived cache accumulated one entry per feed URL ever seen, the bulk of
+// the bytes being episode descriptions no caller reads back. It reports whether
+// anything changed, so the caller knows to rewrite the file.
+func pruneFeedEntries(entries map[string]*FeedCacheEntry, retention time.Duration) bool {
+	changed := false
+	for url, entry := range entries {
+		if entry == nil || entry.IsExpired(retention) {
+			delete(entries, url)
+			changed = true
+			continue
+		}
+		if len(entry.Episodes) > 0 {
+			if len(entry.PubDates) == 0 {
+				entry.PubDates = pubDatesFromEpisodes(entry.Episodes)
+			}
+			entry.Episodes = nil
+			changed = true
+		}
+	}
+	return changed
 }
 
 func (m *FeedCacheManager) Save() error {

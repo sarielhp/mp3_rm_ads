@@ -187,7 +187,7 @@ func classifyFetchedFeed(res FeedCheckResult, fetched FeedFetchResult, entry *Fe
 	latest := doc.LatestGUID()
 	res.EpisodeCount = len(doc.Episodes)
 
-	cache.Put(res.FeedURL, &FeedCacheEntry{
+	updated := &FeedCacheEntry{
 		FeedURL:        res.FeedURL,
 		ETag:           fetched.ETag,
 		LastModified:   fetched.LastModified,
@@ -196,7 +196,13 @@ func classifyFetchedFeed(res FeedCheckResult, fetched FeedFetchResult, entry *Fe
 		LastBuildDate:  doc.LastBuildDate,
 		ChannelPubDate: doc.ChannelPubDate,
 		EpisodeCount:   len(doc.Episodes),
-	})
+	}
+	if entry != nil {
+		// The sweep replaces the entry outright, so carry over the publication
+		// history the frequency analysis maintains rather than discarding it.
+		updated.PubDates = entry.PubDates
+	}
+	cache.Put(res.FeedURL, updated)
 
 	if !opts.Force && feedMarkersUnchanged(entry, doc, latest) {
 		res.Status = FeedUnchanged
