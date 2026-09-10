@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -320,4 +321,77 @@ func buildConfigCompletionCommand() clihelp.Command {
 		}
 	}
 	return cmd
+}
+
+func runConfigCommand(config *Config, cli CLIOptions) error {
+	switch cli.ConfigCmd {
+	case "get":
+		if err := handleConfigGet(*config, cli.ConfigKey); err != nil {
+			return err
+		}
+	case "set":
+		if err := handleConfigSet(config, cli.ConfigKey, cli.ConfigVal); err != nil {
+			return err
+		}
+	case "show":
+		printConfig(*config)
+	case "llm-list":
+		listProfiles(*config)
+	case "llm-default":
+		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+			setDefaultProfile(config, id)
+		} else {
+			return fmt.Errorf("invalid profile ID %q", cli.ConfigVal)
+		}
+	case "llm-import":
+		copyLLMFromOpenCode(config)
+	case "whisper-list", "whisper-default", "whisper-add", "whisper-del":
+		return runWhisperConfig(config, cli)
+	case "cache-show":
+		dir, entries, size := cacheStats()
+		fmt.Printf("Cache directory: %q\n", dir)
+		fmt.Printf("  entries: %d\n", entries)
+		fmt.Printf("  size:    %.1f MB\n", float64(size)/(1024*1024))
+		fmt.Println("Run 'abs config cache clear' to delete it.")
+	case "cache-reset":
+		if err := resetCache(); err != nil {
+			return fmt.Errorf("error resetting cache: %w", err)
+		}
+		if !cli.Quiet {
+			fmt.Println("Cache reset successfully.")
+		}
+	case "migrate":
+		handleConfigMigrate(config, cli.ConfigVal)
+	default:
+		if cli.ProcessorCmd != "" {
+			handleConfigProcessor(config, cli.ProcessorCmd, cli.ProcessorValue)
+		} else if cli.PodcastsDir != "" {
+			setPodcastsDir(config, cli.PodcastsDir)
+		} else {
+			printConfig(*config)
+		}
+	}
+	return nil
+}
+
+func runWhisperConfig(config *Config, cli CLIOptions) error {
+	switch cli.ConfigCmd {
+	case "whisper-list":
+		listWhispers(*config)
+	case "whisper-default":
+		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+			setDefaultWhisperProfile(config, id)
+		} else {
+			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
+		}
+	case "whisper-add":
+		addWhisperProfile(config, cli.ConfigVal)
+	case "whisper-del":
+		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
+			removeWhisperProfile(config, id)
+		} else {
+			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
+		}
+	}
+	return nil
 }

@@ -281,3 +281,28 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
 	fmt.Printf("%s\n\n", strings.Repeat("=", 90))
 }
+
+func runStatusCommand(config *Config, cli CLIOptions) error {
+	if cli.StatusSubcmd == "check" {
+		return runCheckCommand(*config, cli)
+	}
+	showDetailedPodcasts := false
+	targetDir := config.PodcastsDir
+	if len(cli.Args) > 0 {
+		arg := strings.ToLower(cli.Args[0])
+		if arg == "podcasts" || arg == "podcast" || arg == "all" {
+			showDetailedPodcasts = true
+		} else if fi, err := os.Stat(cli.Args[0]); err == nil && fi.IsDir() {
+			targetDir = cli.Args[0]
+			showDetailedPodcasts = true
+		}
+	}
+	if cli.Verbose {
+		showDetailedPodcasts = true
+	}
+	if targetDir != "" {
+		config.PodcastsDir = targetDir
+	}
+	absStatus(*config, showDetailedPodcasts, cli.Quiet)
+	return nil
+}

@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/sarielhp/clihelp"
 )
 
@@ -209,4 +211,32 @@ func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			return nil
 		},
 	}
+}
+
+func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
+	if cli.ProcSubcmd == "audit" {
+		runAuditTranscripts(config, cli)
+		return nil
+	}
+	if cli.ProcSubcmd == "recut" {
+		cli.Recut = true
+	}
+	if cli.ProcSubcmd == "export" {
+		runExportCommand(cli)
+		return nil
+	}
+	if cli.ProcSubcmd == "collect" {
+		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
+			return fmt.Errorf("error collecting from remote %s: %w", cli.RemoteHost, err)
+		}
+		return nil
+	}
+	if cli.ProcSubcmd == "clear" {
+		if err := runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
+			return fmt.Errorf("error clearing remote queue on %s: %w", cli.RemoteHost, err)
+		}
+		return nil
+	}
+	processAudioFilesBatch(cli, config, action)
+	return nil
 }
