@@ -4,7 +4,7 @@ import (
 	"testing"
 )
 
-func TestCLIScanAndNewCommands(t *testing.T) {
+func TestServerCommandFlagParsing(t *testing.T) {
 	var action string
 	var opts CLIOptions
 
