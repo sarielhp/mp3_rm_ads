@@ -9,10 +9,10 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/pipeline"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 type ResolvedType int

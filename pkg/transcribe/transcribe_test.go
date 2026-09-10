@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func TestBuildWavHeader(t *testing.T) {

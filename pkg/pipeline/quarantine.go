@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 )
 
 var guidSuffixRegex = regexp.MustCompile(`\s*\([0-9a-fA-F-]{6,}\)$`)

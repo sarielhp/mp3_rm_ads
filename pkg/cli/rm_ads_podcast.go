@@ -8,7 +8,7 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 )
 
 func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast, bool) {

@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/sariel/abs/pkg/cli"
+	"abs/pkg/cli"
 )
 
 func main() {

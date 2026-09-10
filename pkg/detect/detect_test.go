@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func TestExtractJSONArray(t *testing.T) {

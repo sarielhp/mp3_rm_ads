@@ -5,7 +5,7 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/util"
 )
 
 var dockerMu util.SyncMutex

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 const (

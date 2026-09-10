@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/gemini"
-	"github.com/sariel/abs/pkg/transcribe"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/config"
+	"abs/pkg/gemini"
+	"abs/pkg/transcribe"
+	"abs/pkg/types"
 )
 
 func ContainsHebrew(s string) bool {

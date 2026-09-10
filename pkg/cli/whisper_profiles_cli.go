@@ -5,8 +5,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/config"
+	"abs/pkg/util"
 )
 
 func resolveActiveWhisperProfile(cfg *Config) {

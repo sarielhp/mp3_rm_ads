@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/format"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func RunRemoteStatus(cfg *types.Config, host string, transport RemoteTransport, quiet, verbose bool) error {

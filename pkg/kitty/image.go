@@ -12,8 +12,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sariel/abs/pkg/podcast"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"

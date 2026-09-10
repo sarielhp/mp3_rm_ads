@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/format"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func PrintRemoteStatus(targetHost string, status types.RemoteServerStatus, readyEpisodes []RemoteDoneItem, archiveCount int, cfg *types.Config, quiet, verbose bool) error {

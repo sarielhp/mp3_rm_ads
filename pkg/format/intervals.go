@@ -3,7 +3,7 @@ package format
 import (
 	"math"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 const maxAdSegments = 500

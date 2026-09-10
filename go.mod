@@ -1,4 +1,4 @@
-module github.com/sariel/abs
+module abs
 
 go 1.26.5
 

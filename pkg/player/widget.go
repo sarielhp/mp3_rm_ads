@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func (p *AudioPlayer) RenderProgressBar(width int) string {

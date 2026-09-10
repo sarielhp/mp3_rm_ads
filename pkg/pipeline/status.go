@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/audio"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/audio"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func StatusPathFor(audioPath string) string {

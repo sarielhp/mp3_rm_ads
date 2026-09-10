@@ -9,7 +9,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/util"
 )
 
 const minKeepFraction = 0.25

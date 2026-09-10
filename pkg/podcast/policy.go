@@ -3,8 +3,8 @@ package podcast
 import (
 	"fmt"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/config"
+	"abs/pkg/backend"
+	"abs/pkg/config"
 )
 
 func SelectEpisodesByDownloadPolicy(sortedCatalog []backend.FeedEpisode, isDownloaded func(ep backend.FeedEpisode) bool, policy string, k int, oldest bool) ([]backend.FeedEpisode, []string) {

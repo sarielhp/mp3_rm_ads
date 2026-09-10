@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/config"
+	"abs/pkg/backend"
+	"abs/pkg/config"
 )
 
 func TestFeedCache(t *testing.T) {

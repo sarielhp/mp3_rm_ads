@@ -1,7 +1,7 @@
 package tui
 
 import (
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 	"path/filepath"
 	"sort"
 	"strings"

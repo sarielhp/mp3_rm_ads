@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/pipeline"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/backend"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func RunRemoteAck(remoteDir string, relPaths []string) error {

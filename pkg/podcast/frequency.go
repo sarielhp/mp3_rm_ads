@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/backend"
+	"abs/pkg/types"
 )
 
 type PodcastFreqResult struct {

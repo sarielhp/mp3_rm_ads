@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/util"
 )
 
 type PodcastDirEntry struct {

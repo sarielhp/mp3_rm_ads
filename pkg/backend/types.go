@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 type LibraryFolder struct {

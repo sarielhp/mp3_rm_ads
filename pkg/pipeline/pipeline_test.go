@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/backend"
+	"abs/pkg/types"
 )
 
 func TestEnsureABSIgnore(t *testing.T) {

@@ -10,14 +10,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/audio"
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/detect"
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/gemini"
-	"github.com/sariel/abs/pkg/transcribe"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/audio"
+	"abs/pkg/config"
+	"abs/pkg/detect"
+	"abs/pkg/format"
+	"abs/pkg/gemini"
+	"abs/pkg/transcribe"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func ResolveAudioFiles(inputFile string, verbose bool) (mainMP3File, precutFile, sourceAudioFile string) {

@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/config"
+	"abs/pkg/util"
 )
 
 func listProfiles(cfg Config) {

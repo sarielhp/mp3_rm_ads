@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sariel/abs/pkg/config"
+	"abs/pkg/config"
 )
 
 func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {

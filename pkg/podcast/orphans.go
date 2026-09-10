@@ -8,7 +8,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 )
 
 type OrphanPodcast struct {

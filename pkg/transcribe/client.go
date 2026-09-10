@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/format"
+	"abs/pkg/types"
 )
 
 const WavBytesPerSec = WavSampleRate * 2

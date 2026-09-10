@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/util"
 )
 
 type OpenRouterModel struct {

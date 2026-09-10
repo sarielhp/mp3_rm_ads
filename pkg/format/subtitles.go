@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func FormatSRT(data *types.TranscriptionData) string {

@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 const SystemPrompt = `You are an expert podcast editor assistant.

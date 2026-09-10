@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func TestFormatClock(t *testing.T) {

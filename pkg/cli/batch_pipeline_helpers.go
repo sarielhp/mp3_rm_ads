@@ -8,9 +8,9 @@ import (
 	"time"
 	"unicode"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/tui"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/config"
+	"abs/pkg/tui"
+	"abs/pkg/types"
 )
 
 func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, quiet bool) bool {

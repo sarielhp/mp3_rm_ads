@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"strings"
 
+	"abs/pkg/types"
 	"cloud.google.com/go/vertexai/genai"
-	"github.com/sariel/abs/pkg/types"
 )
 
 func CallGeminiAudioProcessor(ctx context.Context, projectID, location, gcsURI string) (*types.GeminiResponsePayload, error) {

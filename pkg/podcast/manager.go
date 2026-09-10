@@ -1,9 +1,9 @@
 package podcast
 
 import (
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/types"
 )
 
 type PodcastManager struct {

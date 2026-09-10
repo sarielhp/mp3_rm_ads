@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func IsAudiobookshelfActive(cfg *types.Config) bool {

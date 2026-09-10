@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"github.com/sariel/abs/pkg/cli"
+	"abs/pkg/cli"
 )
 
 func TestMainExecuteHelp(t *testing.T) {

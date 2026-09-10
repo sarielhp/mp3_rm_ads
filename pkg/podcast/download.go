@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/config"
+	"abs/pkg/backend"
+	"abs/pkg/config"
 )
 
 type DownloadOptions struct {

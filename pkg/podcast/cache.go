@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/pipeline"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/backend"
+	"abs/pkg/pipeline"
+	"abs/pkg/util"
 )
 
 type CachedEpisodeSummary struct {

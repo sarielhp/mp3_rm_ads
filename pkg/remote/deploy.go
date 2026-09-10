@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/config"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func RunRemoteDeploy(cfg *types.Config, host string, transport RemoteTransport, quiet, verbose bool) error {

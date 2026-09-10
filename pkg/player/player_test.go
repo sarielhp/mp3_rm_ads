@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sariel/abs/pkg/types"
+	"abs/pkg/types"
 )
 
 func TestFormatPlayerTime(t *testing.T) {

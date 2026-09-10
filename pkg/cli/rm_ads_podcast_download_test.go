@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 )
 
 func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {

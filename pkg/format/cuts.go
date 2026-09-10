@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func BuildCutEntries(combined []types.AdSegment) []types.CutEntry {

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/pipeline"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/pipeline"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func RunRemoteStop(cfg *types.Config, host string, transport RemoteTransport, quiet, verbose bool) error {

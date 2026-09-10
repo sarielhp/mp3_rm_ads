@@ -10,11 +10,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/audio"
-	"github.com/sariel/abs/pkg/config"
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/audio"
+	"abs/pkg/config"
+	"abs/pkg/format"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 const DefaultGeminiChunkSec = 1800.0

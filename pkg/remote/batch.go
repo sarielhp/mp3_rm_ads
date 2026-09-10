@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/audio"
-	"github.com/sariel/abs/pkg/backend"
-	"github.com/sariel/abs/pkg/format"
-	"github.com/sariel/abs/pkg/pipeline"
-	"github.com/sariel/abs/pkg/podcast"
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/audio"
+	"abs/pkg/backend"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func FindAudioFilesForRemote(paths []string, defaultDir string) []string {

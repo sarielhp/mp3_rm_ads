@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/sariel/abs/pkg/types"
-	"github.com/sariel/abs/pkg/util"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 const defaultGeminiModel = "gemini-flash-latest"

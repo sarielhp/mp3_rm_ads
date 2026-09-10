@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sariel/abs/pkg/backend"
+	"abs/pkg/backend"
 )
 
 func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []string) (string, []string) {

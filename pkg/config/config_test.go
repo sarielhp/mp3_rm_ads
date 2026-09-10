@@ -8,14 +8,15 @@ import (
 	"testing"
 )
 
-func TestDefaultConfigContainsNoSariel(t *testing.T) {
+func TestDefaultConfigNoUsername(t *testing.T) {
 	cfg := DefaultConfig()
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatalf("Marshal failed: %v", err)
 	}
-	if strings.Contains(strings.ToLower(string(data)), "sariel") {
-		t.Errorf("DefaultConfig contains 'sariel': %s", string(data))
+	u := os.Getenv("USER")
+	if u != "" && strings.Contains(strings.ToLower(string(data)), strings.ToLower(u)) {
+		t.Errorf("DefaultConfig contains current username %q: %s", u, string(data))
 	}
 }
 

@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
+	"abs/pkg/types"
 	"cloud.google.com/go/vertexai/genai"
-	"github.com/sariel/abs/pkg/types"
 )
 
 func TestGeminiPromptContent(t *testing.T) {
