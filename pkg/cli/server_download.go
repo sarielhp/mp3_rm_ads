@@ -27,6 +27,7 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 			clihelp.Bool(&opts.Fill, "-f, --fill", false, "Fill gaps in downloaded episodes"),
 			clihelp.Int(keepVal, "-K, --keep <number>", -1, "Enforce keep count policies"),
 			clihelp.BoolToggle(&opts.CheckNew, "--[no-]check-new", true, "Check new episodes published"),
+			clihelp.Int(&opts.FeedJobs, "-j, --jobs <number>", 0, "Feeds to fetch concurrently (default 24)"),
 			clihelp.Bool(&opts.Oldest, "--oldest", false, "Download oldest first"),
 			clihelp.Bool(&opts.NoWait, "--no-wait", false, "Do not wait for download completion"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
@@ -69,15 +70,100 @@ func handleServerDownload(config Config, cli CLIOptions) error {
 }
 
 func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error {
-	podcasts, err := resolveServerTargetPodcasts(b, cli)
+	podcasts, err := resolveDownloadTargets(b, cli)
 	if err != nil {
 		return err
 	}
-	return executeServerDownloads(b, config, cli, podcasts)
+	plans := planServerDownloads(b, config, cli, podcasts)
+	return executeServerDownloads(b, config, cli, podcasts, plans)
 }
 
-func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast) error {
-	opts := podcast.DownloadOptions{
+// resolveDownloadTargets lists the podcasts to consider. It takes the backend's
+// cheap metadata listing: what the server already holds is read separately from
+// its catalog in one go, so there is no reason to pay a request per podcast for
+// episode lists here.
+func resolveDownloadTargets(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
+	if !cli.Quiet {
+		fmt.Print("Reading podcast list from server...")
+		os.Stdout.Sync()
+	}
+	start := time.Now()
+	podcasts, err := backend.ListPodcastsFrom(b)
+	if err != nil {
+		if !cli.Quiet {
+			fmt.Println()
+		}
+		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
+	}
+	targets, err := filterServerTargets(podcasts, cli)
+	if err != nil {
+		if !cli.Quiet {
+			fmt.Println()
+		}
+		return nil, err
+	}
+	if !cli.Quiet {
+		fmt.Printf(" %d podcast(s) (%.1fs).\n", len(targets), time.Since(start).Seconds())
+	}
+	return targets, nil
+}
+
+// planServerDownloads asks every target feed what it offers, concurrently, and
+// reports progress while it does: the feeds are the slow part of a run, and
+// without this the command sits silent for most of its life.
+func planServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast) []podcast.DownloadPlan {
+	start := time.Now()
+	index := podcast.BuildEpisodeIndex(b, podcasts)
+
+	progress := func(done, total int) {}
+	if !cli.Quiet {
+		progress = func(done, total int) {
+			fmt.Printf("\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
+			os.Stdout.Sync()
+		}
+	}
+	plans := podcast.PlanDownloads(b, podcasts, index, downloadOptions(config, cli), progress)
+	if !cli.Quiet {
+		fmt.Print("\r\x1b[K")
+	}
+	reportDownloadPlans(plans, time.Since(start), cli)
+	return plans
+}
+
+// reportDownloadPlans says what the feed check found before anything is queued,
+// so a run that has nothing to do says so once instead of once per podcast.
+func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cli CLIOptions) {
+	if cli.Quiet {
+		return
+	}
+	selected, episodes, failed := 0, 0, 0
+	for i := range plans {
+		switch {
+		case plans[i].Err != nil:
+			failed++
+		case len(plans[i].Episodes) > 0:
+			selected++
+			episodes += len(plans[i].Episodes)
+		}
+	}
+	fmt.Printf("Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
+		len(plans), elapsed.Seconds(), episodes, selected)
+	if failed > 0 {
+		fmt.Printf(", %d unreadable", failed)
+	}
+	fmt.Println(".")
+
+	for i := range plans {
+		if plans[i].Err != nil {
+			fmt.Printf("  ! %s: %v\n", plans[i].Title(), plans[i].Err)
+		} else if cli.Verbose && len(plans[i].Episodes) == 0 {
+			fmt.Printf("  - %s: up to date\n", plans[i].Title())
+		}
+	}
+}
+
+func downloadOptions(config Config, cli CLIOptions) podcast.DownloadOptions {
+	return podcast.DownloadOptions{
 		Count:       cli.Count,
 		Oldest:      cli.Oldest,
 		DryRun:      cli.DryRun,
@@ -89,37 +175,33 @@ func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, po
 		Keep:        cli.KeepCount,
 		Verbose:     cli.Verbose,
 		Quiet:       cli.Quiet,
+		Jobs:        cli.FeedJobs,
+		PodcastsDir: config.PodcastsDir,
 	}
-	totalDownloaded := 0
-	for idx, item := range podcasts {
-		title := item.Media.Metadata.Title
-		if title == "" {
-			title = "Untitled"
+}
+
+func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast, plans []podcast.DownloadPlan) error {
+	opts := downloadOptions(config, cli)
+	totalDownloaded, fromPodcasts := 0, 0
+	for i := range plans {
+		if plans[i].Err != nil || len(plans[i].Episodes) == 0 {
+			continue
 		}
-		if !cli.Quiet && len(podcasts) > 1 {
-			fmt.Printf("\rDownloading episodes (%d/%d): %s\x1b[K", idx+1, len(podcasts), title)
-			os.Stdout.Sync()
-		}
-		if fresh, err := b.GetPodcast(item.ID); err == nil && fresh != nil {
-			item = *fresh
-		}
-		count, err := podcast.DownloadPodcastEpisodes(b, item, opts)
+		count, err := podcast.ExecuteEpisodeDownloads(b, plans[i].Item, plans[i].Episodes, plans[i].Reasons, opts)
 		if err != nil {
-			return fmt.Errorf("download %s: %w", title, err)
+			return fmt.Errorf("download %s: %w", plans[i].Title(), err)
 		}
 		if !cli.DryRun {
 			totalDownloaded += count
+			fromPodcasts++
 		}
 	}
-	if !cli.Quiet && len(podcasts) > 1 {
-		fmt.Print("\r\x1b[K")
-	}
-	return finalizeServerDownloads(b, config, cli, podcasts, totalDownloaded)
+	return finalizeServerDownloads(b, config, cli, podcasts, totalDownloaded, fromPodcasts)
 }
 
-func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast, totalDownloaded int) error {
-	if !cli.Quiet {
-		fmt.Printf("Queued %d episode download(s) across %d podcast(s).\n", totalDownloaded, len(podcasts))
+func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast, totalDownloaded, fromPodcasts int) error {
+	if !cli.Quiet && !cli.DryRun {
+		fmt.Printf("Queued %d episode download(s) across %d podcast(s).\n", totalDownloaded, fromPodcasts)
 	}
 	if totalDownloaded > 0 && !cli.NoWait && !cli.DryRun {
 		if !cli.Quiet {

@@ -24,6 +24,14 @@ type DownloadOptions struct {
 	Keep         *int
 	Verbose      bool
 	Quiet        bool
+
+	// Jobs caps how many feeds are read at once; zero takes the default.
+	Jobs int
+
+	// PodcastsDir is the local library root. Without it neither a podcast's own
+	// download policy nor the audio already on disk can be found, and a run
+	// silently falls back to the default policy.
+	PodcastsDir string
 }
 
 func GetPubMS(ep backend.FeedEpisode) int64 {
@@ -37,9 +45,9 @@ func GetPubMS(ep backend.FeedEpisode) int64 {
 	return 0
 }
 
-func scanPodcastDiskTitles(item backend.Podcast) map[string]bool {
+func scanPodcastDiskTitles(item backend.Podcast, podcastsDir string) map[string]bool {
 	diskTitles := make(map[string]bool)
-	podDir := FindPodcastDirForItem(item, "")
+	podDir := FindPodcastDirForItem(item, podcastsDir)
 	if podDir == "" {
 		return diskTitles
 	}
@@ -59,77 +67,59 @@ func scanPodcastDiskTitles(item backend.Podcast) map[string]bool {
 	return diskTitles
 }
 
-func BuildDownloadedChecker(client backend.Backend, item backend.Podcast, itemID string) func(backend.FeedEpisode) bool {
-	downloadedURLs := make(map[string]bool)
-	downloadedGUIDs := make(map[string]bool)
-	downloadedTitles := make(map[string]bool)
-
-	isPodfetch := client != nil && client.Name() == "podfetch"
-	for _, ep := range item.Media.Episodes {
-		if ep.AudioFile == nil && isPodfetch {
-			continue
-		}
-		if ep.EnclosureURL != "" {
-			downloadedURLs[ep.EnclosureURL] = true
-		}
-		if ep.GUID != "" {
-			downloadedGUIDs[ep.GUID] = true
-		}
-		t := strings.ToLower(strings.TrimSpace(ep.Title))
-		if t != "" {
-			downloadedTitles[t] = true
-		}
-	}
-
+// BuildDownloadedChecker reports which feed episodes need no download. What the
+// server already holds comes from the catalog index, read once for the whole
+// run; queued downloads and audio already on disk are added on top of it.
+func BuildDownloadedChecker(item backend.Podcast, index *PodcastEpisodeIndex, active []backend.ActiveDownload, podcastsDir string) func(backend.FeedEpisode) bool {
 	queuedTitles := make(map[string]bool)
 	queuedURLs := make(map[string]bool)
 	queuedGUIDs := make(map[string]bool)
 
-	if client != nil {
-		activeDls, _ := client.ActiveDownloads(itemID)
-		for _, ad := range activeDls {
-			for _, t := range []string{ad.EpisodeDisplayTitle, ad.DisplayTitle, ad.Title, ad.Episode.Title} {
-				t = strings.ToLower(strings.TrimSpace(t))
-				if t != "" {
-					queuedTitles[t] = true
-				}
+	for _, ad := range active {
+		for _, t := range []string{ad.EpisodeDisplayTitle, ad.DisplayTitle, ad.Title, ad.Episode.Title} {
+			t = strings.ToLower(strings.TrimSpace(t))
+			if t != "" {
+				queuedTitles[t] = true
 			}
-			if ad.URL != "" {
-				queuedURLs[ad.URL] = true
-			}
-			if ad.Episode.EnclosureURL != "" {
-				queuedURLs[ad.Episode.EnclosureURL] = true
-			}
-			if ad.Episode.GUID != "" {
-				queuedGUIDs[ad.Episode.GUID] = true
-			}
+		}
+		if ad.URL != "" {
+			queuedURLs[ad.URL] = true
+		}
+		if ad.Episode.EnclosureURL != "" {
+			queuedURLs[ad.Episode.EnclosureURL] = true
+		}
+		if ad.Episode.GUID != "" {
+			queuedGUIDs[ad.Episode.GUID] = true
 		}
 	}
 
-	diskTitles := scanPodcastDiskTitles(item)
+	diskTitles := scanPodcastDiskTitles(item, podcastsDir)
 
 	return func(ep backend.FeedEpisode) bool {
+		if index.HasAudio(ep) {
+			return true
+		}
 		encURL := ""
 		if ep.Enclosure != nil {
 			encURL = ep.Enclosure.URL
 		}
+		if encURL == "" {
+			encURL = ep.EnclosureURL
+		}
 		guid := ep.GUID
 		title := strings.ToLower(strings.TrimSpace(ep.Title))
 
-		if (encURL != "" && (downloadedURLs[encURL] || queuedURLs[encURL])) ||
-			(guid != "" && (downloadedGUIDs[guid] || queuedGUIDs[guid])) ||
-			(title != "" && (downloadedTitles[title] || queuedTitles[title])) {
+		if (encURL != "" && queuedURLs[encURL]) ||
+			(guid != "" && queuedGUIDs[guid]) ||
+			(title != "" && queuedTitles[title]) {
 			return true
 		}
-		if title != "" && diskTitles[title] {
-			return true
-		}
-		return false
+		return title != "" && diskTitles[title]
 	}
 }
 
 func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, opts DownloadOptions) ([]backend.FeedEpisode, []string) {
-	podDir := FindPodcastDirForItem(item, "")
+	podDir := FindPodcastDirForItem(item, opts.PodcastsDir)
 	podCfg := config.DefaultPodcastConfig(nil)
 	if podDir != "" {
 		podCfg = config.LoadPodcastConfig(podDir, podCfg)
@@ -328,54 +318,18 @@ func selectDefaultUndownloadedEpisodes(sortedCatalog []backend.FeedEpisode, down
 	return episodesToDownload, reasons
 }
 
-func DownloadPodcastEpisodes(client backend.Backend, item backend.Podcast, opts DownloadOptions) (int, error) {
-	podcastTitle := item.Media.Metadata.Title
-	if podcastTitle == "" {
-		podcastTitle = "Untitled Podcast"
-	}
-	feedURL := item.Media.Metadata.FeedURL
-	itemID := item.ID
-
-	if feedURL == "" {
-		return 0, fmt.Errorf("podcast %s has no RSS feed URL configured", podcastTitle)
-	}
-
-	feedEpisodes, err := client.PodcastFeedEpisodes(feedURL)
-	if err != nil {
-		return 0, fmt.Errorf("fetch episode catalog for %s: %w", podcastTitle, err)
-	}
-
-	isDownloaded := BuildDownloadedChecker(client, item, itemID)
-	sortedCatalog := make([]backend.FeedEpisode, len(feedEpisodes))
-	copy(sortedCatalog, feedEpisodes)
-	sort.Slice(sortedCatalog, func(i, j int) bool {
-		return GetPubMS(sortedCatalog[i]) < GetPubMS(sortedCatalog[j])
-	})
-
-	var downloadedIndices []int
-	for idx, ep := range sortedCatalog {
-		if isDownloaded(ep) {
-			downloadedIndices = append(downloadedIndices, idx)
-		}
-	}
-
-	episodesToDownload, reasons := ResolveEpisodesToDownload(item, sortedCatalog, downloadedIndices, isDownloaded, opts)
-	return ExecuteEpisodeDownloads(client, item, episodesToDownload, reasons, opts)
-}
-
 func ExecuteEpisodeDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, reasons []string, opts DownloadOptions) (int, error) {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
 	}
 
-	if len(episodesToDownload) > 0 {
-		sortAndPrintSelectedEpisodes(episodesToDownload, podcastTitle, reasons, opts.Oldest, opts.Verbose, opts.Quiet)
-		if err := queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, opts.Quiet); err != nil {
-			return 0, err
-		}
-	} else if !opts.ForceNewOnly && !opts.Quiet {
-		fmt.Printf("No new episodes to download for %s.\n", podcastTitle)
+	if len(episodesToDownload) == 0 {
+		return 0, nil
+	}
+	sortAndPrintSelectedEpisodes(episodesToDownload, podcastTitle, reasons, opts.Oldest, opts.Verbose, opts.Quiet)
+	if err := queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, opts.Quiet); err != nil {
+		return 0, err
 	}
 
 	return len(episodesToDownload), nil
