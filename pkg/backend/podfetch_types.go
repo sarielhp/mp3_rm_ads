@@ -1,8 +1,10 @@
 package backend
 
 import (
+	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 )
 
 type podFetchItemDTO struct {
@@ -36,7 +38,7 @@ type podFetchEpisodeDTO struct {
 	FilePath        string      `json:"file_path"`
 	Description     string      `json:"description"`
 	Summary         string      `json:"summary"`
-	Status          string      `json:"status"`
+	Status          interface{} `json:"status"`
 }
 
 func mapPodFetchDTOToPodcast(dto podFetchItemDTO, epDTOs []podFetchEpisodeDTO) Podcast {
@@ -125,7 +127,7 @@ func mapPodFetchDTOToEpisode(dto podFetchEpisodeDTO) Episode {
 		EnclosureURL: dto.URL,
 	}
 
-	if locURL != "" {
+	if isPodFetchEpisodeDownloaded(dto, locURL) && locURL != "" {
 		ep.AudioFile = &PodcastAudioFile{
 			Duration: dur,
 			Metadata: &AudioFileMetadata{
@@ -137,6 +139,35 @@ func mapPodFetchDTOToEpisode(dto podFetchEpisodeDTO) Episode {
 	}
 
 	return ep
+}
+
+func isPodFetchEpisodeDownloaded(dto podFetchEpisodeDTO, locURL string) bool {
+	if b, ok := dto.Status.(bool); ok {
+		return b
+	}
+	if s, ok := dto.Status.(string); ok && strings.EqualFold(s, "true") {
+		return true
+	}
+	if locURL != "" && !strings.Contains(locURL, "/proxy/podcast") {
+		return true
+	}
+	return false
+}
+
+func unmarshalPodFetchEpisodes(data []byte) []podFetchEpisodeDTO {
+	var wrappers []struct {
+		PodcastEpisode podFetchEpisodeDTO `json:"podcastEpisode"`
+	}
+	if err := json.Unmarshal(data, &wrappers); err == nil && len(wrappers) > 0 && wrappers[0].PodcastEpisode.ID != nil {
+		dtos := make([]podFetchEpisodeDTO, 0, len(wrappers))
+		for _, w := range wrappers {
+			dtos = append(dtos, w.PodcastEpisode)
+		}
+		return dtos
+	}
+	var dtos []podFetchEpisodeDTO
+	_ = json.Unmarshal(data, &dtos)
+	return dtos
 }
 
 func mapPodFetchDTOToFeedEpisode(dto podFetchEpisodeDTO) FeedEpisode {

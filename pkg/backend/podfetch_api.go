@@ -1,6 +1,7 @@
 package backend
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -69,7 +70,7 @@ func (c *PodFetchBackend) GetPodcast(id string) (*Podcast, error) {
 			podFetchItemDTO
 			Episodes []podFetchEpisodeDTO `json:"episodes"`
 		}
-		if err := json.Unmarshal(body, &detailed); err == nil && detailed.ID != nil {
+		if err := json.Unmarshal(body, &detailed); err == nil && detailed.ID != nil && len(detailed.Episodes) > 0 {
 			pod := mapPodFetchDTOToPodcast(detailed.podFetchItemDTO, detailed.Episodes)
 			return &pod, nil
 		}
@@ -85,7 +86,10 @@ func (c *PodFetchBackend) GetPodcast(id string) (*Podcast, error) {
 		epBody, epErr := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/episodes", id), "GET", nil)
 		var epDTOs []podFetchEpisodeDTO
 		if epErr == nil {
-			_ = json.Unmarshal(epBody, &epDTOs)
+			epDTOs = unmarshalPodFetchEpisodes(epBody)
+		}
+		if len(epDTOs) == 0 && c.DBPath != "" {
+			return fetchPodFetchPodcastDB(c.DBPath, id)
 		}
 		pod := mapPodFetchDTOToPodcast(dto, epDTOs)
 		return &pod, nil
@@ -213,25 +217,91 @@ func readAndParseDirectFeedXML(resp *http.Response) ([]FeedEpisode, error) {
 	return parseRSSFeedXML(rawXML)
 }
 
-func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpisode) error {
-	if c.Host != "" {
-		payload := map[string]interface{}{
-			"episodes": episodes,
-		}
-		_, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/download", podcastID), "POST", payload)
-		if err == nil {
-			return nil
-		}
-		for _, ep := range episodes {
-			epID := ep.GUID
-			if epID == "" {
-				epID = ep.Title
+func (c *PodFetchBackend) addPendingDownload(podcastID, epID string) {
+	c.pendingMu.Lock()
+	defer c.pendingMu.Unlock()
+	if c.pendingEps == nil {
+		c.pendingEps = make(map[string]map[string]bool)
+	}
+	if c.pendingEps[podcastID] == nil {
+		c.pendingEps[podcastID] = make(map[string]bool)
+	}
+	c.pendingEps[podcastID][epID] = true
+}
+
+func (c *PodFetchBackend) findEpisodeIDForDownload(podcastID string, ep FeedEpisode) (string, bool, error) {
+	if c.DBPath != "" {
+		if db, err := getPodfetchDB(c.DBPath); err == nil {
+			var epID, fileEpPath sql.NullString
+			query := "SELECT episode_id, file_episode_path FROM podcast_episodes WHERE podcast_id = ? AND (guid = ? OR url = ? OR lower(name) = lower(?)) LIMIT 1"
+			title := strings.TrimSpace(ep.Title)
+			if err := db.QueryRow(query, podcastID, ep.GUID, ep.EnclosureURL, title).Scan(&epID, &fileEpPath); err == nil {
+				isDone := fileEpPath.Valid && strings.TrimSpace(fileEpPath.String) != ""
+				return epID.String, isDone, nil
 			}
-			_, _ = c.Request(fmt.Sprintf("/api/v1/podcasts/episode/%s/download", epID), "POST", nil)
 		}
+	}
+	if c.Host != "" {
+		body, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/episodes", podcastID), "GET", nil)
+		if err == nil {
+			for _, d := range unmarshalPodFetchEpisodes(body) {
+				match := false
+				if ep.GUID != "" && d.GUID == ep.GUID {
+					match = true
+				} else if ep.EnclosureURL != "" && d.URL == ep.EnclosureURL {
+					match = true
+				} else if strings.EqualFold(d.Name, ep.Title) {
+					match = true
+				}
+				if match {
+					isDone := isPodFetchEpisodeDownloaded(d, d.LocalURL)
+					epID := d.EpisodeID
+					if epID == "" {
+						epID = fmt.Sprintf("%v", d.ID)
+					}
+					return epID, isDone, nil
+				}
+			}
+		}
+	}
+	if ep.GUID != "" {
+		return ep.GUID, false, nil
+	}
+	if ep.Title != "" {
+		return ep.Title, false, nil
+	}
+	return "", false, fmt.Errorf("episode %q not found in podfetch catalog", ep.Title)
+}
+
+func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpisode) error {
+	if c.Host == "" {
 		return nil
 	}
-	return nil
+	var lastErr error
+	for _, ep := range episodes {
+		epID, isDone, err := c.findEpisodeIDForDownload(podcastID, ep)
+		if err != nil {
+			lastErr = err
+			continue
+		}
+		if isDone {
+			continue
+		}
+		_, err = c.Request(fmt.Sprintf("/api/v1/podcasts/%s/episodes/download", epID), "PUT", nil)
+		if err != nil {
+			_, err = c.Request(fmt.Sprintf("/api/v1/podcasts/episode/%s/download", epID), "POST", nil)
+		}
+		if err != nil {
+			payload := map[string]interface{}{"episodes": []FeedEpisode{ep}}
+			_, err = c.Request(fmt.Sprintf("/api/v1/podcasts/%s/download", podcastID), "POST", payload)
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			c.addPendingDownload(podcastID, epID)
+		}
+	}
+	return lastErr
 }
 
 func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) error {
@@ -254,6 +324,29 @@ func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) erro
 	return lastErr
 }
 
+func (c *PodFetchBackend) isEpisodeDownloadFinished(podcastID, epID string) bool {
+	if c.DBPath != "" {
+		if db, err := getPodfetchDB(c.DBPath); err == nil {
+			var fileEpPath sql.NullString
+			query := "SELECT file_episode_path FROM podcast_episodes WHERE episode_id = ? OR id = ? LIMIT 1"
+			if err := db.QueryRow(query, epID, epID).Scan(&fileEpPath); err == nil {
+				return fileEpPath.Valid && strings.TrimSpace(fileEpPath.String) != ""
+			}
+		}
+	}
+	if c.Host != "" {
+		body, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/episodes", podcastID), "GET", nil)
+		if err == nil {
+			for _, d := range unmarshalPodFetchEpisodes(body) {
+				if d.EpisodeID == epID || fmt.Sprintf("%v", d.ID) == epID {
+					return isPodFetchEpisodeDownloaded(d, d.LocalURL)
+				}
+			}
+		}
+	}
+	return false
+}
+
 func (c *PodFetchBackend) ActiveDownloads(podcastID string) ([]ActiveDownload, error) {
 	if c.Host != "" {
 		body, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/downloads", podcastID), "GET", nil)
@@ -262,10 +355,10 @@ func (c *PodFetchBackend) ActiveDownloads(podcastID string) ([]ActiveDownload, e
 		}
 		if err == nil {
 			var dtos []podFetchEpisodeDTO
-			if json.Unmarshal(body, &dtos) == nil {
-				var dls []ActiveDownload
+			if json.Unmarshal(body, &dtos) == nil && len(dtos) > 0 {
+				var active []ActiveDownload
 				for _, d := range dtos {
-					dls = append(dls, ActiveDownload{
+					active = append(active, ActiveDownload{
 						ID:                  fmt.Sprintf("%v", d.ID),
 						EpisodeDisplayTitle: d.Name,
 						Title:               d.Name,
@@ -273,14 +366,35 @@ func (c *PodFetchBackend) ActiveDownloads(podcastID string) ([]ActiveDownload, e
 						URL:                 d.URL,
 					})
 				}
-				return dls, nil
+				return active, nil
 			}
 		}
 	}
-	if c.DBPath != "" {
-		return fetchActiveDownloadsDB(c.DBPath, podcastID)
+
+	var active []ActiveDownload
+
+	c.pendingMu.Lock()
+	if c.pendingEps != nil && len(c.pendingEps[podcastID]) > 0 {
+		for epID := range c.pendingEps[podcastID] {
+			if c.isEpisodeDownloadFinished(podcastID, epID) {
+				delete(c.pendingEps[podcastID], epID)
+			} else {
+				active = append(active, ActiveDownload{
+					ID:        epID,
+					EpisodeID: epID,
+				})
+			}
+		}
 	}
-	return nil, nil
+	c.pendingMu.Unlock()
+
+	if c.DBPath != "" {
+		if dbDls, err := fetchActiveDownloadsDB(c.DBPath, podcastID); err == nil {
+			active = append(active, dbDls...)
+		}
+	}
+
+	return active, nil
 }
 
 func (c *PodFetchBackend) OpenRSSFeed(podcastID, baseURL string) (string, error) {

@@ -24,6 +24,8 @@ type PodFetchBackend struct {
 	Quiet       bool
 	Verbose     bool
 	httpClient  *http.Client
+	pendingMu   syncRWMutex
+	pendingEps  map[string]map[string]bool
 }
 
 func init() {
@@ -67,6 +69,7 @@ func NewPodFetch(cfg Config) *PodFetchBackend {
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
+		pendingEps: make(map[string]map[string]bool),
 	}
 }
 
@@ -238,13 +241,16 @@ func buildPodFetchRequest(method, reqURL string, jsonData []byte, apiKey, token,
 		return nil, err
 	}
 
-	if apiKey != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
-		req.Header.Set("x-api-key", apiKey)
-	} else if token != "" {
-		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
-	} else if user != "" && pass != "" {
+	if user != "" && pass != "" {
 		req.SetBasicAuth(user, pass)
+	}
+	if apiKey != "" {
+		req.Header.Set("x-api-key", apiKey)
+		if user == "" || pass == "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiKey))
+		}
+	} else if token != "" && (user == "" || pass == "") {
+		req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", token))
 	}
 	return req, nil
 }

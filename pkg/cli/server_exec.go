@@ -229,6 +229,9 @@ func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, po
 			fmt.Printf("\rDownloading episodes (%d/%d): %s\x1b[K", idx+1, len(podcasts), title)
 			os.Stdout.Sync()
 		}
+		if fresh, err := b.GetPodcast(item.ID); err == nil && fresh != nil {
+			item = *fresh
+		}
 		count := podcast.DownloadPodcastEpisodes(b, item, opts)
 		if !cli.DryRun {
 			totalDownloaded += count

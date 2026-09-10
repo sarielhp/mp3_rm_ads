@@ -2,6 +2,7 @@ package podcast
 
 import (
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 	"time"
@@ -36,12 +37,38 @@ func GetPubMS(ep backend.FeedEpisode) int64 {
 	return 0
 }
 
+func scanPodcastDiskTitles(item backend.Podcast) map[string]bool {
+	diskTitles := make(map[string]bool)
+	podDir := FindPodcastDirForItem(item, "")
+	if podDir == "" {
+		return diskTitles
+	}
+	entries, err := os.ReadDir(podDir)
+	if err != nil {
+		return diskTitles
+	}
+	for _, entry := range entries {
+		name := strings.ToLower(strings.TrimSpace(entry.Name()))
+		if entry.IsDir() {
+			diskTitles[name] = true
+		} else if strings.HasSuffix(name, ".mp3") {
+			diskTitles[name] = true
+			diskTitles[strings.TrimSuffix(name, ".mp3")] = true
+		}
+	}
+	return diskTitles
+}
+
 func BuildDownloadedChecker(client backend.Backend, item backend.Podcast, itemID string) func(backend.FeedEpisode) bool {
 	downloadedURLs := make(map[string]bool)
 	downloadedGUIDs := make(map[string]bool)
 	downloadedTitles := make(map[string]bool)
 
+	isPodfetch := client != nil && client.Name() == "podfetch"
 	for _, ep := range item.Media.Episodes {
+		if ep.AudioFile == nil && isPodfetch {
+			continue
+		}
 		if ep.EnclosureURL != "" {
 			downloadedURLs[ep.EnclosureURL] = true
 		}
@@ -79,6 +106,8 @@ func BuildDownloadedChecker(client backend.Backend, item backend.Podcast, itemID
 		}
 	}
 
+	diskTitles := scanPodcastDiskTitles(item)
+
 	return func(ep backend.FeedEpisode) bool {
 		encURL := ""
 		if ep.Enclosure != nil {
@@ -87,9 +116,15 @@ func BuildDownloadedChecker(client backend.Backend, item backend.Podcast, itemID
 		guid := ep.GUID
 		title := strings.ToLower(strings.TrimSpace(ep.Title))
 
-		return (encURL != "" && (downloadedURLs[encURL] || queuedURLs[encURL])) ||
+		if (encURL != "" && (downloadedURLs[encURL] || queuedURLs[encURL])) ||
 			(guid != "" && (downloadedGUIDs[guid] || queuedGUIDs[guid])) ||
-			(title != "" && (downloadedTitles[title] || queuedTitles[title]))
+			(title != "" && (downloadedTitles[title] || queuedTitles[title])) {
+			return true
+		}
+		if title != "" && diskTitles[title] {
+			return true
+		}
+		return false
 	}
 }
 
