@@ -186,19 +186,6 @@ func parseFlagsArgs(args []string) (string, CLIOptions, error) {
 		return "", opts, nil
 	}
 
-	opts.IsConfigCommand = (action == "config")
-	opts.IsDirCommand = (action == "dir")
-	opts.IsFileCommand = (action == "rm_ads")
-	opts.IsTUICommand = (action == "tui")
-	opts.IsTimelineCommand = ((action == "server" || action == "sync") && (opts.ServerSubcmd == "timeline" || opts.SyncSubcmd == "timeline"))
-	opts.IsTestCommand = (action == "info" && opts.InfoSubcmd == "check")
-	opts.IsScanCommand = ((action == "server" || action == "sync") && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new" || opts.ServerSubcmd == "feeds" || opts.SyncSubcmd == "feeds"))
-	opts.IsStatusCommand = (action == "info" && opts.InfoSubcmd == "status")
-	opts.IsRemoteCommand = (action == "offload")
-	opts.IsBatchWorkerCommand = (action == "offload" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
-	opts.IsServerCommand = (action == "server" || action == "sync")
-	opts.IsSyncCommand = (action == "server" || action == "sync")
-
 	return action, opts, nil
 }
 

@@ -200,42 +200,29 @@ type CLIOptions struct {
 	PolicyOptions
 	BackendOptions
 
-	ConfigCmd            string
-	ConfigKey            string
-	ConfigVal            string
-	SetDefault           int
-	PodcastsDir          string
-	SetPodcastsDir       bool
-	IsConfigCommand      bool
-	IsDirCommand         bool
-	IsFileCommand        bool
-	IsTUICommand         bool
-	IsTimelineCommand    bool
-	IsTestCommand        bool
-	IsScanCommand        bool
-	IsSyncCommand        bool
-	IsServerCommand      bool
-	IsStatusCommand      bool
-	IsRemoteCommand      bool
-	IsBatchWorkerCommand bool
-	ListLLMs             bool
-	CopyOpenCode         bool
-	Quiet                bool
-	Verbose              bool
-	Debug                bool
-	TestWhisper          bool
-	TestABS              bool
-	TestABSMap           bool
-	TestABSDownload      bool
-	TestKitty            bool
-	IsCacheCommand       bool
-	ResetCache           bool
-	AddWhisper           string
-	RemoveWhisper        int
-	SetDefaultWhisper    int
-	ListWhispers         bool
-	WhisperEngine        string
-	WhisperModel         string
+	ConfigCmd         string
+	ConfigKey         string
+	ConfigVal         string
+	SetDefault        int
+	PodcastsDir       string
+	SetPodcastsDir    bool
+	ListLLMs          bool
+	CopyOpenCode      bool
+	Quiet             bool
+	Verbose           bool
+	Debug             bool
+	TestWhisper       bool
+	TestABS           bool
+	TestABSMap        bool
+	TestABSDownload   bool
+	TestKitty         bool
+	ResetCache        bool
+	AddWhisper        string
+	RemoveWhisper     int
+	SetDefaultWhisper int
+	ListWhispers      bool
+	WhisperEngine     string
+	WhisperModel      string
 
 	Count          int
 	CountGiven     bool

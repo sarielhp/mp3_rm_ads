@@ -41,7 +41,6 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 				case "check":
 					opts.InfoSubcmd = "check"
 					opts.StatusSubcmd = "check"
-					opts.IsTestCommand = true
 					args := ctx.Args[1:]
 					if len(args) > 0 && args[0] == "kitty" {
 						opts.Args = args[1:]
@@ -117,7 +116,6 @@ func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			*action = "info"
 			opts.InfoSubcmd = "check"
 			opts.StatusSubcmd = "check"
-			opts.IsTestCommand = true
 			if len(ctx.Args) > 0 && ctx.Args[0] == "kitty" {
 				opts.Args = ctx.Args[1:]
 			} else {
