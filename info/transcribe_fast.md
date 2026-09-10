@@ -13,7 +13,7 @@ The setup utilizes a **dual-tier architecture**:
    * **Model:** `ivrit-large-v3-turbo` (specialized on thousands of hours of Hebrew speech, with native English accuracy).
    * **Role:** Background service for automated podcast downloaders and ad removal pipelines (`mp3_rm_ads`).
 2. **Host CLI (`transcribe`):**
-   * **Location:** [`~/.local/bin/transcribe`](file:///home/sariel/.local/bin/transcribe) (native Ruby executable).
+   * **Location:** `~/.local/bin/transcribe` (native Ruby executable).
    * **Backend:** Native `whisper.cpp` compiled with **Vulkan (`-DGGML_VULKAN=ON`)** and **Flash Attention (`-fa`)**.
    * **Role:** Ad-hoc manual jobs, batch processing, and ultra-fast draft generation for LLM ad detection.
 
@@ -34,7 +34,7 @@ All models reside in `/media/dockers/whisper/models/` (symlinked to `~/.local/sh
 
 ## 3. The `transcribe` CLI Command
 
-The [`transcribe`](file:///home/sariel/.local/bin/transcribe) script automatically applies optimal GPU device flags, thread budgets, greedy decoding, and parallel streams.
+The `transcribe` script automatically applies optimal GPU device flags, thread budgets, greedy decoding, and parallel streams.
 
 ### Quick Start Examples
 

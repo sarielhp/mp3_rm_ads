@@ -1,7 +1,6 @@
 package cli
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -10,7 +9,6 @@ import (
 	"strconv"
 	"strings"
 
-	_ "github.com/mattn/go-sqlite3"
 	"github.com/sariel/abs/pkg/config"
 	"github.com/sariel/abs/pkg/util"
 )
@@ -135,26 +133,6 @@ func handleConfigMigrate(cfg *Config, source string) {
 	}
 }
 
-func getABSTokenFromDB(dbPath string) string {
-	if dbPath == "" || !util.FileExists(dbPath) {
-		return ""
-	}
-
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
-	if err != nil {
-		return ""
-	}
-	defer db.Close()
-
-	var token string
-	query := "SELECT token FROM users WHERE token IS NOT NULL AND token != '' ORDER BY createdAt ASC LIMIT 1;"
-	err = db.QueryRow(query).Scan(&token)
-	if err != nil {
-		return ""
-	}
-	return token
-}
-
 func resolveProcessorPath(prog string) (string, error) {
 	path, err := exec.LookPath(prog)
 	if err == nil {
@@ -214,73 +192,5 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 
 	default:
 		fatalError("%s\n", fmt.Sprintf("Error: unknown processor command '%s'", cmd))
-	}
-}
-
-func printConfigInfo(cfg Config) {
-	fmt.Println("=== Audiobookshelf & LLM Config Info ===")
-	fmt.Printf("Config File:  %s\n", config.ConfigPath())
-
-	hostStr := cfg.AudiobookshelfURL
-	if hostStr == "" {
-		hostStr = "Not Set"
-	}
-	fmt.Printf("ABS URL:      %s\n", hostStr)
-
-	tokenStr := "Not Set"
-	if cfg.AudiobookshelfToken != "" {
-		if len(cfg.AudiobookshelfToken) > 10 {
-			tokenStr = fmt.Sprintf("%s... (length: %d chars)", cfg.AudiobookshelfToken[:10], len(cfg.AudiobookshelfToken))
-		} else {
-			tokenStr = fmt.Sprintf("%s... (length: %d chars)", cfg.AudiobookshelfToken, len(cfg.AudiobookshelfToken))
-		}
-	}
-	fmt.Printf("ABS Token:    %s\n", tokenStr)
-
-	dbStr := cfg.AudiobookshelfDBPath
-	if dbStr == "" {
-		dbStr = "Not Set"
-	}
-	fmt.Printf("ABS SQLite:   %s\n", dbStr)
-
-	dirStr := cfg.PodcastsDir
-	if dirStr == "" {
-		dirStr = "Not Set"
-	}
-	fmt.Printf("Podcasts Dir: %s\n", dirStr)
-
-	if len(cfg.PostProcessors) == 0 {
-		fmt.Println("Post-Processors: None")
-	} else {
-		fmt.Println("Post-Processors:")
-		for i, p := range cfg.PostProcessors {
-			fmt.Printf("  %d. %s\n", i+1, p)
-		}
-	}
-}
-
-func runPostProcessors(processors []string, quiet bool) {
-	if !quiet {
-		fmt.Printf("\n=== Executing %d Post-Processor(s) ===\n", len(processors))
-	}
-	for _, proc := range processors {
-		if !quiet {
-			fmt.Printf("Running post-processor: %s...\n", proc)
-		}
-		parts := strings.Fields(proc)
-		if len(parts) == 0 {
-			continue
-		}
-		var cmd *exec.Cmd
-		if len(parts) > 1 {
-			cmd = exec.Command(parts[0], parts[1:]...)
-		} else {
-			cmd = exec.Command(parts[0])
-		}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil {
-			fmt.Fprintf(os.Stderr, "Post-processor '%s' failed: %v\n", proc, err)
-		}
 	}
 }

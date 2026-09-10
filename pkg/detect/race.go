@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/sariel/abs/pkg/config"
 	"github.com/sariel/abs/pkg/gemini"
@@ -96,7 +97,8 @@ func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp ty
 	chunkDuration := cfg.ChunkDurationSec
 	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 	if useChunks {
-		return transcribe.TranscribeChunks(
+		return transcribe.TranscribeChunksContext(
+			ctx,
 			audioPath, wp.URL, cli.Quiet, cli.Verbose,
 			totalDuration, speedFactor, chunkDuration,
 			dockerContainer, whisperPrompt, whisperLang,
@@ -110,7 +112,15 @@ func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp ty
 }
 
 func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg types.Config, cli types.CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string, isHebrew bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
-	ctx, cancel := context.WithCancel(parentCtx)
+	var (
+		ctx    context.Context
+		cancel context.CancelFunc
+	)
+	if _, hasDeadline := parentCtx.Deadline(); !hasDeadline {
+		ctx, cancel = context.WithTimeout(parentCtx, 30*time.Minute)
+	} else {
+		ctx, cancel = context.WithCancel(parentCtx)
+	}
 	defer cancel()
 
 	if isHebrew && whisperLang == "" {

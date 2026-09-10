@@ -75,7 +75,13 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 		UUID:       "item-1",
 	}
 
-	cfg := Config{PodcastsDir: tmp, AudiobookshelfURL: srv.URL, AudiobookshelfToken: "test-tok"}
+	cfg := Config{
+		PodcastsDir: tmp,
+		BackendConfig: BackendConfig{
+			AudiobookshelfURL:   srv.URL,
+			AudiobookshelfToken: "test-tok",
+		},
+	}
 	targetPath, handled := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 
 	if targetPath != "" {

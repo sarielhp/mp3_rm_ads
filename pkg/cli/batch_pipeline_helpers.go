@@ -222,24 +222,37 @@ func Execute(args []string) int {
 	ensureConfigExists()
 	config := loadConfig()
 
-	if handleParityCommands(action, config, cli) {
+	if handled, hErr := handleParityCommands(action, config, cli); handled {
+		if hErr != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", hErr)
+			return 1
+		}
 		return 0
 	}
 
 	switch action {
 	case "config":
-		handleMainConfig(&config, cli)
+		if err := handleMainConfig(&config, cli); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
 	case "tui":
 		if err := tui.RunTUI(&config, cli.PodcastsDir); err != nil {
 			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 			return 1
 		}
 	case "sync":
-		handleSyncCommand(config, cli)
+		if err := handleSyncCommand(config, cli); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
 	case "offload":
 		handleRemoteCommand(config, cli)
 	case "rm_ads":
-		handleMainProc(config, cli, action)
+		if err := handleMainProc(config, cli, action); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			return 1
+		}
 	}
 	return 0
 }

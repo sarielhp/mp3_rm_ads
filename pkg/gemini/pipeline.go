@@ -97,6 +97,10 @@ func SplitAudioChunk(inputPath, outputPath string, startSec, durSec float64) err
 			return fmt.Errorf("split audio chunk failed: %w (copy: %s, fallback: %s)", fbErr, string(out), string(fbOut))
 		}
 	}
+	fi, err := os.Stat(outputPath)
+	if err != nil || fi.Size() == 0 {
+		return fmt.Errorf("split audio chunk produced empty or missing file: %s", outputPath)
+	}
 	return nil
 }
 

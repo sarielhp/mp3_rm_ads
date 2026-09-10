@@ -1,7 +1,16 @@
-abs
+/abs
 scratch/
 *.xml
 .work/
 .review_state.json
-reports/logs/
+reports/
 .verified_head
+
+# Bubblewrap Sandbox (bws) configuration & artifacts
+.bw*
+.bws*
+.bw/
+.bws/
+.bw.jsonc
+bws-agent-*
+

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 	"time"
 
@@ -108,13 +107,20 @@ func (t *DefaultSSHTransport) RsyncFrom(host string, remoteSrc, localDst string)
 	return nil
 }
 
-var currentTransport RemoteTransport = &DefaultSSHTransport{}
+var (
+	transportMu      util.SyncRWMutex
+	currentTransport RemoteTransport = &DefaultSSHTransport{}
+)
 
 func GetRemoteTransport() RemoteTransport {
+	transportMu.RLock()
+	defer transportMu.RUnlock()
 	return currentTransport
 }
 
 func SetRemoteTransport(t RemoteTransport) {
+	transportMu.Lock()
+	defer transportMu.Unlock()
 	currentTransport = t
 }
 
@@ -164,26 +170,9 @@ func ShellQuote(s string) string {
 }
 
 func ShellQuoteHomePath(s string) string {
-	if s == "~" {
-		return "$HOME"
-	}
-	if strings.HasPrefix(s, "~/") {
-		return "$HOME/" + ShellQuote(strings.TrimPrefix(s, "~/"))
-	}
-	return ShellQuote(s)
+	return util.ShellQuoteHomePath(s)
 }
 
 func ValidateBatchID(batchID string) bool {
-	if batchID == "" || strings.Contains(batchID, "/") || strings.Contains(batchID, "\\") || strings.Contains(batchID, "..") {
-		return false
-	}
-	if filepath.Base(batchID) != batchID {
-		return false
-	}
-	for _, r := range batchID {
-		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_') {
-			return false
-		}
-	}
-	return true
+	return util.ValidateBatchID(batchID)
 }

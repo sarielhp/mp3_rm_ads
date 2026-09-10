@@ -125,11 +125,3 @@ func loadEpisodeTranscriptData(epPath string) ([]transcriptItem, []string, error
 
 	return nil, nil, fmt.Errorf("no transcript found")
 }
-
-func loadEpisodeTranscriptText(epPath string) (string, []string, error) {
-	_, lines, err := loadEpisodeTranscriptData(epPath)
-	if err != nil {
-		return "", nil, err
-	}
-	return strings.Join(lines, "\n"), lines, nil
-}

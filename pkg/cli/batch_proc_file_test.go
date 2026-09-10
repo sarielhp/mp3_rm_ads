@@ -82,8 +82,10 @@ func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cliRecut := CLIOptions{Quiet: true}
+	cliRecut.Recut = true
 	processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{Quiet: true, Recut: true}, Config{}, "recut", time.Now(), offlineProfile())
+		cliRecut, Config{}, "recut", time.Now(), offlineProfile())
 }
 
 func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
@@ -97,8 +99,10 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	cliTMin := CLIOptions{Quiet: true}
+	cliTMin.TranscribeMin = "1"
 	processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{Quiet: true, TranscribeMin: "1"}, Config{}, "proc", time.Now(), offlineProfile())
+		cliTMin, Config{}, "proc", time.Now(), offlineProfile())
 
 	if fileExists(filepath.Join(dir, "ep.cuts.json")) {
 		t.Errorf("--tminutes wrote ep.cuts.json; a preview run must not touch cut metadata")

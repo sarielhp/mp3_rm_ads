@@ -1,5 +1,9 @@
 package types
 
+import (
+	"os"
+)
+
 type AdSegment struct {
 	Start  float64 `json:"start"`
 	End    float64 `json:"end"`
@@ -124,18 +128,74 @@ type TUIColorConfig struct {
 	Dim      string `json:"dim,omitempty"`
 }
 
+type BatchOptions struct {
+	Output           string
+	TranscriptPath   string
+	SaveTranscript   bool
+	ExportSRT        bool
+	ExportTXT        bool
+	ExportFormat     string
+	Recut            bool
+	Force            string
+	ForceLLM         bool
+	ForceTranscribe  bool
+	UseLLM           string
+	UseChunks        bool
+	TranscribeMin    string
+	ExtractKeywords  bool
+	ShowCuts         bool
+	ShowTranscript   bool
+	AuditMinRatioStr string
+	AuditMinChars    int
+}
+
+type RemoteOptions struct {
+	RemoteFFmpegHost    string
+	SetRemoteFFmpegHost bool
+	RemoteSubcmd        string
+	RemoteHost          string
+	RemoteWorkDir       string
+	Remote              bool
+	Local               bool
+	NoCollect           bool
+	Daemon              bool
+	IfDirty             bool
+	BatchWorkerDir      string
+	Priority            int
+}
+
+type PolicyOptions struct {
+	AutoDownloadStr string
+	DownloadPolicy  string
+	DownloadK       int
+	AutoCleanupStr  string
+	CleanupDays     int
+	AdRemovalMode   string
+}
+
+type BackendOptions struct {
+	ABSURL        string
+	ABSUser       string
+	ABSPass       string
+	SetABS        bool
+	ABSToken      string
+	SqliteDBPath  string
+	ServerSubcmd  string
+	ForceDelete   bool
+	Refresh       bool
+	DisableHourly bool
+	OPMLSubcmd    string
+	OPMLFile      string
+	PodcastsOnly  bool
+	EpisodesOnly  bool
+}
+
 type CLIOptions struct {
-	Output               string
-	TranscriptPath       string
-	SaveTranscript       bool
-	ExportSRT            bool
-	ExportTXT            bool
-	ExportFormat         string
-	Recut                bool
-	Force                string
-	ForceLLM             bool
-	ForceTranscribe      bool
-	UseLLM               string
+	BatchOptions
+	RemoteOptions
+	PolicyOptions
+	BackendOptions
+
 	ConfigCmd            string
 	ConfigKey            string
 	ConfigVal            string
@@ -158,18 +218,11 @@ type CLIOptions struct {
 	Quiet                bool
 	Verbose              bool
 	Debug                bool
-	UseChunks            bool
-	TranscribeMin        string
-	ExtractKeywords      bool
 	TestWhisper          bool
 	TestABS              bool
 	TestABSMap           bool
 	TestABSDownload      bool
 	TestKitty            bool
-	ABSURL               string
-	ABSUser              string
-	ABSPass              string
-	SetABS               bool
 	IsCacheCommand       bool
 	ResetCache           bool
 	AddWhisper           string
@@ -179,112 +232,101 @@ type CLIOptions struct {
 	WhisperEngine        string
 	WhisperModel         string
 
-	Count               int
-	CountGiven          bool
-	Podcast             string
-	Fill                bool
-	DownloadAll         bool
-	KeepCount           *int
-	CheckNew            bool
-	Oldest              bool
-	NoWait              bool
-	SqliteDBPath        string
-	ProcessorCmd        string
-	ProcessorValue      string
-	DryRun              bool
-	ConfigInfo          bool
-	ABSToken            string
-	Args                []string
-	ServerSubcmd        string
-	ForceDelete         bool
-	Refresh             bool
-	DisableHourly       bool
-	OPMLSubcmd          string
-	OPMLFile            string
-	PodcastsOnly        bool
-	EpisodesOnly        bool
-	RemoteFFmpegHost    string
-	SetRemoteFFmpegHost bool
-	RemoteSubcmd        string
-	ProcSubcmd          string
-	LsSubcmd            string
-	RemoteHost          string
-	RemoteWorkDir       string
-	Remote              bool
-	Local               bool
-	NoCollect           bool
-	Daemon              bool
-	IfDirty             bool
-	BatchWorkerDir      string
-	Priority            int
-	JSON                bool
-	ShowCuts            bool
-	AutoDownloadStr     string
-	DownloadPolicy      string
-	DownloadK           int
-	AutoCleanupStr      string
-	CleanupDays         int
-	AdRemovalMode       string
-	QueueSubcmd         string
-	PlayerSubcmd        string
-	InfoSubcmd          string
-	SyncSubcmd          string
-	StatusSubcmd        string
-	ShowTranscript      bool
-	Latest              bool
-	ShowExamples        bool
-	AuditMinRatioStr    string
-	AuditMinChars       int
+	Count          int
+	CountGiven     bool
+	Podcast        string
+	Fill           bool
+	DownloadAll    bool
+	KeepCount      *int
+	CheckNew       bool
+	Oldest         bool
+	NoWait         bool
+	ProcessorCmd   string
+	ProcessorValue string
+	DryRun         bool
+	ConfigInfo     bool
+	Args           []string
+	ProcSubcmd     string
+	LsSubcmd       string
+	JSON           bool
+	InfoSubcmd     string
+	QueueSubcmd    string
+	PlayerSubcmd   string
+	SyncSubcmd     string
+	StatusSubcmd   string
+	Latest         bool
+	ShowExamples   bool
+}
+
+type WhisperConfig struct {
+	WhisperURL             string           `json:"whisper_url"`
+	WhisperSpeedFactor     float64          `json:"whisper_speed_factor"`
+	WhisperDockerContainer string           `json:"whisper_docker_container"`
+	WhisperLanguage        string           `json:"whisper_language"`
+	WhisperPrompt          string           `json:"whisper_prompt"`
+	WhisperWakeCommand     string           `json:"whisper_wake_command,omitempty"`
+	WhisperEngine          WhisperEngine    `json:"whisper_engine,omitempty"`
+	WhisperModel           string           `json:"whisper_model,omitempty"`
+	WhisperCliBinary       string           `json:"whisper_cli_binary,omitempty"`
+	WhisperProcessors      int              `json:"whisper_processors,omitempty"`
+	WhisperThreads         int              `json:"whisper_threads,omitempty"`
+	WhisperGreedy          bool             `json:"whisper_greedy,omitempty"`
+	ActiveWhisperID        int              `json:"active_whisper_id,omitempty"`
+	WhisperProfiles        []WhisperProfile `json:"whisper_profiles,omitempty"`
+}
+
+type BackendConfig struct {
+	AudiobookshelfURL    string `json:"audiobookshelf_url,omitempty"`
+	AudiobookshelfUser   string `json:"audiobookshelf_user,omitempty"`
+	AudiobookshelfPass   string `json:"audiobookshelf_pass,omitempty"`
+	AudiobookshelfToken  string `json:"audiobookshelf_token,omitempty"`
+	AudiobookshelfDBPath string `json:"audiobookshelf_sqlite_db_path,omitempty"`
+	BackendType          string `json:"backend_type,omitempty"`
+	PodfetchURL          string `json:"podfetch_url,omitempty"`
+	PodfetchUser         string `json:"podfetch_user,omitempty"`
+	PodfetchPass         string `json:"podfetch_pass,omitempty"`
+	PodfetchAPIKey       string `json:"podfetch_api_key,omitempty"`
+	PodfetchDBPath       string `json:"podfetch_db_path,omitempty"`
+}
+
+type RemoteConfig struct {
+	RemoteFFmpegHost  string `json:"remote_ffmpeg_host,omitempty"`
+	RemoteHost        string `json:"remote_host,omitempty"`
+	DefaultProcessing string `json:"default_processing,omitempty"`
+	RemoteWorkDir     string `json:"remote_work_dir,omitempty"`
+}
+
+type PolicyConfig struct {
+	DefaultDownloadPolicy string `json:"default_download_policy,omitempty"`
+	DefaultDownloadK      int    `json:"default_download_k,omitempty"`
+	DefaultAdRemoval      string `json:"default_ad_policy,omitempty"`
+}
+
+type GeminiConfig struct {
+	GeminiProjectID          string `json:"gemini_project_id,omitempty"`
+	GeminiStagingBucket      string `json:"gemini_staging_bucket,omitempty"`
+	GeminiLocation           string `json:"gemini_location,omitempty"`
+	GeminiAPIKey             string `json:"gemini_api_key,omitempty"`
+	GeminiModel              string `json:"gemini_model,omitempty"`
+	GeminiAPIKeyEnabled      *bool  `json:"gemini_api_key_enabled,omitempty"`
+	OpenRouterAPIKeyEnabled  *bool  `json:"openrouter_api_key_enabled,omitempty"`
+	SpeculativeTranscription *bool  `json:"speculative_transcription,omitempty"`
 }
 
 type Config struct {
-	Instructions             string           `json:"_instructions"`
-	PodcastsDir              string           `json:"podcasts_dir"`
-	WhisperURL               string           `json:"whisper_url"`
-	WhisperSpeedFactor       float64          `json:"whisper_speed_factor"`
-	WhisperDockerContainer   string           `json:"whisper_docker_container"`
-	WhisperLanguage          string           `json:"whisper_language"`
-	WhisperPrompt            string           `json:"whisper_prompt"`
-	WhisperWakeCommand       string           `json:"whisper_wake_command,omitempty"`
-	WhisperEngine            WhisperEngine    `json:"whisper_engine,omitempty"`
-	WhisperModel             string           `json:"whisper_model,omitempty"`
-	WhisperCliBinary         string           `json:"whisper_cli_binary,omitempty"`
-	WhisperProcessors        int              `json:"whisper_processors,omitempty"`
-	WhisperThreads           int              `json:"whisper_threads,omitempty"`
-	WhisperGreedy            bool             `json:"whisper_greedy,omitempty"`
-	ChunkDurationSec         int              `json:"chunk_duration_sec"`
-	ActiveProfileID          int              `json:"active_profile_id"`
-	Profiles                 []LLMProfile     `json:"profiles"`
-	ActiveWhisperID          int              `json:"active_whisper_id,omitempty"`
-	WhisperProfiles          []WhisperProfile `json:"whisper_profiles,omitempty"`
-	AudiobookshelfURL        string           `json:"audiobookshelf_url,omitempty"`
-	AudiobookshelfUser       string           `json:"audiobookshelf_user,omitempty"`
-	AudiobookshelfPass       string           `json:"audiobookshelf_pass,omitempty"`
-	AudiobookshelfToken      string           `json:"audiobookshelf_token,omitempty"`
-	AudiobookshelfDBPath     string           `json:"audiobookshelf_sqlite_db_path,omitempty"`
-	BackendType              string           `json:"backend_type,omitempty"`
-	PodfetchURL              string           `json:"podfetch_url,omitempty"`
-	PodfetchUser             string           `json:"podfetch_user,omitempty"`
-	PodfetchPass             string           `json:"podfetch_pass,omitempty"`
-	PodfetchAPIKey           string           `json:"podfetch_api_key,omitempty"`
-	PodfetchDBPath           string           `json:"podfetch_db_path,omitempty"`
-	PostProcessors           []string         `json:"post_processors,omitempty"`
-	RemoteFFmpegHost         string           `json:"remote_ffmpeg_host,omitempty"`
-	RemoteHost               string           `json:"remote_host,omitempty"`
-	DefaultProcessing        string           `json:"default_processing,omitempty"`
-	RemoteWorkDir            string           `json:"remote_work_dir,omitempty"`
-	DefaultDownloadPolicy    string           `json:"default_download_policy,omitempty"`
-	DefaultDownloadK         int              `json:"default_download_k,omitempty"`
-	DefaultAdRemoval         string           `json:"default_ad_policy,omitempty"`
-	GeminiProjectID          string           `json:"gemini_project_id,omitempty"`
-	GeminiStagingBucket      string           `json:"gemini_staging_bucket,omitempty"`
-	GeminiLocation           string           `json:"gemini_location,omitempty"`
-	GeminiAPIKey             string           `json:"gemini_api_key,omitempty"`
-	GeminiModel              string           `json:"gemini_model,omitempty"`
-	GeminiAPIKeyEnabled      *bool            `json:"gemini_api_key_enabled,omitempty"`
-	OpenRouterAPIKeyEnabled  *bool            `json:"openrouter_api_key_enabled,omitempty"`
-	SpeculativeTranscription *bool            `json:"speculative_transcription,omitempty"`
-	TUIColor                 *TUIColorConfig  `json:"tui_color,omitempty"`
+	Instructions     string          `json:"_instructions"`
+	PodcastsDir      string          `json:"podcasts_dir"`
+	ChunkDurationSec int             `json:"chunk_duration_sec"`
+	ActiveProfileID  int             `json:"active_profile_id"`
+	Profiles         []LLMProfile    `json:"profiles"`
+	PostProcessors   []string        `json:"post_processors,omitempty"`
+	TUIColor         *TUIColorConfig `json:"tui_color,omitempty"`
+
+	WhisperConfig
+	BackendConfig
+	RemoteConfig
+	PolicyConfig
+	GeminiConfig
 }
 
 func (c *Config) IsGeminiAPIKeyEnabled() bool {
@@ -319,7 +361,7 @@ func (c *Config) GetGeminiProjectID() string {
 	if c != nil && c.GeminiProjectID != "" {
 		return c.GeminiProjectID
 	}
-	return "vm-on-cloud-sariel"
+	return os.Getenv("GEMINI_PROJECT_ID")
 }
 
 func (c *Config) GetGeminiStagingBucket() string {
@@ -330,7 +372,11 @@ func (c *Config) GetGeminiStagingBucket() string {
 		}
 		return s
 	}
-	return "abs-audio-staging-sariel"
+	s := os.Getenv("GEMINI_STAGING_BUCKET")
+	if len(s) >= 5 && s[:5] == "gs://" {
+		return s[5:]
+	}
+	return s
 }
 
 func (c *Config) GetGeminiLocation() string {

@@ -12,7 +12,42 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+var (
+	podfetchDBPoolMu syncRWMutex
+	podfetchDBPool   = make(map[string]*sql.DB)
+)
+
+func getPodfetchDB(dbPath string) (*sql.DB, error) {
+	podfetchDBPoolMu.Lock()
+	defer podfetchDBPoolMu.Unlock()
+	if db, ok := podfetchDBPool[dbPath]; ok {
+		if err := db.Ping(); err == nil {
+			return db, nil
+		}
+		_ = db.Close()
+		delete(podfetchDBPool, dbPath)
+	}
+	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	if err != nil {
+		return nil, err
+	}
+	podfetchDBPool[dbPath] = db
+	return db, nil
+}
+
+func ClosePodfetchDB(dbPath string) {
+	podfetchDBPoolMu.Lock()
+	defer podfetchDBPoolMu.Unlock()
+	if db, ok := podfetchDBPool[dbPath]; ok {
+		_ = db.Close()
+		delete(podfetchDBPool, dbPath)
+	}
+}
+
 func podfetchHasColumn(db *sql.DB, table, column string) bool {
+	if table != "podcasts" && table != "podcast_episodes" && table != "podcast_settings" {
+		return false
+	}
 	rows, err := db.Query(fmt.Sprintf("PRAGMA table_info(%s)", table))
 	if err != nil {
 		return false
@@ -62,11 +97,10 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 		return nil, fmt.Errorf("podfetch db file does not exist: %s", dbPath)
 	}
 
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	dirCol := podfetchPodcastsDirCol(db)
 	imgCol := podfetchColOrEmpty(db, "podcasts", "image_url")
@@ -84,6 +118,7 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 		var idVal interface{}
 		var name, directory, rssfeed, imageURL, summary, author sql.NullString
 		if err := rows.Scan(&idVal, &name, &directory, &rssfeed, &imageURL, &summary, &author); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to scan podcast row: %v\n", err)
 			continue
 		}
 
@@ -112,6 +147,10 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 			},
 		}
 		podcasts = append(podcasts, pod)
+	}
+
+	if err := rows.Err(); err != nil {
+		return podcasts, fmt.Errorf("error reading podcast rows: %w", err)
 	}
 
 	return podcasts, nil
@@ -146,6 +185,7 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode,
 		var totalTime sql.NullFloat64
 
 		if err := rows.Scan(&idVal, &epID, &name, &url, &dateOfRec, &totalTime, &localURL, &description, &status); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to scan episode row: %v\n", err)
 			continue
 		}
 
@@ -184,6 +224,10 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode,
 		episodes = append(episodes, ep)
 	}
 
+	if err := rows.Err(); err != nil {
+		return episodes, fmt.Errorf("error reading episode rows: %w", err)
+	}
+
 	return episodes, nil
 }
 
@@ -192,11 +236,10 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 	if dbPath == "" {
 		return nil, fmt.Errorf("dbPath is empty")
 	}
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	dirCol := podfetchPodcastsDirCol(db)
 	imgCol := podfetchColOrEmpty(db, "podcasts", "image_url")
@@ -240,11 +283,10 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 
 func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast, error) {
 	verifyPodfetchNotDisabled("createPodFetchPodcastDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	dirCol := podfetchPodcastsDirCol(db)
 	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
@@ -272,11 +314,10 @@ func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast
 
 func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
 	verifyPodfetchNotDisabled("deletePodFetchEpisodeDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	_, err = db.Exec("DELETE FROM podcast_episodes WHERE (podcast_id = ? OR ? = '') AND (id = ? OR episode_id = ?)", podcastID, podcastID, episodeID, episodeID)
 	return err
@@ -284,11 +325,10 @@ func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
 
 func deletePodFetchPodcastDB(dbPath, podcastID string) error {
 	verifyPodfetchNotDisabled("deletePodFetchPodcastDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	tx, err := db.Begin()
 	if err != nil {
@@ -309,11 +349,10 @@ func deletePodFetchPodcastDB(dbPath, podcastID string) error {
 
 func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) {
 	verifyPodfetchNotDisabled("fetchActiveDownloadsDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return nil, err
 	}
-	defer db.Close()
 
 	if !podfetchHasColumn(db, "podcast_episodes", "status") {
 		return nil, nil
@@ -345,11 +384,10 @@ func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) 
 
 func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
 	verifyPodfetchNotDisabled("updatePodFetchDurationDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	base := filepath.Base(filePath)
 	likePattern := "%" + base
@@ -362,11 +400,10 @@ func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
 
 func resetPodFetchDateCheckDB(dbPath, itemID, title string) error {
 	verifyPodfetchNotDisabled("resetPodFetchDateCheckDB")
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	if itemID != "" {
 		_, err = db.Exec("UPDATE podcasts SET created_at = '1970-01-01 00:00:00' WHERE id = ?", itemID)
@@ -386,11 +423,10 @@ func updatePodFetchSettingsDB(dbPath, identifier string, autoDownload, autoClean
 	if dbPath == "" {
 		return fmt.Errorf("dbPath is empty")
 	}
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=5000")
+	db, err := getPodfetchDB(dbPath)
 	if err != nil {
 		return err
 	}
-	defer db.Close()
 
 	var realID string
 	query := "SELECT id FROM podcasts WHERE id = ? OR lower(name) = lower(?) OR lower(directory_name) = lower(?) OR lower(directory_name) = lower('podcasts/' || ?) OR lower(directory_name) = lower(?) LIMIT 1"

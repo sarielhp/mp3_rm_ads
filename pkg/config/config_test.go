@@ -1,10 +1,23 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
+
+func TestDefaultConfigContainsNoSariel(t *testing.T) {
+	cfg := DefaultConfig()
+	data, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+	if strings.Contains(strings.ToLower(string(data)), "sariel") {
+		t.Errorf("DefaultConfig contains 'sariel': %s", string(data))
+	}
+}
 
 func TestDefaultConfig(t *testing.T) {
 	cfg := DefaultConfig()

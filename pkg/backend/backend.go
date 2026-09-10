@@ -7,34 +7,46 @@ import (
 	"time"
 )
 
-type Backend interface {
-	Name() string
-	TestConnection(quiet bool) (bool, error)
-	Login() (string, error)
+type PodcastReader interface {
 	Libraries() ([]Library, error)
 	PodcastLibraries() ([]Library, error)
 	Podcasts() ([]Podcast, error)
 	GetPodcast(id string) (*Podcast, error)
-	CreatePodcast(libraryID, folderID, path, title, feedURL string) (*Podcast, error)
-	DeletePodcast(id string) error
-	DeleteItem(id string) error
 	PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, error)
-	DownloadEpisodes(podcastID string, episodes []FeedEpisode) error
-	DeletePodcastEpisode(podcastID, episodeID string) error
 	ActiveDownloads(podcastID string) ([]ActiveDownload, error)
 	OpenRSSFeed(podcastID, baseURL string) (string, error)
 	DownloadCover(podcastID, destPath string) error
+}
+
+type PodcastWriter interface {
+	CreatePodcast(libraryID, folderID, path, title, feedURL string) (*Podcast, error)
+	DeletePodcast(id string) error
+	DeleteItem(id string) error
+	DownloadEpisodes(podcastID string, episodes []FeedEpisode) error
+	DeletePodcastEpisode(podcastID, episodeID string) error
 	ResetPodcastDateCheck(itemID, title string) error
 	ResetPodcastDateCheckAPI(itemID string) error
+	SyncDuration(filePath string, duration float64) error
+	ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error)
+	UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error
+}
+
+type PodcastAdmin interface {
+	TestConnection(quiet bool) (bool, error)
+	Login() (string, error)
 	Scan(opts ScanOptions) (ScanResult, error)
 	Rescan(opts RescanOptions) (RescanResult, error)
 	ExportOPML(opts OPMLExportOptions) ([]byte, error)
 	ImportOPML(data []byte, opts OPMLImportOptions) (OPMLImportResult, error)
 	FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, error)
-	SyncDuration(filePath string, duration float64) error
-	ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error)
 	WaitForActiveDownloads(podcasts []Podcast, quiet bool, timeout time.Duration) error
-	UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error
+}
+
+type Backend interface {
+	Name() string
+	PodcastReader
+	PodcastWriter
+	PodcastAdmin
 }
 
 type Config struct {

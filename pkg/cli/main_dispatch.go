@@ -8,13 +8,13 @@ import (
 	"strings"
 )
 
-func handleParityCommands(action string, config Config, cli CLIOptions) bool {
+func handleParityCommands(action string, config Config, cli CLIOptions) (bool, error) {
 	var err error
 	switch action {
 	case "info":
 		if cli.InfoSubcmd == "status" || cli.InfoSubcmd == "check" {
-			handleMainStatus(&config, cli)
-			return true
+			err = handleMainStatus(&config, cli)
+			return true, err
 		}
 		err = runInfoCommand(config, cli)
 	case "queue":
@@ -24,35 +24,32 @@ func handleParityCommands(action string, config Config, cli CLIOptions) bool {
 	case "policy":
 		err = runPolicyCommand(config, cli)
 	default:
-		return false
+		return false, nil
 	}
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		os.Exit(1)
-	}
-	return true
+	return true, err
 }
 
-func handleMainTest(config Config, cli CLIOptions) {
+func handleMainTest(config Config, cli CLIOptions) error {
 	if cli.TestABSMap {
 		if !absMapPodcasts(config, cli.Quiet) {
-			os.Exit(1)
+			return fmt.Errorf("abs map failed")
 		}
 	} else if cli.TestABSDownload {
 		if !absDownloadAllData(config, cli.Quiet) {
-			os.Exit(1)
+			return fmt.Errorf("abs download failed")
 		}
 	} else if cli.TestKitty {
 		testKittyImage(cli.Args)
 	} else if cli.TestABS {
 		if !testAudiobookshelfServer(config, cli.Quiet) {
-			os.Exit(1)
+			return fmt.Errorf("audiobookshelf test failed")
 		}
 	} else {
 		if !testWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
-			os.Exit(1)
+			return fmt.Errorf("whisper test failed")
 		}
 	}
+	return nil
 }
 
 func handleMainExport(cli CLIOptions) {
@@ -86,17 +83,15 @@ func handleMainExport(cli CLIOptions) {
 	}
 }
 
-func handleMainConfig(config *Config, cli CLIOptions) {
+func handleMainConfig(config *Config, cli CLIOptions) error {
 	switch cli.ConfigCmd {
 	case "get":
 		if err := handleConfigGet(*config, cli.ConfigKey); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 	case "set":
 		if err := handleConfigSet(config, cli.ConfigKey, cli.ConfigVal); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 	case "show":
 		printConfig(*config)
@@ -106,13 +101,12 @@ func handleMainConfig(config *Config, cli CLIOptions) {
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
 			setDefaultProfile(config, id)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: Invalid profile ID %q\n", cli.ConfigVal)
-			os.Exit(1)
+			return fmt.Errorf("invalid profile ID %q", cli.ConfigVal)
 		}
 	case "llm-import":
 		copyLLMFromOpenCode(config)
 	case "whisper-list", "whisper-default", "whisper-add", "whisper-del":
-		handleMainWhisperConfig(config, cli)
+		return handleMainWhisperConfig(config, cli)
 	case "cache-show":
 		dir, entries, size := cacheStats()
 		fmt.Printf("Cache directory: %q\n", dir)
@@ -121,8 +115,7 @@ func handleMainConfig(config *Config, cli CLIOptions) {
 		fmt.Println("Run 'abs config cache clear' to delete it.")
 	case "cache-reset":
 		if err := resetCache(); err != nil {
-			fmt.Fprintf(os.Stderr, "Error resetting cache: %v\n", err)
-			os.Exit(1)
+			return fmt.Errorf("error resetting cache: %w", err)
 		}
 		if !cli.Quiet {
 			fmt.Println("Cache reset successfully.")
@@ -138,9 +131,10 @@ func handleMainConfig(config *Config, cli CLIOptions) {
 			printConfig(*config)
 		}
 	}
+	return nil
 }
 
-func handleMainWhisperConfig(config *Config, cli CLIOptions) {
+func handleMainWhisperConfig(config *Config, cli CLIOptions) error {
 	switch cli.ConfigCmd {
 	case "whisper-list":
 		listWhispers(*config)
@@ -148,8 +142,7 @@ func handleMainWhisperConfig(config *Config, cli CLIOptions) {
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
 			setDefaultWhisperProfile(config, id)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: Invalid Whisper profile ID %q\n", cli.ConfigVal)
-			os.Exit(1)
+			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
 		}
 	case "whisper-add":
 		addWhisperProfile(config, cli.ConfigVal)
@@ -157,16 +150,15 @@ func handleMainWhisperConfig(config *Config, cli CLIOptions) {
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
 			removeWhisperProfile(config, id)
 		} else {
-			fmt.Fprintf(os.Stderr, "Error: Invalid Whisper profile ID %q\n", cli.ConfigVal)
-			os.Exit(1)
+			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
 		}
 	}
+	return nil
 }
 
-func handleMainStatus(config *Config, cli CLIOptions) {
+func handleMainStatus(config *Config, cli CLIOptions) error {
 	if cli.StatusSubcmd == "check" {
-		handleMainTest(*config, cli)
-		return
+		return handleMainTest(*config, cli)
 	}
 	showDetailedPodcasts := false
 	targetDir := config.PodcastsDir
@@ -186,47 +178,47 @@ func handleMainStatus(config *Config, cli CLIOptions) {
 		config.PodcastsDir = targetDir
 	}
 	absStatus(*config, showDetailedPodcasts, cli.Quiet)
+	return nil
 }
 
-func handleMainProc(config Config, cli CLIOptions, action string) {
+func handleMainProc(config Config, cli CLIOptions, action string) error {
 	if cli.ProcSubcmd == "audit" {
 		runAuditTranscripts(config, cli)
-		return
+		return nil
 	}
 	if cli.ProcSubcmd == "recut" {
 		cli.Recut = true
 	}
 	if cli.ProcSubcmd == "export" {
 		handleMainExport(cli)
-		return
+		return nil
 	}
 	if cli.ProcSubcmd == "collect" {
 		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
-			fmt.Fprintf(os.Stderr, "Error collecting from remote %s: %v\n", cli.RemoteHost, err)
-			os.Exit(1)
+			return fmt.Errorf("error collecting from remote %s: %w", cli.RemoteHost, err)
 		}
-		return
+		return nil
 	}
 	if cli.ProcSubcmd == "clear" {
 		if err := runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
-			fmt.Fprintf(os.Stderr, "Error clearing remote queue on %s: %v\n", cli.RemoteHost, err)
-			os.Exit(1)
+			return fmt.Errorf("error clearing remote queue on %s: %w", cli.RemoteHost, err)
 		}
-		return
+		return nil
 	}
 	processAudioFilesBatch(cli, config, action)
+	return nil
 }
 
-func handleSyncCommand(config Config, cli CLIOptions) {
+func handleSyncCommand(config Config, cli CLIOptions) error {
 	subcmd := cli.SyncSubcmd
 	if subcmd == "policy" {
 		if err := runPolicyCommand(config, cli); err != nil {
-			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-			os.Exit(1)
+			return err
 		}
-		return
+		return nil
 	}
 	if !cli.Quiet {
 		fmt.Printf("Sync sub-command %q executed.\n", subcmd)
 	}
+	return nil
 }

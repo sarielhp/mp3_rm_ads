@@ -96,7 +96,13 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 	}
 	t0 := time.Now()
 	isNewlyTranscribed := false
-	cliOpts := CLIOptions{SaveTranscript: true, Quiet: quiet, Verbose: verbose}
+	cliOpts := CLIOptions{
+		BatchOptions: BatchOptions{
+			SaveTranscript: true,
+		},
+		Quiet:   quiet,
+		Verbose: verbose,
+	}
 
 	transcriptionData, err := loadOrTranscribe(inputFile, outTranscriptJSON, config, cliOpts, selectedProfile, origDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0)
 	if err != nil {

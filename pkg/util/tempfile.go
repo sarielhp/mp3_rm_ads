@@ -3,7 +3,7 @@ package util
 import (
 	"fmt"
 	"path/filepath"
-	"regexp"
+	"strings"
 )
 
 const WorkDirName = ".work"
@@ -21,8 +21,7 @@ func VerifyTempFile(filePath string) error {
 	if err != nil {
 		return fmt.Errorf("temp file '%s' path resolution failed: %w", filePath, err)
 	}
-	matched, _ := regexp.MatchString(`/\.work/`, abs)
-	if !matched {
+	if !strings.Contains(abs, "/.work/") {
 		return fmt.Errorf("temp file '%s' is not in .work/ directory", filePath)
 	}
 	return nil

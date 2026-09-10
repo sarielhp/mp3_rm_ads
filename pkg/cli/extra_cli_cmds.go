@@ -7,61 +7,6 @@ import (
 	"strings"
 )
 
-func runFetchCommand(cfg Config, cli CLIOptions) error {
-	podcastsDir := cfg.PodcastsDir
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	if len(cli.Args) > 0 {
-		target := cli.Args[0]
-		res, err := resolveAnyID(podcastsDir, target)
-		if err != nil {
-			return err
-		}
-		if !res.IsPodcast() {
-			return fmt.Errorf("target %q is not a podcast", target)
-		}
-		return fetchSinglePodcastFeedCLI(res.Podcast)
-	}
-
-	entries := scanPodcastDirs(podcastsDir)
-	if len(entries) == 0 {
-		fmt.Println("No podcasts found to fetch.")
-		return nil
-	}
-
-	fmt.Printf("Fetching RSS feeds for %d podcast(s)...\n", len(entries))
-	for _, p := range entries {
-		res, err := resolveAnyID(podcastsDir, p.shortID)
-		if err == nil && res.IsPodcast() {
-			_ = fetchSinglePodcastFeedCLI(res.Podcast)
-		}
-	}
-	return nil
-}
-
-func fetchSinglePodcastFeedCLI(pod *ResolvedPodcast) error {
-	feedURL := ""
-	if cached, _ := loadPodcastCache(pod.Dir); cached != nil && cached.FeedURL != "" {
-		feedURL = cached.FeedURL
-	}
-	if feedURL == "" {
-		fmt.Printf("Skipping %s [%s]: No RSS feed URL found\n", pod.Title, pod.ShortID)
-		return nil
-	}
-
-	eps, _, _, _, err := fetchFeedDirect(feedURL, "", "")
-	if err != nil {
-		fmt.Printf("Failed to fetch %s [%s]: %v\n", pod.Title, pod.ShortID, err)
-		return err
-	}
-
-	fmt.Printf("✓ %s [%s]: Fetched feed (%d episodes listed)\n",
-		bold(pod.Title), boldCyan(pod.ShortID), len(eps))
-	return nil
-}
-
 func runPlayerCommand(cfg Config, cli CLIOptions) error {
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {

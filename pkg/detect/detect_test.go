@@ -16,7 +16,10 @@ func TestExtractJSONArray(t *testing.T) {
 ]
 Hope this helps!`
 
-	ads := ExtractJSONArray(raw)
+	ads, err := ExtractJSONArray(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if len(ads) != 2 {
 		t.Fatalf("expected 2 ads, got %d", len(ads))
 	}
@@ -30,14 +33,17 @@ Hope this helps!`
 
 func TestExtractJSONArrayEmpty(t *testing.T) {
 	raw := `No ads found: []`
-	ads := ExtractJSONArray(raw)
+	ads, err := ExtractJSONArray(raw)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
 	if ads == nil || len(ads) != 0 {
 		t.Errorf("expected empty slice, got %v", ads)
 	}
 
 	invalid := `No JSON here at all`
-	if ads := ExtractJSONArray(invalid); ads != nil {
-		t.Errorf("expected nil for invalid JSON, got %v", ads)
+	if _, err := ExtractJSONArray(invalid); err == nil {
+		t.Errorf("expected error for invalid JSON, got nil")
 	}
 }
 
@@ -85,21 +91,23 @@ func TestWhisperProfileSupportsLanguage(t *testing.T) {
 
 func TestResolveLocalWhisperProfileHebrewRouting(t *testing.T) {
 	cfg := types.Config{
-		ActiveWhisperID: 1,
-		WhisperProfiles: []types.WhisperProfile{
-			{
-				ID:        1,
-				Name:      "Local CLI",
-				Engine:    types.WhisperEngineLocal,
-				Model:     "tiny.en",
-				Languages: []string{"en"},
-			},
-			{
-				ID:        2,
-				Name:      "Docker Daemon",
-				Engine:    types.WhisperEngineDocker,
-				URL:       "http://localhost:8088/inference",
-				Languages: []string{"en", "he"},
+		WhisperConfig: types.WhisperConfig{
+			ActiveWhisperID: 1,
+			WhisperProfiles: []types.WhisperProfile{
+				{
+					ID:        1,
+					Name:      "Local CLI",
+					Engine:    types.WhisperEngineLocal,
+					Model:     "tiny.en",
+					Languages: []string{"en"},
+				},
+				{
+					ID:        2,
+					Name:      "Docker Daemon",
+					Engine:    types.WhisperEngineDocker,
+					URL:       "http://localhost:8088/inference",
+					Languages: []string{"en", "he"},
+				},
 			},
 		},
 	}

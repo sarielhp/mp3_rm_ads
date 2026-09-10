@@ -1,6 +1,7 @@
 package transcribe
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -22,6 +23,10 @@ type ChunkInfo struct {
 }
 
 func TranscribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*types.TranscriptionData, error) {
+	return TranscribeChunksContext(context.Background(), audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, chunkDuration, dockerContainer, prompt, language)
+}
+
+func TranscribeChunksContext(ctx context.Context, audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*types.TranscriptionData, error) {
 	overlap := 30.0
 	maxChunk := float64(chunkDuration)
 	if maxChunk > 1200.0 {
@@ -62,14 +67,19 @@ func TranscribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDu
 		f.Close()
 		os.Remove(wavPath)
 		os.RemoveAll(workDir)
-		return TranscribeWhisper(audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
+		return TranscribeWhisperContext(ctx, audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
 	}
 
 	chunks := ComputeChunks(totalDuration, maxChunk, overlap, pcmSize, numChunks)
 	var allSegments []types.TranscriptionSegment
 
 	for _, ch := range chunks {
-		segs, err := ProcessSingleChunk(wavPath, workDir, ch, numChunks, whisperURL, quiet, verbose, speedFactor, dockerContainer, prompt, language)
+		if err := ctx.Err(); err != nil {
+			os.Remove(wavPath)
+			os.RemoveAll(workDir)
+			return nil, err
+		}
+		segs, err := ProcessSingleChunkContext(ctx, wavPath, workDir, ch, numChunks, whisperURL, quiet, verbose, speedFactor, dockerContainer, prompt, language)
 		if err != nil {
 			os.Remove(wavPath)
 			os.RemoveAll(workDir)
@@ -122,6 +132,10 @@ func ComputeChunks(totalDuration, maxChunk, overlap float64, pcmSize int64, numC
 }
 
 func ProcessSingleChunk(wavPath, workDir string, ch ChunkInfo, numChunks int, whisperURL string, quiet, verbose bool, speedFactor float64, dockerContainer, prompt, language string) ([]types.TranscriptionSegment, error) {
+	return ProcessSingleChunkContext(context.Background(), wavPath, workDir, ch, numChunks, whisperURL, quiet, verbose, speedFactor, dockerContainer, prompt, language)
+}
+
+func ProcessSingleChunkContext(ctx context.Context, wavPath, workDir string, ch ChunkInfo, numChunks int, whisperURL string, quiet, verbose bool, speedFactor float64, dockerContainer, prompt, language string) ([]types.TranscriptionSegment, error) {
 	if !quiet {
 		chunkLen := ch.ActualEnd - ch.ActualStart
 		fmt.Printf("\nWorking on chunk %d/%d: %s -> %s (%s)\n",
@@ -147,7 +161,8 @@ func ProcessSingleChunk(wavPath, workDir string, ch ChunkInfo, numChunks int, wh
 		return nil, fmt.Errorf("chunk %d failed WAV validation", ch.Index+1)
 	}
 
-	chunkData, err := TranscribeWhisper(
+	chunkData, err := TranscribeWhisperContext(
+		ctx,
 		chunkPath, whisperURL, quiet, verbose,
 		ch.ActualEnd-ch.ActualStart, speedFactor,
 		dockerContainer, prompt, language, nil,

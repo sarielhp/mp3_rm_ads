@@ -45,8 +45,8 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 		totalDuration = handleTranscribeMin(&sourceAudioFile, totalDuration, cli)
 	}
 	if cli.Recut {
-		handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, config, cli, fileStartTime)
-		return false, processed, false
+		err := handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, config, cli, fileStartTime)
+		return err != nil, processed, false
 	}
 
 	needsTranscription := !fileExists(jsonFile) || cli.ForceTranscribe

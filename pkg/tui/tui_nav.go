@@ -201,8 +201,8 @@ func (m *tuiModel) handleSortToggle() {
 }
 
 func (m *tuiModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
-	switch msg.Type {
-	case tea.MouseWheelUp:
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
 		switch m.screen {
 		case screenEpisodeDetail:
 			if m.descScroll > 0 {
@@ -219,7 +219,7 @@ func (m *tuiModel) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		default:
 			m.handleUp()
 		}
-	case tea.MouseWheelDown:
+	case tea.MouseButtonWheelDown:
 		switch m.screen {
 		case screenEpisodeDetail:
 			m.descScroll++

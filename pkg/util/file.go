@@ -12,23 +12,50 @@ import (
 )
 
 func FindMP3Files(dir string) []string {
+	files, err := FindMP3FilesErr(dir)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to read directory %s: %v\n", dir, err)
+	}
+	return files
+}
+
+func FindMP3FilesErr(dir string) ([]string, error) {
+	visited := make(map[string]bool)
+	return findMP3FilesHelper(dir, visited)
+}
+
+func findMP3FilesHelper(dir string, visited map[string]bool) ([]string, error) {
+	realPath, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		realPath = dir
+	}
+	if visited[realPath] {
+		return nil, nil
+	}
+	visited[realPath] = true
+
 	var files []string
 	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return files
+		return nil, err
 	}
 	for _, entry := range entries {
+		name := entry.Name()
+		if name == ".work" || strings.HasPrefix(name, ".") {
+			continue
+		}
+		fullPath := filepath.Join(dir, name)
 		if entry.IsDir() {
-			if entry.Name() == ".work" || strings.HasPrefix(entry.Name(), ".") {
-				continue
+			subFiles, subErr := findMP3FilesHelper(fullPath, visited)
+			if subErr != nil {
+				fmt.Fprintf(os.Stderr, "Warning: cannot read subdirectory %s: %v\n", fullPath, subErr)
 			}
-			subFiles := FindMP3Files(filepath.Join(dir, entry.Name()))
 			files = append(files, subFiles...)
-		} else if strings.HasSuffix(strings.ToLower(entry.Name()), ".mp3") {
-			files = append(files, filepath.Join(dir, entry.Name()))
+		} else if strings.HasSuffix(strings.ToLower(name), ".mp3") {
+			files = append(files, fullPath)
 		}
 	}
-	return files
+	return files, nil
 }
 
 var RenameFn = os.Rename

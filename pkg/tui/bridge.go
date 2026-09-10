@@ -38,9 +38,6 @@ type (
 	ABSClient     = backend.AudiobookshelfBackend
 	absItem       = backend.Podcast
 	absEpisode    = backend.Episode
-	absAudioFile  = backend.PodcastAudioFile
-	absLibrary    = backend.Library
-	absFolder     = backend.LibraryFolder
 
 	CachedPodcastIndex   = podcast.CachedPodcastIndex
 	CachedEpisodeSummary = podcast.CachedEpisodeSummary
@@ -343,49 +340,6 @@ func getAllAdQueueItems(pods []tuiPodcast, q map[string][]string) []AdQueueItem 
 		}
 	}
 	return list
-}
-
-func removeAdQueueItem(item AdQueueItem, q map[string][]string, saveFn func(dir string, entries []string)) {
-	entries := q[item.PodcastDir]
-	var updated []string
-	for _, fn := range entries {
-		if fn != item.Filename {
-			updated = append(updated, fn)
-		}
-	}
-	q[item.PodcastDir] = updated
-	if saveFn != nil {
-		saveFn(item.PodcastDir, updated)
-	}
-}
-
-func moveAdQueueItem(items []AdQueueItem, from, to int, q map[string][]string, saveFn func(dir string, entries []string)) {
-	if from < 0 || from >= len(items) || to < 0 || to >= len(items) || from == to {
-		return
-	}
-	item := items[from]
-	targetItem := items[to]
-	if item.PodcastDir == targetItem.PodcastDir {
-		entries := q[item.PodcastDir]
-		fromIdx, toIdx := -1, -1
-		for i, fn := range entries {
-			if fn == item.Filename {
-				fromIdx = i
-			}
-			if fn == targetItem.Filename {
-				toIdx = i
-			}
-		}
-		if fromIdx != -1 && toIdx != -1 {
-			fn := entries[fromIdx]
-			entries = append(entries[:fromIdx], entries[fromIdx+1:]...)
-			entries = append(entries[:toIdx], append([]string{fn}, entries[toIdx:]...)...)
-			q[item.PodcastDir] = entries
-			if saveFn != nil {
-				saveFn(item.PodcastDir, entries)
-			}
-		}
-	}
 }
 
 func resolveLocalPath(path string) string {

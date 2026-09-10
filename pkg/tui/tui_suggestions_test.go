@@ -190,12 +190,12 @@ func TestMouseWheelScrolling(t *testing.T) {
 	m.screen = screenPodcasts
 	m.podIdx = 0
 
-	m.handleMouse(tea.MouseMsg{Type: tea.MouseWheelDown})
+	m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	if m.podIdx != 1 {
 		t.Errorf("expected podIdx to increment to 1 on wheel down, got %d", m.podIdx)
 	}
 
-	m.handleMouse(tea.MouseMsg{Type: tea.MouseWheelUp})
+	m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	if m.podIdx != 0 {
 		t.Errorf("expected podIdx to decrement to 0 on wheel up, got %d", m.podIdx)
 	}

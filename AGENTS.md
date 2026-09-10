@@ -227,6 +227,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
    - `PODCASTS_DIR`
    - `WHISPER_LANGUAGE`
    - `WHISPER_DOCKER_CONTAINER`
+ - Security & Wake Command: `whisper_wake_command` executes via `/bin/sh -c` under the executing user's privileges. Ensure `~/.config/abs/config.json` permissions remain restricted to the local user.
 
 ## Agent Development Rules
 

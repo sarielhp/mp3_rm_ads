@@ -236,7 +236,8 @@ func TestQueueRun_CleansAndDequeues(t *testing.T) {
 	markEpisodeClean(t, paths[1])
 
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Quiet: true, Local: true}
+	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand run failed: %v", err)
 	}
@@ -263,7 +264,8 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 
 	pod1Cfg := loadPodcastConfig(pod1Dir)
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Args: []string{pod1Cfg.ID}, Quiet: true, Local: true}
+	cli := CLIOptions{QueueSubcmd: "run", Args: []string{pod1Cfg.ID}, Quiet: true}
+	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand target failed: %v", err)
 	}

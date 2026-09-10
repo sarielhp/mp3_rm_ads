@@ -54,6 +54,12 @@ type LLMChoice struct {
 	Message LLMMessage `json:"message"`
 }
 
+var sharedLLMClient = &http.Client{
+	Timeout: 120 * time.Second,
+}
+
+var DefaultLLMTimeout = 120 * time.Second
+
 func CallLLMChat(profile types.LLMProfile, sysPrompt, userPrompt string, maxTokens int, timeout time.Duration, apiKey string) (string, error) {
 	payload := LLMRequest{
 		Model: profile.Model,
@@ -70,61 +76,85 @@ func CallLLMChat(profile types.LLMProfile, sysPrompt, userPrompt string, maxToke
 		return "", fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	client := &http.Client{Timeout: timeout}
-	req, err := http.NewRequest("POST", profile.URL, bytes.NewReader(body))
-	if err != nil {
-		return "", fmt.Errorf("failed to create request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	if apiKey != "" {
-		req.Header.Set("Authorization", "Bearer "+apiKey)
+	client := sharedLLMClient
+	if timeout > 0 && timeout != sharedLLMClient.Timeout {
+		client = &http.Client{Timeout: timeout}
 	}
 
-	resp, err := client.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
+	var lastErr error
+	for attempt := 0; attempt < 3; attempt++ {
+		if attempt > 0 {
+			time.Sleep(time.Duration(1<<attempt) * 500 * time.Millisecond)
+		}
+		req, err := http.NewRequest("POST", profile.URL, bytes.NewReader(body))
+		if err != nil {
+			return "", fmt.Errorf("failed to create request: %w", err)
+		}
+		req.Header.Set("Content-Type", "application/json")
 
-	if resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(resp.Body)
-		return "", fmt.Errorf("server returned status code %d: %s", resp.StatusCode, string(respBody))
-	}
+		if apiKey != "" {
+			req.Header.Set("Authorization", "Bearer "+apiKey)
+		}
 
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return "", fmt.Errorf("failed to read response: %w", err)
-	}
+		resp, err := client.Do(req)
+		if err != nil {
+			lastErr = err
+			continue
+		}
 
-	var llmResp LLMResponse
-	if err := json.Unmarshal(respBody, &llmResp); err != nil {
-		return "", fmt.Errorf("failed to unmarshal response: %w", err)
-	}
+		if resp.StatusCode == 429 || resp.StatusCode >= 500 {
+			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			lastErr = fmt.Errorf("server returned status code %d: %s", resp.StatusCode, string(respBody))
+			continue
+		}
 
-	if len(llmResp.Choices) == 0 {
-		return "", fmt.Errorf("no choices in response")
-	}
+		if resp.StatusCode != http.StatusOK {
+			respBody, _ := io.ReadAll(resp.Body)
+			resp.Body.Close()
+			return "", fmt.Errorf("server returned status code %d: %s", resp.StatusCode, string(respBody))
+		}
 
-	return llmResp.Choices[0].Message.Content, nil
+		respBody, err := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if err != nil {
+			return "", fmt.Errorf("failed to read response: %w", err)
+		}
+
+		var llmResp LLMResponse
+		if err := json.Unmarshal(respBody, &llmResp); err != nil {
+			return "", fmt.Errorf("failed to unmarshal response: %w", err)
+		}
+
+		if len(llmResp.Choices) == 0 {
+			return "", fmt.Errorf("no choices in response")
+		}
+
+		return llmResp.Choices[0].Message.Content, nil
+	}
+	return "", lastErr
 }
 
 func DetectAdsLLM(transcriptText string, profile types.LLMProfile, apiKey string) ([]types.AdSegment, error) {
+	return DetectAdsLLMTimeout(transcriptText, profile, apiKey, DefaultLLMTimeout)
+}
+
+func DetectAdsLLMTimeout(transcriptText string, profile types.LLMProfile, apiKey string, timeout time.Duration) ([]types.AdSegment, error) {
 	if profile.URL == "" {
 		return nil, nil
 	}
 	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
-	content, err := CallLLMChat(profile, SystemPrompt, userPrompt, 0, 30*time.Second, apiKey)
+	content, err := CallLLMChat(profile, SystemPrompt, userPrompt, 0, timeout, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("LLM ad detection failed: %w", err)
 	}
-	return ExtractJSONArray(content), nil
+	return ExtractJSONArray(content)
 }
 
-func ExtractJSONArray(content string) []types.AdSegment {
+func ExtractJSONArray(content string) ([]types.AdSegment, error) {
 	start := strings.IndexByte(content, '[')
 	if start < 0 {
-		return nil
+		return nil, fmt.Errorf("no JSON array start found in response")
 	}
 
 	end := -1
@@ -159,15 +189,14 @@ func ExtractJSONArray(content string) []types.AdSegment {
 		}
 	}
 	if end < 0 {
-		return nil
+		return nil, fmt.Errorf("no matching JSON array end found in response")
 	}
 
 	var ads []types.AdSegment
 	if err := json.Unmarshal([]byte(content[start:end+1]), &ads); err != nil {
-		fmt.Fprintf(os.Stderr, "Error unmarshaling ads JSON: %v\n", err)
-		return nil
+		return nil, fmt.Errorf("failed to unmarshal ads JSON: %w", err)
 	}
-	return ads
+	return ads, nil
 }
 
 func ExtractKeywordsLLM(transcriptText string, profile types.LLMProfile, apiKey string, quiet bool) string {
@@ -181,19 +210,19 @@ func ExtractKeywordsLLM(transcriptText string, profile types.LLMProfile, apiKey 
 	}
 
 	var keywords []string
-	current := ""
+	var current strings.Builder
 	for _, ch := range content {
 		if ch == ',' || ch == '[' || ch == ']' || ch == '"' {
-			if current != "" {
-				keywords = append(keywords, current)
-				current = ""
+			if current.Len() > 0 {
+				keywords = append(keywords, current.String())
+				current.Reset()
 			}
 		} else {
-			current += string(ch)
+			current.WriteRune(ch)
 		}
 	}
-	if current != "" {
-		keywords = append(keywords, current)
+	if current.Len() > 0 {
+		keywords = append(keywords, current.String())
 	}
 
 	var cleaned []string
@@ -207,12 +236,5 @@ func ExtractKeywordsLLM(transcriptText string, profile types.LLMProfile, apiKey 
 		cleaned = cleaned[:30]
 	}
 
-	result := ""
-	for i, kw := range cleaned {
-		if i > 0 {
-			result += ", "
-		}
-		result += kw
-	}
-	return result
+	return strings.Join(cleaned, ", ")
 }

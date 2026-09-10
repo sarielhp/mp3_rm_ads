@@ -164,7 +164,8 @@ func TestInfoEpisodeWithCuts(t *testing.T) {
 	oldStdout := os.Stdout
 	os.Stdout = w
 
-	cli := CLIOptions{Args: []string{epID}, ShowCuts: true}
+	cli := CLIOptions{Args: []string{epID}}
+	cli.ShowCuts = true
 	err := runInfoCommand(cfg, cli)
 
 	_ = w.Close()

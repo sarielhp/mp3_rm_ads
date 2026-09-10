@@ -50,21 +50,23 @@ func TestWhisperProfileSupportsLanguage(t *testing.T) {
 
 func TestResolveLocalWhisperProfileHebrewRouting(t *testing.T) {
 	cfg := Config{
-		ActiveWhisperID: 1,
-		WhisperProfiles: []WhisperProfile{
-			{
-				ID:        1,
-				Name:      "Local CLI",
-				Engine:    WhisperEngineLocal,
-				Model:     "tiny.en",
-				Languages: []string{"en"},
-			},
-			{
-				ID:        2,
-				Name:      "Docker Daemon",
-				Engine:    WhisperEngineDocker,
-				URL:       "http://localhost:8088/inference",
-				Languages: []string{"en", "he"},
+		WhisperConfig: WhisperConfig{
+			ActiveWhisperID: 1,
+			WhisperProfiles: []WhisperProfile{
+				{
+					ID:        1,
+					Name:      "Local CLI",
+					Engine:    WhisperEngineLocal,
+					Model:     "tiny.en",
+					Languages: []string{"en"},
+				},
+				{
+					ID:        2,
+					Name:      "Docker Daemon",
+					Engine:    WhisperEngineDocker,
+					URL:       "http://localhost:8088/inference",
+					Languages: []string{"en", "he"},
+				},
 			},
 		},
 	}

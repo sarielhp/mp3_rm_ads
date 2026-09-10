@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -36,6 +37,8 @@ type daemonState struct {
 	start    time.Time
 	offset   float64
 	duration float64
+	volume   float64
+	cmd      *exec.Cmd
 }
 
 func DialPlayerSocket() (net.Conn, error) {
@@ -146,13 +149,19 @@ func QueryPlayerStatus() (*types.PlayerStatusDTO, error) {
 	pos, _ := timeData.(float64)
 	dur, _ := durData.(float64)
 
+	volData, _ := SendMpvRawCommand(conn, []any{"get_property", "volume"})
+	vol := 100.0
+	if v, ok := volData.(float64); ok && v > 0 {
+		vol = v
+	}
+
 	return &types.PlayerStatusDTO{
 		IsRunning: true,
 		IsPaused:  paused,
 		Title:     title,
 		Position:  pos,
 		Duration:  dur,
-		Volume:    70,
+		Volume:    int(vol),
 	}, nil
 }
 
@@ -258,10 +267,6 @@ func RunPlayerDaemon(audioPath, title, podcast string) error {
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = listener.Close()
-		_ = os.Remove(PlayerSocketPath)
-	}()
 
 	dur := audio.GetAudioDuration(audioPath)
 	state := &daemonState{
@@ -270,16 +275,45 @@ func RunPlayerDaemon(audioPath, title, podcast string) error {
 		podcast:  podcast,
 		duration: dur,
 		start:    time.Now(),
+		volume:   100,
 	}
 
 	cmd, err := StartDaemonPlayback(audioPath)
 	if err != nil {
+		_ = listener.Close()
+		_ = os.Remove(PlayerSocketPath)
 		return err
 	}
+	state.cmd = cmd
+
+	defer func() {
+		_ = listener.Close()
+		_ = os.Remove(PlayerSocketPath)
+		state.mu.Lock()
+		if state.cmd != nil && state.cmd.Process != nil {
+			_ = state.cmd.Process.Signal(syscall.SIGCONT)
+			_ = state.cmd.Process.Kill()
+		}
+		state.mu.Unlock()
+	}()
 
 	done := make(chan struct{})
 	go func() {
-		_ = cmd.Wait()
+		for {
+			state.mu.Lock()
+			current := state.cmd
+			state.mu.Unlock()
+			if current == nil || current.Process == nil {
+				break
+			}
+			_ = current.Wait()
+			state.mu.Lock()
+			same := (state.cmd == current)
+			state.mu.Unlock()
+			if same {
+				break
+			}
+		}
 		close(done)
 	}()
 
@@ -290,21 +324,40 @@ func RunPlayerDaemon(audioPath, title, podcast string) error {
 }
 
 func StartDaemonPlayback(audioPath string) (*exec.Cmd, error) {
+	return StartDaemonPlaybackAt(audioPath, 0)
+}
+
+func StartDaemonPlaybackAt(audioPath string, offset float64) (*exec.Cmd, error) {
 	if _, err := exec.LookPath("cvlc"); err == nil {
-		cmd := exec.Command("cvlc", "--no-video", "--intf", "dummy", "--control", "dbus", audioPath)
+		args := []string{"--no-video", "--intf", "dummy", "--control", "dbus"}
+		if offset > 0 {
+			args = append(args, fmt.Sprintf("--start-time=%.2f", offset))
+		}
+		args = append(args, audioPath)
+		cmd := exec.Command("cvlc", args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		if err := cmd.Start(); err == nil {
 			return cmd, nil
 		}
 	}
 	if _, err := exec.LookPath("ffplay"); err == nil {
-		cmd := exec.Command("ffplay", "-nodisp", "-autoexit", "-loglevel", "quiet", audioPath)
+		args := []string{"-nodisp", "-autoexit", "-loglevel", "quiet"}
+		if offset > 0 {
+			args = append(args, "-ss", fmt.Sprintf("%.2f", offset))
+		}
+		args = append(args, audioPath)
+		cmd := exec.Command("ffplay", args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 		if err := cmd.Start(); err == nil {
 			return cmd, nil
 		}
 	}
-	cmd := exec.Command("mpg123", "-q", audioPath)
+	args := []string{"-q"}
+	if offset > 0 {
+		args = append(args, "-k", strconv.Itoa(int(offset*38.28)))
+	}
+	args = append(args, audioPath)
+	cmd := exec.Command("mpg123", args...)
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
 		return nil, err
@@ -367,17 +420,33 @@ func HandleDaemonCycle(args []any, state *daemonState, cmd *exec.Cmd) mpvRespons
 	state.mu.Lock()
 	defer state.mu.Unlock()
 	state.paused = !state.paused
-	SignalDaemonProcess(cmd, state.paused)
+	activeCmd := cmd
+	if state.cmd != nil {
+		activeCmd = state.cmd
+	}
+	SignalDaemonProcess(activeCmd, state.paused)
 	return mpvResponse{Data: state.paused, Error: "success"}
 }
 
 func HandleDaemonSetProp(args []any, state *daemonState, cmd *exec.Cmd) mpvResponse {
-	if len(args) > 2 && args[1] == "pause" {
+	if len(args) > 2 {
 		state.mu.Lock()
 		defer state.mu.Unlock()
-		if p, ok := args[2].(bool); ok {
-			state.paused = p
-			SignalDaemonProcess(cmd, state.paused)
+		prop, _ := args[1].(string)
+		switch prop {
+		case "pause":
+			if p, ok := args[2].(bool); ok {
+				state.paused = p
+				activeCmd := cmd
+				if state.cmd != nil {
+					activeCmd = state.cmd
+				}
+				SignalDaemonProcess(activeCmd, state.paused)
+			}
+		case "volume":
+			if v, ok := args[2].(float64); ok {
+				state.volume = v
+			}
 		}
 	}
 	return mpvResponse{Error: "success"}
@@ -418,6 +487,12 @@ func HandleDaemonGetProp(args []any, state *daemonState) mpvResponse {
 		return mpvResponse{Data: pos, Error: "success"}
 	case "duration":
 		return mpvResponse{Data: state.duration, Error: "success"}
+	case "volume":
+		vol := state.volume
+		if vol <= 0 {
+			vol = 100
+		}
+		return mpvResponse{Data: vol, Error: "success"}
 	default:
 		return mpvResponse{Error: "success"}
 	}
@@ -437,6 +512,20 @@ func HandleDaemonSeek(args []any, state *daemonState) mpvResponse {
 	state.offset += delta
 	if state.offset < 0 {
 		state.offset = 0
+	}
+	if state.duration > 0 && state.offset > state.duration {
+		state.offset = state.duration
+	}
+	if state.cmd != nil && state.cmd.Process != nil {
+		_ = state.cmd.Process.Signal(syscall.SIGCONT)
+		_ = state.cmd.Process.Kill()
+	}
+	if newCmd, err := StartDaemonPlaybackAt(state.path, state.offset); err == nil {
+		state.cmd = newCmd
+		state.start = time.Now()
+		if state.paused {
+			SignalDaemonProcess(newCmd, true)
+		}
 	}
 	return mpvResponse{Error: "success"}
 }

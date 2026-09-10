@@ -54,51 +54,55 @@ func ResolveOutputFile(mainMP3File string, output string, totalFiles int) string
 	return mainMP3File
 }
 
-func HandleTranscribeMin(sourceAudioFile *string, totalDuration float64, transcribeMin string) float64 {
+func HandleTranscribeMin(sourceAudioFile *string, totalDuration float64, transcribeMin string) (float64, error) {
 	val, err := strconv.ParseFloat(transcribeMin, 64)
 	if err != nil || val <= 0 {
-		return totalDuration
+		return totalDuration, nil
 	}
 	durSec := val * 60.0
 	if durSec >= totalDuration {
-		return totalDuration
+		return totalDuration, nil
 	}
 	workDir := util.WorkDirFor(*sourceAudioFile)
-	_ = os.MkdirAll(workDir, 0755)
+	if err := os.MkdirAll(workDir, 0755); err != nil {
+		return totalDuration, err
+	}
 	truncPath := filepath.Join(workDir, filepath.Base(*sourceAudioFile)+".truncated.wav")
 	if err := util.VerifyTempFile(truncPath); err != nil {
-		return totalDuration
+		return totalDuration, err
 	}
-	if audio.TruncateAudio(*sourceAudioFile, truncPath, durSec) {
-		*sourceAudioFile = truncPath
-		return durSec
+	if !audio.TruncateAudio(*sourceAudioFile, truncPath, durSec) {
+		return totalDuration, fmt.Errorf("failed to truncate audio to %v min", transcribeMin)
 	}
-	return totalDuration
+	*sourceAudioFile = truncPath
+	return durSec, nil
 }
 
-func HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile types.LLMProfile, cfg types.Config, cli types.CLIOptions, fileStartTime time.Time) {
+func HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile types.LLMProfile, cfg types.Config, cli types.CLIOptions, fileStartTime time.Time) error {
 	cutsFile := baseName + ".cuts.json"
 	if !util.FileExists(cutsFile) {
-		fmt.Fprintf(os.Stderr, "Error: Cut metadata JSON file '%s' not found for recutting.\n", cutsFile)
-		return
+		err := fmt.Errorf("cut metadata JSON file '%s' not found for recutting", cutsFile)
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return err
 	}
 
 	keepSegments, _, ok := LoadRecutKeepSegments(cutsFile, mainMP3File, totalDuration, selectedProfile, cli)
 	if !ok || len(keepSegments) == 0 {
-		return
+		return fmt.Errorf("no keep segments loaded from '%s'", cutsFile)
 	}
 
 	workDir := util.WorkDirFor(outputFile)
 	if err := os.MkdirAll(workDir, 0755); err != nil {
 		fmt.Fprintf(os.Stderr, "Error creating work directory '%s': %v\n", workDir, err)
-		return
+		return err
 	}
 	tempOutputFile := filepath.Join(workDir, filepath.Base(outputFile)+".tmp"+filepath.Ext(outputFile))
 	if err := util.VerifyTempFile(tempOutputFile); err != nil {
-		return
+		return err
 	}
 
 	ExecuteRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir, keepSegments, totalDuration, cfg, cli, fileStartTime)
+	return nil
 }
 
 func LoadRecutKeepSegments(cutsFile, mainMP3File string, totalDuration float64, selectedProfile types.LLMProfile, cli types.CLIOptions) ([][2]float64, types.CutsData, bool) {

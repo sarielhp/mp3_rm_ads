@@ -30,6 +30,15 @@ import (
 type (
 	Config              = types.Config
 	CLIOptions          = types.CLIOptions
+	WhisperConfig       = types.WhisperConfig
+	BackendConfig       = types.BackendConfig
+	RemoteConfig        = types.RemoteConfig
+	PolicyConfig        = types.PolicyConfig
+	GeminiConfig        = types.GeminiConfig
+	BatchOptions        = types.BatchOptions
+	RemoteOptions       = types.RemoteOptions
+	PolicyOptions       = types.PolicyOptions
+	BackendOptions      = types.BackendOptions
 	LLMProfile          = types.LLMProfile
 	AdSegment           = types.AdSegment
 	TranscriptionData   = types.TranscriptionData
@@ -368,12 +377,13 @@ func updateTranscriptAdDetectionStatus(jsonFile string, successful bool, status,
 	return os.WriteFile(jsonFile, append(content, '\n'), 0644)
 }
 
-func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile LLMProfile, cfg Config, cli CLIOptions, fileStartTime time.Time) {
-	pipeline.HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, cfg, cli, fileStartTime)
+func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile LLMProfile, cfg Config, cli CLIOptions, fileStartTime time.Time) error {
+	return pipeline.HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, cfg, cli, fileStartTime)
 }
 
 func handleTranscribeMin(sourceAudioFile *string, totalDuration float64, cli CLIOptions) float64 {
-	return pipeline.HandleTranscribeMin(sourceAudioFile, totalDuration, cli.TranscribeMin)
+	dur, _ := pipeline.HandleTranscribeMin(sourceAudioFile, totalDuration, cli.TranscribeMin)
+	return dur
 }
 
 func formatTranscript(data *TranscriptionData, totalDuration float64) string {
@@ -562,10 +572,6 @@ func runPlayerDaemon(audioPath, title, podcast string) error {
 }
 
 func isPlayerSocketAlive() bool { return player.IsPlayerSocketAlive() }
-
-func startPlayerTrack(audioPath, title, podcast string) error {
-	return player.StartPlayerTrack(audioPath, title, podcast)
-}
 
 func StartPlayerTrack(audioPath, title, podcast string) error {
 	return player.StartPlayerTrack(audioPath, title, podcast)

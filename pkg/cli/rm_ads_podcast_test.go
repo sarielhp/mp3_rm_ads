@@ -271,7 +271,13 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cfg := Config{PodcastsDir: tmp, AudiobookshelfURL: srv.URL, AudiobookshelfToken: "test-tok"}
+	cfg := Config{
+		PodcastsDir: tmp,
+		BackendConfig: BackendConfig{
+			AudiobookshelfURL:   srv.URL,
+			AudiobookshelfToken: "test-tok",
+		},
+	}
 	targetPath, ok := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !ok || targetPath == "" {
 		t.Fatalf("expected to download and find target episode 2, got %s (ok=%v)", targetPath, ok)
@@ -339,7 +345,13 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cfg := Config{PodcastsDir: tmp, AudiobookshelfURL: srv.URL, AudiobookshelfToken: "test-tok"}
+	cfg := Config{
+		PodcastsDir: tmp,
+		BackendConfig: BackendConfig{
+			AudiobookshelfURL:   srv.URL,
+			AudiobookshelfToken: "test-tok",
+		},
+	}
 	targetPath, handled := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !handled || targetPath != "" {
 		t.Fatalf("expected handled=true and targetPath='' when all episodes clean, got %s (handled=%v)", targetPath, handled)
@@ -357,7 +369,9 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 
 	markEpisodeClean(t, targetAudio)
 
-	err := processSingleQueuedTarget(podDir, targetAudio, "rm_ads", CLIOptions{Quiet: true, Local: true}, Config{PodcastsDir: tmp})
+	cliLocal := CLIOptions{Quiet: true}
+	cliLocal.Local = true
+	err := processSingleQueuedTarget(podDir, targetAudio, "rm_ads", cliLocal, Config{PodcastsDir: tmp})
 	if err != nil {
 		t.Fatalf("processSingleQueuedTarget failed: %v", err)
 	}
@@ -397,9 +411,11 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 	defer srv.Close()
 
 	cfg := Config{
-		PodcastsDir:         tmp,
-		AudiobookshelfURL:   srv.URL,
-		AudiobookshelfToken: "invalid",
+		PodcastsDir: tmp,
+		BackendConfig: BackendConfig{
+			AudiobookshelfURL:   srv.URL,
+			AudiobookshelfToken: "invalid",
+		},
 	}
 
 	targetPath, err := resolveTargetEpisodeForRmAds(resolved, CLIOptions{Quiet: true}, cfg)
@@ -428,7 +444,8 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{Quiet: true, Local: true}
+	cli := CLIOptions{Quiet: true}
+	cli.Local = true
 	config := Config{PodcastsDir: tmp}
 
 	addEpisodeToQueueFile(resolved.Dir, filepath.Base(paths[0]))
@@ -491,14 +508,18 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 	_ = os.MkdirAll(remoteWorkDir, 0755)
 
 	cfg := Config{
-		RemoteHost:    "mock-box",
-		RemoteWorkDir: remoteWorkDir,
-		PodcastsDir:   localPodcasts,
+		RemoteConfig: RemoteConfig{
+			RemoteHost:    "mock-box",
+			RemoteWorkDir: remoteWorkDir,
+		},
+		PodcastsDir: localPodcasts,
 	}
 	cli := CLIOptions{
-		Quiet:      true,
-		Remote:     true,
-		RemoteHost: "mock-box",
+		Quiet: true,
+		RemoteOptions: RemoteOptions{
+			Remote:     true,
+			RemoteHost: "mock-box",
+		},
 	}
 
 	go func() {
@@ -682,7 +703,13 @@ func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
 		UUID:       "item-h",
 	}
 
-	cfg := Config{PodcastsDir: tmp, AudiobookshelfURL: srv.URL, AudiobookshelfToken: "test-tok"}
+	cfg := Config{
+		PodcastsDir: tmp,
+		BackendConfig: BackendConfig{
+			AudiobookshelfURL:   srv.URL,
+			AudiobookshelfToken: "test-tok",
+		},
+	}
 	targetPath, ok := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !ok || targetPath != mp3Path {
 		t.Fatalf("expected targetPath=%s (ok=true), got %s (ok=%v)", mp3Path, targetPath, ok)

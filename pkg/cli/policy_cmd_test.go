@@ -76,12 +76,14 @@ func TestPolicyUpdate(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	cli := CLIOptions{
-		Args:            []string{podID},
-		AutoDownloadStr: "false",
-		DownloadPolicy:  "none",
-		AutoCleanupStr:  "true",
-		CleanupDays:     14,
-		AdRemovalMode:   "latest",
+		Args: []string{podID},
+		PolicyOptions: PolicyOptions{
+			AutoDownloadStr: "false",
+			DownloadPolicy:  "none",
+			AutoCleanupStr:  "true",
+			CleanupDays:     14,
+			AdRemovalMode:   "latest",
+		},
 	}
 
 	r, w, _ := os.Pipe()

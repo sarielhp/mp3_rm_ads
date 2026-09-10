@@ -8,14 +8,12 @@ var (
 	colorCyan     = lipgloss.Color("#00f5d4")
 	colorPurple   = lipgloss.Color("#7b2cbf")
 	colorMagenta  = lipgloss.Color("#f72585")
-	colorPink     = lipgloss.Color("#ff70a6")
 	colorYellow   = lipgloss.Color("#ffd166")
 	colorGreen    = lipgloss.Color("#06d6a0")
 	colorRed      = lipgloss.Color("#ef476f")
 	colorBlue     = lipgloss.Color("#4cc9f0")
 	colorLavender = lipgloss.Color("#c77dff")
 	colorDarkBg   = lipgloss.Color("#1a1b26")
-	colorCardBg   = lipgloss.Color("#24283b")
 	colorBorder   = lipgloss.Color("#414868")
 	colorSubtext  = lipgloss.Color("#a9b1d6")
 	colorDim      = lipgloss.Color("#565f89")
@@ -64,12 +62,6 @@ var (
 	tuiYellowStyle = lipgloss.NewStyle().
 			Foreground(colorYellow)
 
-	tuiBlueStyle = lipgloss.NewStyle().
-			Foreground(colorBlue)
-
-	tuiMagentaStyle = lipgloss.NewStyle().
-			Foreground(colorMagenta)
-
 	tuiPurpleStyle = lipgloss.NewStyle().
 			Foreground(colorPurple)
 
@@ -114,11 +106,6 @@ var (
 			Background(colorYellow).
 			Padding(0, 1)
 
-	tuiBadgeType = lipgloss.NewStyle().
-			Foreground(colorLavender).
-			Background(lipgloss.Color("#2e2a4a")).
-			Padding(0, 1)
-
 	tuiBadgeTranscript = lipgloss.NewStyle().
 				Bold(true).
 				Foreground(colorDarkBg).
@@ -135,12 +122,6 @@ var (
 				Foreground(colorBlue).
 				Background(lipgloss.Color("#1f2d3d")).
 				Padding(0, 1)
-
-	tuiBadgeCount = lipgloss.NewStyle().
-			Bold(true).
-			Foreground(colorMagenta).
-			Background(lipgloss.Color("#361f36")).
-			Padding(0, 1)
 
 	tuiPlayerPlaying = lipgloss.NewStyle().
 				Bold(true).
@@ -163,11 +144,6 @@ var (
 			Bold(true).
 			Foreground(colorMagenta)
 
-	tuiCardBox = lipgloss.NewStyle().
-			Border(lipgloss.RoundedBorder()).
-			BorderForeground(colorBorder).
-			Padding(0, 1)
-
 	tuiDividerStyle = lipgloss.NewStyle().
 			Foreground(colorBorder)
 )
@@ -184,9 +160,6 @@ func applyTUIColorConfig(cfg *TUIColorConfig) {
 	}
 	if cfg.Magenta != "" {
 		colorMagenta = lipgloss.Color(cfg.Magenta)
-	}
-	if cfg.Pink != "" {
-		colorPink = lipgloss.Color(cfg.Pink)
 	}
 	if cfg.Yellow != "" {
 		colorYellow = lipgloss.Color(cfg.Yellow)
@@ -205,9 +178,6 @@ func applyTUIColorConfig(cfg *TUIColorConfig) {
 	}
 	if cfg.DarkBg != "" {
 		colorDarkBg = lipgloss.Color(cfg.DarkBg)
-	}
-	if cfg.CardBg != "" {
-		colorCardBg = lipgloss.Color(cfg.CardBg)
 	}
 	if cfg.Border != "" {
 		colorBorder = lipgloss.Color(cfg.Border)

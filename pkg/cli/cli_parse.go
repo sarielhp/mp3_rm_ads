@@ -155,7 +155,9 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 func parseFlagsArgs(args []string) (string, CLIOptions, error) {
 	var action string
 	opts := CLIOptions{
-		SaveTranscript: true,
+		BatchOptions: BatchOptions{
+			SaveTranscript: true,
+		},
 	}
 
 	for i, a := range args {

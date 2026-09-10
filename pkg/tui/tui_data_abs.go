@@ -7,11 +7,6 @@ import (
 	"strings"
 )
 
-func absDownloadCover(baseURL, token, itemID, destPath string) error {
-	client := backend.NewAudiobookshelf(backend.Config{Host: baseURL, Token: token})
-	return client.DownloadCover(itemID, destPath)
-}
-
 func loadTUIPodcastsABS(podcastsDir string, cfg Config) ([]tuiPodcast, error) {
 	podcasts, err := loadTUIPodcasts(podcastsDir)
 	if err != nil {

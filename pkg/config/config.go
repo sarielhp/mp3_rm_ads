@@ -7,6 +7,7 @@ import (
 	"strconv"
 
 	"github.com/sariel/abs/pkg/types"
+	"github.com/sariel/abs/pkg/util"
 )
 
 var defaultKeyEnabled = true
@@ -14,31 +15,40 @@ var defaultKeyDisabled = false
 
 func DefaultConfig() types.Config {
 	return types.Config{
-		Instructions:            "Configuration file for abs. Select profiles by ID or set active_profile_id.",
-		DefaultDownloadPolicy:   "latest",
-		DefaultDownloadK:        3,
-		DefaultAdRemoval:        "all",
-		DefaultProcessing:       "local",
-		RemoteWorkDir:           "~/abs_remote",
-		WhisperURL:              "http://127.0.0.1:8088/inference",
-		WhisperSpeedFactor:      70.0,
-		ChunkDurationSec:        0,
-		ActiveProfileID:         1,
-		ActiveWhisperID:         1,
-		WhisperProfiles:         DefaultWhisperProfiles,
-		WhisperEngine:           types.WhisperEngineLocal,
-		WhisperModel:            "tiny.en",
-		WhisperCliBinary:        "whisper-cli",
-		WhisperProcessors:       4,
-		WhisperThreads:          4,
-		WhisperGreedy:           true,
-		GeminiProjectID:         "vm-on-cloud-sariel",
-		GeminiStagingBucket:     "abs-audio-staging-sariel",
-		GeminiLocation:          "us-central1",
-		GeminiAPIKeyEnabled:     &defaultKeyEnabled,
-		OpenRouterAPIKeyEnabled: &defaultKeyDisabled,
-		Profiles:                DefaultLLMProfiles,
-		RemoteFFmpegHost:        "",
+		Instructions:     "Configuration file for abs. Select profiles by ID or set active_profile_id.",
+		ChunkDurationSec: 0,
+		ActiveProfileID:  1,
+		Profiles:         DefaultLLMProfiles,
+
+		WhisperConfig: types.WhisperConfig{
+			WhisperURL:         "http://127.0.0.1:8088/inference",
+			WhisperSpeedFactor: 70.0,
+			ActiveWhisperID:    1,
+			WhisperProfiles:    DefaultWhisperProfiles,
+			WhisperEngine:      types.WhisperEngineLocal,
+			WhisperModel:       "tiny.en",
+			WhisperCliBinary:   "whisper-cli",
+			WhisperProcessors:  4,
+			WhisperThreads:     4,
+			WhisperGreedy:      true,
+		},
+		RemoteConfig: types.RemoteConfig{
+			DefaultProcessing: "local",
+			RemoteWorkDir:     "~/abs_remote",
+			RemoteFFmpegHost:  "",
+		},
+		PolicyConfig: types.PolicyConfig{
+			DefaultDownloadPolicy: "latest",
+			DefaultDownloadK:      3,
+			DefaultAdRemoval:      "all",
+		},
+		GeminiConfig: types.GeminiConfig{
+			GeminiProjectID:         "",
+			GeminiStagingBucket:     "",
+			GeminiLocation:          "us-central1",
+			GeminiAPIKeyEnabled:     &defaultKeyEnabled,
+			OpenRouterAPIKeyEnabled: &defaultKeyDisabled,
+		},
 	}
 }
 
@@ -64,7 +74,7 @@ func EnsureConfigExists() (*types.Config, error) {
 		if err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(path, append(data, '\n'), 0600); err != nil {
+		if err := util.WriteFileAtomic(path, append(data, '\n'), 0600); err != nil {
 			return nil, fmt.Errorf("failed to write default config to %s: %w", path, err)
 		}
 		return &cfg, nil
@@ -76,15 +86,11 @@ func LoadConfig() (*types.Config, error) {
 	path := ConfigPath()
 	data, err := os.ReadFile(path)
 	if err != nil {
-		cfg := DefaultConfig()
-		ApplyEnvOverrides(&cfg)
-		return &cfg, err
+		return nil, err
 	}
 	var cfg types.Config
 	if err := json.Unmarshal(data, &cfg); err != nil {
-		def := DefaultConfig()
-		ApplyEnvOverrides(&def)
-		return &def, fmt.Errorf("invalid config json in %s: %w", path, err)
+		return nil, fmt.Errorf("invalid config json in %s: %w", path, err)
 	}
 	ApplyEnvOverrides(&cfg)
 	ResolveAuthFolderCredentials(&cfg)
@@ -104,7 +110,7 @@ func SaveConfig(cfg *types.Config) error {
 	if err != nil {
 		return fmt.Errorf("failed to serialize config: %w", err)
 	}
-	return os.WriteFile(ConfigPath(), append(data, '\n'), 0600)
+	return util.WriteFileAtomic(ConfigPath(), append(data, '\n'), 0600)
 }
 
 func ApplyEnvOverrides(cfg *types.Config) {
