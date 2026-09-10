@@ -24,7 +24,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 			},
 			{
 				Line:        "abs server download -p 'Huberman Lab' -k 3",
-				Description: "Update feeds and download 3 latest episodes for a specific podcast",
+				Description: "Download the 3 latest episodes for a specific podcast",
 			},
 			{
 				Line:        "abs server opml export podcasts.opml",

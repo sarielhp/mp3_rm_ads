@@ -16,7 +16,7 @@ import (
 func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
 	return clihelp.Command{
 		Name:        "download",
-		Description: "Update feeds and download undownloaded episodes for podcasts",
+		Description: "Download undownloaded episodes for podcasts",
 		UsageLine:   "abs server download [podcast-id] [options]",
 		Parameters:  []clihelp.Param{{Name: "[podcast-id]", Description: "Specify podcast by name, index, or ID"}},
 		Args:        clihelp.MaximumNArgs(1),
@@ -72,19 +72,6 @@ func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error 
 	podcasts, err := resolveServerTargetPodcasts(b, cli)
 	if err != nil {
 		return err
-	}
-	if !cli.DryRun {
-		if !cli.Quiet {
-			fmt.Println("Refreshing feeds before downloading...")
-		}
-		// Only the podcasts whose feeds actually changed are handed to the
-		// server. A feed that cannot be read is reported and skipped rather
-		// than aborting the whole download run.
-		summary := checkServerFeeds(b, podcasts, cli)
-		if !cli.Quiet {
-			fmt.Printf("%d feed(s) changed, %d unchanged, %d unreadable (%.1fs).\n",
-				summary.Changed, summary.Unchanged, summary.Unreadable, summary.Elapsed.Seconds())
-		}
 	}
 	return executeServerDownloads(b, config, cli, podcasts)
 }

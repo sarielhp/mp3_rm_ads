@@ -44,7 +44,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			},
 			{
 				Line:        "abs server download",
-				Description: "Update feeds and download new episodes from server",
+				Description: "Download new episodes from server",
 			},
 			{
 				Line:        "abs server opml export podcasts.opml",
