@@ -319,12 +319,16 @@ func selectDefaultUndownloadedEpisodes(sortedCatalog []backend.FeedEpisode, down
 			reasons = append(reasons, fmt.Sprintf("%d undownloaded episode(s)", len(episodesToDownload)))
 		}
 	} else if countGiven && len(episodesToDownload) > count {
-		episodesToDownload = episodesToDownload[:count]
+		if oldest {
+			episodesToDownload = episodesToDownload[:count]
+		} else {
+			episodesToDownload = episodesToDownload[len(episodesToDownload)-count:]
+		}
 	}
 	return episodesToDownload, reasons
 }
 
-func DownloadPodcastEpisodes(client backend.Backend, item backend.Podcast, opts DownloadOptions) int {
+func DownloadPodcastEpisodes(client backend.Backend, item backend.Podcast, opts DownloadOptions) (int, error) {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
@@ -333,18 +337,12 @@ func DownloadPodcastEpisodes(client backend.Backend, item backend.Podcast, opts 
 	itemID := item.ID
 
 	if feedURL == "" {
-		if !opts.Quiet {
-			fmt.Printf("Podcast %s has no RSS feed URL configured.\n", podcastTitle)
-		}
-		return 0
+		return 0, fmt.Errorf("podcast %s has no RSS feed URL configured", podcastTitle)
 	}
 
 	feedEpisodes, err := client.PodcastFeedEpisodes(feedURL)
 	if err != nil {
-		if !opts.Quiet {
-			fmt.Printf("Failed to parse episode catalog for %s: %v\n", podcastTitle, err)
-		}
-		return 0
+		return 0, fmt.Errorf("fetch episode catalog for %s: %w", podcastTitle, err)
 	}
 
 	isDownloaded := BuildDownloadedChecker(client, item, itemID)
@@ -365,7 +363,7 @@ func DownloadPodcastEpisodes(client backend.Backend, item backend.Podcast, opts 
 	return ExecuteEpisodeDownloads(client, item, episodesToDownload, reasons, opts)
 }
 
-func ExecuteEpisodeDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, reasons []string, opts DownloadOptions) int {
+func ExecuteEpisodeDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, reasons []string, opts DownloadOptions) (int, error) {
 	podcastTitle := item.Media.Metadata.Title
 	if podcastTitle == "" {
 		podcastTitle = "Untitled Podcast"
@@ -373,12 +371,14 @@ func ExecuteEpisodeDownloads(client backend.Backend, item backend.Podcast, episo
 
 	if len(episodesToDownload) > 0 {
 		sortAndPrintSelectedEpisodes(episodesToDownload, podcastTitle, reasons, opts.Oldest, opts.Verbose, opts.Quiet)
-		queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, opts.Quiet)
+		if err := queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, opts.Quiet); err != nil {
+			return 0, err
+		}
 	} else if !opts.ForceNewOnly && !opts.Quiet {
 		fmt.Printf("No new episodes to download for %s.\n", podcastTitle)
 	}
 
-	return len(episodesToDownload)
+	return len(episodesToDownload), nil
 }
 
 func sortAndPrintSelectedEpisodes(episodesToDownload []backend.FeedEpisode, podcastTitle string, reasons []string, oldest, verbose, quiet bool) {
@@ -419,46 +419,26 @@ func sortAndPrintSelectedEpisodes(episodesToDownload []backend.FeedEpisode, podc
 	}
 }
 
-func queueAndTrackDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, noWait, dryRun, quiet bool) {
+func queueAndTrackDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, noWait, dryRun, quiet bool) error {
 	if dryRun {
 		if !quiet {
 			fmt.Println("Dry run mode enabled. Skipping actual download request.")
 		}
-		return
+		return nil
 	}
 
 	if !quiet {
 		fmt.Printf("Queueing download request for %d episode(s)...\n", len(episodesToDownload))
 	}
 	if err := client.DownloadEpisodes(item.ID, episodesToDownload); err != nil {
-		if !quiet {
-			fmt.Printf("Failed to queue episode download: %v\n", err)
-		}
-		return
+		return fmt.Errorf("queue episode download: %w", err)
 	}
 
 	if !quiet {
 		fmt.Println("Download request successfully sent!")
 	}
 	if !noWait {
-		waitForEpisodeDownloads(client, item.ID, quiet)
+		return client.WaitForActiveDownloads([]backend.Podcast{item}, quiet, 5*time.Minute)
 	}
-}
-
-func waitForEpisodeDownloads(client backend.Backend, itemID string, quiet bool) {
-	if !quiet {
-		fmt.Println("\nWaiting for backend to complete episode download(s)...")
-	}
-	time.Sleep(2 * time.Second)
-
-	for {
-		activeDls, err := client.ActiveDownloads(itemID)
-		if err == nil && len(activeDls) == 0 {
-			if !quiet {
-				fmt.Println("Episode download(s) completed!")
-			}
-			return
-		}
-		time.Sleep(2 * time.Second)
-	}
+	return nil
 }

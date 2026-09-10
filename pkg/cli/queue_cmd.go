@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 type queueEpisodeItem struct {
@@ -32,6 +33,9 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			args = args[1:]
 		case "add":
 			subcmd = "add"
+			args = args[1:]
+		case "today":
+			subcmd = "today"
 			args = args[1:]
 		case "remove":
 			subcmd = "remove"
@@ -61,6 +65,11 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			args = []string{"all"}
 		}
 		return handleQueueAdd(podcastsDir, args)
+	case "today":
+		if len(args) != 0 {
+			return fmt.Errorf("queue today accepts no arguments")
+		}
+		return handleQueueToday(podcastsDir, cli, time.Now())
 	case "remove":
 		if len(args) == 0 {
 			return fmt.Errorf("missing target ID(s) to remove from queue")
@@ -79,7 +88,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		}
 		return handleQueueRun(cfg, cli, target)
 	default:
-		return fmt.Errorf("unknown queue action %q (use list, add, remove, clear, or run)", subcmd)
+		return fmt.Errorf("unknown queue action %q (use list, add, today, remove, clear, or run)", subcmd)
 	}
 }
 

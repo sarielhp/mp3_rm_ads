@@ -192,15 +192,23 @@ func handleServerDownload(config Config, cli CLIOptions) error {
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
+	return runServerDownloads(b, config, cli)
+}
+
+func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error {
 	podcasts, err := resolveServerTargetPodcasts(b, cli)
 	if err != nil {
 		return err
 	}
-	if !cli.Quiet {
-		fmt.Println("Refreshing feeds before downloading...")
-	}
-	for _, item := range podcasts {
-		_, _ = refreshSinglePodcastFeed(b, item, true, false)
+	if !cli.DryRun {
+		if !cli.Quiet {
+			fmt.Println("Refreshing feeds before downloading...")
+		}
+		for _, item := range podcasts {
+			if _, err := refreshSinglePodcastFeed(b, item, true, false); err != nil {
+				return err
+			}
+		}
 	}
 	return executeServerDownloads(b, config, cli, podcasts)
 }
@@ -210,7 +218,7 @@ func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, po
 		Count:       cli.Count,
 		Oldest:      cli.Oldest,
 		DryRun:      cli.DryRun,
-		NoWait:      cli.NoWait,
+		NoWait:      true,
 		Fill:        cli.Fill,
 		CountGiven:  cli.CountGiven,
 		CheckNew:    cli.CheckNew,
@@ -232,7 +240,10 @@ func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, po
 		if fresh, err := b.GetPodcast(item.ID); err == nil && fresh != nil {
 			item = *fresh
 		}
-		count := podcast.DownloadPodcastEpisodes(b, item, opts)
+		count, err := podcast.DownloadPodcastEpisodes(b, item, opts)
+		if err != nil {
+			return fmt.Errorf("download %s: %w", title, err)
+		}
 		if !cli.DryRun {
 			totalDownloaded += count
 		}
@@ -251,9 +262,11 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 		if !cli.Quiet {
 			fmt.Printf("Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
 		}
-		_ = b.WaitForActiveDownloads(podcasts, cli.Quiet, 5*time.Minute)
+		if err := b.WaitForActiveDownloads(podcasts, cli.Quiet, 5*time.Minute); err != nil {
+			return fmt.Errorf("waiting for downloads: %w", err)
+		}
 	}
-	if totalDownloaded > 0 && !cli.DryRun {
+	if totalDownloaded > 0 && !cli.DryRun && !cli.NoWait {
 		if len(config.PostProcessors) > 0 {
 			runPostProcessors(config.PostProcessors, cli.Quiet)
 		} else {

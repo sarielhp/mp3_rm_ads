@@ -155,7 +155,8 @@ abs info check              # Test external services (Whisper, ABS, Kitty)
 # Podcast sync & server operations (absorbs fetch, server, policy)
 abs sync                    # Scan library for podcasts and new episodes
 abs sync feeds              # Fetch latest RSS feeds
-abs sync download           # Download pending episodes
+abs server download         # Download pending episodes according to podcast policy
+abs server download p0001 -k 3 # Download up to 3 missing episodes for a podcast
 abs sync prune              # Prune old episodes per retention policy
 abs sync policy p0001       # View or update download/AdR policy
 abs sync timeline           # Display online availability timestamps table
@@ -163,6 +164,7 @@ abs sync timeline           # Display online availability timestamps table
 # Manage AdR queue
 abs queue list
 abs queue add e12345
+abs queue today             # Queue downloaded, uncleaned episodes published today (local date)
 abs queue remove e12345
 abs queue clear
 

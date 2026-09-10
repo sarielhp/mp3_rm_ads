@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"fmt"
 	"strconv"
 
 	"github.com/sarielhp/clihelp"
@@ -122,14 +123,13 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 			opts.ServerSubcmd = "download"
 			opts.SyncSubcmd = "download"
 			opts.Args = ctx.Args
-			if len(ctx.Args) > 0 {
-				if k, err := strconv.Atoi(ctx.Args[0]); err == nil {
-					opts.Count = k
-					opts.CountGiven = true
-				} else if opts.Podcast == "" {
-					opts.Podcast = ctx.Args[0]
+			if len(ctx.Args) > 0 && opts.Podcast == "" {
+				opts.Podcast = ctx.Args[0]
+			}
+			if *countVal != -1 {
+				if *countVal <= 0 {
+					return fmt.Errorf("download count must be positive")
 				}
-			} else if *countVal != -1 {
 				opts.Count = *countVal
 				opts.CountGiven = true
 			} else {

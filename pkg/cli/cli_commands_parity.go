@@ -255,6 +255,7 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Subcommands: []clihelp.Command{
 			buildQueueListSubcommand(opts, action),
 			buildQueueAddSubcommand(opts, action),
+			buildQueueTodaySubcommand(opts, action),
 			buildQueueRemoveSubcommand(opts, action),
 			buildQueueClearSubcommand(opts, action),
 			buildQueueRunSubcommand(opts, action),
