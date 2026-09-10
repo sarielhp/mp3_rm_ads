@@ -13,7 +13,6 @@ import (
 
 type (
 	Config              = types.Config
-	CLIOptions          = types.CLIOptions
 	ProcOptions         = types.ProcOptions
 	LLMProfile          = types.LLMProfile
 	AdSegment           = types.AdSegment

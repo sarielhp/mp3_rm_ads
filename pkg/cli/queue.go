@@ -437,7 +437,7 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 			continue
 		}
 
-		err := adremoval.ProcessQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli, cfg)
+		err := adremoval.ProcessQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli.ProcOptions, cfg)
 		if err != nil {
 			if !cli.Quiet {
 				fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", it.Filename, err)

@@ -147,7 +147,7 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 			runPostProcessors(config.PostProcessors, cli.Quiet)
 		} else {
 			if targets, ok := resolveTargetAudioArgs(cli, config); ok {
-				adremoval.ProcessFiles(targets, cli, config, "proc")
+				adremoval.ProcessFiles(targets, cli.ProcOptions, config, "proc")
 			}
 		}
 	}

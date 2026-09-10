@@ -86,27 +86,27 @@ type localRaceResult struct {
 	err error
 }
 
-func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp WhisperProfile, config Config, cli CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
+func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp WhisperProfile, config Config, opts ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
 	if wp.Engine == WhisperEngineLocal {
-		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
+		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
 	}
 	chunkDuration := config.ChunkDurationSec
-	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
+	useChunks := opts.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 	if useChunks {
 		return transcribe.TranscribeChunks(
-			audioPath, wp.URL, cli.Quiet, cli.Verbose,
+			audioPath, wp.URL, opts.Quiet, opts.Verbose,
 			totalDuration, speedFactor, chunkDuration,
 			dockerContainer, whisperPrompt, whisperLang,
 		)
 	}
 	return transcribe.TranscribeWhisperContext(
-		ctx, audioPath, wp.URL, cli.Quiet, cli.Verbose,
+		ctx, audioPath, wp.URL, opts.Quiet, opts.Verbose,
 		totalDuration, speedFactor, dockerContainer,
 		whisperPrompt, whisperLang, nil,
 	)
 }
 
-func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, config Config, cli CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string, isHebrew bool) (*TranscriptionData, []AdSegment, bool, error) {
+func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, config Config, opts ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string, isHebrew bool) (*TranscriptionData, []AdSegment, bool, error) {
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -114,7 +114,7 @@ func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, con
 		whisperLang = "he"
 	}
 	localWp := resolveLocalWhisperProfile(config, isHebrew)
-	if isHebrew && !cli.Quiet {
+	if isHebrew && !opts.Quiet {
 		fmt.Printf("   Hebrew detected: routed local Whisper to %s (%s)\n", localWp.Name, whisperEngineBadge(localWp.Engine))
 	}
 
@@ -132,11 +132,11 @@ func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, con
 	}()
 
 	go func() {
-		td, err := runLocalCandidateTranscription(ctx, audioPath, localWp, config, cli, totalDuration, speedFactor, whisperPrompt, whisperLang, dockerContainer)
+		td, err := runLocalCandidateTranscription(ctx, audioPath, localWp, config, opts, totalDuration, speedFactor, whisperPrompt, whisperLang, dockerContainer)
 		localCh <- localRaceResult{td: td, err: err}
 	}()
 
-	return awaitRaceResults(ctx, cancel, geminiCh, localCh, cli.Quiet)
+	return awaitRaceResults(ctx, cancel, geminiCh, localCh, opts.Quiet)
 }
 
 func awaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <-chan geminiRaceResult, localCh <-chan localRaceResult, quiet bool) (*TranscriptionData, []AdSegment, bool, error) {

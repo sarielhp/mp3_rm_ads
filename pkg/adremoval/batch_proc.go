@@ -19,36 +19,36 @@ import (
 // files, or directories to be expanded into the episodes their podcast's
 // ad-removal policy admits. Interpreting a command line into that set belongs
 // to the caller.
-func ProcessFiles(targets []string, cli CLIOptions, config Config, action string) {
-	cli.Normalize()
+func ProcessFiles(targets []string, opts ProcOptions, config Config, action string) {
+	opts.Normalize()
 
-	expandedArgs := expandDirectoryArgs(targets, cli)
+	expandedArgs := expandDirectoryArgs(targets, opts)
 	if len(expandedArgs) == 0 {
-		if !cli.Quiet {
+		if !opts.Quiet {
 			fmt.Println("No files or directories with audio found to process.")
 		}
 		return
 	}
 
-	if cli.DryRun {
-		handleProcDryRun(expandedArgs, cli, config)
+	if opts.DryRun {
+		handleProcDryRun(expandedArgs, opts, config)
 		return
 	}
 
-	targetHost := resolveRemoteProcessingTargetHost(cli, config)
+	targetHost := resolveRemoteProcessingTargetHost(opts, config)
 	if targetHost != "" {
-		handleRemoteBatchExecution(expandedArgs, cli, config, targetHost)
+		handleRemoteBatchExecution(expandedArgs, opts, config, targetHost)
 		return
 	}
 
-	executeLocalBatchProcessing(expandedArgs, cli, config, action)
+	executeLocalBatchProcessing(expandedArgs, opts, config, action)
 }
 
-func expandDirectoryArgs(args []string, cli CLIOptions) []string {
+func expandDirectoryArgs(args []string, opts ProcOptions) []string {
 	var expandedArgs []string
 	hasPrintedScanning := false
 	printScanning := func(dir string) {
-		if cli.Quiet {
+		if opts.Quiet {
 			return
 		}
 		if !hasPrintedScanning {
@@ -62,12 +62,12 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 		fi, err := os.Stat(arg)
 		if err == nil && fi.IsDir() {
 			printScanning(arg)
-			if !cli.DryRun {
+			if !opts.DryRun {
 				removeWorkDirs(arg)
 			}
 			rawMp3Files := util.FindMP3Files(arg)
 			if len(rawMp3Files) == 0 {
-				if !cli.Quiet {
+				if !opts.Quiet {
 					fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
 				}
 				continue
@@ -92,7 +92,7 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 				fList := filesByFolder[podFolder]
 				podCfg := loadPodcastConfig(podFolder)
 				if podCfg.AdRemoval == AdRemovalNone {
-					if cli.Verbose && !cli.Quiet {
+					if opts.Verbose && !opts.Quiet {
 						fmt.Printf("Podcast config set to 'none' for '%s'. Skipping.\n", filepath.Base(podFolder))
 					}
 					continue
@@ -118,12 +118,12 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 	return expandedArgs
 }
 
-func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
-	if cli.Local {
+func resolveRemoteProcessingTargetHost(opts ProcOptions, config Config) string {
+	if opts.Local {
 		return ""
 	}
 	reqHost := ""
-	if cli.Remote {
+	if opts.Remote {
 		reqHost = config.RemoteHost
 	}
 	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
@@ -133,10 +133,10 @@ func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
 	return ""
 }
 
-func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Config, targetHost string) {
-	if !cli.NoCollect && !cli.DryRun {
-		if err := remote.RunRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
-			if !cli.Quiet {
+func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config Config, targetHost string) {
+	if !opts.NoCollect && !opts.DryRun {
+		if err := remote.RunRemotePull(&config, targetHost, nil, opts.Quiet, opts.Verbose); err != nil {
+			if !opts.Quiet {
 				fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
 			}
 		}
@@ -147,49 +147,49 @@ func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Co
 		if strings.HasSuffix(f, ".json") {
 			continue
 		}
-		mainMP3File, _, _ := resolveAudioFiles(f, cli)
-		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (pipeline.IsEpisodeCompleted(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
+		mainMP3File, _, _ := resolveAudioFiles(f, opts)
+		if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && (pipeline.IsEpisodeCompleted(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
 			continue
 		}
 		filesToPush = append(filesToPush, f)
 	}
 	remote.SortAudioFilesByDuration(filesToPush)
-	if cli.Count > 0 && len(filesToPush) > cli.Count {
-		filesToPush = filesToPush[:cli.Count]
+	if opts.Count > 0 && len(filesToPush) > opts.Count {
+		filesToPush = filesToPush[:opts.Count]
 	}
 	if len(filesToPush) == 0 {
 		remoteWorkDir := config.RemoteWorkDir
 		if remoteWorkDir == "" {
 			remoteWorkDir = "~/abs_remote"
 		}
-		_ = remote.EnsureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
-		if !cli.Quiet {
+		_ = remote.EnsureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, opts.Quiet)
+		if !opts.Quiet {
 			fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 		}
 		return
 	}
-	if err := remote.RunRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
+	if err := remote.RunRemotePush(&config, filesToPush, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
 		fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
 	}
 }
 
-func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config Config, action string) {
+func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config Config, action string) {
 	wp := getActiveWhisperProfile(config)
-	if cli.WhisperEngine != "" {
-		wp.Engine = WhisperEngine(cli.WhisperEngine)
+	if opts.WhisperEngine != "" {
+		wp.Engine = WhisperEngine(opts.WhisperEngine)
 	}
 	if wp.Engine != WhisperEngineLocal && wp.Engine != WhisperEngineGemini {
-		transcribe.WakeServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
+		transcribe.WakeServer(config.WhisperURL, config.WhisperWakeCommand, opts.Quiet)
 	}
 
-	selectedProfile := selectProfile(config, cli.UseLLM)
+	selectedProfile := selectProfile(config, opts.UseLLM)
 	batchStartTime := time.Now()
 
 	totalFiles := len(expandedArgs)
 	processedCount := 0
 
 	for idx, inputFile := range expandedArgs {
-		_, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, cli, config, action, batchStartTime, selectedProfile)
+		_, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, opts, config, action, batchStartTime, selectedProfile)
 		if stopFlag {
 			break
 		}
@@ -198,7 +198,7 @@ func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config C
 		}
 	}
 
-	if (processedCount > 1 || totalFiles > 1) && !cli.Quiet {
+	if (processedCount > 1 || totalFiles > 1) && !opts.Quiet {
 		batchDuration := time.Since(batchStartTime)
 		fmt.Printf("\nBatch Completed! Processed %d file(s) in %s.\n", processedCount, format.FormatClock(batchDuration.Seconds()))
 	}

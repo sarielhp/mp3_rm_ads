@@ -30,13 +30,13 @@ func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error
 	}), nil
 }
 
-func handleTranscribeMin(sourceAudioFile *string, totalDuration float64, cli CLIOptions) float64 {
-	dur, _ := pipeline.HandleTranscribeMin(sourceAudioFile, totalDuration, cli.TranscribeMin)
+func handleTranscribeMin(sourceAudioFile *string, totalDuration float64, opts ProcOptions) float64 {
+	dur, _ := pipeline.HandleTranscribeMin(sourceAudioFile, totalDuration, opts.TranscribeMin)
 	return dur
 }
 
-func isGeminiEngine(cfg Config, cli CLIOptions) bool {
-	if cli.WhisperEngine == string(WhisperEngineGemini) {
+func isGeminiEngine(cfg Config, opts ProcOptions) bool {
+	if opts.WhisperEngine == string(WhisperEngineGemini) {
 		return true
 	}
 	wp := config.GetActiveWhisperProfile(&cfg)
@@ -138,12 +138,12 @@ func convertJSONToTXT(inputFile string, data *TranscriptionData, totalDuration f
 	return res
 }
 
-func resolveAudioFiles(inputFile string, cli CLIOptions) (string, string, string) {
-	return pipeline.ResolveAudioFiles(inputFile, cli.Verbose)
+func resolveAudioFiles(inputFile string, opts ProcOptions) (string, string, string) {
+	return pipeline.ResolveAudioFiles(inputFile, opts.Verbose)
 }
 
-func resolveOutputFile(mainMP3File string, cli CLIOptions, totalFiles int) string {
-	return pipeline.ResolveOutputFile(mainMP3File, cli.Output, totalFiles)
+func resolveOutputFile(mainMP3File string, opts ProcOptions, totalFiles int) string {
+	return pipeline.ResolveOutputFile(mainMP3File, opts.Output, totalFiles)
 }
 
 func loadPodcastConfig(dir string) PodcastConfig {

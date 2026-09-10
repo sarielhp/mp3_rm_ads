@@ -291,8 +291,8 @@ func formatTranscript(data *TranscriptionData, totalDuration float64) string {
 	return pipeline.FormatTranscript(data, totalDuration)
 }
 
-func loadOrTranscribe(sourceAudioFile, jsonFile string, cfg Config, cli CLIOptions, selectedProfile LLMProfile, totalDuration, speedFactor float64, whisperLanguage, whisperPrompt string, id3TagsOut map[string]string, isNewlyTranscribed *bool, t0Step1 *time.Time) (*TranscriptionData, error) {
-	return pipeline.LoadOrTranscribe(sourceAudioFile, jsonFile, cfg, cli, selectedProfile, totalDuration, speedFactor, whisperLanguage, whisperPrompt, id3TagsOut, isNewlyTranscribed, t0Step1)
+func loadOrTranscribe(sourceAudioFile, jsonFile string, cfg Config, opts ProcOptions, selectedProfile LLMProfile, totalDuration, speedFactor float64, whisperLanguage, whisperPrompt string, id3TagsOut map[string]string, isNewlyTranscribed *bool, t0Step1 *time.Time) (*TranscriptionData, error) {
+	return pipeline.LoadOrTranscribe(sourceAudioFile, jsonFile, cfg, opts, selectedProfile, totalDuration, speedFactor, whisperLanguage, whisperPrompt, id3TagsOut, isNewlyTranscribed, t0Step1)
 }
 
 func saveJSONTranscript(mainFile string, data *TranscriptionData, jsonFile string, quiet bool, id3Tags map[string]string) error {

@@ -108,14 +108,12 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	opts := ProcOptions{
+		Quiet: true,
 	}
 	config := Config{PodcastsDir: tmp}
 
-	err := ProcessPodcast(resolved, cli, config, "rm_ads")
+	err := ProcessPodcast(resolved, opts, config, "rm_ads")
 	if err != nil {
 		t.Fatalf("ProcessPodcast failed: %v", err)
 	}
@@ -153,15 +151,13 @@ func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet:  true,
-			DryRun: true,
-		},
+	opts := ProcOptions{
+		Quiet:  true,
+		DryRun: true,
 	}
 	config := Config{PodcastsDir: tmp}
 
-	err := ProcessPodcast(resolved, cli, config, "rm_ads")
+	err := ProcessPodcast(resolved, opts, config, "rm_ads")
 	if err != nil {
 		t.Fatalf("dry run workflow failed: %v", err)
 	}
@@ -337,13 +333,11 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 
 	markEpisodeClean(t, targetAudio)
 
-	cliLocal := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	optsLocal := ProcOptions{
+		Quiet: true,
 	}
-	cliLocal.Local = true
-	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", cliLocal, Config{PodcastsDir: tmp})
+	optsLocal.Local = true
+	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", optsLocal, Config{PodcastsDir: tmp})
 	if err != nil {
 		t.Fatalf("ProcessQueuedTarget failed: %v", err)
 	}
@@ -390,10 +384,8 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 		},
 	}
 
-	targetPath, err := resolveTargetEpisodeForRmAds(resolved, CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	targetPath, err := resolveTargetEpisodeForRmAds(resolved, ProcOptions{
+		Quiet: true,
 	}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error during offline fallback: %v", err)
@@ -420,17 +412,15 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	opts := ProcOptions{
+		Quiet: true,
 	}
-	cli.Local = true
+	opts.Local = true
 	config := Config{PodcastsDir: tmp}
 
 	pipeline.AddToQueue(resolved.Dir, filepath.Base(paths[0]))
 
-	err := ProcessQueuedTarget(resolved.Dir, paths[0], "rm_ads", cli, config)
+	err := ProcessQueuedTarget(resolved.Dir, paths[0], "rm_ads", opts, config)
 	if err != nil {
 		t.Fatalf("ProcessQueuedTarget failed: %v", err)
 	}
@@ -494,12 +484,10 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		},
 		PodcastsDir: localPodcasts,
 	}
-	cli := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet:      true,
-			Remote:     true,
-			RemoteHost: "mock-box",
-		},
+	opts := ProcOptions{
+		Quiet:      true,
+		Remote:     true,
+		RemoteHost: "mock-box",
 	}
 
 	go func() {
@@ -524,7 +512,7 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		})
 	}()
 
-	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", cli, cfg)
+	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", opts, cfg)
 	if err != nil {
 		t.Fatalf("ProcessQueuedTarget remote failed: %v", err)
 	}

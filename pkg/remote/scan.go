@@ -227,14 +227,12 @@ func transcribeAndDetectAdsRemoteScan(audioFile string, origDuration float64, cf
 	t0 := time.Now()
 	isNewlyTranscribed := false
 
-	cli := types.CLIOptions{
-		ProcOptions: types.ProcOptions{
-			Quiet:          quiet,
-			Verbose:        verbose,
-			SaveTranscript: true,
-		},
+	opts := types.ProcOptions{
+		Quiet:          quiet,
+		Verbose:        verbose,
+		SaveTranscript: true,
 	}
-	transData, err := pipeline.LoadOrTranscribe(audioFile, transcriptJSON, *cfg, cli, profile, origDuration, speedFactor, cfg.WhisperLanguage, cfg.WhisperPrompt, map[string]string{}, &isNewlyTranscribed, &t0)
+	transData, err := pipeline.LoadOrTranscribe(audioFile, transcriptJSON, *cfg, opts, profile, origDuration, speedFactor, cfg.WhisperLanguage, cfg.WhisperPrompt, map[string]string{}, &isNewlyTranscribed, &t0)
 	if err != nil {
 		return nil, nil, err
 	}

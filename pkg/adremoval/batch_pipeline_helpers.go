@@ -174,7 +174,7 @@ func prepareWhisperFallbackConfig(cfg Config) Config {
 	return fallback
 }
 
-func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, cli CLIOptions, selectedProfile LLMProfile, fileStartTime time.Time) bool {
+func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, opts ProcOptions, selectedProfile LLMProfile, fileStartTime time.Time) bool {
 	ctx := context.Background()
 	t0Step1 := time.Now()
 
@@ -188,11 +188,11 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 		return false
 	}
 
-	if cli.SaveTranscript {
-		_ = pipeline.SaveJSONTranscript(mainMP3File, td, jsonFile, cli.Quiet, map[string]string{})
+	if opts.SaveTranscript {
+		_ = pipeline.SaveJSONTranscript(mainMP3File, td, jsonFile, opts.Quiet, map[string]string{})
 	}
 
-	if handleExportOrPreviewReturns(td, totalDuration, fileStartTime, sourceAudioFile, jsonFile, cli) {
+	if handleExportOrPreviewReturns(td, totalDuration, fileStartTime, sourceAudioFile, jsonFile, opts) {
 		return true
 	}
 
@@ -204,11 +204,11 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	_ = updateTranscriptAdDetectionStatus(jsonFile, true, "completed", "gemini-flash", "", len(ads))
 	updateStatusAdDetection(mainMP3File, true, "completed", "gemini-flash", "")
 	if len(ads) == 0 {
-		handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile, totalDuration, selectedProfile, cli, fileStartTime, t0Step1, t0Step2)
+		handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile, totalDuration, selectedProfile, opts, fileStartTime, t0Step1, t0Step2)
 		return true
 	}
 
-	cutsResult := format.SaveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, cli.Quiet)
+	cutsResult := format.SaveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, opts.Quiet)
 	t0Step3 := time.Now()
-	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, cli, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
+	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, opts, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
 }

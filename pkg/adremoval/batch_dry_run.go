@@ -17,8 +17,8 @@ type dryRunFileStatus struct {
 	status string
 }
 
-func auditFileStatus(inputFile string, cli CLIOptions) (category string, statusText string) {
-	mainMP3File, precutFile, _ := resolveAudioFiles(inputFile, cli)
+func auditFileStatus(inputFile string, opts ProcOptions) (category string, statusText string) {
+	mainMP3File, precutFile, _ := resolveAudioFiles(inputFile, opts)
 	statFile := pipeline.StatusPathFor(mainMP3File)
 	st, _ := pipeline.LoadEpisodeStatus(statFile)
 
@@ -34,7 +34,7 @@ func auditFileStatus(inputFile string, cli CLIOptions) (category string, statusT
 	}
 
 	baseName := util.StripExt(mainMP3File)
-	jsonFile := cli.TranscriptPath
+	jsonFile := opts.TranscriptPath
 	if jsonFile == "" {
 		jsonFile = baseName + ".transcript.json"
 	}
@@ -57,12 +57,12 @@ func auditFileStatus(inputFile string, cli CLIOptions) (category string, statusT
 	return "completed", "Completed (0 ads)"
 }
 
-func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
-	if cli.Local {
+func fetchRemoteReadyCount(opts ProcOptions, config Config) (int, string) {
+	if opts.Local {
 		return 0, ""
 	}
 	reqHost := ""
-	if cli.Remote {
+	if opts.Remote {
 		reqHost = config.RemoteHost
 	}
 	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
@@ -93,7 +93,7 @@ func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
 	return remoteReadyOnServer, h
 }
 
-func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, cli CLIOptions, details []dryRunFileStatus) {
+func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, opts ProcOptions, details []dryRunFileStatus) {
 	totalNeedingAction := needsTx + needsLLM + needsCut
 	fmt.Println()
 	fmt.Println(util.Bold("DRY RUN: Audio Processing Pipeline Status"))
@@ -111,12 +111,12 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	fmt.Printf("  • Already Processed / Ad-Free:   %d\n", alreadyComplete)
 	fmt.Println(strings.Repeat("─", 55))
 	fmt.Printf("  Total Needing Local Processing:  %s\n", util.Bold(fmt.Sprintf("%d", totalNeedingAction)))
-	if cli.Count > 0 && totalNeedingAction > cli.Count {
-		fmt.Printf("  (Limit -n %d: would process first %d of %d episodes)\n", cli.Count, cli.Count, totalNeedingAction)
+	if opts.Count > 0 && totalNeedingAction > opts.Count {
+		fmt.Printf("  (Limit -n %d: would process first %d of %d episodes)\n", opts.Count, opts.Count, totalNeedingAction)
 	}
 	fmt.Println()
 
-	if cli.Verbose {
+	if opts.Verbose {
 		fmt.Println("Episode Details:")
 		for _, d := range details {
 			fmt.Printf("  [%s] %s\n", d.status, util.DisplayName(d.path))
@@ -125,7 +125,7 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	}
 }
 
-func handleProcDryRun(files []string, cli CLIOptions, config Config) {
+func handleProcDryRun(files []string, opts ProcOptions, config Config) {
 	var needsTranscribe, needsLLM, needsCut, alreadyComplete, remotePending int
 	var details []dryRunFileStatus
 
@@ -133,7 +133,7 @@ func handleProcDryRun(files []string, cli CLIOptions, config Config) {
 		if strings.HasSuffix(inputFile, ".json") {
 			continue
 		}
-		cat, desc := auditFileStatus(inputFile, cli)
+		cat, desc := auditFileStatus(inputFile, opts)
 		details = append(details, dryRunFileStatus{path: inputFile, status: desc})
 		switch cat {
 		case "completed":
@@ -149,6 +149,6 @@ func handleProcDryRun(files []string, cli CLIOptions, config Config) {
 		}
 	}
 
-	remoteReady, targetHost := fetchRemoteReadyCount(cli, config)
-	printDryRunSummary(len(files), needsTranscribe, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady, targetHost, cli, details)
+	remoteReady, targetHost := fetchRemoteReadyCount(opts, config)
+	printDryRunSummary(len(files), needsTranscribe, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady, targetHost, opts, details)
 }

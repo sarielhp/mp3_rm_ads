@@ -62,10 +62,8 @@ func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{
-			ProcOptions: ProcOptions{
-				Quiet: true,
-			},
+		ProcOptions{
+			Quiet: true,
 		}, Config{}, "proc", time.Now(), offlineProfile())
 
 	if !hasError {
@@ -88,14 +86,12 @@ func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliRecut := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	optsRecut := ProcOptions{
+		Quiet: true,
 	}
-	cliRecut.Recut = true
+	optsRecut.Recut = true
 	processSingleAudioFile(0, 1, 0, mp3,
-		cliRecut, Config{}, "recut", time.Now(), offlineProfile())
+		optsRecut, Config{}, "recut", time.Now(), offlineProfile())
 }
 
 func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
@@ -109,14 +105,12 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliTMin := CLIOptions{
-		ProcOptions: ProcOptions{
-			Quiet: true,
-		},
+	optsTMin := ProcOptions{
+		Quiet: true,
 	}
-	cliTMin.TranscribeMin = "1"
+	optsTMin.TranscribeMin = "1"
 	processSingleAudioFile(0, 1, 0, mp3,
-		cliTMin, Config{}, "proc", time.Now(), offlineProfile())
+		optsTMin, Config{}, "proc", time.Now(), offlineProfile())
 
 	if util.FileExists(filepath.Join(dir, "ep.cuts.json")) {
 		t.Errorf("--tminutes wrote ep.cuts.json; a preview run must not touch cut metadata")
@@ -145,10 +139,8 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 	}
 
 	processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{
-			ProcOptions: ProcOptions{
-				Quiet: true,
-			},
+		ProcOptions{
+			Quiet: true,
 		}, Config{}, "proc", time.Now(), offlineProfile())
 
 	if util.FileExists(mp3 + ".precut") {
@@ -179,10 +171,8 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{
-			ProcOptions: ProcOptions{
-				Quiet: true,
-			},
+		ProcOptions{
+			Quiet: true,
 		}, Config{}, "proc", time.Now(), failingProfile)
 
 	if !hasError {

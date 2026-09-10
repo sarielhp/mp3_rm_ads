@@ -28,7 +28,7 @@ type transcriptAuditItem struct {
 	adFailed       bool
 }
 
-func RunTranscriptAudit(config Config, targets []string, cli CLIOptions) {
+func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) {
 	if len(targets) == 0 {
 		if config.PodcastsDir == "" {
 			fmt.Fprintf(os.Stderr, "Error: podcasts_dir not configured and no target paths provided.\n")
@@ -38,25 +38,25 @@ func RunTranscriptAudit(config Config, targets []string, cli CLIOptions) {
 	}
 
 	minRatio := 0.15
-	if cli.AuditMinRatioStr != "" {
-		if v, err := strconv.ParseFloat(cli.AuditMinRatioStr, 64); err == nil && v > 0 {
+	if opts.AuditMinRatioStr != "" {
+		if v, err := strconv.ParseFloat(opts.AuditMinRatioStr, 64); err == nil && v > 0 {
 			minRatio = v
 		}
 	}
-	minChars := cli.AuditMinChars
+	minChars := opts.AuditMinChars
 	if minChars <= 0 {
 		minChars = 50
 	}
 
 	audioFiles := collectAudioFilesForAudit(targets)
 	if len(audioFiles) == 0 {
-		if !cli.Quiet {
+		if !opts.Quiet {
 			fmt.Println("No audio files found to audit.")
 		}
 		return
 	}
 
-	if !cli.Quiet {
+	if !opts.Quiet {
 		fmt.Printf("Auditing transcripts across %d audio file(s)...\n", len(audioFiles))
 	}
 
@@ -72,17 +72,17 @@ func RunTranscriptAudit(config Config, targets []string, cli CLIOptions) {
 		scanned++
 		if item.isSuspicious {
 			suspiciousCount++
-			reportAndHealSuspicious(item, cli.DryRun, cli.Quiet)
+			reportAndHealSuspicious(item, opts.DryRun, opts.Quiet)
 		} else if item.adFailed {
 			adFailedCount++
-			reportAndHealFailedAd(item, cli.DryRun, cli.Quiet)
-		} else if cli.Verbose && !cli.Quiet {
+			reportAndHealFailedAd(item, opts.DryRun, opts.Quiet)
+		} else if opts.Verbose && !opts.Quiet {
 			fmt.Printf("  [OK] %s (%.0fs, %d chars, %.1f%% coverage)\n",
 				auditDisplayName(item.audioPath), item.audioDur, item.textChars, item.coverageRatio*100)
 		}
 	}
 
-	printAuditSummary(scanned, suspiciousCount, adFailedCount, cli.DryRun, cli.Quiet)
+	printAuditSummary(scanned, suspiciousCount, adFailedCount, opts.DryRun, opts.Quiet)
 }
 
 func auditDisplayName(p string) string {

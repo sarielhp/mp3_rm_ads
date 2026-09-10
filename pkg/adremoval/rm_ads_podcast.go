@@ -18,10 +18,10 @@ import (
 
 // ProcessPodcast removes ads from one podcast the caller has already resolved,
 // queueing or processing episodes according to that podcast's own policy.
-func ProcessPodcast(pod *ResolvedPodcast, cli CLIOptions, config Config, action string) error {
-	cli.Normalize()
+func ProcessPodcast(pod *ResolvedPodcast, opts ProcOptions, config Config, action string) error {
+	opts.Normalize()
 
-	targetAudioPath, err := resolveTargetEpisodeForRmAds(pod, cli, config)
+	targetAudioPath, err := resolveTargetEpisodeForRmAds(pod, opts, config)
 	if err != nil {
 		return err
 	}
@@ -36,8 +36,8 @@ func ProcessPodcast(pod *ResolvedPodcast, cli CLIOptions, config Config, action 
 			displayEp = t
 		}
 	}
-	if cli.DryRun {
-		if !cli.Quiet {
+	if opts.DryRun {
+		if !opts.Quiet {
 			fmt.Printf("[Dry run] Would queue and process %s for ad removal.\n", util.DisplayName(displayEp))
 		}
 		return nil
@@ -47,7 +47,7 @@ func ProcessPodcast(pod *ResolvedPodcast, cli CLIOptions, config Config, action 
 	epID := podcast.GetOrSetEpisodeShortID(pod.Dir, pod.ShortID, targetAudioPath)
 	title := podcast.EpisodeTitleFromPath(targetAudioPath)
 
-	if !cli.Quiet {
+	if !opts.Quiet {
 		if added {
 			fmt.Printf("Added to AdR queue: [%s] %s\n", util.BoldCyan(epID), util.DisplayName(title))
 		} else {
@@ -61,13 +61,13 @@ func ProcessPodcast(pod *ResolvedPodcast, cli CLIOptions, config Config, action 
 	}
 	totalQueued := countAllQueuedEpisodes(podcastsDir)
 	if totalQueued > 1 {
-		if !cli.Quiet {
+		if !opts.Quiet {
 			fmt.Printf("Queued for ad removal (%d items in queue).\n", totalQueued)
 		}
 		return nil
 	}
 
-	return ProcessQueuedTarget(pod.Dir, targetAudioPath, action, cli, config)
+	return ProcessQueuedTarget(pod.Dir, targetAudioPath, action, opts, config)
 }
 
 func countAllQueuedEpisodes(podcastsDir string) int {
@@ -81,15 +81,15 @@ func countAllQueuedEpisodes(podcastsDir string) int {
 	return total
 }
 
-func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, cli CLIOptions, config Config) (string, error) {
-	b := getActiveBackendForPodcast(config, cli.Quiet)
+func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, opts ProcOptions, config Config) (string, error) {
+	b := getActiveBackendForPodcast(config, opts.Quiet)
 	if b != nil {
-		if targetPath, handled := findTargetEpisodeFromBackend(b, pod, config, cli.Quiet); handled {
+		if targetPath, handled := findTargetEpisodeFromBackend(b, pod, config, opts.Quiet); handled {
 			return targetPath, nil
 		}
 	}
 
-	targetPath, ok := findLatestUncleanedLocalEpisode(pod.Dir, pod.Title, cli.Quiet)
+	targetPath, ok := findLatestUncleanedLocalEpisode(pod.Dir, pod.Title, opts.Quiet)
 	if !ok {
 		return "", nil
 	}
@@ -496,21 +496,21 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 	return "", false
 }
 
-func ProcessQueuedTarget(podDir, targetAudioPath, action string, cli CLIOptions, config Config) error {
-	cli.Normalize()
+func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts ProcOptions, config Config) error {
+	opts.Normalize()
 
 	epFilename := queueItemFilename(podDir, targetAudioPath)
-	targetHost := resolveRemoteProcessingTargetHost(cli, config)
+	targetHost := resolveRemoteProcessingTargetHost(opts, config)
 
 	if targetHost != "" {
-		if err := remote.RunRemotePush(&config, []string{targetAudioPath}, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
+		if err := remote.RunRemotePush(&config, []string{targetAudioPath}, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
 			return fmt.Errorf("error pushing episode to remote: %w", err)
 		}
-		if err := pollAndPullRemoteEpisode(config, cli, targetHost, targetAudioPath); err != nil {
+		if err := pollAndPullRemoteEpisode(config, opts, targetHost, targetAudioPath); err != nil {
 			return err
 		}
 	} else {
-		executeLocalBatchProcessing([]string{targetAudioPath}, cli, config, action)
+		executeLocalBatchProcessing([]string{targetAudioPath}, opts, config, action)
 	}
 
 	pipeline.RemoveFromQueue(podDir, epFilename)
@@ -525,13 +525,13 @@ func queueItemFilename(podDir, audioPath string) string {
 	return filepath.Base(audioPath)
 }
 
-func pollAndPullRemoteEpisode(config Config, cli CLIOptions, targetHost, targetAudioPath string) error {
-	if !cli.Quiet {
+func pollAndPullRemoteEpisode(config Config, opts ProcOptions, targetHost, targetAudioPath string) error {
+	if !opts.Quiet {
 		fmt.Printf("Waiting for remote processing on %s to complete...\n", targetHost)
 	}
 	startTime := time.Now()
 	for {
-		_ = remote.RunRemotePull(&config, targetHost, nil, true, cli.Verbose)
+		_ = remote.RunRemotePull(&config, targetHost, nil, true, opts.Verbose)
 		if pipeline.IsEpisodeClean(targetAudioPath) {
 			break
 		}
@@ -541,7 +541,7 @@ func pollAndPullRemoteEpisode(config Config, cli CLIOptions, targetHost, targetA
 		}
 	}
 
-	printRemoteEpisodeSummary(targetAudioPath, cli.Quiet)
+	printRemoteEpisodeSummary(targetAudioPath, opts.Quiet)
 	return nil
 }
 
