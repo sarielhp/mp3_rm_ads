@@ -28,8 +28,7 @@ type transcriptAuditItem struct {
 	adFailed       bool
 }
 
-func RunTranscriptAudit(config Config, cli CLIOptions) {
-	targets := cli.Args
+func RunTranscriptAudit(config Config, targets []string, cli CLIOptions) {
 	if len(targets) == 0 {
 		if config.PodcastsDir == "" {
 			fmt.Fprintf(os.Stderr, "Error: podcasts_dir not configured and no target paths provided.\n")

@@ -76,10 +76,9 @@ func TestProcDryRunMutatesNothing(t *testing.T) {
 			Quiet:  true,
 			DryRun: true,
 		},
-		Args: []string{dir},
 	}
 	cli.Local = true
-	ProcessBatch(cli, Config{}, "proc")
+	ProcessFiles([]string{dir}, cli, Config{}, "proc")
 
 	if diffs := diffTrees(before, snapshotTree(t, dir)); len(diffs) > 0 {
 		t.Errorf("--dry-run modified the tree:\n  %v", diffs)

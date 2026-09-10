@@ -16,70 +16,11 @@ import (
 	"abs/pkg/util"
 )
 
-func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast, bool) {
-	candidate := ""
-	if cli.Podcast != "" {
-		candidate = cli.Podcast
-	} else if len(cli.Args) == 1 {
-		candidate = cli.Args[0]
-	} else {
-		return nil, false
-	}
+// ProcessPodcast removes ads from one podcast the caller has already resolved,
+// queueing or processing episodes according to that podcast's own policy.
+func ProcessPodcast(pod *ResolvedPodcast, cli CLIOptions, config Config, action string) error {
+	cli.Normalize()
 
-	cleanCand := strings.TrimSpace(candidate)
-	if cleanCand == "" {
-		return nil, false
-	}
-
-	lower := strings.ToLower(cleanCand)
-	if strings.HasSuffix(lower, ".mp3") || strings.HasSuffix(lower, ".json") ||
-		strings.HasSuffix(lower, ".wav") || strings.HasSuffix(lower, ".m4a") ||
-		strings.HasSuffix(lower, ".ogg") || strings.HasSuffix(lower, ".aac") {
-		return nil, false
-	}
-
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	if isExcludedRootPodcastsDir(podcastsDir, cleanCand) {
-		return nil, false
-	}
-
-	if res, err := podcast.ResolveAnyID(podcastsDir, cleanCand); err == nil && res.IsPodcast() {
-		if !isExcludedRootPodcastsDir(podcastsDir, res.Podcast.Dir) {
-			return res.Podcast, true
-		}
-	}
-
-	if dir, title, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cleanCand); found {
-		if !isExcludedRootPodcastsDir(podcastsDir, dir) {
-			shortID := podcast.GetOrSetPodcastShortID(dir, title)
-			cfg := loadPodcastConfig(dir)
-			return &ResolvedPodcast{
-				Dir:        dir,
-				Title:      title,
-				ShortID:    shortID,
-				FolderName: filepath.Base(dir),
-				UUID:       cfg.ID,
-				Config:     cfg,
-			}, true
-		}
-	}
-
-	return nil, false
-}
-
-func isExcludedRootPodcastsDir(podcastsDir, cand string) bool {
-	absCand, err1 := filepath.Abs(cand)
-	absRoot, err2 := filepath.Abs(podcastsDir)
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	return absCand == absRoot
-}
-
-func handlePodcastRmAdsWorkflow(pod *ResolvedPodcast, cli CLIOptions, config Config, action string) error {
 	targetAudioPath, err := resolveTargetEpisodeForRmAds(pod, cli, config)
 	if err != nil {
 		return err
@@ -556,6 +497,8 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 }
 
 func ProcessQueuedTarget(podDir, targetAudioPath, action string, cli CLIOptions, config Config) error {
+	cli.Normalize()
+
 	epFilename := queueItemFilename(podDir, targetAudioPath)
 	targetHost := resolveRemoteProcessingTargetHost(cli, config)
 

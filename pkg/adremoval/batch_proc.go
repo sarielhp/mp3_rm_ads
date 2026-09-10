@@ -15,31 +15,14 @@ import (
 	"time"
 )
 
-func ProcessBatch(cli CLIOptions, config Config, action string) {
-	if cli.ProcSubcmd == "collect" {
-		if err := remote.RunRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
-			fatalError("Error collecting from remote %s: %v\n", cli.RemoteHost, err)
-		}
-		return
-	}
+// ProcessFiles removes ads from an already-resolved set of targets: audio
+// files, or directories to be expanded into the episodes their podcast's
+// ad-removal policy admits. Interpreting a command line into that set belongs
+// to the caller.
+func ProcessFiles(targets []string, cli CLIOptions, config Config, action string) {
+	cli.Normalize()
 
-	if action == "rm_ads" {
-		if pod, ok := resolvePodcastTarget(config.PodcastsDir, cli); ok {
-			if err := handlePodcastRmAdsWorkflow(pod, cli, config, action); err != nil {
-				fatalError("%v\n", err)
-			}
-			return
-		}
-	}
-
-	ApplyForceOptions(&cli)
-
-	args, ok := resolveTargetAudioArgs(cli, config)
-	if !ok {
-		return
-	}
-
-	expandedArgs := expandDirectoryArgs(args, cli)
+	expandedArgs := expandDirectoryArgs(targets, cli)
 	if len(expandedArgs) == 0 {
 		if !cli.Quiet {
 			fmt.Println("No files or directories with audio found to process.")
@@ -59,63 +42,6 @@ func ProcessBatch(cli CLIOptions, config Config, action string) {
 	}
 
 	executeLocalBatchProcessing(expandedArgs, cli, config, action)
-}
-
-func ApplyForceOptions(cli *CLIOptions) {
-	if cli.Force == "" {
-		return
-	}
-	f := strings.ToLower(cli.Force)
-	if f == "all" || strings.Contains(f, "whisper") || strings.Contains(f, "transcribe") {
-		cli.ForceTranscribe = true
-	}
-	if f == "all" || strings.Contains(f, "llm") || strings.Contains(f, "ads") {
-		cli.ForceLLM = true
-	}
-}
-
-func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
-	podcastsDir := config.PodcastsDir
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	if cli.Podcast != "" {
-		targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cli.Podcast)
-		if !found {
-			if !cli.Quiet {
-				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
-			}
-			return nil, false
-		}
-		return []string{targetDir}, true
-	}
-
-	if len(cli.Args) == 1 {
-		arg := cli.Args[0]
-		if !strings.HasSuffix(strings.ToLower(arg), ".mp3") && !strings.HasSuffix(strings.ToLower(arg), ".json") {
-			if targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, arg); found {
-				return []string{targetDir}, true
-			}
-			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
-				return []string{arg}, true
-			}
-			if !cli.Quiet {
-				fmt.Printf("Podcast matching '%s' not found.\n", arg)
-			}
-			return nil, false
-		}
-		return cli.Args, true
-	}
-
-	if len(cli.Args) == 0 {
-		if config.PodcastsDir != "" {
-			return []string{config.PodcastsDir}, true
-		}
-		fmt.Println("ERROR: No files or directories specified, and podcasts_dir is not configured.")
-		return nil, false
-	}
-	return cli.Args, true
 }
 
 func expandDirectoryArgs(args []string, cli CLIOptions) []string {

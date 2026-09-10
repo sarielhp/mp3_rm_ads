@@ -358,7 +358,7 @@ func handleQueueRun(cfg Config, cli CLIOptions, target string) error {
 		return nil
 	}
 
-	adremoval.ApplyForceOptions(&cli)
+	cli.Normalize()
 	return executeQueueRun(items, cli, cfg)
 }
 
