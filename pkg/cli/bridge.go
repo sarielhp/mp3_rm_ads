@@ -323,8 +323,8 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 	return out
 }
 
-func fetchFeedDirect(feedURL, absBaseURL, itemID string) ([]backend.FeedEpisode, string, string, bool, error) {
-	return podcast.FetchFeedDirect(feedURL, absBaseURL, itemID)
+func fetchFeedDirect(feedURL, cachedETag, cachedLastModified string) ([]backend.FeedEpisode, string, string, bool, error) {
+	return podcast.FetchFeedDirect(feedURL, cachedETag, cachedLastModified)
 }
 
 func statusPathFor(audioFile string) string { return pipeline.StatusPathFor(audioFile) }

@@ -45,7 +45,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		Examples: []clihelp.Example{
 			{
 				Line:        "abs server feeds",
-				Description: "Wake up server and check for newly published episodes across feeds",
+				Description: "Check podcast feeds directly for newly published episodes",
 			},
 			{
 				Line:        "abs server download",

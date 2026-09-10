@@ -1,0 +1,164 @@
+package cli
+
+import (
+	"fmt"
+	"time"
+
+	"abs/pkg/backend"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
+)
+
+const (
+	// feedCheckTimeout bounds a single feed fetch. A sweep waits on dozens of
+	// unrelated origins, so one unresponsive publisher must not be able to
+	// stall the run.
+	feedCheckTimeout = 15 * time.Second
+	// feedCheckAttempts is deliberately small: a feed that fails twice is
+	// reported as unreadable and handed to the server rather than retried at
+	// length here.
+	feedCheckAttempts = 2
+	// maxServerRefreshes caps concurrent server refreshes. Each one makes the
+	// server fetch and parse a feed, so this is a limit on the server's work,
+	// not on ours.
+	maxServerRefreshes = 4
+)
+
+type feedCheckSummary struct {
+	Results      []podcast.FeedCheckResult
+	Unchanged    int
+	Changed      int
+	Unreadable   int
+	Refreshed    int
+	NewEpisodes  int
+	Undownloaded int
+	Elapsed      time.Duration
+}
+
+// resolveFeedTargets resolves the podcasts to check. Unlike the download and
+// pruning paths it needs only metadata, so it takes the backend's cheap listing
+// when one exists rather than transferring every episode of every podcast.
+func resolveFeedTargets(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
+	podcasts, err := backend.ListPodcastsFrom(b)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
+	}
+	return filterServerTargets(podcasts, cli)
+}
+
+// checkServerFeeds fetches every target feed directly and conditionally, then
+// asks the server to update only those that turned out to need it.
+func checkServerFeeds(b backend.Backend, podcasts []backend.Podcast, cli CLIOptions) *feedCheckSummary {
+	start := time.Now()
+	index := podcast.BuildEpisodeIndex(b, podcasts)
+	results := podcast.CheckFeedsForUpdates(podcasts, index, podcast.FeedCheckOptions{
+		Concurrency: cli.FeedJobs,
+		Force:       cli.Refresh,
+		Timeout:     feedCheckTimeout,
+		MaxAttempts: feedCheckAttempts,
+	})
+
+	summary := &feedCheckSummary{Results: results}
+	for i := range results {
+		r := &results[i]
+		switch r.Status {
+		case podcast.FeedUnchanged:
+			summary.Unchanged++
+		case podcast.FeedChanged:
+			summary.Changed++
+		default:
+			summary.Unreadable++
+		}
+		summary.NewEpisodes += len(r.New)
+		summary.Undownloaded += r.Undownloaded
+	}
+
+	summary.Refreshed = wakeServerForFeeds(b, results, cli.DryRun)
+	summary.Elapsed = time.Since(start)
+	return summary
+}
+
+// wakeServerForFeeds resets the server's episode check date for the podcasts
+// whose feeds actually changed, so the server picks up the new episodes. Feeds
+// the origin confirmed unchanged are skipped entirely, which is what keeps the
+// command from making the server refetch every feed on every run.
+func wakeServerForFeeds(b backend.Backend, results []podcast.FeedCheckResult, dryRun bool) int {
+	var targets []*podcast.FeedCheckResult
+	for i := range results {
+		if results[i].NeedsServer() {
+			targets = append(targets, &results[i])
+		}
+	}
+	if len(targets) == 0 || dryRun {
+		return 0
+	}
+
+	workers := min(maxServerRefreshes, len(targets))
+	jobs := make(chan *podcast.FeedCheckResult)
+	var wg util.WaitGroup
+	var mu util.Mutex
+	refreshed := 0
+
+	for w := 0; w < workers; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for target := range jobs {
+				if err := b.ResetPodcastDateCheck(target.Podcast.ID, target.Title); err != nil {
+					continue
+				}
+				mu.Lock()
+				refreshed++
+				mu.Unlock()
+			}
+		}()
+	}
+	for _, target := range targets {
+		jobs <- target
+	}
+	close(jobs)
+	wg.Wait()
+
+	return refreshed
+}
+
+func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {
+	if cli.Quiet {
+		return
+	}
+	for i := range summary.Results {
+		r := &summary.Results[i]
+		if cli.Verbose || r.Status != podcast.FeedUnchanged {
+			printFeedCheckLine(r, cli.Verbose)
+		}
+	}
+
+	total := len(summary.Results)
+	fmt.Printf("\nChecked %d feed(s) in %.1fs: %d unchanged, %d changed, %d unreadable.\n",
+		total, summary.Elapsed.Seconds(), summary.Unchanged, summary.Changed, summary.Unreadable)
+	fmt.Printf("%d new episode(s) not yet in the server catalog (%d undownloaded episode(s) available).\n",
+		summary.NewEpisodes, summary.Undownloaded)
+	if summary.Refreshed > 0 {
+		fmt.Printf("Woke the server for %d podcast(s); the rest needed no server work.\n", summary.Refreshed)
+	} else {
+		fmt.Println("No server work was needed.")
+	}
+}
+
+func printFeedCheckLine(r *podcast.FeedCheckResult, verbose bool) {
+	switch r.Status {
+	case podcast.FeedUnchanged:
+		fmt.Printf("  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
+			r.Title, r.Reason, r.EpisodeCount, r.Undownloaded)
+	case podcast.FeedUnknown:
+		fmt.Printf("! %s: could not read feed: %v\n", r.Title, r.Err)
+	default:
+		fmt.Printf("+ %s: %d new episode(s) (%d in feed, %d undownloaded)\n",
+			r.Title, len(r.New), r.EpisodeCount, r.Undownloaded)
+		if verbose {
+			for _, ep := range r.New {
+				fmt.Printf("    + %s (%s)\n", ep.Title, ep.PubDate)
+			}
+		}
+	}
+}

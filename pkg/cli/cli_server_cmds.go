@@ -15,7 +15,7 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 		Examples: []clihelp.Example{
 			{
 				Line:        "abs server feeds",
-				Description: "Wake up server and check for newly published episodes across feeds",
+				Description: "Check podcast feeds directly for newly published episodes",
 			},
 			{
 				Line:        "abs server download -p 'Huberman Lab' -k 3",

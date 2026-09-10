@@ -188,6 +188,10 @@ type BackendOptions struct {
 	OPMLFile      string
 	PodcastsOnly  bool
 	EpisodesOnly  bool
+
+	// FeedJobs caps how many podcast feeds are fetched concurrently when
+	// checking for new episodes. Zero selects the default.
+	FeedJobs int
 }
 
 type CLIOptions struct {

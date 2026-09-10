@@ -13,47 +13,59 @@ import (
 )
 
 func (c *PodFetchBackend) Podcasts() ([]Podcast, error) {
-	if c.Host != "" {
-		body, err := c.Request("/api/v1/podcasts", "GET", nil)
-		if err != nil {
-			if c.DBPath != "" {
-				return fetchPodFetchPodcastsDB(c.DBPath)
-			}
-			return nil, err
+	if c.Host == "" {
+		if c.DBPath != "" {
+			return fetchPodFetchPodcastsDB(c.DBPath)
 		}
+		return nil, fmt.Errorf("neither host nor db_path configured for podfetch")
+	}
 
-		var dtos []podFetchItemDTO
-		if err := json.Unmarshal(body, &dtos); err != nil {
-			var wrapper struct {
-				Podcasts []podFetchItemDTO `json:"podcasts"`
-			}
-			if err2 := json.Unmarshal(body, &wrapper); err2 != nil {
-				if c.DBPath != "" {
-					return fetchPodFetchPodcastsDB(c.DBPath)
-				}
-				return nil, err
-			}
-			dtos = wrapper.Podcasts
+	body, err := c.Request("/api/v1/podcasts", "GET", nil)
+	if err != nil {
+		if c.DBPath != "" {
+			return fetchPodFetchPodcastsDB(c.DBPath)
 		}
+		return nil, err
+	}
 
-		var podcasts []Podcast
-		for _, dto := range dtos {
+	dtos, err := unmarshalPodFetchPodcastList(body)
+	if err != nil {
+		if c.DBPath != "" {
+			return fetchPodFetchPodcastsDB(c.DBPath)
+		}
+		return nil, err
+	}
+	return c.fetchPodcastDetails(dtos), nil
+}
+
+// fetchPodcastDetails fills in each podcast's episodes. PodFetch exposes them
+// only one podcast at a time, so the requests are issued concurrently; doing
+// them in sequence made listing a library cost one round trip per podcast.
+func (c *PodFetchBackend) fetchPodcastDetails(dtos []podFetchItemDTO) []Podcast {
+	const maxConcurrent = 10
+
+	ordered := make([]Podcast, len(dtos))
+	sem := make(chan struct{}, maxConcurrent)
+	var wg syncWaitGroup
+
+	for i, dto := range dtos {
+		wg.Add(1)
+		go func(idx int, dto podFetchItemDTO) {
+			defer wg.Done()
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
 			idStr := fmt.Sprintf("%v", dto.ID)
-			pod, err := c.GetPodcast(idStr)
-			if err == nil && pod != nil {
-				podcasts = append(podcasts, *pod)
-			} else {
-				podcasts = append(podcasts, mapPodFetchDTOToPodcast(dto, nil))
+			if pod, err := c.GetPodcast(idStr); err == nil && pod != nil {
+				ordered[idx] = *pod
+				return
 			}
-		}
-		return podcasts, nil
+			ordered[idx] = mapPodFetchDTOToPodcast(dto, nil)
+		}(i, dto)
 	}
+	wg.Wait()
 
-	if c.DBPath != "" {
-		return fetchPodFetchPodcastsDB(c.DBPath)
-	}
-
-	return nil, fmt.Errorf("neither host nor db_path configured for podfetch")
+	return ordered
 }
 
 func (c *PodFetchBackend) GetPodcast(id string) (*Podcast, error) {

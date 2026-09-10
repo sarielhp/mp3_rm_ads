@@ -96,6 +96,10 @@ func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.P
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
 	}
+	return filterServerTargets(podcasts, cli)
+}
+
+func serverTargetName(cli CLIOptions) string {
 	target := cli.Podcast
 	if target == "" && len(cli.Args) > 0 {
 		if cli.Args[0] != "update" {
@@ -104,7 +108,11 @@ func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.P
 			target = cli.Args[1]
 		}
 	}
-	if target != "" {
+	return target
+}
+
+func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
+	if target := serverTargetName(cli); target != "" {
 		matched := matchBackendPodcast(podcasts, target)
 		if matched == nil {
 			return nil, fmt.Errorf("podcast matching %q not found on server", target)
@@ -128,63 +136,15 @@ func handleServerFeeds(config Config, cli CLIOptions) error {
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
-	podcasts, err := resolveServerTargetPodcasts(b, cli)
+	podcasts, err := resolveFeedTargets(b, cli)
 	if err != nil {
 		return err
 	}
 	if !cli.Quiet {
-		fmt.Printf("Waking up server and checking feeds for %d podcast(s)...\n", len(podcasts))
+		fmt.Printf("Checking %d podcast feed(s) directly for new episodes...\n", len(podcasts))
 	}
-	totalNew := 0
-	for _, item := range podcasts {
-		newCount, err := refreshSinglePodcastFeed(b, item, cli.Quiet, cli.Verbose)
-		if err != nil && !cli.Quiet {
-			fmt.Printf("! %s: %v\n", item.Media.Metadata.Title, err)
-		}
-		totalNew += newCount
-	}
-	if !cli.Quiet {
-		fmt.Printf("\nChecked a total of %d podcast feed(s) (%d undownloaded episode(s) available).\n", len(podcasts), totalNew)
-	}
+	reportFeedCheck(checkServerFeeds(b, podcasts, cli), cli)
 	return nil
-}
-
-func refreshSinglePodcastFeed(b backend.Backend, item backend.Podcast, quiet, verbose bool) (int, error) {
-	title := item.Media.Metadata.Title
-	if title == "" {
-		title = "Untitled Podcast"
-	}
-	_ = b.ResetPodcastDateCheck(item.ID, title)
-
-	feedURL := item.Media.Metadata.FeedURL
-	if feedURL == "" {
-		return 0, fmt.Errorf("no feed URL configured for %s", title)
-	}
-
-	feedEpisodes, err := b.PodcastFeedEpisodes(feedURL)
-	if err != nil {
-		return 0, fmt.Errorf("failed to fetch feed episodes for %s: %w", title, err)
-	}
-
-	isDownloaded := podcast.BuildDownloadedChecker(b, item, item.ID)
-	undownloaded := 0
-	for _, ep := range feedEpisodes {
-		if !isDownloaded(ep) {
-			undownloaded++
-		}
-	}
-
-	if !quiet {
-		fmt.Printf("✓ %s: server awakened, feed checked (%d total episodes, %d undownloaded)\n", title, len(feedEpisodes), undownloaded)
-		if verbose && undownloaded > 0 {
-			for _, ep := range feedEpisodes {
-				if !isDownloaded(ep) {
-					fmt.Printf("    + %s (%s)\n", ep.Title, ep.PubDate)
-				}
-			}
-		}
-	}
-	return undownloaded, nil
 }
 
 func handleServerDownload(config Config, cli CLIOptions) error {
@@ -204,10 +164,13 @@ func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error 
 		if !cli.Quiet {
 			fmt.Println("Refreshing feeds before downloading...")
 		}
-		for _, item := range podcasts {
-			if _, err := refreshSinglePodcastFeed(b, item, true, false); err != nil {
-				return err
-			}
+		// Only the podcasts whose feeds actually changed are handed to the
+		// server. A feed that cannot be read is reported and skipped rather
+		// than aborting the whole download run.
+		summary := checkServerFeeds(b, podcasts, cli)
+		if !cli.Quiet {
+			fmt.Printf("%d feed(s) changed, %d unchanged, %d unreadable (%.1fs).\n",
+				summary.Changed, summary.Unchanged, summary.Unreadable, summary.Elapsed.Seconds())
 		}
 	}
 	return executeServerDownloads(b, config, cli, podcasts)

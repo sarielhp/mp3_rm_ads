@@ -22,7 +22,7 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 func buildServerFeedsUpdateSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "update",
-		Description: "Wake up server and check for newly published episodes across feeds",
+		Description: "Check podcast feeds directly for newly published episodes",
 		UsageLine:   "abs server feeds update [options] [podcast-id]",
 		Parameters: []clihelp.Param{
 			{Name: "[podcast-id]", Description: "Optional podcast identifier"},
@@ -30,6 +30,8 @@ func buildServerFeedsUpdateSubcommand(opts *CLIOptions, action *string) clihelp.
 		Args: clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+			clihelp.Bool(&opts.Refresh, "-F, --force", false, "Ignore cached feed validators and re-read every feed"),
+			clihelp.Int(&opts.FeedJobs, "-j, --jobs <number>", 0, "Feeds to fetch concurrently (default 16)"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
 		},
@@ -49,7 +51,7 @@ func buildServerFeedsUpdateSubcommand(opts *CLIOptions, action *string) clihelp.
 func buildServerFeedsSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "feeds",
-		Description: "Wake up server and check for newly published episodes across feeds",
+		Description: "Check podcast feeds directly for newly published episodes",
 		UsageLine:   "abs server feeds [command] [options] [podcast-id]",
 		Subcommands: []clihelp.Command{
 			buildServerFeedsUpdateSubcommand(opts, action),
@@ -60,21 +62,27 @@ func buildServerFeedsSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 		Args: clihelp.MaximumNArgs(2),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+			clihelp.Bool(&opts.Refresh, "-F, --force", false, "Ignore cached feed validators and re-read every feed"),
+			clihelp.Int(&opts.FeedJobs, "-j, --jobs <number>", 0, "Feeds to fetch concurrently (default 16)"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
 		},
 		Examples: []clihelp.Example{
 			{
 				Line:        "abs server feeds",
-				Description: "Wake up server and check all feeds for new episodes",
+				Description: "Check all feeds for new episodes, waking the server only for those that changed",
 			},
 			{
-				Line:        "abs server feeds update",
-				Description: "Wake up server and scan all podcast feeds",
+				Line:        "abs server feeds update -v",
+				Description: "Scan all podcast feeds and report the verdict for each one",
 			},
 			{
 				Line:        "abs server feeds update -p 'Huberman Lab'",
-				Description: "Wake up server and check feeds for a specific podcast",
+				Description: "Check the feed for a specific podcast",
+			},
+			{
+				Line:        "abs server feeds update --force -j 24",
+				Description: "Re-read every feed, ignoring cached validators, 24 at a time",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {

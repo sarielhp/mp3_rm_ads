@@ -40,6 +40,16 @@ type FeedCacheEntry struct {
 	LastChecked  time.Time             `json:"last_checked"`
 	LatestGUID   string                `json:"latest_guid,omitempty"`
 	Episodes     []backend.FeedEpisode `json:"episodes,omitempty"`
+
+	// Channel-level freshness markers, used for feeds that serve no usable
+	// ETag or Last-Modified. A feed whose lastBuildDate and newest item are
+	// unchanged since the previous check has nothing new to offer.
+	LastBuildDate  string `json:"last_build_date,omitempty"`
+	ChannelPubDate string `json:"channel_pub_date,omitempty"`
+
+	// EpisodeCount is how many episodes the feed carried at the last check. It
+	// lets an unchanged feed be reported without re-transferring its body.
+	EpisodeCount int `json:"episode_count,omitempty"`
 }
 
 const FeedCacheDefaultTTL = 48 * time.Hour
@@ -149,8 +159,10 @@ type rssXML struct {
 }
 
 type channelXML struct {
-	Title string    `xml:"title"`
-	Items []itemXML `xml:"item"`
+	Title         string    `xml:"title"`
+	LastBuildDate string    `xml:"lastBuildDate"`
+	PubDate       string    `xml:"pubDate"`
+	Items         []itemXML `xml:"item"`
 }
 
 type itemXML struct {
@@ -225,12 +237,70 @@ func ParseFeedDate(pubDate string) (int64, string) {
 	return 0, pubDate
 }
 
+// FeedDocument is a parsed RSS feed: its episodes plus the channel-level
+// freshness markers used to decide whether the feed changed at all.
+type FeedDocument struct {
+	Title          string
+	LastBuildDate  string
+	ChannelPubDate string
+	Episodes       []backend.FeedEpisode
+}
+
+// LatestGUID identifies the newest episode in the feed. It is the last-resort
+// change marker for feeds that serve neither HTTP validators nor a
+// lastBuildDate, where the only way to tell whether anything is new is to look
+// at the content itself.
+func (d *FeedDocument) LatestGUID() string {
+	if d == nil {
+		return ""
+	}
+	var newest *backend.FeedEpisode
+	for i := range d.Episodes {
+		ep := &d.Episodes[i]
+		if newest == nil || ep.PublishedAt > newest.PublishedAt {
+			newest = ep
+		}
+	}
+	if newest == nil {
+		return ""
+	}
+	return EpisodeIdentity(*newest)
+}
+
+// EpisodeIdentity returns the most stable identifier available for an episode,
+// preferring the GUID and falling back to the enclosure URL and then the title.
+func EpisodeIdentity(ep backend.FeedEpisode) string {
+	if g := strings.TrimSpace(ep.GUID); g != "" {
+		return g
+	}
+	if ep.Enclosure != nil && strings.TrimSpace(ep.Enclosure.URL) != "" {
+		return strings.TrimSpace(ep.Enclosure.URL)
+	}
+	if u := strings.TrimSpace(ep.EnclosureURL); u != "" {
+		return u
+	}
+	return strings.ToLower(strings.TrimSpace(ep.Title))
+}
+
 func ParseRSSXML(data []byte) ([]backend.FeedEpisode, error) {
+	doc, err := ParseRSSFeed(data)
+	if err != nil {
+		return nil, err
+	}
+	return doc.Episodes, nil
+}
+
+func ParseRSSFeed(data []byte) (*FeedDocument, error) {
 	var rss rssXML
 	if err := xml.Unmarshal(data, &rss); err != nil {
 		return nil, err
 	}
 
+	doc := &FeedDocument{
+		Title:          strings.TrimSpace(rss.Channel.Title),
+		LastBuildDate:  strings.TrimSpace(rss.Channel.LastBuildDate),
+		ChannelPubDate: strings.TrimSpace(rss.Channel.PubDate),
+	}
 	var episodes []backend.FeedEpisode
 	for _, it := range rss.Channel.Items {
 		if it.Enclosure == nil || strings.TrimSpace(it.Enclosure.URL) == "" {
@@ -269,7 +339,8 @@ func ParseRSSXML(data []byte) ([]backend.FeedEpisode, error) {
 		}
 		episodes = append(episodes, ep)
 	}
-	return episodes, nil
+	doc.Episodes = episodes
+	return doc, nil
 }
 
 func isTransientHTTPStatus(code int) bool {
@@ -285,78 +356,153 @@ func feedSleepBackoff(attempt int) {
 	time.Sleep(time.Duration(attempt)*time.Second + jitter)
 }
 
-func FetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]backend.FeedEpisode, string, string, bool, error) {
-	client := &http.Client{Timeout: 60 * time.Second}
-	const maxAttempts = 3
-	var lastErr error
+const (
+	feedUserAgent            = "Mozilla/5.0 (compatible; ABSPodcastManager/1.0)"
+	defaultFeedFetchTimeout  = 15 * time.Second
+	defaultFeedFetchAttempts = 2
+	maxFeedSize              = 32 * 1024 * 1024
+)
 
-	for attempt := 1; attempt <= maxAttempts; attempt++ {
-		req, err := http.NewRequest("GET", feedURL, nil)
-		if err != nil {
-			return nil, "", "", false, err
-		}
-		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; ABSPodcastManager/1.0)")
-		if cachedETag != "" {
-			req.Header.Set("If-None-Match", cachedETag)
-		}
-		if cachedLastMod != "" {
-			req.Header.Set("If-Modified-Since", cachedLastMod)
-		}
-
-		resp, err := client.Do(req)
-		if err != nil {
-			lastErr = err
-			if attempt < maxAttempts {
-				feedSleepBackoff(attempt)
-				continue
-			}
-			return nil, "", "", false, err
-		}
-
-		if resp.StatusCode == http.StatusNotModified {
-			resp.Body.Close()
-			return nil, cachedETag, cachedLastMod, true, nil
-		}
-
-		if isTransientHTTPStatus(resp.StatusCode) {
-			resp.Body.Close()
-			lastErr = fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
-			if attempt < maxAttempts {
-				feedSleepBackoff(attempt)
-				continue
-			}
-			return nil, "", "", false, lastErr
-		}
-
-		if resp.StatusCode != http.StatusOK {
-			resp.Body.Close()
-			return nil, "", "", false, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
-		}
-
-		return ReadAndParseFeedResponse(resp)
-	}
-
-	if lastErr != nil {
-		return nil, "", "", false, lastErr
-	}
-	return nil, "", "", false, fmt.Errorf("failed to fetch feed")
+// feedTransport is shared by every feed fetch. A feed sweep opens connections
+// to dozens of hosts at once and repeats the sweep on later runs, so pooling
+// connections and TLS sessions across calls is worth far more than the
+// isolation a per-call transport would buy.
+var feedTransport = &http.Transport{
+	Proxy:               http.ProxyFromEnvironment,
+	MaxIdleConns:        128,
+	MaxIdleConnsPerHost: 4,
+	IdleConnTimeout:     90 * time.Second,
+	TLSHandshakeTimeout: 10 * time.Second,
 }
 
-func ReadAndParseFeedResponse(resp *http.Response) ([]backend.FeedEpisode, string, string, bool, error) {
-	defer resp.Body.Close()
-	newETag := resp.Header.Get("ETag")
-	newLastMod := resp.Header.Get("Last-Modified")
+func feedHTTPClient(timeout time.Duration) *http.Client {
+	if timeout <= 0 {
+		timeout = defaultFeedFetchTimeout
+	}
+	return &http.Client{Transport: feedTransport, Timeout: timeout}
+}
 
-	const maxFeedSize = 32 * 1024 * 1024
+// FeedFetchOptions configures a single conditional feed fetch.
+type FeedFetchOptions struct {
+	ETag         string
+	LastModified string
+	Timeout      time.Duration
+	MaxAttempts  int
+	Client       *http.Client
+}
+
+// FeedFetchResult is the outcome of a conditional feed fetch. When NotModified
+// is set the origin answered 304, no body was transferred, and Doc is nil.
+type FeedFetchResult struct {
+	Doc          *FeedDocument
+	ETag         string
+	LastModified string
+	NotModified  bool
+}
+
+// FetchFeedConditional fetches a feed, sending If-None-Match/If-Modified-Since
+// when the caller has cached validators. Most podcast hosts honour them and
+// answer 304, which is the cheapest possible way to learn that a feed has
+// nothing new.
+func FetchFeedConditional(feedURL string, opts FeedFetchOptions) (FeedFetchResult, error) {
+	client := opts.Client
+	if client == nil {
+		client = feedHTTPClient(opts.Timeout)
+	}
+	maxAttempts := opts.MaxAttempts
+	if maxAttempts <= 0 {
+		maxAttempts = defaultFeedFetchAttempts
+	}
+
+	var lastErr error
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		res, retry, err := fetchFeedAttempt(client, feedURL, opts)
+		if err == nil {
+			return res, nil
+		}
+		lastErr = err
+		if !retry || attempt == maxAttempts {
+			return FeedFetchResult{}, err
+		}
+		feedSleepBackoff(attempt)
+	}
+	if lastErr == nil {
+		lastErr = fmt.Errorf("failed to fetch feed")
+	}
+	return FeedFetchResult{}, lastErr
+}
+
+func fetchFeedAttempt(client *http.Client, feedURL string, opts FeedFetchOptions) (FeedFetchResult, bool, error) {
+	req, err := http.NewRequest("GET", feedURL, nil)
+	if err != nil {
+		return FeedFetchResult{}, false, err
+	}
+	req.Header.Set("User-Agent", feedUserAgent)
+	if opts.ETag != "" {
+		req.Header.Set("If-None-Match", opts.ETag)
+	}
+	if opts.LastModified != "" {
+		req.Header.Set("If-Modified-Since", opts.LastModified)
+	}
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return FeedFetchResult{}, true, err
+	}
+
+	if resp.StatusCode == http.StatusNotModified {
+		resp.Body.Close()
+		return FeedFetchResult{
+			ETag:         opts.ETag,
+			LastModified: opts.LastModified,
+			NotModified:  true,
+		}, false, nil
+	}
+	if isTransientHTTPStatus(resp.StatusCode) {
+		resp.Body.Close()
+		return FeedFetchResult{}, true, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+	}
+	if resp.StatusCode != http.StatusOK {
+		resp.Body.Close()
+		return FeedFetchResult{}, false, fmt.Errorf("feed returned HTTP %d", resp.StatusCode)
+	}
+	return readFeedResponse(resp)
+}
+
+func readFeedResponse(resp *http.Response) (FeedFetchResult, bool, error) {
+	defer resp.Body.Close()
+	res := FeedFetchResult{
+		ETag:         resp.Header.Get("ETag"),
+		LastModified: resp.Header.Get("Last-Modified"),
+	}
+
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxFeedSize))
 	if err != nil {
-		return nil, "", "", false, err
+		return FeedFetchResult{}, true, err
 	}
+	doc, err := ParseRSSFeed(body)
+	if err != nil {
+		return FeedFetchResult{}, false, err
+	}
+	res.Doc = doc
+	return res, false, nil
+}
 
-	episodes, err := ParseRSSXML(body)
+// FetchFeedDirect fetches a feed conditionally and reports its episodes. It
+// keeps the longer timeout and retry budget suited to one-off interactive
+// fetches; sweeps over many feeds should call FetchFeedConditional directly.
+func FetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]backend.FeedEpisode, string, string, bool, error) {
+	res, err := FetchFeedConditional(feedURL, FeedFetchOptions{
+		ETag:         cachedETag,
+		LastModified: cachedLastMod,
+		Timeout:      60 * time.Second,
+		MaxAttempts:  3,
+	})
 	if err != nil {
 		return nil, "", "", false, err
 	}
-
-	return episodes, newETag, newLastMod, false, nil
+	if res.NotModified {
+		return nil, res.ETag, res.LastModified, true, nil
+	}
+	return res.Doc.Episodes, res.ETag, res.LastModified, false, nil
 }
