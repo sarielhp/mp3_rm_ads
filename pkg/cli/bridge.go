@@ -33,7 +33,7 @@ type (
 	RemoteConfig        = types.RemoteConfig
 	PolicyConfig        = types.PolicyConfig
 	GeminiConfig        = types.GeminiConfig
-	BatchOptions        = types.BatchOptions
+	ProcOptions         = types.ProcOptions
 	RemoteOptions       = types.RemoteOptions
 	PolicyOptions       = types.PolicyOptions
 	BackendOptions      = types.BackendOptions

@@ -199,7 +199,12 @@ func TestPrintQueueTableHebrew(t *testing.T) {
 func TestQueueRun_Empty(t *testing.T) {
 	tempDir := t.TempDir()
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+		QueueSubcmd: "run",
+	}
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("expected nil error on empty queue run, got: %v", err)
 	}
@@ -212,7 +217,13 @@ func TestQueueRun_DryRun(t *testing.T) {
 	addEpisodeToQueueFile(podDir, filepath.Base(paths[1]))
 
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", DryRun: true, Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			DryRun: true,
+			Quiet:  true,
+		},
+		QueueSubcmd: "run",
+	}
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand dry-run failed: %v", err)
 	}
@@ -236,7 +247,12 @@ func TestQueueRun_CleansAndDequeues(t *testing.T) {
 	markEpisodeClean(t, paths[1])
 
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+		QueueSubcmd: "run",
+	}
 	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand run failed: %v", err)
@@ -264,7 +280,13 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 
 	pod1Cfg := loadPodcastConfig(pod1Dir)
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Args: []string{pod1Cfg.ID}, Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+		QueueSubcmd: "run",
+		Args:        []string{pod1Cfg.ID},
+	}
 	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand target failed: %v", err)
@@ -291,7 +313,12 @@ func TestQueueRun_MissingFileAutoDequeued(t *testing.T) {
 	addEpisodeToQueueFile(podDir, "nonexistent.mp3")
 
 	cfg := Config{PodcastsDir: tempDir}
-	cli := CLIOptions{QueueSubcmd: "run", Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+		QueueSubcmd: "run",
+	}
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand failed on missing file: %v", err)
 	}

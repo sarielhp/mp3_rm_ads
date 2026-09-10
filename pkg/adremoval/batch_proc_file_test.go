@@ -62,7 +62,11 @@ func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{Quiet: true}, Config{}, "proc", time.Now(), offlineProfile())
+		CLIOptions{
+			ProcOptions: ProcOptions{
+				Quiet: true,
+			},
+		}, Config{}, "proc", time.Now(), offlineProfile())
 
 	if !hasError {
 		t.Errorf("expected hasError=true when the transcript cannot be parsed")
@@ -84,7 +88,11 @@ func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliRecut := CLIOptions{Quiet: true}
+	cliRecut := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	cliRecut.Recut = true
 	processSingleAudioFile(0, 1, 0, mp3,
 		cliRecut, Config{}, "recut", time.Now(), offlineProfile())
@@ -101,7 +109,11 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	cliTMin := CLIOptions{Quiet: true}
+	cliTMin := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	cliTMin.TranscribeMin = "1"
 	processSingleAudioFile(0, 1, 0, mp3,
 		cliTMin, Config{}, "proc", time.Now(), offlineProfile())
@@ -133,7 +145,11 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 	}
 
 	processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{Quiet: true}, Config{}, "proc", time.Now(), offlineProfile())
+		CLIOptions{
+			ProcOptions: ProcOptions{
+				Quiet: true,
+			},
+		}, Config{}, "proc", time.Now(), offlineProfile())
 
 	if util.FileExists(mp3 + ".precut") {
 		t.Errorf("no ads were detected, but the original was moved to .precut")
@@ -163,7 +179,11 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		CLIOptions{Quiet: true}, Config{}, "proc", time.Now(), failingProfile)
+		CLIOptions{
+			ProcOptions: ProcOptions{
+				Quiet: true,
+			},
+		}, Config{}, "proc", time.Now(), failingProfile)
 
 	if !hasError {
 		t.Errorf("expected hasError=true when LLM ad detection fails")

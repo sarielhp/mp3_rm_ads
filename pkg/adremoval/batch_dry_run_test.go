@@ -71,7 +71,13 @@ func TestProcDryRunMutatesNothing(t *testing.T) {
 
 	before := snapshotTree(t, dir)
 
-	cli := CLIOptions{Quiet: true, DryRun: true, Args: []string{dir}}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet:  true,
+			DryRun: true,
+		},
+		Args: []string{dir},
+	}
 	cli.Local = true
 	ProcessBatch(cli, Config{}, "proc")
 

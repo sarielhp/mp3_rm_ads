@@ -39,8 +39,10 @@ func TestLsLatestCommand(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Count: 2,
+		},
 		InfoSubcmd: "latest",
-		Count:      2,
 	}
 	err := runInfoCommand(cfg, cli)
 
@@ -171,7 +173,11 @@ func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
 	oldStdout = os.Stdout
 	os.Stdout = w
 
-	cliQuiet := CLIOptions{Quiet: true}
+	cliQuiet := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	err = runInfoCommand(cfg, cliQuiet)
 
 	_ = w.Close()
@@ -230,8 +236,10 @@ func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
 	os.Stdout = w
 
 	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Count: 1,
+		},
 		InfoSubcmd: "latest",
-		Count:      1,
 	}
 	err := runInfoCommand(cfg, cli)
 

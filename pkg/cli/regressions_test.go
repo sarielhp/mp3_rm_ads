@@ -106,10 +106,10 @@ func TestRegressionIssue5_TranscriptConflictingFlags(t *testing.T) {
 	}
 
 	conflictCases := []CLIOptions{
-		{BatchOptions: BatchOptions{ExportFormat: "srt", ExportTXT: true}},
-		{BatchOptions: BatchOptions{ExportFormat: "txt", ExportSRT: true}},
-		{BatchOptions: BatchOptions{ExportTXT: true, ExportSRT: true}},
-		{BatchOptions: BatchOptions{ExportFormat: "srt", ExportTXT: true, ExportSRT: true}},
+		{ExportFormat: "srt", ProcOptions: ProcOptions{ExportTXT: true}},
+		{ExportFormat: "txt", ProcOptions: ProcOptions{ExportSRT: true}},
+		{ProcOptions: ProcOptions{ExportTXT: true, ExportSRT: true}},
+		{ExportFormat: "srt", ProcOptions: ProcOptions{ExportTXT: true, ExportSRT: true}},
 	}
 
 	for _, c := range conflictCases {

@@ -228,9 +228,9 @@ func transcribeAndDetectAdsRemoteScan(audioFile string, origDuration float64, cf
 	isNewlyTranscribed := false
 
 	cli := types.CLIOptions{
-		Quiet:   quiet,
-		Verbose: verbose,
-		BatchOptions: types.BatchOptions{
+		ProcOptions: types.ProcOptions{
+			Quiet:          quiet,
+			Verbose:        verbose,
 			SaveTranscript: true,
 		},
 	}

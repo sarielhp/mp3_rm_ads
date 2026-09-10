@@ -55,7 +55,6 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 		clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		hideOption(clihelp.BoolToggle(&opts.SaveTranscript, "--[no-]transcript", true, "Save default .transcript.json file")),
 		hideOption(clihelp.Bool(&opts.UseChunks, "--use-chunks", false, "Split audio into chunks")),
-		hideOption(clihelp.Bool(&opts.ExtractKeywords, "--extract-keywords", false, "Extract keywords for transcription")),
 		hideOption(clihelp.String(&opts.TranscribeMin, "-t, --tminutes <minutes>", "", "Transcribe first N minutes")),
 		hideOption(clihelp.Bool(&opts.Recut, "--recut", false, "Recut audio using existing cuts metadata")),
 		clihelp.String(&opts.Force, "-f, --force <stage>", "", "Force: 'whisper', 'llm', or 'all'"),
@@ -76,7 +75,7 @@ func getTranscriptionOptions(opts *CLIOptions) []clihelp.Option {
 func parseFlagsArgs(args []string) (string, CLIOptions, error) {
 	var action string
 	opts := CLIOptions{
-		BatchOptions: BatchOptions{
+		ProcOptions: ProcOptions{
 			SaveTranscript: true,
 		},
 	}

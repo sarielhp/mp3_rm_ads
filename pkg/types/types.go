@@ -128,40 +128,16 @@ type TUIColorConfig struct {
 	Dim      string `json:"dim,omitempty"`
 }
 
-type BatchOptions struct {
-	Output           string
-	TranscriptPath   string
-	SaveTranscript   bool
-	ExportSRT        bool
-	ExportTXT        bool
-	ExportFormat     string
-	Recut            bool
-	Force            string
-	ForceLLM         bool
-	ForceTranscribe  bool
-	UseLLM           string
-	UseChunks        bool
-	TranscribeMin    string
-	ExtractKeywords  bool
-	ShowCuts         bool
-	ShowTranscript   bool
-	AuditMinRatioStr string
-	AuditMinChars    int
-}
-
+// RemoteOptions holds the remote-execution flags the command line acts on
+// itself. The flags the engine acts on — Remote, Local, RemoteHost,
+// RemoteFFmpegHost, NoCollect, Priority — live in ProcOptions.
 type RemoteOptions struct {
-	RemoteFFmpegHost    string
 	SetRemoteFFmpegHost bool
 	RemoteSubcmd        string
-	RemoteHost          string
 	RemoteWorkDir       string
-	Remote              bool
-	Local               bool
-	NoCollect           bool
 	Daemon              bool
 	IfDirty             bool
 	BatchWorkerDir      string
-	Priority            int
 }
 
 type PolicyOptions struct {
@@ -195,7 +171,7 @@ type BackendOptions struct {
 }
 
 type CLIOptions struct {
-	BatchOptions
+	ProcOptions
 	RemoteOptions
 	PolicyOptions
 	BackendOptions
@@ -208,8 +184,6 @@ type CLIOptions struct {
 	SetPodcastsDir    bool
 	ListLLMs          bool
 	CopyOpenCode      bool
-	Quiet             bool
-	Verbose           bool
 	Debug             bool
 	TestWhisper       bool
 	TestABS           bool
@@ -221,10 +195,7 @@ type CLIOptions struct {
 	RemoveWhisper     int
 	SetDefaultWhisper int
 	ListWhispers      bool
-	WhisperEngine     string
-	WhisperModel      string
 
-	Count          int
 	CountGiven     bool
 	Podcast        string
 	Fill           bool
@@ -235,10 +206,12 @@ type CLIOptions struct {
 	NoWait         bool
 	ProcessorCmd   string
 	ProcessorValue string
-	DryRun         bool
 	ConfigInfo     bool
 	Args           []string
 	ProcSubcmd     string
+	ExportFormat   string
+	ShowCuts       bool
+	ShowTranscript bool
 	LsSubcmd       string
 	JSON           bool
 	InfoSubcmd     string

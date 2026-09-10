@@ -39,14 +39,22 @@ func TestQueueTodaySelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	addEpisodeToQueueFile(dir, "existing.mp3")
-	if err := handleQueueToday(root, CLIOptions{DryRun: true}, now); err != nil {
+	if err := handleQueueToday(root, CLIOptions{
+		ProcOptions: ProcOptions{
+			DryRun: true,
+		},
+	}, now); err != nil {
 		t.Fatal(err)
 	}
 	if got := readTodayTestQueue(t, dir); !reflect.DeepEqual(got, []string{"existing.mp3"}) {
 		t.Fatalf("dry run changed queue: %v", got)
 	}
 	for i := 0; i < 2; i++ {
-		if err := handleQueueToday(root, CLIOptions{Quiet: true}, now); err != nil {
+		if err := handleQueueToday(root, CLIOptions{
+			ProcOptions: ProcOptions{
+				Quiet: true,
+			},
+		}, now); err != nil {
 			t.Fatal(err)
 		}
 	}

@@ -153,7 +153,11 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	config := Config{PodcastsDir: tmp}
 
 	err := handlePodcastRmAdsWorkflow(resolved, cli, config, "rm_ads")
@@ -194,7 +198,12 @@ func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{Quiet: true, DryRun: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet:  true,
+			DryRun: true,
+		},
+	}
 	config := Config{PodcastsDir: tmp}
 
 	err := handlePodcastRmAdsWorkflow(resolved, cli, config, "rm_ads")
@@ -373,7 +382,11 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 
 	markEpisodeClean(t, targetAudio)
 
-	cliLocal := CLIOptions{Quiet: true}
+	cliLocal := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	cliLocal.Local = true
 	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", cliLocal, Config{PodcastsDir: tmp})
 	if err != nil {
@@ -422,7 +435,11 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 		},
 	}
 
-	targetPath, err := resolveTargetEpisodeForRmAds(resolved, CLIOptions{Quiet: true}, cfg)
+	targetPath, err := resolveTargetEpisodeForRmAds(resolved, CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}, cfg)
 	if err != nil {
 		t.Fatalf("unexpected error during offline fallback: %v", err)
 	}
@@ -448,7 +465,11 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 		Config:     podCfg,
 	}
 
-	cli := CLIOptions{Quiet: true}
+	cli := CLIOptions{
+		ProcOptions: ProcOptions{
+			Quiet: true,
+		},
+	}
 	cli.Local = true
 	config := Config{PodcastsDir: tmp}
 
@@ -519,8 +540,8 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		PodcastsDir: localPodcasts,
 	}
 	cli := CLIOptions{
-		Quiet: true,
-		RemoteOptions: RemoteOptions{
+		ProcOptions: ProcOptions{
+			Quiet:      true,
 			Remote:     true,
 			RemoteHost: "mock-box",
 		},
