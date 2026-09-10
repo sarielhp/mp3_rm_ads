@@ -6,42 +6,100 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func buildSyncSubcommands(opts *CLIOptions, action *string, countVal, keepVal *int) []clihelp.Command {
+func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal *int) []clihelp.Command {
 	cmds := []clihelp.Command{
-		buildSyncFeedsSubcommand(opts, action),
-		buildSyncDownloadSubcommand(opts, action, countVal, keepVal),
-		buildSyncPruneSubcommand(opts, action, keepVal),
-		buildSyncPolicySubcommand(opts, action),
-		buildSyncListSubcommand(opts, action),
-		buildSyncGetInfoSubcommand(opts, action),
+		buildServerFeedsSubcommand(opts, action),
+		buildServerDownloadSubcommand(opts, action, countVal, keepVal),
+		buildServerPruneSubcommand(opts, action, keepVal),
+		buildServerPolicySubcommand(opts, action),
+		buildServerListSubcommand(opts, action),
+		buildServerGetInfoSubcommand(opts, action),
 	}
-	return append(cmds, buildSyncSubcommands2(opts, action)...)
+	return append(cmds, buildServerSubcommands2(opts, action)...)
 }
 
-func buildSyncFeedsSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerFeedsUpdateSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
-		Name:        "feeds",
-		Description: "Fetch and sync latest RSS feeds for podcasts",
-		UsageLine:   "abs sync feeds [options] [podcast-id]",
+		Name:        "update",
+		Description: "Wake up server and check for newly published episodes across feeds",
+		UsageLine:   "abs server feeds update [options] [podcast-id]",
 		Parameters: []clihelp.Param{
 			{Name: "[podcast-id]", Description: "Optional podcast identifier"},
 		},
 		Args: clihelp.MaximumNArgs(1),
+		Options: []clihelp.Option{
+			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "feeds"
+			*action = "server"
 			opts.ServerSubcmd = "feeds"
+			opts.SyncSubcmd = "feeds"
 			opts.Args = ctx.Args
+			if len(ctx.Args) > 0 && opts.Podcast == "" {
+				opts.Podcast = ctx.Args[0]
+			}
 			return nil
 		},
 	}
 }
 
-func buildSyncDownloadSubcommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
+func buildServerFeedsSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "feeds",
+		Description: "Wake up server and check for newly published episodes across feeds",
+		UsageLine:   "abs server feeds [command] [options] [podcast-id]",
+		Subcommands: []clihelp.Command{
+			buildServerFeedsUpdateSubcommand(opts, action),
+		},
+		Parameters: []clihelp.Param{
+			{Name: "[podcast-id]", Description: "Optional podcast identifier"},
+		},
+		Args: clihelp.MaximumNArgs(2),
+		Options: []clihelp.Option{
+			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by name, index, or ID"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
+			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug output"),
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs server feeds",
+				Description: "Wake up server and check all feeds for new episodes",
+			},
+			{
+				Line:        "abs server feeds update",
+				Description: "Wake up server and scan all podcast feeds",
+			},
+			{
+				Line:        "abs server feeds update -p 'Huberman Lab'",
+				Description: "Wake up server and check feeds for a specific podcast",
+			},
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "server"
+			opts.ServerSubcmd = "feeds"
+			opts.SyncSubcmd = "feeds"
+			opts.Args = ctx.Args
+			if len(ctx.Args) > 0 {
+				if ctx.Args[0] == "update" {
+					if len(ctx.Args) > 1 && opts.Podcast == "" {
+						opts.Podcast = ctx.Args[1]
+					}
+				} else if opts.Podcast == "" {
+					opts.Podcast = ctx.Args[0]
+				}
+			}
+			return nil
+		},
+	}
+}
+
+func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
 	return clihelp.Command{
 		Name:        "download",
-		Description: "Download undownloaded episodes for podcasts",
-		UsageLine:   "abs sync download [podcast-id] [options]",
+		Description: "Update feeds and download undownloaded episodes for podcasts",
+		UsageLine:   "abs server download [podcast-id] [options]",
 		Parameters:  []clihelp.Param{{Name: "[podcast-id]", Description: "Specify podcast by name, index, or ID"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -60,9 +118,9 @@ func buildSyncDownloadSubcommand(opts *CLIOptions, action *string, countVal, kee
 			clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "download"
+			*action = "server"
 			opts.ServerSubcmd = "download"
+			opts.SyncSubcmd = "download"
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 {
 				if k, err := strconv.Atoi(ctx.Args[0]); err == nil {
@@ -85,11 +143,11 @@ func buildSyncDownloadSubcommand(opts *CLIOptions, action *string, countVal, kee
 	}
 }
 
-func buildSyncPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) clihelp.Command {
+func buildServerPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) clihelp.Command {
 	return clihelp.Command{
 		Name:        "prune",
 		Description: "Delete older episodes per retention limit",
-		UsageLine:   "abs sync prune [number] [options]",
+		UsageLine:   "abs server prune [number] [options]",
 		Parameters:  []clihelp.Param{{Name: "[number]", Description: "Number of latest episodes to keep per podcast"}},
 		Args:        clihelp.RangeArgs(0, 1),
 		Options: []clihelp.Option{
@@ -100,9 +158,9 @@ func buildSyncPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) cl
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "prune"
+			*action = "server"
 			opts.ServerSubcmd = "keep"
+			opts.SyncSubcmd = "prune"
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 {
 				if k, err := strconv.Atoi(ctx.Args[0]); err == nil {
@@ -118,11 +176,11 @@ func buildSyncPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) cl
 	}
 }
 
-func buildSyncPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "policy",
 		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "abs sync policy <podcast-id> [<number>] [options]",
+		UsageLine:   "abs server policy <podcast-id> [<number>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "<podcast-id>", Description: "Target podcast identifier"},
 			{Name: "[<number>]", Description: "Shorthand: auto-download latest K episodes with ad-removal all"},
@@ -139,53 +197,53 @@ func buildSyncPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync policy 42 1",
+				Line:        "abs server policy 42 1",
 				Description: "Shorthand: auto-download latest 1 episode and remove all ads",
 			},
 			{
-				Line:        "abs sync policy 'Huberman Lab' 3",
+				Line:        "abs server policy 'Huberman Lab' 3",
 				Description: "Shorthand: auto-download latest 3 episodes and remove all ads",
 			},
 			{
-				Line:        "abs sync policy 42 --download-policy all --ad-removal all",
+				Line:        "abs server policy 42 --download-policy all --ad-removal all",
 				Description: "Configure podcast 42 to download all episodes and remove ads",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "policy"
+			*action = "server"
 			opts.ServerSubcmd = "policy"
+			opts.SyncSubcmd = "policy"
 			opts.Args = ctx.Args
 			return nil
 		},
 	}
 }
 
-func buildSyncListSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerListSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "list",
 		Description: "List all available podcasts in server with episode counts",
-		UsageLine:   "abs sync list [options]",
+		UsageLine:   "abs server list [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "list"
+			*action = "server"
 			opts.ServerSubcmd = "list"
+			opts.SyncSubcmd = "list"
 			opts.Args = ctx.Args
 			return nil
 		},
 	}
 }
 
-func buildSyncGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "get-info",
 		Description: "Cache metadata for latest K episodes",
-		UsageLine:   "abs sync get-info [<k>] [options]",
+		UsageLine:   "abs server get-info [<k>] [options]",
 		Parameters:  []clihelp.Param{{Name: "[<k>]", Description: "Episodes count per podcast (default 100)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -195,9 +253,9 @@ func buildSyncGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed per-episode metadata"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "get-info"
+			*action = "server"
 			opts.ServerSubcmd = "get-info"
+			opts.SyncSubcmd = "get-info"
 			opts.Count = 100
 			opts.CountGiven = false
 			opts.Args = ctx.Args

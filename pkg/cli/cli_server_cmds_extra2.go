@@ -6,22 +6,22 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func buildSyncSubcommands2(opts *CLIOptions, action *string) []clihelp.Command {
+func buildServerSubcommands2(opts *CLIOptions, action *string) []clihelp.Command {
 	return []clihelp.Command{
-		buildSyncRescanSubcommand(opts, action),
-		buildSyncTimelineSubcommand(opts, action),
-		buildSyncOPMLSubcommand(opts, action),
+		buildServerRescanSubcommand(opts, action),
+		buildServerTimelineSubcommand(opts, action),
+		buildServerOPMLSubcommand(opts, action),
 		buildServerFrequencySubcommand(opts, action),
 		buildServerDisableHourlySubcommand(opts, action),
 		buildServerCleanOrphansSubcommand(opts, action),
 	}
 }
 
-func buildSyncRescanSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerRescanSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "rescan",
 		Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
-		UsageLine:   "abs sync rescan [options]",
+		UsageLine:   "abs server rescan [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by index or title"),
@@ -31,39 +31,39 @@ func buildSyncRescanSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.String(&opts.SqliteDBPath, "--db-path <path>", "", "Path to absdatabase.sqlite"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "rescan"
+			*action = "server"
 			opts.ServerSubcmd = "rescan"
+			opts.SyncSubcmd = "rescan"
 			opts.Args = ctx.Args
 			return nil
 		},
 	}
 }
 
-func buildSyncTimelineSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerTimelineSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "timeline",
 		Description: "Display exact online availability timestamps table for recent podcast episodes",
-		UsageLine:   "abs sync timeline [directory]",
+		UsageLine:   "abs server timeline [directory]",
 		Parameters: []clihelp.Param{
 			{Name: "[directory]", Description: "Optional path to podcasts directory"},
 		},
 		Args: clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "timeline"
+			*action = "server"
 			opts.ServerSubcmd = "timeline"
+			opts.SyncSubcmd = "timeline"
 			opts.Args = ctx.Args
 			return nil
 		},
 	}
 }
 
-func buildSyncOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "import",
 		Description: "Import podcast subscriptions from an OPML file into the server",
-		UsageLine:   "abs sync opml import <file> [options]",
+		UsageLine:   "abs server opml import <file> [options]",
 		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to the OPML file to import"}},
 		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
@@ -72,14 +72,14 @@ func buildSyncOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.Com
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync opml import subscriptions.opml",
+				Line:        "abs server opml import subscriptions.opml",
 				Description: "Import podcasts from subscriptions.opml into the server",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "opml"
+			*action = "server"
 			opts.ServerSubcmd = "opml"
+			opts.SyncSubcmd = "opml"
 			opts.OPMLSubcmd = "import"
 			if len(ctx.Args) > 0 {
 				opts.OPMLFile = ctx.Args[0]
@@ -89,11 +89,11 @@ func buildSyncOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.Com
 	}
 }
 
-func buildSyncOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "export",
 		Description: "Export podcast RSS feeds provided by the server into an OPML file",
-		UsageLine:   "abs sync opml export <file> [options]",
+		UsageLine:   "abs server opml export <file> [options]",
 		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to write the exported OPML file"}},
 		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
@@ -102,11 +102,11 @@ func buildSyncOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Com
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync opml export podcasts.opml",
+				Line:        "abs server opml export podcasts.opml",
 				Description: "Export all server podcast feeds into podcasts.opml",
 			},
 			{
-				Line:        "abs sync opml export ~/Downloads/podcasts.opml --verbose",
+				Line:        "abs server opml export ~/Downloads/podcasts.opml --verbose",
 				Description: "Export feeds with detailed progress and show each feed URL",
 			},
 		},
@@ -117,13 +117,13 @@ func buildSyncOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Com
 			},
 			{
 				Heading: "Importing Into AntennaPod",
-				Text:    "To import all server podcasts into AntennaPod at once:\n1. Run 'abs sync opml export podcasts.opml' and transfer the file to your mobile device (via Nextcloud, Syncthing, email, or USB).\n2. Open AntennaPod on your device.\n3. Navigate to Subscriptions -> tap the top-right menu (⋮) -> 'Import/Export'.\n4. Select 'OPML import' and choose the exported 'podcasts.opml' file.\n5. AntennaPod will subscribe to all server-provided podcast feeds in one single step.",
+				Text:    "To import all server podcasts into AntennaPod at once:\n1. Run 'abs server opml export podcasts.opml' and transfer the file to your mobile device (via Nextcloud, Syncthing, email, or USB).\n2. Open AntennaPod on your device.\n3. Navigate to Subscriptions -> tap the top-right menu (⋮) -> 'Import/Export'.\n4. Select 'OPML import' and choose the exported 'podcasts.opml' file.\n5. AntennaPod will subscribe to all server-provided podcast feeds in one single step.",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "opml"
+			*action = "server"
 			opts.ServerSubcmd = "opml"
+			opts.SyncSubcmd = "opml"
 			opts.OPMLSubcmd = "export"
 			if len(ctx.Args) > 0 {
 				opts.OPMLFile = ctx.Args[0]
@@ -133,29 +133,29 @@ func buildSyncOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.Com
 	}
 }
 
-func buildSyncOPMLSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+func buildServerOPMLSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "opml",
 		Description: "Import or export podcast subscriptions using OPML files",
-		UsageLine:   "abs sync opml <command> [args]",
+		UsageLine:   "abs server opml <command> [args]",
 		Subcommands: []clihelp.Command{
-			buildSyncOPMLImportSubcommand(opts, action),
-			buildSyncOPMLExportSubcommand(opts, action),
+			buildServerOPMLImportSubcommand(opts, action),
+			buildServerOPMLExportSubcommand(opts, action),
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync opml export podcasts.opml",
+				Line:        "abs server opml export podcasts.opml",
 				Description: "Export all server podcast feeds into an OPML file",
 			},
 			{
-				Line:        "abs sync opml import subscriptions.opml",
+				Line:        "abs server opml import subscriptions.opml",
 				Description: "Import podcasts from an OPML file into the server",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
-			opts.SyncSubcmd = "opml"
+			*action = "server"
 			opts.ServerSubcmd = "opml"
+			opts.SyncSubcmd = "opml"
 			if len(ctx.Args) > 0 {
 				switch strings.ToLower(ctx.Args[0]) {
 				case "import":
@@ -181,7 +181,7 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 	return clihelp.Command{
 		Name:        "frequency",
 		Description: "Analyze podcast release cadence and save frequency metadata",
-		UsageLine:   "abs sync frequency [<podcast>] [options]",
+		UsageLine:   "abs server frequency [<podcast>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to analyze"},
 		},
@@ -194,7 +194,8 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed metrics (span, days interval, hours interval)"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
+			*action = "server"
+			opts.ServerSubcmd = "frequency"
 			opts.SyncSubcmd = "frequency"
 			opts.Args = ctx.Args
 			if len(ctx.Args) > 0 && opts.Podcast == "" {
@@ -209,7 +210,7 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 	return clihelp.Command{
 		Name:        "disable-hourly",
 		Description: "Disable policy for hourly podcasts",
-		UsageLine:   "abs sync disable-hourly [options]",
+		UsageLine:   "abs server disable-hourly [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Podcast name, index, or ID"},
 		},
@@ -221,7 +222,8 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
+			*action = "server"
+			opts.ServerSubcmd = "disable-hourly"
 			opts.SyncSubcmd = "disable-hourly"
 			opts.DisableHourly = true
 			opts.Args = ctx.Args
@@ -237,7 +239,7 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 	return clihelp.Command{
 		Name:        "clean-orphans",
 		Description: "Delete orphaned ABS podcast entries",
-		UsageLine:   "abs sync clean-orphans [options]",
+		UsageLine:   "abs server clean-orphans [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview items without deleting"),
@@ -246,7 +248,8 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output during pruning"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
+			*action = "server"
+			opts.ServerSubcmd = "clean-orphans"
 			opts.SyncSubcmd = "clean-orphans"
 			opts.Args = ctx.Args
 			return nil

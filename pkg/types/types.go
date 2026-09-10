@@ -210,6 +210,7 @@ type CLIOptions struct {
 	IsTestCommand        bool
 	IsScanCommand        bool
 	IsSyncCommand        bool
+	IsServerCommand      bool
 	IsStatusCommand      bool
 	IsRemoteCommand      bool
 	IsBatchWorkerCommand bool

@@ -6,23 +6,23 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-func buildSyncCommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
+func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int) clihelp.Command {
 	return clihelp.Command{
-		Name:        "sync",
-		Description: "Sync podcast RSS feeds, episodes, and server policies",
-		UsageLine:   "abs sync [command] [options] [podcast-id]",
-		Subcommands: buildSyncSubcommands(opts, action, countVal, keepVal),
+		Name:        "server",
+		Description: "Manage podcast server (Audiobookshelf / PodFetch) feeds, downloads, and policies",
+		UsageLine:   "abs server [command] [options] [podcast-id]",
+		Subcommands: buildServerSubcommands(opts, action, countVal, keepVal),
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync",
-				Description: "Sync all subscribed podcasts and download new episodes",
+				Line:        "abs server feeds",
+				Description: "Wake up server and check for newly published episodes across feeds",
 			},
 			{
-				Line:        "abs sync -p 'Huberman Lab' -k 3",
-				Description: "Download 3 latest episodes for a specific podcast",
+				Line:        "abs server download -p 'Huberman Lab' -k 3",
+				Description: "Update feeds and download 3 latest episodes for a specific podcast",
 			},
 			{
-				Line:        "abs sync opml export podcasts.opml",
+				Line:        "abs server opml export podcasts.opml",
 				Description: "Export server podcast RSS feeds to an OPML file",
 			},
 		},
@@ -40,7 +40,7 @@ func buildSyncCommand(opts *CLIOptions, action *string, countVal, keepVal *int) 
 			clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check episodes (skip podcast scan)"),
 		},
 		Run: func(ctx *clihelp.Context) error {
-			*action = "sync"
+			*action = "server"
 			if len(ctx.Args) > 0 {
 				arg := ctx.Args[0]
 				if fi, err := os.Stat(arg); err != nil || !fi.IsDir() {

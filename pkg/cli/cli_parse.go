@@ -44,11 +44,15 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs sync",
-				Description: "Synchronize feeds and download new episodes from server",
+				Line:        "abs server feeds",
+				Description: "Wake up server and check for newly published episodes across feeds",
 			},
 			{
-				Line:        "abs sync opml export podcasts.opml",
+				Line:        "abs server download",
+				Description: "Update feeds and download new episodes from server",
+			},
+			{
+				Line:        "abs server opml export podcasts.opml",
 				Description: "Export server podcast RSS feeds into an OPML file",
 			},
 			{
@@ -67,7 +71,7 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 			buildPlayerCommand(opts, action),
 			buildQueueCommand(opts, action),
 			buildRmAdsCommand(opts, action),
-			buildSyncCommand(opts, action, &countVal, &keepVal),
+			buildServerCommand(opts, action, &countVal, &keepVal),
 			buildTUICommand(opts, action),
 		},
 	}
@@ -186,13 +190,14 @@ func parseFlagsArgs(args []string) (string, CLIOptions, error) {
 	opts.IsDirCommand = (action == "dir")
 	opts.IsFileCommand = (action == "rm_ads")
 	opts.IsTUICommand = (action == "tui")
-	opts.IsTimelineCommand = (action == "sync" && opts.SyncSubcmd == "timeline")
+	opts.IsTimelineCommand = ((action == "server" || action == "sync") && (opts.ServerSubcmd == "timeline" || opts.SyncSubcmd == "timeline"))
 	opts.IsTestCommand = (action == "info" && opts.InfoSubcmd == "check")
-	opts.IsScanCommand = (action == "sync" && (opts.SyncSubcmd == "scan" || opts.SyncSubcmd == "new" || opts.SyncSubcmd == "feeds"))
+	opts.IsScanCommand = ((action == "server" || action == "sync") && (opts.ServerSubcmd == "scan" || opts.ServerSubcmd == "new" || opts.ServerSubcmd == "feeds" || opts.SyncSubcmd == "feeds"))
 	opts.IsStatusCommand = (action == "info" && opts.InfoSubcmd == "status")
 	opts.IsRemoteCommand = (action == "offload")
 	opts.IsBatchWorkerCommand = (action == "offload" && opts.RemoteSubcmd == "worker" && opts.BatchWorkerDir != "")
-	opts.IsSyncCommand = (action == "sync")
+	opts.IsServerCommand = (action == "server" || action == "sync")
+	opts.IsSyncCommand = (action == "server" || action == "sync")
 
 	return action, opts, nil
 }

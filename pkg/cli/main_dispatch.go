@@ -208,17 +208,3 @@ func handleMainProc(config Config, cli CLIOptions, action string) error {
 	processAudioFilesBatch(cli, config, action)
 	return nil
 }
-
-func handleSyncCommand(config Config, cli CLIOptions) error {
-	subcmd := cli.SyncSubcmd
-	if subcmd == "policy" {
-		if err := runPolicyCommand(config, cli); err != nil {
-			return err
-		}
-		return nil
-	}
-	if !cli.Quiet {
-		fmt.Printf("Sync sub-command %q executed.\n", subcmd)
-	}
-	return nil
-}

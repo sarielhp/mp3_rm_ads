@@ -202,19 +202,19 @@ func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
-	if err := app.Execute([]string{"sync", "get-info"}); err != nil {
-		t.Errorf("expected 'sync get-info' to succeed: %v", err)
+	if err := app.Execute([]string{"server", "get-info"}); err != nil {
+		t.Errorf("expected 'server get-info' to succeed: %v", err)
 	}
-	if opts.SyncSubcmd != "get-info" {
-		t.Errorf("expected SyncSubcmd 'get-info', got %q", opts.SyncSubcmd)
+	if opts.ServerSubcmd != "get-info" {
+		t.Errorf("expected ServerSubcmd 'get-info', got %q", opts.ServerSubcmd)
 	}
 
 	opts = CLIOptions{}
-	if err := app.Execute([]string{"sync", "disable-hourly"}); err != nil {
-		t.Errorf("expected 'sync disable-hourly' to succeed: %v", err)
+	if err := app.Execute([]string{"server", "disable-hourly"}); err != nil {
+		t.Errorf("expected 'server disable-hourly' to succeed: %v", err)
 	}
-	if opts.SyncSubcmd != "disable-hourly" {
-		t.Errorf("expected SyncSubcmd 'disable-hourly', got %q", opts.SyncSubcmd)
+	if opts.ServerSubcmd != "disable-hourly" {
+		t.Errorf("expected ServerSubcmd 'disable-hourly', got %q", opts.ServerSubcmd)
 	}
 }
 

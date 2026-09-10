@@ -241,8 +241,8 @@ func Execute(args []string) int {
 			fmt.Fprintf(os.Stderr, "TUI error: %v\n", err)
 			return 1
 		}
-	case "sync":
-		if err := handleSyncCommand(config, cli); err != nil {
+	case "server", "sync":
+		if err := handleServerCommand(config, cli); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 			return 1
 		}
