@@ -35,7 +35,11 @@ func ProcessFiles(targets []string, opts ProcOptions, config Config, action stri
 		return
 	}
 
-	targetHost := resolveRemoteProcessingTargetHost(opts, config)
+	targetHost, err := resolveRemoteProcessingTargetHost(opts, config)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return
+	}
 	if targetHost != "" {
 		handleRemoteBatchExecution(expandedArgs, opts, config, targetHost)
 		return
@@ -118,19 +122,28 @@ func expandDirectoryArgs(args []string, opts ProcOptions) []string {
 	return expandedArgs
 }
 
-func resolveRemoteProcessingTargetHost(opts ProcOptions, config Config) string {
+func resolveRemoteProcessingTargetHost(opts ProcOptions, config Config) (string, error) {
 	if opts.Local {
-		return ""
+		return "", nil
 	}
-	reqHost := ""
-	if opts.Remote {
+	reqHost := opts.RemoteHost
+	if opts.Remote && reqHost == "" {
 		reqHost = config.RemoteHost
+		if reqHost == "" {
+			reqHost = config.RemoteFFmpegHost
+		}
+		if reqHost == "" {
+			return "", fmt.Errorf("remote processing requested without a remote host")
+		}
 	}
 	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
-	if err == nil && isRem {
-		return h
+	if err != nil {
+		return "", err
 	}
-	return ""
+	if err == nil && isRem {
+		return h, nil
+	}
+	return "", nil
 }
 
 func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config Config, targetHost string) {
@@ -148,7 +161,7 @@ func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config 
 			continue
 		}
 		mainMP3File, _, _ := resolveAudioFiles(f, opts)
-		if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && (pipeline.IsEpisodeCompleted(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
+		if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && (pipeline.IsEpisodeClean(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
 			continue
 		}
 		filesToPush = append(filesToPush, f)
@@ -173,7 +186,7 @@ func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config 
 	}
 }
 
-func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config Config, action string) {
+func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config Config, action string) error {
 	wp := getActiveWhisperProfile(config)
 	if opts.WhisperEngine != "" {
 		wp.Engine = WhisperEngine(opts.WhisperEngine)
@@ -187,9 +200,13 @@ func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config
 
 	totalFiles := len(expandedArgs)
 	processedCount := 0
+	failures := 0
 
 	for idx, inputFile := range expandedArgs {
-		_, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, opts, config, action, batchStartTime, selectedProfile)
+		hasError, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, opts, config, action, batchStartTime, selectedProfile)
+		if hasError || (!processedFlag && !stopFlag && (opts.ForceTranscribe || opts.ForceLLM || opts.Recut || !pipeline.IsEpisodeClean(inputFile))) {
+			failures++
+		}
 		if stopFlag {
 			break
 		}
@@ -205,4 +222,8 @@ func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config
 
 	os.Stdout.Sync()
 	os.Stderr.Sync()
+	if failures > 0 {
+		return fmt.Errorf("%d episode(s) failed or could not be processed", failures)
+	}
+	return nil
 }

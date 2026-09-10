@@ -3,6 +3,8 @@ package pipeline
 import (
 	"encoding/json"
 	"os"
+	"strings"
+	"unicode/utf8"
 
 	"abs/pkg/audio"
 	"abs/pkg/types"
@@ -11,8 +13,26 @@ import (
 
 // IsEpisodeClean reports whether an episode has finished ad removal.
 func IsEpisodeClean(mp3Path string) bool {
-	st := GetOrCreateEpisodeStatus(mp3Path)
-	return st.Status == types.StateDone || st.Status == types.StateCopiedBack || IsEpisodeCompleted(mp3Path)
+	if !HasNonEmptyTranscript(mp3Path) {
+		return false
+	}
+	return IsEpisodeCompleted(mp3Path)
+}
+
+func HasNonEmptyTranscript(mp3Path string) bool {
+	path := util.StripExt(mp3Path) + ".transcript.json"
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return false
+	}
+	var transcript struct {
+		Text                  string `json:"text"`
+		AdDetectionSuccessful *bool  `json:"ad_detection_successful"`
+	}
+	if json.Unmarshal(data, &transcript) != nil {
+		return false
+	}
+	return (transcript.AdDetectionSuccessful == nil || *transcript.AdDetectionSuccessful) && utf8.RuneCountInString(strings.TrimSpace(transcript.Text)) >= 50
 }
 
 // EpisodeDurations reports an episode's original and post-cut durations,

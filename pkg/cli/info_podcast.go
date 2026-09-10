@@ -83,9 +83,6 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisod
 		totalDur += od
 
 		pt := getEpisodePublicationTime(mp3)
-		if pt.IsZero() && fi != nil {
-			pt = fi.ModTime()
-		}
 		epList = append(epList, epTime{path: mp3, pt: pt, fi: fi})
 	}
 
@@ -109,7 +106,7 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisod
 		recent = append(recent, RecentEpisodeDTO{
 			ID:       epID,
 			Title:    episodeTitleFromPath(mp3),
-			Date:     epList[i].pt.Format("2006-01-02"),
+			Date:     publicationDateTime(epList[i].pt),
 			Status:   formatShortStatus(st),
 			Duration: formatClock(od),
 		})

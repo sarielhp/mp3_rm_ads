@@ -31,7 +31,8 @@ func (c *PodFetchBackend) CatalogEpisodes() ([]CatalogEpisode, error) {
 	if podfetchHasColumn(db, "podcast_episodes", "deleted") {
 		where = " WHERE deleted = 0"
 	}
-	query := fmt.Sprintf("SELECT podcast_id, guid, url, name, %s FROM podcast_episodes%s", fileCol, where)
+	dateCol := podfetchColOrEmpty(db, "podcast_episodes", "date_of_recording")
+	query := fmt.Sprintf("SELECT podcast_id, guid, url, name, %s, %s FROM podcast_episodes%s", fileCol, dateCol, where)
 
 	rows, err := db.Query(query)
 	if err != nil {
@@ -42,9 +43,9 @@ func (c *PodFetchBackend) CatalogEpisodes() ([]CatalogEpisode, error) {
 	var episodes []CatalogEpisode
 	for rows.Next() {
 		var podcastID string
-		var guid, url, name, filePath sql.NullString
-		if err := rows.Scan(&podcastID, &guid, &url, &name, &filePath); err != nil {
-			continue
+		var guid, url, name, filePath, published sql.NullString
+		if err := rows.Scan(&podcastID, &guid, &url, &name, &filePath, &published); err != nil {
+			return nil, fmt.Errorf("read catalog episode: %w", err)
 		}
 		episodes = append(episodes, CatalogEpisode{
 			PodcastID:    podcastID,
@@ -52,6 +53,8 @@ func (c *PodFetchBackend) CatalogEpisodes() ([]CatalogEpisode, error) {
 			EnclosureURL: strings.TrimSpace(url.String),
 			Title:        strings.TrimSpace(name.String),
 			Downloaded:   filePath.Valid && strings.TrimSpace(filePath.String) != "",
+			AudioPath:    strings.TrimPrefix(strings.TrimSpace(filePath.String), "podcasts/"),
+			PublishedAt:  ParsePubDate(published.String),
 		})
 	}
 	if err := rows.Err(); err != nil {

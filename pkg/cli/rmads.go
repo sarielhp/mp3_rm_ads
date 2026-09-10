@@ -193,7 +193,7 @@ func buildRmAdsExportSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "audit",
-		Description: "Scan and heal suspiciously short or incomplete episode transcripts",
+		Description: "Scan and heal invalid clean states plus suspicious episode transcripts",
 		UsageLine:   "abs rm_ads audit [paths...] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[paths...]", Description: "Podcast directories or audio files to audit (defaults to configured podcasts_dir)"},
@@ -216,8 +216,7 @@ func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command
 
 func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 	if cli.ProcSubcmd == "audit" {
-		adremoval.RunTranscriptAudit(config, cli.Args, cli.ProcOptions)
-		return nil
+		return adremoval.RunTranscriptAudit(config, cli.Args, cli.ProcOptions)
 	}
 	if cli.ProcSubcmd == "recut" {
 		cli.Recut = true
@@ -237,6 +236,9 @@ func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 			return fmt.Errorf("error clearing remote queue on %s: %w", cli.RemoteHost, err)
 		}
 		return nil
+	}
+	if handled, err := runUrgentEpisode(config, cli); handled {
+		return err
 	}
 	if pod, ok := resolvePodcastTarget(config.PodcastsDir, cli); ok {
 		return adremoval.ProcessPodcast(pod, cli.ProcOptions, config, action)

@@ -1,0 +1,195 @@
+package cli
+
+import (
+	"abs/pkg/backend"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
+	"fmt"
+	"io/fs"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/sarielhp/clihelp"
+)
+
+func buildServerFlushSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "flush",
+		Description: "Remove a podcast's audio and precut copies, keep transcripts, and disable automatic downloads",
+		UsageLine:   "abs server flush <podcast-id> [--dry-run]",
+		Parameters:  []clihelp.Param{{Name: "<podcast-id>", Description: "Exact podcast ID, local short ID, or title"}},
+		Args:        clihelp.ExactArgs(1),
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview audio removal and download-policy changes"),
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress output"),
+		},
+		Run: func(ctx *clihelp.Context) error {
+			*action = "server"
+			opts.ServerSubcmd = "flush"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
+func handleServerFlush(cfg Config, cli CLIOptions) error {
+	if len(cli.Args) != 1 || cfg.PodcastsDir == "" {
+		return fmt.Errorf("flush requires one podcast ID and a configured podcasts_dir")
+	}
+	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
+	if err != nil {
+		return err
+	}
+	items, err := b.Podcasts()
+	if err != nil {
+		return err
+	}
+	item, dir, err := resolveFlushPodcast(cfg.PodcastsDir, cli.Args[0], items)
+	if err != nil {
+		return err
+	}
+	return flushPodcastAudio(b, item, dir, cli, podcast.DefaultDownloadQueue())
+}
+
+func resolveFlushPodcast(root, query string, items []backend.Podcast) (backend.Podcast, string, error) {
+	var matches []backend.Podcast
+	var dirs []string
+	for _, item := range items {
+		dir, err := flushPodcastDir(root, item.RelPath)
+		if err != nil {
+			continue
+		}
+		local := loadPodcastConfig(dir)
+		if query == item.ID || strings.EqualFold(query, item.Media.Metadata.Title) ||
+			(local.ID != "" && strings.EqualFold(query, local.ID)) {
+			matches = append(matches, item)
+			dirs = append(dirs, dir)
+		}
+	}
+	if len(matches) != 1 {
+		return backend.Podcast{}, "", fmt.Errorf("flush needs one exact podcast match for %q; found %d", query, len(matches))
+	}
+	return matches[0], dirs[0], nil
+}
+
+func flushPodcastDir(root, rel string) (string, error) {
+	root, err := filepath.Abs(root)
+	if err != nil {
+		return "", err
+	}
+	rel = strings.TrimPrefix(filepath.ToSlash(rel), "podcasts/")
+	if rel == "" || filepath.IsAbs(rel) {
+		return "", fmt.Errorf("invalid podcast directory %q", rel)
+	}
+	dir := filepath.Join(root, filepath.FromSlash(rel))
+	check, err := filepath.Rel(root, dir)
+	if err != nil || check == "." || check == ".." || strings.HasPrefix(check, ".."+string(filepath.Separator)) {
+		return "", fmt.Errorf("podcast directory must be strictly below podcasts_dir")
+	}
+	realRoot, err := filepath.EvalSymlinks(root)
+	if err != nil {
+		return "", err
+	}
+	realDir, err := filepath.EvalSymlinks(dir)
+	if err != nil || realDir != filepath.Join(realRoot, check) {
+		return "", fmt.Errorf("podcast directory is missing or contains symlinks: %s", dir)
+	}
+	return dir, nil
+}
+
+func flushAudioFiles(dir string) ([]string, error) {
+	var paths []string
+	err := filepath.WalkDir(dir, func(path string, entry fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		name := strings.ToLower(entry.Name())
+		if strings.HasSuffix(name, ".mp3") || strings.HasSuffix(name, ".mp3.precut") {
+			paths = append(paths, path)
+		}
+		return nil
+	})
+	return paths, err
+}
+
+func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli CLIOptions, queue *podcast.DownloadQueue) error {
+	files, err := flushAudioFiles(dir)
+	if err != nil {
+		return err
+	}
+	if cli.DryRun {
+		fmt.Printf("[dry-run] Disable automatic downloads for %s; remove %d audio files; preserve transcripts.\n", item.Media.Metadata.Title, len(files))
+		for _, path := range files {
+			fmt.Println(path)
+		}
+		return nil
+	}
+	local := loadPodcastConfig(dir)
+	if err := b.UpdatePodcastSettings(item.ID, false, local.IsAutoCleanupEnabled(), local.AutoCleanupDays); err != nil {
+		return fmt.Errorf("disable server downloads before flushing: %w", err)
+	}
+	local.SetAutoDownload(false)
+	if err := savePodcastConfig(dir, local); err != nil {
+		return err
+	}
+	if err := queue.FlushPodcast(item.ID, dir); err != nil {
+		return err
+	}
+	active, err := b.ActiveDownloads(item.ID)
+	if err != nil {
+		return err
+	}
+	if len(active) != 0 {
+		return fmt.Errorf("downloads disabled, but %d downloads are still active; retry flush when they finish", len(active))
+	}
+	release, err := lockFlushAudio(files)
+	if err != nil {
+		return err
+	}
+	defer release()
+	for _, path := range files {
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return fmt.Errorf("flush %s: %w", path, err)
+		}
+	}
+	if err := saveQueue(dir, nil); err != nil {
+		return err
+	}
+	if !cli.Quiet {
+		fmt.Printf("Removed %d audio files from %s; transcripts kept. Automatic downloads disabled. Deleted audio can only be recovered from backups or by downloading it again.\n", len(files), item.Media.Metadata.Title)
+	}
+	return nil
+}
+
+func lockFlushAudio(paths []string) (func(), error) {
+	var locks []*util.FileLockWrapper
+	seen := make(map[string]bool)
+	release := func() {
+		for _, lock := range locks {
+			lock.Release()
+		}
+	}
+	for _, path := range paths {
+		target := strings.TrimSuffix(path, ".precut")
+		if seen[target] {
+			continue
+		}
+		seen[target] = true
+		if pipeline.IsEpisodeInRemoteFlight(target) {
+			release()
+			return nil, fmt.Errorf("episode is processing remotely: %s", target)
+		}
+		lock, err := util.AcquireFileLock(target)
+		if err != nil || lock == nil {
+			release()
+			return nil, fmt.Errorf("audio is locked or unavailable: %s", path)
+		}
+		locks = append(locks, lock)
+	}
+	return release, nil
+}

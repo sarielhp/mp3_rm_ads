@@ -3,8 +3,10 @@ package cli
 import (
 	"fmt"
 	"os"
+	"time"
 
 	"abs/pkg/tui"
+	"abs/pkg/util"
 )
 
 func Execute(args []string) int {
@@ -18,6 +20,23 @@ func Execute(args []string) int {
 	}
 	ensureConfigExists()
 	config := loadConfig()
+	if err := preparePublicationSource(action, config, cli); err != nil {
+		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		return 1
+	}
+	if !cli.DryRun {
+		root := config.PodcastsDir
+		if cli.PodcastsDir != "" {
+			root = cli.PodcastsDir
+		}
+		removed, err := util.CleanupStaleWorkDirs(root, time.Now())
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: stale work cleanup: %v\n", err)
+		}
+		if removed > 0 {
+			fmt.Fprintf(os.Stderr, "Removed %d stale .work directories (older than 24 hours).\n", removed)
+		}
+	}
 
 	if err := dispatch(action, &config, cli); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)

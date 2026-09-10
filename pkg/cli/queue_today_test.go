@@ -35,6 +35,11 @@ func TestQueueTodaySelection(t *testing.T) {
 		{Filename: filepath.Base(paths[6]), PublishedAt: now.UnixMilli()},
 		{Filename: "unknown extended.mp3", PublishedAt: now.UnixMilli()},
 	}}
+	for i, date := range dates[:6] {
+		if published, err := time.Parse(time.RFC3339, date); err == nil {
+			index.Episodes = append(index.Episodes, podcast.CachedEpisodeSummary{Path: paths[i], PublishedAt: published.UnixMilli()})
+		}
+	}
 	if err := podcast.SavePodcastCache(dir, index); err != nil {
 		t.Fatal(err)
 	}
@@ -64,6 +69,46 @@ func TestQueueTodaySelection(t *testing.T) {
 	}
 }
 
+func TestQueueTodayRequiresSourcePublicationDate(t *testing.T) {
+	root := t.TempDir()
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	dir, paths := createTestPodcastWithEpisodes(t, root, "SourceDates", []string{"old", "today", "unknown"})
+	for i, path := range paths {
+		st := getOrCreateEpisodeStatus(path)
+		st.PublishedAt = now.Format(time.RFC3339)
+		if i == 1 {
+			st.PublishedAt = now.AddDate(0, 0, -5).Format(time.RFC3339)
+		}
+		if err := saveEpisodeStatus(statusPathFor(path), st); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.Chtimes(path, now, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	cache := &podcast.CachedPodcastIndex{Episodes: []podcast.CachedEpisodeSummary{
+		{Path: paths[0], PublishedAt: now.AddDate(0, 0, -5).UnixMilli()},
+		{Path: paths[1], PublishedAt: now.UnixMilli()},
+	}}
+	if err := podcast.SavePodcastCache(dir, cache); err != nil {
+		t.Fatal(err)
+	}
+	if err := handleQueueToday(root, CLIOptions{ProcOptions: ProcOptions{Quiet: true}}, now); err != nil {
+		t.Fatal(err)
+	}
+	if got := readTodayTestQueue(t, dir); !reflect.DeepEqual(got, []string{"today.mp3"}) {
+		t.Fatalf("queue = %v", got)
+	}
+	items, err := collectQueueDisplayItems(podcastDirEntry{dir: dir})
+	if err != nil || len(items) != 1 {
+		t.Fatalf("display disagrees with source publication: %+v, %v", items, err)
+	}
+	published, err := time.Parse(time.RFC3339, items[0].PublishedAt)
+	if err != nil || !published.Equal(now) {
+		t.Fatalf("display disagrees with source publication: %s", items[0].PublishedAt)
+	}
+}
+
 func readTodayTestQueue(t *testing.T, dir string) []string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join(dir, "queue.json"))
@@ -90,6 +135,51 @@ func TestQueueTodayParsing(t *testing.T) {
 	for _, args := range [][]string{{"queue", "today", "extra"}, {"download"}} {
 		if err := app.Execute(args); err == nil {
 			t.Fatalf("expected rejection for %v", args)
+		}
+	}
+}
+
+func TestQueueTodayNestedEpisodesResolveForRun(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "show")
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	var episodes []podcast.CachedEpisodeSummary
+	for _, name := range []string{"one", "two", "yesterday"} {
+		path := filepath.Join(dir, name, "podcast.mp3")
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
+			t.Fatal(err)
+		}
+		date := now
+		if name == "yesterday" {
+			date = now.AddDate(0, 0, -1)
+		}
+		episodes = append(episodes, podcast.CachedEpisodeSummary{
+			Path: path, Filename: "podcast.mp3", PublishedAt: date.UnixMilli(),
+		})
+	}
+	if err := podcast.SavePodcastCache(dir, &podcast.CachedPodcastIndex{Episodes: episodes}); err != nil {
+		t.Fatal(err)
+	}
+	opts := CLIOptions{ProcOptions: ProcOptions{Quiet: true}}
+	for i := 0; i < 2; i++ {
+		if err := handleQueueToday(root, opts, now); err != nil {
+			t.Fatal(err)
+		}
+	}
+	want := []string{filepath.Join("one", "podcast.mp3"), filepath.Join("two", "podcast.mp3")}
+	if got := readTodayTestQueue(t, dir); !reflect.DeepEqual(got, want) {
+		t.Fatalf("queue = %v, want %v", got, want)
+	}
+	items, err := resolveQueueRunItems(root, "")
+	if err != nil || len(items) != 2 {
+		t.Fatalf("run items = %v, error = %v", items, err)
+	}
+	for i, item := range items {
+		if item.AudioPath != filepath.Join(dir, want[i]) || !fileExists(item.AudioPath) {
+			t.Fatalf("queue run resolved incorrect path: %s", item.AudioPath)
 		}
 	}
 }

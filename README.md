@@ -148,6 +148,7 @@ abs info p0001              # Display podcast metadata and episode list
 abs info e12345             # Display episode cuts and metadata
 abs info e12345 --cuts      # Show detailed cuts breakdown
 abs info e12345 --transcript # Display transcript text
+abs info transcript e12345  # Read transcript in $PAGER or the system pager
 abs info e12345 --export srt # Export transcript to SRT
 abs info status             # Show library summary and worker status
 abs info check              # Test external services (Whisper, ABS, Kitty)
@@ -157,6 +158,10 @@ abs sync                    # Scan library for podcasts and new episodes
 abs sync feeds              # Fetch latest RSS feeds
 abs server download         # Download pending episodes according to podcast policy
 abs server download p0001 -k 3 # Download up to 3 missing episodes for a podcast
+abs server flush p0001 --dry-run # Preview removing this podcast's audio, keeping transcripts
+abs server flush p0001       # Remove MP3/precut audio and disable automatic downloads
+abs server publication-sync --dry-run # Preview correcting local publication metadata from the source catalog
+abs server publication-sync # Correct cached/status dates; unknown source dates stay unknown
 abs sync prune              # Prune old episodes per retention policy
 abs sync policy p0001       # View or update download/AdR policy
 abs sync timeline           # Display online availability timestamps table
@@ -165,6 +170,9 @@ abs sync timeline           # Display online availability timestamps table
 abs queue list
 abs queue add e12345
 abs queue today             # Queue downloaded, uncleaned episodes published today (local date)
+abs queue priority tdbwg 8   # Persist podcast priority (0–10; default 0)
+abs queue priority tdbwg     # Show the podcast's priority
+abs rm_ads e79636            # Queue this episode at priority 10 and process it immediately
 abs queue remove e12345
 abs queue clear
 

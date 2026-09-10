@@ -29,11 +29,9 @@ func UpdateQueue(dir string, mutate func([]string) []string) error {
 	}
 	defer lock.Release()
 
-	var entries []string
-	if data, err := os.ReadFile(path); err == nil {
-		if err := json.Unmarshal(data, &entries); err != nil {
-			return err
-		}
+	entries, err := ReadQueue(dir)
+	if err != nil {
+		return err
 	}
 	entries = mutate(entries)
 	if entries == nil {
@@ -49,8 +47,13 @@ func UpdateQueue(dir string, mutate func([]string) []string) error {
 // AddToQueue appends an episode to a podcast's queue, reporting whether it was
 // not already there.
 func AddToQueue(podDir, filename string) bool {
+	added, _ := AddToQueueChecked(podDir, filename)
+	return added
+}
+
+func AddToQueueChecked(podDir, filename string) (bool, error) {
 	added := false
-	_ = UpdateQueue(podDir, func(entries []string) []string {
+	err := UpdateQueue(podDir, func(entries []string) []string {
 		for _, e := range entries {
 			if strings.EqualFold(e, filename) {
 				return entries
@@ -59,14 +62,19 @@ func AddToQueue(podDir, filename string) bool {
 		added = true
 		return append(entries, filename)
 	})
-	return added
+	return added && err == nil, err
 }
 
 // RemoveFromQueue drops an episode from a podcast's queue, reporting whether it
 // was present.
 func RemoveFromQueue(podDir, filename string) bool {
+	found, _ := RemoveFromQueueChecked(podDir, filename)
+	return found
+}
+
+func RemoveFromQueueChecked(podDir, filename string) (bool, error) {
 	found := false
-	_ = UpdateQueue(podDir, func(entries []string) []string {
+	err := UpdateQueue(podDir, func(entries []string) []string {
 		var filtered []string
 		for _, e := range entries {
 			if strings.EqualFold(e, filename) {
@@ -80,7 +88,23 @@ func RemoveFromQueue(podDir, filename string) bool {
 		}
 		return entries
 	})
-	return found
+	return found && err == nil, err
+}
+
+func ReadQueue(dir string) ([]string, error) {
+	path := filepath.Join(dir, "queue.json")
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read queue %s: %w", path, err)
+	}
+	var entries []string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		return nil, fmt.Errorf("parse queue %s: %w", path, err)
+	}
+	return entries, nil
 }
 
 // QueuedEpisodes reports the episode filenames queued in a podcast directory.

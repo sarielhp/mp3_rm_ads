@@ -78,6 +78,8 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 		buildServerFrequencySubcommand(opts, action),
 		buildServerDisableHourlySubcommand(opts, action),
 		buildServerCleanOrphansSubcommand(opts, action),
+		buildServerFlushSubcommand(opts, action),
+		buildServerPublicationSubcommand(opts, action),
 	}
 }
 
@@ -114,6 +116,10 @@ func handleServerCommand(config Config, cli CLIOptions) error {
 		return handleServerDisableHourly(config, cli)
 	case "clean-orphans":
 		return handleServerCleanOrphans(config, cli)
+	case "flush":
+		return handleServerFlush(config, cli)
+	case "publication-sync":
+		return handleServerPublication(config, cli)
 	default:
 		return fmt.Errorf("unknown server subcommand %q", subcmd)
 	}

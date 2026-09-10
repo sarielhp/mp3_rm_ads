@@ -1,6 +1,7 @@
 package remote
 
 import (
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -8,17 +9,19 @@ import (
 )
 
 type mockTransport struct {
-	execs     []string
-	execOut   map[string]string
-	uploads   map[string]string
-	downloads map[string]string
+	execs         []string
+	execOut       map[string]string
+	uploads       map[string]string
+	uploadContent map[string][]byte
+	downloads     map[string]string
 }
 
 func newMockTransport() *mockTransport {
 	return &mockTransport{
-		execOut:   make(map[string]string),
-		uploads:   make(map[string]string),
-		downloads: make(map[string]string),
+		execOut:       make(map[string]string),
+		uploads:       make(map[string]string),
+		uploadContent: make(map[string][]byte),
+		downloads:     make(map[string]string),
 	}
 }
 
@@ -32,6 +35,7 @@ func (m *mockTransport) Exec(host, cmd string) (string, error) {
 
 func (m *mockTransport) Upload(host, localSrc, remoteDst string) error {
 	m.uploads[remoteDst] = localSrc
+	m.uploadContent[remoteDst], _ = os.ReadFile(localSrc)
 	return nil
 }
 

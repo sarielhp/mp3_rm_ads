@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"abs/pkg/podcast"
 	"os"
 	"path/filepath"
 	"sort"
@@ -107,6 +108,12 @@ func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]Cach
 	} else if ce, ok := cachedByName[fn]; ok {
 		applyCachedSummaryToEpisode(&ep, ce)
 	}
+	if date, ok := podcast.SourcePublicationTime(mp3); ok {
+		ep.publishedAt = 0
+		if !date.IsZero() {
+			ep.publishedAt = date.UnixMilli()
+		}
+	}
 	return ep
 }
 
@@ -167,6 +174,12 @@ func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *Podcast
 	absPath, _ := filepath.Abs(ep.path)
 	title := ep.displayTitle()
 	pubAt := ep.publishedAt
+	if date, ok := podcast.SourcePublicationTime(ep.path); ok {
+		pubAt = 0
+		if !date.IsZero() {
+			pubAt = date.UnixMilli()
+		}
+	}
 	dur := ep.duration
 	season := ep.season
 	episode := ep.episode

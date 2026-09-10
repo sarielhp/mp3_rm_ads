@@ -30,6 +30,7 @@ func LoadEpisodeStatus(path string) (*types.EpisodeStatusFile, error) {
 }
 
 func SaveEpisodeStatus(path string, st *types.EpisodeStatusFile) error {
+	applySourcePublication(strings.TrimSuffix(path, ".json"), st)
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -51,6 +52,7 @@ func SaveEpisodeStatus(path string, st *types.EpisodeStatusFile) error {
 func GetOrCreateEpisodeStatus(audioPath string) *types.EpisodeStatusFile {
 	statPath := StatusPathFor(audioPath)
 	if st, err := LoadEpisodeStatus(statPath); err == nil && st != nil {
+		applySourcePublication(audioPath, st)
 		return st
 	}
 	now := time.Now().UTC().Format(time.RFC3339)
@@ -60,17 +62,12 @@ func GetOrCreateEpisodeStatus(audioPath string) *types.EpisodeStatusFile {
 		sz = fi.Size()
 	}
 	dur := audio.GetAudioDuration(audioPath)
-	pubStr := ""
-	if fi, err := os.Stat(audioPath); err == nil {
-		pubStr = fi.ModTime().UTC().Format(time.RFC3339)
-	}
 	st := &types.EpisodeStatusFile{
-		Version:     1,
-		MediaFile:   fname,
-		Status:      types.StateDownloaded,
-		CreatedAt:   now,
-		UpdatedAt:   now,
-		PublishedAt: pubStr,
+		Version:   1,
+		MediaFile: fname,
+		Status:    types.StateDownloaded,
+		CreatedAt: now,
+		UpdatedAt: now,
 		Original: types.EpisodeAudioMeta{
 			Filename:    fname,
 			DurationSec: dur,

@@ -29,6 +29,15 @@ func TestLsLatestCommand(t *testing.T) {
 	_ = saveEpisodeStatus(statusPathFor(ep3), &EpisodeStatusFile{
 		Status: StateDone,
 	})
+	for i, path := range []string{ep1, ep2, ep3} {
+		st := getOrCreateEpisodeStatus(path)
+		st.PublicationSource = "source"
+		st.PublishedAt = time.Date(2026, 9, 8+i, 9, 0, 0, 0, time.UTC).Format(time.RFC3339)
+		if err := saveEpisodeStatus(statusPathFor(path), st); err != nil {
+			t.Fatal(err)
+		}
+	}
+	_ = os.WriteFile(strings.TrimSuffix(ep3, filepath.Ext(ep3))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644)
 
 	cfg := Config{
 		PodcastsDir: tempDir,

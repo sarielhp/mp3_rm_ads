@@ -6,6 +6,7 @@ import (
 	"abs/pkg/podcast"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -31,6 +32,7 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 			t.Fatal(err)
 		}
 		st := pipeline.GetOrCreateEpisodeStatus(p)
+		st.PublicationSource = "source"
 		st.PublishedAt = time.Now().Add(-time.Duration(len(titles)-i) * 24 * time.Hour).Format(time.RFC3339)
 		if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(p), st); err != nil {
 			t.Fatal(err)
@@ -41,6 +43,9 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 }
 
 func markEpisodeClean(t *testing.T, mp3Path string) {
+	if err := os.WriteFile(strings.TrimSuffix(mp3Path, filepath.Ext(mp3Path))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
 	st.Status = StateDone
 	st.Original.DurationSec = 60.0

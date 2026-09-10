@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -12,7 +14,7 @@ import (
 func buildQueueTodaySubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "today",
-		Description: "Queue downloaded, uncleaned episodes published today (local calendar date)",
+		Description: "Queue downloaded, uncleaned episodes whose source publication date is today (local calendar date; unknown dates skipped)",
 		UsageLine:   "abs queue today [options]",
 		Args:        clihelp.MaximumNArgs(0),
 		Options: []clihelp.Option{
@@ -28,25 +30,18 @@ func buildQueueTodaySubcommand(opts *CLIOptions, action *string) clihelp.Command
 	}
 }
 
-func knownQueuePublicationTime(path string, cached map[string]time.Time) time.Time {
-	if st, err := loadEpisodeStatus(statusPathFor(path)); err == nil && st != nil {
-		if published, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !published.IsZero() {
-			return published
-		}
-	}
-	return cached[filepath.Base(path)]
-}
-
-func todayQueueCandidates(dir string, now time.Time) []string {
+func todayQueueCandidates(dir string, now time.Time, source map[string]time.Time) []string {
 	cached := make(map[string]time.Time)
 	if index, _ := loadPodcastCache(dir); index != nil {
 		for _, ep := range index.Episodes {
 			if ep.PublishedAt > 0 {
-				filename := ep.Filename
-				if filename == "" && filepath.Dir(ep.Path) == dir {
-					filename = filepath.Base(ep.Path)
+				path := ep.Path
+				if path == "" {
+					path = filepath.Join(dir, ep.Filename)
+				} else if !filepath.IsAbs(path) {
+					path = filepath.Join(dir, path)
 				}
-				cached[filename] = time.UnixMilli(ep.PublishedAt)
+				cached[filepath.Clean(path)] = time.UnixMilli(ep.PublishedAt)
 			}
 		}
 	}
@@ -54,18 +49,34 @@ func todayQueueCandidates(dir string, now time.Time) []string {
 	end := start.AddDate(0, 0, 1)
 	var candidates []string
 	for _, path := range findMP3Files(dir) {
-		published := knownQueuePublicationTime(path, cached)
+		if !pipeline.IsQueueAudioPath(path) {
+			continue
+		}
+		published := cached[filepath.Clean(path)]
+		if source != nil {
+			absolute, err := filepath.Abs(path)
+			if err != nil {
+				continue
+			}
+			published = source[absolute]
+		} else if date, ok := podcast.SourcePublicationTime(path); ok {
+			published = date
+		}
 		if !published.IsZero() && !published.Before(start) && published.Before(end) && !isEpisodeClean(path) {
-			candidates = append(candidates, filepath.Base(path))
+			candidates = append(candidates, queueFilenameForPath(dir, path))
 		}
 	}
 	return candidates
 }
 
 func handleQueueToday(root string, cli CLIOptions, now time.Time) error {
+	return handleQueueTodaySource(root, cli, now, nil)
+}
+
+func handleQueueTodaySource(root string, cli CLIOptions, now time.Time, source map[string]time.Time) error {
 	total := 0
-	for _, pod := range scanPodcastDirs(root) {
-		candidates := todayQueueCandidates(pod.dir, now)
+	for _, pod := range scanQueuePodcasts(root) {
+		candidates := todayQueueCandidates(pod.dir, now, source)
 		if cli.DryRun {
 			for _, filename := range candidates {
 				fmt.Printf("[dry-run] Would queue for AdR: %s\n", filepath.Join(pod.dir, filename))

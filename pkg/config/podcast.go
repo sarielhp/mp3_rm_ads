@@ -26,6 +26,7 @@ const (
 
 type PodcastConfig struct {
 	ID              string                      `json:"id,omitempty"`
+	Priority        int                         `json:"priority"`
 	AdRemoval       string                      `json:"ad_removal"`
 	DownloadPolicy  string                      `json:"download_policy,omitempty"`
 	DownloadK       int                         `json:"download_k,omitempty"`
@@ -287,6 +288,9 @@ func normalizeLoadedPodcastConfig(cfg *PodcastConfig, def PodcastConfig) {
 }
 
 func SavePodcastConfig(dir string, cfg PodcastConfig) error {
+	if cfg.Priority < 0 || cfg.Priority > 10 {
+		return fmt.Errorf("podcast priority must be between 0 and 10")
+	}
 	cfg.AdRemoval = NormalizeAdRemovalMode(cfg.AdRemoval)
 	cfg.DownloadPolicy = NormalizeDownloadPolicy(cfg.DownloadPolicy)
 	if cfg.DownloadPolicy == DownloadPolicyNone {

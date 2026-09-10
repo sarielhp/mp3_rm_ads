@@ -441,10 +441,6 @@ func saveEpisodeStatus(path string, st *EpisodeStatusFile) error {
 	return pipeline.SaveEpisodeStatus(path, st)
 }
 
-func loadEpisodeStatus(path string) (*EpisodeStatusFile, error) {
-	return pipeline.LoadEpisodeStatus(path)
-}
-
 func updateQueue(dir string, mutate func([]string) []string) error {
 	return pipeline.UpdateQueue(dir, mutate)
 }

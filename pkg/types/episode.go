@@ -41,6 +41,7 @@ type EpisodeStatusFile struct {
 	CreatedAt             string           `json:"created_at"`
 	UpdatedAt             string           `json:"updated_at"`
 	PublishedAt           string           `json:"published_at,omitempty"`
+	PublicationSource     string           `json:"publication_source,omitempty"`
 	WorkerHost            string           `json:"worker_host,omitempty"`
 	Original              EpisodeAudioMeta `json:"original,omitempty"`
 	Cleaned               EpisodeAudioMeta `json:"cleaned,omitempty"`

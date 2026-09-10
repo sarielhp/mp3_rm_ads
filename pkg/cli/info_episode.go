@@ -150,7 +150,7 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 	pubTime := getEpisodePublicationTime(ep.Path)
 	pubDateStr := "-"
 	if !pubTime.IsZero() {
-		pubDateStr = pubTime.Format("2006-01-02 15:04")
+		pubDateStr = publicationDateTime(pubTime)
 	}
 
 	hasTx, txPath, txSegments := getEpisodeTranscriptInfo(ep.Path)

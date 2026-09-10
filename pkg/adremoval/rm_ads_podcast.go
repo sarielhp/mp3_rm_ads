@@ -499,8 +499,10 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts ProcOptions, config Config) error {
 	opts.Normalize()
 
-	epFilename := queueItemFilename(podDir, targetAudioPath)
-	targetHost := resolveRemoteProcessingTargetHost(opts, config)
+	targetHost, err := resolveRemoteProcessingTargetHost(opts, config)
+	if err != nil {
+		return err
+	}
 
 	if targetHost != "" {
 		if err := remote.RunRemotePush(&config, []string{targetAudioPath}, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
@@ -510,12 +512,16 @@ func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts ProcOption
 			return err
 		}
 	} else {
-		executeLocalBatchProcessing([]string{targetAudioPath}, opts, config, action)
+		if err := executeLocalBatchProcessing([]string{targetAudioPath}, opts, config, action); err != nil {
+			return err
+		}
 	}
 
-	pipeline.RemoveFromQueue(podDir, epFilename)
-	pipeline.RemoveFromQueue(podDir, filepath.Base(targetAudioPath))
-	return nil
+	if !pipeline.IsEpisodeClean(targetAudioPath) {
+		return fmt.Errorf("episode did not complete ad removal; retained in queue: %s", targetAudioPath)
+	}
+	_, err = pipeline.RemoveQueuedAudio(podDir, targetAudioPath)
+	return err
 }
 
 func queueItemFilename(podDir, audioPath string) string {

@@ -322,11 +322,13 @@ func formatRelativeDateTime(t time.Time) string {
 	return formatRelativeDateTimeAt(t, time.Now())
 }
 
-func queueTableColumns(titleWidth, fileWidth int) []TableColumn {
+func queueTableColumns(titleWidth int) []TableColumn {
 	return []TableColumn{
-		{Header: "🎙️ Pod", Width: 6, Align: AlignCenter},
-		{Header: "🔖 Ep", Width: 6, Align: AlignCenter},
+		{Header: "Podcast ID", Width: 10, Align: AlignCenter},
+		{Header: "Episode ID", Width: 10, Align: AlignCenter},
+		{Header: "Pri", Width: 3, Align: AlignRight},
+		{Header: "Length", Width: 8, Align: AlignRight},
+		{Header: "P-date", Width: 19, Align: AlignLeft},
 		{Header: "Title", Width: titleWidth, Align: AlignLeft},
-		{Header: "File", Width: fileWidth, Align: AlignLeft},
 	}
 }

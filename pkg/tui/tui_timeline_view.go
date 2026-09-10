@@ -42,9 +42,10 @@ func getPodcastLastEpisodesOnlineTimeline(pod tuiPodcast, maxEpisodes int) []Epi
 		d := ep.displayDate()
 
 		localStr := "--:--"
-		source := "File"
+		source := "Unknown"
 
 		if !d.IsZero() {
+			source = "Feed"
 			localStr = d.Local().Format("2006-01-02 15:04:05 MST")
 			if ep.publishedAt > 0 || (ep.absData != nil && parseABSEpisodePublishedAt(ep.absData) > 0) {
 				source = "Feed"

@@ -1,0 +1,67 @@
+package cli
+
+import (
+	"abs/pkg/pipeline"
+	"fmt"
+	"path/filepath"
+	"strconv"
+	"strings"
+)
+
+func runUrgentEpisode(cfg Config, cli CLIOptions) (bool, error) {
+	if cli.ProcSubcmd != "" || cli.Podcast != "" || len(cli.Args) != 1 {
+		return false, nil
+	}
+	id := strings.ToLower(cli.Args[0])
+	if len(id) != 6 || id[0] != 'e' {
+		return false, nil
+	}
+	if _, err := strconv.ParseUint(id[1:], 16, 32); err != nil {
+		return false, nil
+	}
+	res, err := resolveQueueTarget(cfg.PodcastsDir, id)
+	if err != nil {
+		return true, err
+	}
+	if !res.IsEpisode() {
+		return true, fmt.Errorf("%s is not a downloaded episode", id)
+	}
+	ep := res.Episode
+	if cli.DryRun {
+		fmt.Printf("[dry-run] Would queue [%s] %s at priority 10 and process it first.\n", ep.ShortID, ep.Title)
+		return true, nil
+	}
+	item, err := enqueueUrgentEpisode(ep)
+	if err != nil {
+		return true, err
+	}
+	cli.Priority = 10
+	cli.Normalize()
+	return true, executeQueueRun([]queueEpisodeItem{item}, cli, cfg)
+}
+
+func enqueueUrgentEpisode(ep *ResolvedEpisode) (queueEpisodeItem, error) {
+	item := queueEpisodeItem{PodcastID: ep.PodcastShortID, EpisodeID: ep.ShortID, Title: ep.Title, AudioPath: ep.Path, PodcastDir: ep.PodcastDir, Filename: queueFilenameForPath(ep.PodcastDir, ep.Path), Priority: 10}
+	path, err := pipeline.ResolveQueueAudioPath(ep.PodcastDir, item.Filename)
+	if err != nil || filepath.Clean(path) != filepath.Clean(ep.Path) {
+		return item, fmt.Errorf("episode audio is not available in its podcast: %s", ep.ShortID)
+	}
+	err = pipeline.UpdateQueue(ep.PodcastDir, func(entries []string) []string {
+		ordered := []string{item.Filename}
+		for _, entry := range entries {
+			resolved, err := pipeline.ResolveQueueAudioPath(ep.PodcastDir, entry)
+			if err == nil && filepath.Clean(resolved) == filepath.Clean(ep.Path) {
+				continue
+			}
+			ordered = append(ordered, entry)
+		}
+		return ordered
+	})
+	if err != nil {
+		return item, err
+	}
+	st := pipeline.GetOrCreateEpisodeStatus(ep.Path)
+	st.Priority = 10
+	err = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(ep.Path), st)
+	return item, err
+}

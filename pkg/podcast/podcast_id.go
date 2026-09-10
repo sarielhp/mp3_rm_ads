@@ -160,6 +160,14 @@ func GetOrSetPodcastShortID(podDir, title string) string {
 }
 
 func ScanPodcastDirs(podcastsDir string) []PodcastDirEntry {
+	return scanPodcastDirs(podcastsDir, true)
+}
+
+func ScanPodcastDirsReadOnly(podcastsDir string) []PodcastDirEntry {
+	return scanPodcastDirs(podcastsDir, false)
+}
+
+func scanPodcastDirs(podcastsDir string, persist bool) []PodcastDirEntry {
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
@@ -206,11 +214,11 @@ func ScanPodcastDirs(podcastsDir string) []PodcastDirEntry {
 		}
 	}
 
-	assignUniqueShortIDs(entries)
+	assignUniqueShortIDsMode(entries, persist)
 	return entries
 }
 
-func assignUniqueShortIDs(entries []PodcastDirEntry) {
+func assignUniqueShortIDsMode(entries []PodcastDirEntry, persist bool) {
 	sort.Slice(entries, func(i, j int) bool {
 		return strings.ToLower(entries[i].FolderName) < strings.ToLower(entries[j].FolderName)
 	})
@@ -235,7 +243,7 @@ func assignUniqueShortIDs(entries []PodcastDirEntry) {
 		}
 		seenIDs[candID] = entries[i].Dir
 		entries[i].ShortID = candID
-		if cfg.ID != candID {
+		if persist && cfg.ID != candID {
 			cfg.ID = candID
 			_ = config.SavePodcastConfig(entries[i].Dir, cfg)
 		}

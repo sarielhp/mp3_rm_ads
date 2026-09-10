@@ -207,14 +207,7 @@ func pullSingleDoneEpisode(cfg *types.Config, relPath string, item RemoteDoneIte
 		_ = util.SafeMove(tempTrans, localBase+".transcript.json")
 	}
 
-	localStat := pipeline.GetOrCreateEpisodeStatus(localDestAudio)
-	if util.FileExists(tempStat) {
-		if loaded, err := pipeline.LoadEpisodeStatus(tempStat); err == nil {
-			localStat = loaded
-		}
-	}
-	localStat.Status = types.StateDone
-	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(localDestAudio), localStat)
+	savePulledEpisodeStatus(localDestAudio, tempStat)
 
 	SyncAudiobookshelfDuration(cfg, localDestAudio, item.CleanedDurationSec)
 
@@ -222,6 +215,23 @@ func pullSingleDoneEpisode(cfg *types.Config, relPath string, item RemoteDoneIte
 		fmt.Printf("✓ Pulled %s -> %s (saved %.1fs)\n", relPath, localDestAudio, item.CutDurationSec)
 	}
 	return true
+}
+
+func savePulledEpisodeStatus(audioPath, statusPath string) {
+	status := pipeline.GetOrCreateEpisodeStatus(audioPath)
+	localPriority := status.Priority
+	if util.FileExists(statusPath) {
+		if loaded, err := pipeline.LoadEpisodeStatus(statusPath); err == nil {
+			status = loaded
+		}
+	}
+	if pipeline.HasNonEmptyTranscript(audioPath) {
+		status.Status = types.StateDone
+	} else {
+		status.Status = types.StateNeedsAdR
+	}
+	status.Priority = localPriority
+	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), status)
 }
 
 func ackRemoteVerifiedEpisodes(targetHost, remoteWorkDir string, verifiedRelPaths []string, transport RemoteTransport) {

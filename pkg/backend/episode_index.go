@@ -9,6 +9,8 @@ type CatalogEpisode struct {
 	EnclosureURL string
 	Title        string
 	Downloaded   bool
+	AudioPath    string
+	PublishedAt  int64
 }
 
 // CatalogIndexer is implemented by backends that can report every episode

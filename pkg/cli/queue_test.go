@@ -34,6 +34,41 @@ func TestQueueListEmpty(t *testing.T) {
 	}
 }
 
+func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
+	root := t.TempDir()
+	podDir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"Episode One"})
+	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
+	for _, command := range []string{"list", "ls"} {
+		var action string
+		var opts CLIOptions
+		app := buildCLIApp(&action, &opts)
+		if err := app.Execute([]string{"queue", command, "--json"}); err != nil {
+			t.Fatal(err)
+		}
+		r, w, err := os.Pipe()
+		if err != nil {
+			t.Fatal(err)
+		}
+		stdout := os.Stdout
+		os.Stdout = w
+		err = runQueueCommand(Config{PodcastsDir: root}, opts)
+		_ = w.Close()
+		os.Stdout = stdout
+		data, readErr := io.ReadAll(r)
+		_ = r.Close()
+		if err != nil || readErr != nil {
+			t.Fatalf("run: %v; read: %v", err, readErr)
+		}
+		var items []queueEpisodeItem
+		if err := json.Unmarshal(data, &items); err != nil {
+			t.Fatal(err)
+		}
+		if action != "queue" || len(items) != 1 || items[0].AudioPath != paths[0] {
+			t.Fatalf("%s returned %s: %s", command, action, data)
+		}
+	}
+}
+
 func testQueueAddAndList(t *testing.T, cfg Config, podDir, ep1ID string) {
 	cliAdd := CLIOptions{QueueSubcmd: "add", Args: []string{ep1ID}}
 	if err := runQueueCommand(cfg, cliAdd); err != nil {
@@ -307,7 +342,7 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 	}
 }
 
-func TestQueueRun_MissingFileAutoDequeued(t *testing.T) {
+func TestQueueRun_MissingFileRetained(t *testing.T) {
 	tempDir := t.TempDir()
 	podDir, _ := createTestPodcastWithEpisodes(t, tempDir, "MissingShow", []string{})
 	addEpisodeToQueueFile(podDir, "nonexistent.mp3")
@@ -319,16 +354,93 @@ func TestQueueRun_MissingFileAutoDequeued(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
-	if err := runQueueCommand(cfg, cli); err != nil {
-		t.Fatalf("runQueueCommand failed on missing file: %v", err)
+	if err := runQueueCommand(cfg, cli); err == nil {
+		t.Fatal("missing file should report an error")
 	}
 
 	qFile := filepath.Join(podDir, "queue.json")
 	data, _ := os.ReadFile(qFile)
 	var entries []string
 	_ = json.Unmarshal(data, &entries)
+	if len(entries) != 1 {
+		t.Fatalf("expected missing file to remain in queue, got %v", entries)
+	}
+}
+
+func TestQueueAddAllPreservesNestedEpisodePaths(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "NestedShow")
+	audioPath := filepath.Join(podDir, "2026", "ep1.mp3")
+	if err := os.MkdirAll(filepath.Dir(audioPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	cfg := Config{PodcastsDir: tempDir}
+	if err := runQueueCommand(cfg, CLIOptions{QueueSubcmd: "add", Args: []string{"all"}}); err != nil {
+		t.Fatalf("queue add all: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(podDir, "queue.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 1 || entries[0] != filepath.Join("2026", "ep1.mp3") {
+		t.Fatalf("queue entries = %v, want nested relative path", entries)
+	}
+
+	markEpisodeClean(t, audioPath)
+	cli := CLIOptions{QueueSubcmd: "run", ProcOptions: ProcOptions{Quiet: true}}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("queue run: %v", err)
+	}
+	data, err = os.ReadFile(filepath.Join(podDir, "queue.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatal(err)
+	}
 	if len(entries) != 0 {
-		t.Fatalf("expected missing file to be removed from queue, got %v", entries)
+		t.Fatalf("queue entries after run = %v, want empty", entries)
+	}
+}
+
+func TestQueueRunResolvesLegacyNestedFilename(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "LegacyShow")
+	audioPath := filepath.Join(podDir, "2026", "ep1.mp3")
+	if err := os.MkdirAll(filepath.Dir(audioPath), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	addEpisodeToQueueFile(podDir, filepath.Base(audioPath))
+	markEpisodeClean(t, audioPath)
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{QueueSubcmd: "run", ProcOptions: ProcOptions{Quiet: true}}
+	if err := runQueueCommand(cfg, cli); err != nil {
+		t.Fatalf("queue run: %v", err)
+	}
+
+	data, err := os.ReadFile(filepath.Join(podDir, "queue.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var entries []string
+	if err := json.Unmarshal(data, &entries); err != nil {
+		t.Fatal(err)
+	}
+	if len(entries) != 0 {
+		t.Fatalf("legacy queue entries after run = %v, want empty", entries)
 	}
 }
 

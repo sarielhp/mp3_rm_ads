@@ -269,6 +269,9 @@ func (c *PodFetchBackend) WaitForActiveDownloads(podcasts []Podcast, quiet bool,
 }
 
 func (c *PodFetchBackend) UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	if c.DBPath == "" && c.Host == "" {
+		return fmt.Errorf("no PodFetch connection configured")
+	}
 	var errs []string
 	if c.DBPath != "" {
 		if err := updatePodFetchSettingsDB(c.DBPath, podcastID, autoDownload, autoCleanup, autoCleanupDays); err != nil {
@@ -277,12 +280,10 @@ func (c *PodFetchBackend) UpdatePodcastSettings(podcastID string, autoDownload, 
 	}
 	if c.Host != "" {
 		if err := c.syncPodFetchSettingsAPI(podcastID, autoDownload, autoCleanup, autoCleanupDays); err != nil {
-			if c.DBPath == "" {
-				errs = append(errs, err.Error())
-			}
+			errs = append(errs, err.Error())
 		}
 	}
-	if len(errs) > 0 && c.DBPath == "" && c.Host == "" {
+	if len(errs) > 0 {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil
@@ -290,12 +291,15 @@ func (c *PodFetchBackend) UpdatePodcastSettings(podcastID string, autoDownload, 
 
 func (c *PodFetchBackend) syncPodFetchSettingsAPI(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
 	body, err := c.Request(fmt.Sprintf("/api/v1/podcasts/%s/settings", podcastID), "GET", nil)
-	if err != nil || len(body) == 0 {
-		return nil
+	if err != nil {
+		return err
 	}
 	var settings map[string]interface{}
 	if err := json.Unmarshal(body, &settings); err != nil {
-		return nil
+		return err
+	}
+	if settings == nil {
+		return fmt.Errorf("empty PodFetch settings for %s", podcastID)
 	}
 	settings["autoDownload"] = autoDownload
 	settings["autoCleanup"] = autoCleanup

@@ -249,7 +249,7 @@ func runLocalAdDetectionAndCutStep(transcriptionData *TranscriptionData, sourceA
 
 func checkSkipOrLockAudioFile(mainMP3File, inputFile string, idx, totalFiles, processedCount int, opts ProcOptions) (*fileLockWrapper, bool, bool) {
 	shortName := util.DisplayName(filepath.Base(inputFile))
-	if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && pipeline.IsEpisodeCompleted(mainMP3File) {
+	if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && pipeline.IsEpisodeClean(mainMP3File) {
 		if opts.Verbose && !opts.Quiet {
 			fmt.Printf("skipping: %s\n", shortName)
 		}

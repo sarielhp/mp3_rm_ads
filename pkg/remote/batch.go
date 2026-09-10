@@ -141,11 +141,7 @@ func GetEpisodeDurationForQueue(audioPath string) float64 {
 }
 
 func GetEpisodePriorityForQueue(audioPath string) int {
-	statPath := pipeline.StatusPathFor(audioPath)
-	if st, err := pipeline.LoadEpisodeStatus(statPath); err == nil && st != nil {
-		return st.Priority
-	}
-	return 0
+	return podcast.EpisodePriority("", audioPath)
 }
 
 func IsEpisodeRecent24h(audioPath string, now time.Time) (bool, time.Time) {
@@ -186,9 +182,7 @@ func PushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priori
 	remoteStat := *localStat
 	remoteStat.Status = types.StateAwaitingTranscription
 	remoteStat.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	if priority > 0 {
-		remoteStat.Priority = priority
-	}
+	remoteStat.Priority = max(priority, GetEpisodePriorityForQueue(f))
 
 	workDir := util.WorkDirFor(f)
 	if err := os.MkdirAll(workDir, 0755); err != nil {
@@ -211,7 +205,7 @@ func PushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priori
 
 	localStat.Status = types.StateQueuedRemote
 	if priority > 0 {
-		localStat.Priority = priority
+		localStat.Priority = max(localStat.Priority, priority)
 	}
 	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(f), localStat); err != nil {
 		return fmt.Errorf("failed to save local status for %s: %w", f, err)
@@ -220,6 +214,9 @@ func PushSingleAudioFile(f, defaultDir, remoteWorkDir, targetHost string, priori
 }
 
 func RunRemotePush(cfg *types.Config, args []string, host string, transport RemoteTransport, priority int, quiet, verbose bool) error {
+	if priority < 0 || priority > 10 {
+		return fmt.Errorf("priority must be between 0 and 10")
+	}
 	targetHost, _, err := ResolveProcessingHost(cfg, host, transport)
 	if err != nil {
 		return err
@@ -250,12 +247,14 @@ func RunRemotePush(cfg *types.Config, args []string, host string, transport Remo
 	if priority > 0 {
 		for _, f := range toPush {
 			st := pipeline.GetOrCreateEpisodeStatus(f)
-			st.Priority = priority
-			_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(f), st)
+			st.Priority = max(st.Priority, priority)
+			if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(f), st); err != nil {
+				return err
+			}
 		}
 	}
 
-	SortAudioFilesByDuration(toPush)
+	SortAudioFilesByQueuePolicy(toPush, time.Now())
 
 	if !quiet {
 		if priority > 0 {

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"abs/pkg/podcast"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -64,15 +65,18 @@ type tuiEpisode struct {
 }
 
 func (e tuiEpisode) displayDate() time.Time {
-	if e.publishedAt > 0 {
-		return time.UnixMilli(e.publishedAt)
-	}
 	if e.absData != nil {
 		if pub := parseABSEpisodePublishedAt(e.absData); pub > 0 {
 			return time.UnixMilli(pub)
 		}
 	}
-	return e.modTime
+	if date, ok := podcast.SourcePublicationTime(e.path); ok {
+		return date
+	}
+	if e.publishedAt > 0 {
+		return time.UnixMilli(e.publishedAt)
+	}
+	return podcast.GetEpisodePublicationTime(e.path)
 }
 
 func (e tuiEpisode) displayTitle() string {

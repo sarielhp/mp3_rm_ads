@@ -36,6 +36,7 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 			t.Fatal(err)
 		}
 		st := pipeline.GetOrCreateEpisodeStatus(p)
+		st.PublicationSource = "source"
 		st.PublishedAt = time.Now().Add(-time.Duration(len(titles)-i) * 24 * time.Hour).Format(time.RFC3339)
 		if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(p), st); err != nil {
 			t.Fatal(err)
@@ -46,6 +47,9 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 }
 
 func markEpisodeClean(t *testing.T, mp3Path string) {
+	if err := os.WriteFile(strings.TrimSuffix(mp3Path, filepath.Ext(mp3Path))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644); err != nil {
+		t.Fatal(err)
+	}
 	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
 	st.Status = StateDone
 	st.Original.DurationSec = 60.0
@@ -496,6 +500,7 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		remEpPath := filepath.Join(remoteWorkDir, relPath)
 		_ = os.MkdirAll(filepath.Dir(remEpPath), 0755)
 		_ = os.WriteFile(remEpPath, []byte("cleaned remote audio"), 0644)
+		_ = os.WriteFile(strings.TrimSuffix(remEpPath, filepath.Ext(remEpPath))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644)
 		remStat := pipeline.StatusPathFor(remEpPath)
 		_ = pipeline.SaveEpisodeStatus(remStat, &EpisodeStatusFile{
 			MediaFile: "Ep 1.mp3",

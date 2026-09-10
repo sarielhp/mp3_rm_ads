@@ -2,11 +2,13 @@ package adremoval
 
 import (
 	"abs/pkg/audio"
-	"abs/pkg/format"
 	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 	"abs/pkg/util"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -22,17 +24,18 @@ type transcriptAuditItem struct {
 	textChars      int
 	speechDur      float64
 	coverageRatio  float64
+	isCompleted    bool
 	isCorrupted    bool
 	isSuspicious   bool
 	suspiciousMsg  string
+	cleanStateMsg  string
 	adFailed       bool
 }
 
-func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) {
+func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) error {
 	if len(targets) == 0 {
 		if config.PodcastsDir == "" {
-			fmt.Fprintf(os.Stderr, "Error: podcasts_dir not configured and no target paths provided.\n")
-			return
+			return fmt.Errorf("podcasts_dir not configured and no target paths provided")
 		}
 		targets = []string{config.PodcastsDir}
 	}
@@ -53,7 +56,7 @@ func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) {
 		if !opts.Quiet {
 			fmt.Println("No audio files found to audit.")
 		}
-		return
+		return nil
 	}
 
 	if !opts.Quiet {
@@ -62,7 +65,9 @@ func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) {
 
 	scanned := 0
 	suspiciousCount := 0
+	uncutCount := 0
 	adFailedCount := 0
+	var failures []error
 
 	for _, audioPath := range audioFiles {
 		item := inspectEpisodeTranscript(audioPath, minRatio, minChars)
@@ -70,19 +75,25 @@ func RunTranscriptAudit(config Config, targets []string, opts ProcOptions) {
 			continue
 		}
 		scanned++
-		if item.isSuspicious {
+		if item.cleanStateMsg != "" {
+			uncutCount++
+		} else if item.isSuspicious {
 			suspiciousCount++
-			reportAndHealSuspicious(item, opts.DryRun, opts.Quiet)
 		} else if item.adFailed {
 			adFailedCount++
-			reportAndHealFailedAd(item, opts.DryRun, opts.Quiet)
 		} else if opts.Verbose && !opts.Quiet {
 			fmt.Printf("  [OK] %s (%.0fs, %d chars, %.1f%% coverage)\n",
 				auditDisplayName(item.audioPath), item.audioDur, item.textChars, item.coverageRatio*100)
 		}
+		if item.cleanStateMsg != "" || item.isSuspicious || item.adFailed {
+			if err := repairAuditedEpisode(item, config, opts.DryRun, opts.Quiet); err != nil {
+				failures = append(failures, fmt.Errorf("audit %s: %w", audioPath, err))
+			}
+		}
 	}
 
-	printAuditSummary(scanned, suspiciousCount, adFailedCount, opts.DryRun, opts.Quiet)
+	printAuditSummary(scanned, suspiciousCount, uncutCount, adFailedCount, opts.DryRun, opts.Quiet)
+	return errors.Join(failures...)
 }
 
 func auditDisplayName(p string) string {
@@ -100,7 +111,7 @@ func inspectEpisodeTranscript(audioPath string, minRatio float64, minChars int) 
 	statPath := pipeline.StatusPathFor(audioPath)
 	cutsPath := base + ".cuts.json"
 
-	if !util.FileExists(transPath) && !util.FileExists(statPath) {
+	if !auditMP3Exists(audioPath) || pipeline.IsEpisodeInRemoteFlight(audioPath) {
 		return nil
 	}
 
@@ -112,20 +123,22 @@ func inspectEpisodeTranscript(audioPath string, minRatio float64, minChars int) 
 	}
 
 	st, _ := pipeline.LoadEpisodeStatus(statPath)
+	diskDuration := audio.GetAudioDuration(audioPath)
 	if st != nil && st.Original.DurationSec > 0 {
 		item.audioDur = st.Original.DurationSec
 	} else {
-		item.audioDur = audio.GetAudioDuration(audioPath)
+		item.audioDur = diskDuration
 	}
+	item.cleanStateMsg = invalidCleanStateMessage(st, diskDuration, transPath)
+	item.isCompleted = st != nil && (st.Status == StateDone || st.Status == StateCopiedBack)
 	if st != nil && st.AdDetectionSuccessful != nil && !*st.AdDetectionSuccessful {
 		item.adFailed = true
 	}
 
 	if !util.FileExists(transPath) {
-		if item.adFailed {
-			return item
-		}
-		return nil
+		item.isSuspicious = true
+		item.suspiciousMsg = "missing transcript"
+		return item
 	}
 
 	data, err := os.ReadFile(transPath)
@@ -154,6 +167,30 @@ func inspectEpisodeTranscript(audioPath string, minRatio float64, minChars int) 
 	return item
 }
 
+func invalidCleanStateMessage(st *EpisodeStatusFile, diskDuration float64, transcriptPath string) string {
+	if st == nil || (st.Status != StateDone && st.Status != StateCopiedBack && st.Status != StateArchived) {
+		return ""
+	}
+	info, err := os.Stat(transcriptPath)
+	if err != nil {
+		return "completed status has no transcript on disk"
+	}
+	if info.Size() == 0 {
+		return "completed status has an empty transcript"
+	}
+	return staleCleanAudioMessage(st, diskDuration)
+}
+
+func staleCleanAudioMessage(st *EpisodeStatusFile, diskDuration float64) string {
+	if diskDuration <= 0 || st.Cleaned.DurationSec <= 0 {
+		return ""
+	}
+	if math.Abs(diskDuration-st.Cleaned.DurationSec) <= 2 {
+		return ""
+	}
+	return fmt.Sprintf("on-disk duration %.1fs differs from recorded cleaned duration %.1fs", diskDuration, st.Cleaned.DurationSec)
+}
+
 func evaluateTranscriptMetrics(item *transcriptAuditItem, td TranscriptionData, minRatio float64, minChars int) {
 	text := strings.TrimSpace(td.Text)
 	item.textChars = len([]rune(text))
@@ -166,6 +203,12 @@ func evaluateTranscriptMetrics(item *transcriptAuditItem, td TranscriptionData, 
 
 	if item.audioDur > 0 {
 		item.coverageRatio = item.speechDur / item.audioDur
+	}
+
+	if item.textChars < minChars {
+		item.isSuspicious = true
+		item.suspiciousMsg = fmt.Sprintf("transcript too short (%d chars < %d min)", item.textChars, minChars)
+		return
 	}
 
 	if item.audioDur > 60 {
@@ -182,51 +225,94 @@ func evaluateTranscriptMetrics(item *transcriptAuditItem, td TranscriptionData, 
 	}
 }
 
-func reportAndHealSuspicious(item *transcriptAuditItem, dryRun, quiet bool) {
-	if !quiet {
-		fmt.Printf("  [SUSPICIOUS] %s\n", auditDisplayName(item.audioPath))
-		fmt.Printf("      - Audio length:  %s (%.1fs)\n", format.FormatTime(item.audioDur), item.audioDur)
-		fmt.Printf("      - Issue:         %s\n", item.suspiciousMsg)
-		if dryRun {
-			fmt.Println("      - Action:        [DRY RUN] Would delete transcript and set status to NeedAdR")
-		} else {
-			fmt.Println("      - Action:        Deleted transcript & cuts, marked as NeedAdR")
+func repairAuditedEpisode(item *transcriptAuditItem, config Config, dryRun, quiet bool) error {
+	if !auditMP3Exists(item.audioPath) {
+		return fmt.Errorf("audio is no longer a regular MP3: %s", item.audioPath)
+	}
+	if dryRun {
+		if !quiet {
+			fmt.Printf("  [DRY RUN] %s: would mark NeedAdR and queue\n", item.audioPath)
+		}
+		return nil
+	}
+	if item.isSuspicious {
+		for _, path := range []string{item.transcriptPath, item.cutsPath} {
+			if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+				return fmt.Errorf("remove invalid metadata %s: %w", path, err)
+			}
 		}
 	}
-	if !dryRun {
-		if util.FileExists(item.transcriptPath) {
-			_ = os.Remove(item.transcriptPath)
-		}
-		if util.FileExists(item.cutsPath) {
-			_ = os.Remove(item.cutsPath)
-		}
-		_ = pipeline.UpdateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
-			st.Status = StateNeedsAdR
-			st.Cleaned = EpisodeAudioMeta{}
+	if err := pipeline.UpdateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
+		st.Status = StateNeedsAdR
+		st.Cleaned = EpisodeAudioMeta{}
+		if item.isSuspicious {
 			st.Ads = nil
 			st.AdDetectionSuccessful = nil
 			st.AdDetectionStatus = ""
-		})
+			st.AdDetectionError = ""
+		}
+	}); err != nil {
+		return err
 	}
+	if err := queueAuditedEpisode(config, item.audioPath); err != nil {
+		return err
+	}
+	if !quiet {
+		fmt.Printf("  [NeedAdR] %s: %s%s; queued\n", item.audioPath, item.cleanStateMsg, item.suspiciousMsg)
+	}
+	return nil
 }
 
-func reportAndHealFailedAd(item *transcriptAuditItem, dryRun, quiet bool) {
-	if !quiet {
-		fmt.Printf("  [FAILED AD DETECTION] %s\n", auditDisplayName(item.audioPath))
-		if dryRun {
-			fmt.Println("      - Action:        [DRY RUN] Would mark as NeedAdR for ad detection retry")
-		} else {
-			fmt.Println("      - Action:        Marked as NeedAdR for ad detection retry")
+func queueAuditedEpisode(config Config, audioPath string) error {
+	if !auditMP3Exists(audioPath) {
+		return fmt.Errorf("audio is no longer a regular MP3: %s", audioPath)
+	}
+	podDir := podcast.DetectPodcastDirForAudio(audioPath)
+	if config.PodcastsDir != "" {
+		root, err := filepath.Abs(config.PodcastsDir)
+		if err != nil {
+			return err
+		}
+		rel, err := filepath.Rel(root, audioPath)
+		if err == nil && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) {
+			podDir = root
+			if parts := strings.Split(rel, string(filepath.Separator)); len(parts) > 1 {
+				podDir = filepath.Join(root, parts[0])
+			}
 		}
 	}
-	if !dryRun {
-		_ = pipeline.UpdateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
-			st.Status = StateNeedsAdR
-		})
+	rel, err := filepath.Rel(podDir, audioPath)
+	if err != nil {
+		return err
 	}
+	return pipeline.UpdateQueue(podDir, func(entries []string) []string {
+		for _, entry := range entries {
+			if entry == rel {
+				return entries
+			}
+		}
+		return append(entries, rel)
+	})
 }
 
-func printAuditSummary(scanned, suspicious, adFailed int, dryRun, quiet bool) {
+func auditMP3Exists(path string) bool {
+	if strings.HasSuffix(strings.ToLower(filepath.Base(path)), "precut.mp3") {
+		return false
+	}
+	absolute, err := filepath.Abs(path)
+	if err != nil {
+		return false
+	}
+	for _, part := range strings.Split(absolute, string(filepath.Separator)) {
+		if part == ".work" {
+			return false
+		}
+	}
+	info, err := os.Stat(path)
+	return err == nil && info.Mode().IsRegular() && strings.EqualFold(filepath.Ext(path), ".mp3")
+}
+
+func printAuditSummary(scanned, suspicious, uncut, adFailed int, dryRun, quiet bool) {
 	if quiet {
 		return
 	}
@@ -234,6 +320,7 @@ func printAuditSummary(scanned, suspicious, adFailed int, dryRun, quiet bool) {
 	fmt.Println("TRANSCRIPT AUDIT SUMMARY:")
 	fmt.Printf("  - Scanned episodes:        %d\n", scanned)
 	fmt.Printf("  - Suspicious transcripts:  %d\n", suspicious)
+	fmt.Printf("  - Invalid clean states:    %d\n", uncut)
 	fmt.Printf("  - Failed ad detections:    %d\n", adFailed)
 	if dryRun {
 		fmt.Println("  (Dry-run mode: no files were modified or deleted)")
@@ -243,15 +330,25 @@ func printAuditSummary(scanned, suspicious, adFailed int, dryRun, quiet bool) {
 
 func collectAudioFilesForAudit(targets []string) []string {
 	var files []string
+	seen := make(map[string]bool)
 	for _, target := range targets {
+		target, err := filepath.Abs(target)
+		if err != nil {
+			continue
+		}
 		fi, err := os.Stat(target)
 		if err != nil {
 			continue
 		}
+		candidates := []string{target}
 		if fi.IsDir() {
-			files = append(files, util.FindMP3Files(target)...)
-		} else if strings.HasSuffix(strings.ToLower(target), ".mp3") {
-			files = append(files, target)
+			candidates = util.FindMP3Files(target)
+		}
+		for _, path := range candidates {
+			if auditMP3Exists(path) && !seen[path] {
+				files = append(files, path)
+				seen[path] = true
+			}
 		}
 	}
 	return files

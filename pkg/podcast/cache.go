@@ -189,37 +189,27 @@ func CacheStats() (dir string, entries int, bytes int64) {
 }
 
 func GetEpisodePublicationTime(filePath string) time.Time {
-	statPath := pipeline.StatusPathFor(filePath)
-	if st, err := pipeline.LoadEpisodeStatus(statPath); err == nil && st != nil && st.PublishedAt != "" {
-		if t, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil && !t.IsZero() {
-			return t
-		}
+	if date, ok := SourcePublicationTime(filePath); ok {
+		return date
 	}
-	dir := filepath.Dir(filePath)
-	fn := filepath.Base(filePath)
+	st, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(filePath))
+	if err == nil && st != nil && st.PublicationSource == "source" {
+		if date, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil {
+			return date
+		}
+		return time.Time{}
+	}
+	dir := DetectPodcastDirForAudio(filePath)
 	if cached, _ := LoadPodcastCache(dir); cached != nil {
+		absolute, _ := filepath.Abs(filePath)
 		for _, ep := range cached.Episodes {
-			if (ep.Filename == fn || ep.Path == filePath) && ep.PublishedAt > 0 {
+			path := ep.Path
+			if path == "" {
+				path = ep.Filename
+			}
+			if PublicationAudioPath(dir, path) == absolute && ep.PublishedAt > 0 {
 				return time.UnixMilli(ep.PublishedAt)
 			}
-		}
-		basePrefix := util.StripExt(fn)
-		if idx := strings.LastIndex(basePrefix, " ("); idx != -1 && strings.HasSuffix(basePrefix, ")") {
-			basePrefix = strings.TrimSpace(basePrefix[:idx])
-		}
-		for _, ep := range cached.Episodes {
-			epPrefix := util.StripExt(ep.Filename)
-			if idx := strings.LastIndex(epPrefix, " ("); idx != -1 && strings.HasSuffix(epPrefix, ")") {
-				epPrefix = strings.TrimSpace(epPrefix[:idx])
-			}
-			if (epPrefix == basePrefix || strings.HasPrefix(ep.Filename, basePrefix) || strings.HasPrefix(fn, epPrefix)) && ep.PublishedAt > 0 {
-				return time.UnixMilli(ep.PublishedAt)
-			}
-		}
-	}
-	if !strings.Contains(filePath, "abs_remote") && !strings.Contains(filePath, "/.work/") {
-		if fi, err := os.Stat(filePath); err == nil {
-			return fi.ModTime()
 		}
 	}
 	return time.Time{}

@@ -109,7 +109,14 @@ func GetOrSetEpisodeShortID(podDir, podShortID, audioPath string) string {
 	if podShortID == "" {
 		podShortID = GetOrSetPodcastShortID(podDir, filepath.Base(podDir))
 	}
+	id := EpisodeShortIDReadOnly(podDir, podShortID, audioPath)
+	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
+	st.ID = id
+	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st)
+	return id
+}
 
+func EpisodeShortIDReadOnly(podDir, podShortID, audioPath string) string {
 	bogusID := GenerateEpisodeShortID(podShortID, "podcast")
 	key := EpisodeUniqueKey(podDir, audioPath)
 
@@ -132,9 +139,15 @@ func GetOrSetEpisodeShortID(podDir, podShortID, audioPath string) string {
 	}
 
 	if cached, _ := LoadPodcastCache(podDir); cached != nil {
-		baseFn := filepath.Base(audioPath)
 		for _, ep := range cached.Episodes {
-			if (ep.Path == audioPath || ep.Filename == baseFn) && strings.TrimSpace(ep.ID) != "" {
+			path := ep.Path
+			if path == "" {
+				path = ep.Filename
+			}
+			if !filepath.IsAbs(path) {
+				path = filepath.Join(podDir, path)
+			}
+			if filepath.Clean(path) == filepath.Clean(audioPath) && strings.TrimSpace(ep.ID) != "" {
 				id := strings.TrimSpace(ep.ID)
 				if id != bogusID || key == "podcast" {
 					return id
@@ -143,12 +156,7 @@ func GetOrSetEpisodeShortID(podDir, podShortID, audioPath string) string {
 		}
 	}
 
-	id := GenerateEpisodeShortID(podShortID, key)
-	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
-	st.ID = id
-	_ = pipeline.SaveEpisodeStatus(statPath, st)
-
-	return id
+	return GenerateEpisodeShortID(podShortID, key)
 }
 
 func ResolveAnyID(podcastsDir, query string) (*ResolvedID, error) {

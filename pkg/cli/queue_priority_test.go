@@ -1,0 +1,102 @@
+package cli
+
+import (
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
+	"path/filepath"
+	"reflect"
+	"testing"
+)
+
+func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
+	root := t.TempDir()
+	a, ap := createTestPodcastWithEpisodes(t, root, "Alpha", []string{"episode"})
+	b, bp := createTestPodcastWithEpisodes(t, root, "Beta", []string{"episode"})
+	if err := handleQueueAdd(root, []string{"all"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := handleQueuePriority(root, []string{"Beta", "8"}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := resolveQueueRunItems(root, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sortQueueItems(items)
+	if items[0].AudioPath != bp[0] || items[0].Priority != 8 || items[1].Priority != 0 {
+		t.Fatalf("order=%+v", items)
+	}
+	cfg := config.LoadPodcastConfig(b, config.DefaultPodcastConfig(nil))
+	if cfg.Priority != 8 {
+		t.Fatal("priority was not persisted")
+	}
+	st, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(bp[0]))
+	if st.Priority != 0 {
+		t.Fatal("inherited priority became an episode override")
+	}
+	if err := handleQueuePriority(root, []string{"Beta", "0"}); err != nil {
+		t.Fatal(err)
+	}
+	if podcast.EpisodePriority(b, bp[0]) != 0 {
+		t.Fatal("lowering podcast priority ineffective")
+	}
+	before := queueTree(t, root)
+	for _, value := range []string{"-1", "11", "invalid"} {
+		if err := handleQueuePriority(root, []string{"Alpha", value}); err == nil {
+			t.Errorf("accepted %s", value)
+		}
+	}
+	id := podcast.EpisodeShortIDReadOnly(a, generatePodcastShortID("Alpha"), ap[0])
+	if err := handleQueuePriority(root, []string{id, "8"}); err == nil {
+		t.Fatal("accepted permanent episode priority")
+	}
+	if !reflect.DeepEqual(before, queueTree(t, root)) {
+		t.Fatal("invalid priority command changed files")
+	}
+}
+
+func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
+	root := t.TempDir()
+	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"other", "requested"})
+	if _, err := pipeline.AddToQueueChecked(dir, filepath.Base(paths[0])); err != nil {
+		t.Fatal(err)
+	}
+	id := podcast.EpisodeShortIDReadOnly(dir, generatePodcastShortID("Show"), paths[1])
+	cfg := Config{PodcastsDir: root}
+	cli := CLIOptions{Args: []string{id}, ProcOptions: ProcOptions{DryRun: true, Quiet: true, Local: true}}
+	before := queueTree(t, root)
+	if err := runRmAdsCommand(cfg, cli, "rm_ads"); err != nil {
+		t.Fatal(err)
+	}
+	if !reflect.DeepEqual(before, queueTree(t, root)) {
+		t.Fatal("dry run changed files")
+	}
+	lock, err := util.AcquireFileLock(paths[1])
+	if err != nil || lock == nil {
+		t.Fatalf("lock: %v", err)
+	}
+	defer lock.Release()
+	cli.DryRun = false
+	if err := runRmAdsCommand(cfg, cli, "rm_ads"); err == nil {
+		t.Fatal("locked requested episode reported success")
+	}
+	entries, err := pipeline.ReadQueue(dir)
+	if err != nil || !reflect.DeepEqual(entries, []string{"requested.mp3", "other.mp3"}) {
+		t.Fatalf("queue=%v error=%v", entries, err)
+	}
+	if podcast.EpisodePriority(dir, paths[1]) != 10 {
+		t.Fatal("request missing priority 10")
+	}
+	other, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(paths[0]))
+	if other.Priority != 0 || other.Status != StateDownloaded {
+		t.Fatal("processed unrelated episode")
+	}
+	if _, err := pipeline.RemoveQueuedAudio(dir, paths[1]); err != nil {
+		t.Fatal(err)
+	}
+	if podcast.EpisodePriority(dir, paths[1]) != 0 {
+		t.Fatal("temporary boost survived removal")
+	}
+}

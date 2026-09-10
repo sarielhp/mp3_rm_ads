@@ -433,14 +433,16 @@ func updatePodFetchSettingsDB(dbPath, identifier string, autoDownload, autoClean
 	cleanIdent := strings.TrimPrefix(identifier, "podcasts/")
 	err = db.QueryRow(query, identifier, identifier, identifier, identifier, cleanIdent).Scan(&realID)
 	if err != nil {
-		realID = identifier
+		return fmt.Errorf("resolve PodFetch podcast %q: %w", identifier, err)
 	}
 
 	activeVal := 1
 	if !autoDownload {
 		activeVal = 0
 	}
-	_, _ = db.Exec("UPDATE podcasts SET active = ? WHERE id = ?", activeVal, realID)
+	if _, err := db.Exec("UPDATE podcasts SET active = ? WHERE id = ?", activeVal, realID); err != nil {
+		return err
+	}
 
 	autoDlVal := 0
 	if autoDownload {

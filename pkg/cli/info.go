@@ -19,6 +19,12 @@ func runInfoCommand(cfg Config, cli CLIOptions) error {
 	}
 
 	args := cli.Args
+	if cli.InfoSubcmd == "transcript" {
+		if len(args) != 1 {
+			return fmt.Errorf("use abs info transcript <episode-id>")
+		}
+		return showEpisodeTranscript(podcastsDir, args[0])
+	}
 	if cli.InfoSubcmd == "latest" || (len(args) > 0 && args[0] == "latest") || cli.Latest {
 		if len(args) > 0 && args[0] == "latest" {
 			args = args[1:]
@@ -68,6 +74,7 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 			buildInfoLatestSubcommand(opts, action),
 			buildInfoStatusSubcommand(opts, action),
 			buildInfoCheckSubcommand(opts, action),
+			buildInfoTranscriptSubcommand(opts, action),
 		},
 		Args: clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
