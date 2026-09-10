@@ -150,9 +150,29 @@ func buildQueueListSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 func buildQueueAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "add",
-		Description: "Add episodes or podcast uncleaned episodes to queue",
-		UsageLine:   "abs queue add <id...>",
-		Args:        clihelp.MinimumNArgs(1),
+		Description: "Add uncleaned episodes to the ad removal queue (defaults to all)",
+		UsageLine:   "abs queue add [id... | all]",
+		Parameters: []clihelp.Param{
+			{Name: "[id... | all]", Description: "Episode ID(s), podcast ID(s), or 'all' to queue all uncleaned episodes across library"},
+		},
+		Examples: []clihelp.Example{
+			{
+				Line:        "abs queue add",
+				Description: "Queue all episodes needing ad removal across all podcasts",
+			},
+			{
+				Line:        "abs queue add all",
+				Description: "Queue all episodes needing ad removal across all podcasts",
+			},
+			{
+				Line:        "abs queue add <podcast-id>",
+				Description: "Queue all uncleaned episodes for a specific podcast",
+			},
+			{
+				Line:        "abs queue add <episode-id>",
+				Description: "Queue a specific episode for ad removal",
+			},
+		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
 			opts.QueueSubcmd = "add"

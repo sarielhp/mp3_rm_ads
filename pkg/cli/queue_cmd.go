@@ -58,7 +58,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		return handleQueueList(podcastsDir, target, cli)
 	case "add":
 		if len(args) == 0 {
-			return fmt.Errorf("missing target ID(s) to add to queue")
+			args = []string{"all"}
 		}
 		return handleQueueAdd(podcastsDir, args)
 	case "remove":
@@ -196,6 +196,21 @@ func printQueueTable(items []queueEpisodeItem) {
 
 func handleQueueAdd(podcastsDir string, targets []string) error {
 	for _, query := range targets {
+		if strings.EqualFold(query, "all") || query == "*" || query == "--all" {
+			entries := scanPodcastDirs(podcastsDir)
+			totalAdded := 0
+			for _, p := range entries {
+				count := addPodcastEpisodesToQueue(p.dir)
+				if count > 0 {
+					fmt.Printf("Added %d uncleaned episode(s) of %s [%s] to queue\n",
+						count, bold(displayName(p.title)), boldCyan(p.shortID))
+					totalAdded += count
+				}
+			}
+			fmt.Printf("Added a total of %d uncleaned episode(s) across %d podcast(s) to queue.\n", totalAdded, len(entries))
+			continue
+		}
+
 		res, err := resolveAnyID(podcastsDir, query)
 		if err != nil {
 			return fmt.Errorf("failed to resolve %q: %w", query, err)
