@@ -1,4 +1,4 @@
-package cli
+package adremoval
 
 import (
 	"crypto/sha256"
@@ -73,7 +73,7 @@ func TestProcDryRunMutatesNothing(t *testing.T) {
 
 	cli := CLIOptions{Quiet: true, DryRun: true, Args: []string{dir}}
 	cli.Local = true
-	processAudioFilesBatch(cli, Config{}, "proc")
+	ProcessBatch(cli, Config{}, "proc")
 
 	if diffs := diffTrees(before, snapshotTree(t, dir)); len(diffs) > 0 {
 		t.Errorf("--dry-run modified the tree:\n  %v", diffs)

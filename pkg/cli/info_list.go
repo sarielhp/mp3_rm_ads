@@ -294,40 +294,6 @@ func formatShortStatus(status string) string {
 	}
 }
 
-func isEpisodeClean(mp3Path string) bool {
-	st := getOrCreateEpisodeStatus(mp3Path)
-	return st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path)
-}
-
-func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float64) {
-	origDur := 0.0
-	cleanDur := 0.0
-	if st != nil {
-		origDur = st.Original.DurationSec
-		cleanDur = st.Cleaned.DurationSec
-		if cleanDur == 0 && (st.Status == StateDone || st.Status == StateCopiedBack) {
-			cleanDur = origDur
-		}
-	}
-	if origDur == 0 {
-		cutsFile := stripExt(mp3Path) + ".cuts.json"
-		if data, err := os.ReadFile(cutsFile); err == nil {
-			var cd CutsData
-			if json.Unmarshal(data, &cd) == nil && cd.OriginalDurationSec > 0 {
-				origDur = cd.OriginalDurationSec
-				cleanDur = cd.OriginalDurationSec - cd.TotalCutDurationSec
-			}
-		}
-	}
-	if origDur == 0 {
-		origDur = getAudioDuration(mp3Path)
-		if st != nil && (st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path)) {
-			cleanDur = origDur
-		}
-	}
-	return origDur, cleanDur
-}
-
 func getEpisodeStatusLabel(mp3Path string) (string, string) {
 	st := getOrCreateEpisodeStatus(mp3Path)
 	if st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path) {

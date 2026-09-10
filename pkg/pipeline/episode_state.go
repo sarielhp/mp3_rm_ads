@@ -1,0 +1,47 @@
+package pipeline
+
+import (
+	"encoding/json"
+	"os"
+
+	"abs/pkg/audio"
+	"abs/pkg/types"
+	"abs/pkg/util"
+)
+
+// IsEpisodeClean reports whether an episode has finished ad removal.
+func IsEpisodeClean(mp3Path string) bool {
+	st := GetOrCreateEpisodeStatus(mp3Path)
+	return st.Status == types.StateDone || st.Status == types.StateCopiedBack || IsEpisodeCompleted(mp3Path)
+}
+
+// EpisodeDurations reports an episode's original and post-cut durations,
+// falling back to the cuts file and then to the audio itself.
+func EpisodeDurations(mp3Path string, st *types.EpisodeStatusFile) (float64, float64) {
+	origDur := 0.0
+	cleanDur := 0.0
+	if st != nil {
+		origDur = st.Original.DurationSec
+		cleanDur = st.Cleaned.DurationSec
+		if cleanDur == 0 && (st.Status == types.StateDone || st.Status == types.StateCopiedBack) {
+			cleanDur = origDur
+		}
+	}
+	if origDur == 0 {
+		cutsFile := util.StripExt(mp3Path) + ".cuts.json"
+		if data, err := os.ReadFile(cutsFile); err == nil {
+			var cd types.CutsData
+			if json.Unmarshal(data, &cd) == nil && cd.OriginalDurationSec > 0 {
+				origDur = cd.OriginalDurationSec
+				cleanDur = cd.OriginalDurationSec - cd.TotalCutDurationSec
+			}
+		}
+	}
+	if origDur == 0 {
+		origDur = audio.GetAudioDuration(mp3Path)
+		if st != nil && (st.Status == types.StateDone || st.Status == types.StateCopiedBack || IsEpisodeCompleted(mp3Path)) {
+			cleanDur = origDur
+		}
+	}
+	return origDur, cleanDur
+}

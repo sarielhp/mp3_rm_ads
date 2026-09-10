@@ -150,19 +150,3 @@ func absDownloadAllData(cfg Config, quiet bool) bool {
 	}
 	return true
 }
-
-func sanitizePodcastTitle(title string) string {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return "Untitled Podcast"
-	}
-	badChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
-	for _, c := range badChars {
-		title = strings.ReplaceAll(title, c, "_")
-	}
-	title = strings.TrimSpace(title)
-	if title == "" || title == ".." || title == "." || strings.Trim(title, ".") == "" || strings.HasPrefix(title, "../") || strings.HasPrefix(title, ".._") {
-		return "Untitled Podcast"
-	}
-	return title
-}

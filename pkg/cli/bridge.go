@@ -2,12 +2,9 @@ package cli
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
@@ -64,7 +61,6 @@ type (
 	ResolvedPodcast     = podcast.ResolvedPodcast
 	ResolvedEpisode     = podcast.ResolvedEpisode
 	ResolvedID          = podcast.ResolvedID
-	fileLockWrapper     = util.FileLockWrapper
 	syncWG              = util.SyncWG
 )
 
@@ -116,12 +112,9 @@ const (
 	PlayerSocketPath = player.PlayerSocketPath
 )
 
-const defaultGeminiChunkSec = gemini.DefaultGeminiChunkSec
-
 var (
-	globalPlayer  = player.GetGlobalPlayer()
-	queueUpdateMu util.SyncMutex
-	greenCheck    = "\u2713"
+	globalPlayer = player.GetGlobalPlayer()
+	greenCheck   = "\u2713"
 )
 
 type mockDimStyle struct{}
@@ -139,29 +132,19 @@ func bold(s string) string              { return util.Bold(s) }
 func boldYellow(s string) string        { return util.BoldYellow(s) }
 func boldGreen(s string) string         { return util.BoldGreen(s) }
 func boldCyan(s string) string          { return util.BoldCyan(s) }
-func repeatStr(s string, n int) string  { return util.RepeatStr(s, n) }
 func truncate(s string, max int) string { return util.Truncate(s, max) }
 func truncateDisplayName(s string, max int) string {
 	return util.TruncateDisplayName(s, max)
 }
-func displayName(s string) string    { return util.DisplayName(s) }
-func stripExt(path string) string    { return util.StripExt(path) }
-func fileExists(path string) bool    { return util.FileExists(path) }
-func safeMove(src, dst string) error { return util.SafeMove(src, dst) }
-func workDirFor(path string) string  { return util.WorkDirFor(path) }
-func verifyTempFile(path string)     { util.VerifyTempFile(path) }
-func execCommand(name string, args ...string) *exec.Cmd {
-	return exec.Command(name, args...)
-}
-func copyFileErr(src, dst string) error { return util.CopyFileErr(src, dst) }
-func copyFile(src, dst string) error    { return util.CopyFileErr(src, dst) }
-func acquireFileLock(path string) (*fileLockWrapper, error) {
-	return util.AcquireFileLock(path)
-}
+func displayName(s string) string          { return util.DisplayName(s) }
+func stripExt(path string) string          { return util.StripExt(path) }
+func fileExists(path string) bool          { return util.FileExists(path) }
+func safeMove(src, dst string) error       { return util.SafeMove(src, dst) }
+func verifyTempFile(path string)           { util.VerifyTempFile(path) }
+func copyFile(src, dst string) error       { return util.CopyFileErr(src, dst) }
 func findMP3Files(dir string) []string     { return util.FindMP3Files(dir) }
 func stripHTML(s string) string            { return backend.StripHTML(s) }
 func formatDurationShort(d float64) string { return format.FormatClock(d) }
-func printSeparator()                      { fmt.Println(strings.Repeat("─", 50)) }
 
 func wrapText(text string, maxW int) []string {
 	if maxW <= 0 {
@@ -188,7 +171,6 @@ func wrapText(text string, maxW int) []string {
 }
 
 func formatClock(sec float64) string             { return format.FormatClock(sec) }
-func formatTime(sec float64) string              { return format.FormatTime(sec) }
 func formatSRTTime(sec float64) string           { return format.FormatSRTTime(sec) }
 func mergeIntervals(ads []AdSegment) []AdSegment { return format.MergeIntervals(ads) }
 
@@ -213,12 +195,7 @@ func cutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile stri
 	return audio.CutAudioFFmpeg(inputFile, keepSegments, outputFile)
 }
 
-func cutAudioFFmpegWithHost(inputFile string, keepSegments [][2]float64, outputFile, remoteHost string) bool {
-	return audio.CutAudioFFmpeg(inputFile, keepSegments, outputFile)
-}
-
-func extractID3Tags(path string) map[string]string { return audio.ExtractID3Tags(path) }
-func buildWavHeader(dataLen int) []byte            { return transcribe.BuildWavHeader(dataLen) }
+func buildWavHeader(dataLen int) []byte { return transcribe.BuildWavHeader(dataLen) }
 
 func loadConfig() Config {
 	cfg, err := config.LoadConfig()
@@ -276,22 +253,6 @@ func isEpisodeCompleted(audioPath string) bool {
 	return pipeline.IsEpisodeCompleted(audioPath)
 }
 
-func isEpisodeInRemoteFlight(audioPath string) bool {
-	return pipeline.IsEpisodeInRemoteFlight(audioPath)
-}
-
-func resolvePodcastDirByIDOrName(baseDir, target string) (string, string, bool) {
-	return podcast.ResolvePodcastDirByIDOrName(baseDir, target)
-}
-
-func resolveAudioFiles(inputFile string, cli CLIOptions) (string, string, string) {
-	return pipeline.ResolveAudioFiles(inputFile, cli.Verbose)
-}
-
-func resolveOutputFile(mainMP3File string, cli CLIOptions, totalFiles int) string {
-	return pipeline.ResolveOutputFile(mainMP3File, cli.Output, totalFiles)
-}
-
 func generatePodcastShortID(name string) string { return podcast.GeneratePodcastShortID(name) }
 
 func getOrSetPodcastShortID(podcastDir, title string) string {
@@ -324,68 +285,7 @@ func scanPodcastDirs(podcastsDir string) []podcastDirEntry {
 	return out
 }
 
-func fetchFeedDirect(feedURL, cachedETag, cachedLastModified string) ([]backend.FeedEpisode, string, string, bool, error) {
-	return podcast.FetchFeedDirect(feedURL, cachedETag, cachedLastModified)
-}
-
 func statusPathFor(audioFile string) string { return pipeline.StatusPathFor(audioFile) }
-
-func updateEpisodeStatus(path string, mutate func(*EpisodeStatusFile)) error {
-	return pipeline.UpdateEpisodeStatus(path, mutate)
-}
-
-func updateStatusAdDetection(mainMP3File string, successful bool, status, model, errMsg string) {
-	_ = updateEpisodeStatus(mainMP3File, func(st *EpisodeStatusFile) {
-		st.AdDetectionSuccessful = &successful
-		st.AdDetectionStatus = status
-		st.AdDetectionModel = model
-		st.AdDetectionError = errMsg
-		if !successful {
-			st.Status = StateNeedsAdR
-		}
-	})
-}
-
-func updateTranscriptAdDetectionStatus(jsonFile string, successful bool, status, model, errMsg string, adCount int) error {
-	if !fileExists(jsonFile) {
-		return nil
-	}
-	raw, err := os.ReadFile(jsonFile)
-	if err != nil {
-		return err
-	}
-	var data map[string]interface{}
-	if err := json.Unmarshal(raw, &data); err != nil {
-		return err
-	}
-	data["ad_detection_successful"] = successful
-	data["ad_detection_status"] = status
-	if model != "" {
-		data["ad_detection_model"] = model
-	}
-	if errMsg != "" {
-		data["ad_detection_error"] = errMsg
-	} else {
-		delete(data, "ad_detection_error")
-	}
-	if successful {
-		data["ad_segments_count"] = adCount
-	}
-	content, err := json.MarshalIndent(data, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(jsonFile, append(content, '\n'), 0644)
-}
-
-func handleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName string, totalDuration float64, selectedProfile LLMProfile, cfg Config, cli CLIOptions, fileStartTime time.Time) error {
-	return pipeline.HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName, totalDuration, selectedProfile, cfg, cli, fileStartTime)
-}
-
-func handleTranscribeMin(sourceAudioFile *string, totalDuration float64, cli CLIOptions) float64 {
-	dur, _ := pipeline.HandleTranscribeMin(sourceAudioFile, totalDuration, cli.TranscribeMin)
-	return dur
-}
 
 func formatTranscript(data *TranscriptionData, totalDuration float64) string {
 	return pipeline.FormatTranscript(data, totalDuration)
@@ -395,31 +295,9 @@ func loadOrTranscribe(sourceAudioFile, jsonFile string, cfg Config, cli CLIOptio
 	return pipeline.LoadOrTranscribe(sourceAudioFile, jsonFile, cfg, cli, selectedProfile, totalDuration, speedFactor, whisperLanguage, whisperPrompt, id3TagsOut, isNewlyTranscribed, t0Step1)
 }
 
-func processJSONFile(inputFile string, cli CLIOptions) {
-	pipeline.ProcessJSONFile(inputFile, cli)
-}
-
 func saveJSONTranscript(mainFile string, data *TranscriptionData, jsonFile string, quiet bool, id3Tags map[string]string) error {
 	return pipeline.SaveJSONTranscript(mainFile, data, jsonFile, quiet, id3Tags)
 }
-
-func removeWorkDirs(dir string) {
-	entries, err := os.ReadDir(dir)
-	if err != nil {
-		return
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			if entry.Name() == ".work" {
-				_ = os.RemoveAll(filepath.Join(dir, entry.Name()))
-			} else {
-				removeWorkDirs(filepath.Join(dir, entry.Name()))
-			}
-		}
-	}
-}
-
-func step1Duration(t0 time.Time) time.Duration { return time.Since(t0) }
 
 func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 	entries, err := os.ReadDir(podcastsDir)
@@ -435,69 +313,6 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 		podcasts = append(podcasts, tuiPodcast{name: entry.Name(), dir: podPath})
 	}
 	return podcasts, nil
-}
-
-func filterMP3FilesByPodcastConfig(files []string, dir string, cfg PodcastConfig) []string {
-	if len(files) == 0 {
-		return files
-	}
-	mode := normalizeAdRemovalMode(cfg.AdRemoval)
-	if mode == AdRemovalNone {
-		return nil
-	}
-	if mode == AdRemovalAll {
-		return files
-	}
-	type fileWithTime struct {
-		path    string
-		pubTime time.Time
-	}
-	var list []fileWithTime
-	for _, f := range files {
-		pt := getEpisodePublicationTime(f)
-		list = append(list, fileWithTime{path: f, pubTime: pt})
-	}
-	sort.Slice(list, func(i, j int) bool {
-		if list[i].pubTime.Equal(list[j].pubTime) {
-			return list[i].path < list[j].path
-		}
-		return list[i].pubTime.After(list[j].pubTime)
-	})
-	for _, item := range list {
-		base := strings.TrimSuffix(item.path, ".mp3")
-		if _, err := os.Stat(base + ".cuts.json"); err != nil {
-			return []string{item.path}
-		}
-	}
-	return []string{list[0].path}
-}
-
-func updateQueue(dir string, mutate func([]string) []string) error {
-	queueUpdateMu.Lock()
-	defer queueUpdateMu.Unlock()
-
-	path := filepath.Join(dir, "queue.json")
-	lock, err := util.AcquireFileLockWithTimeout(path, 5*time.Second)
-	if err != nil || lock == nil {
-		return fmt.Errorf("queue is locked: %w", err)
-	}
-	defer lock.Release()
-
-	var entries []string
-	if data, err := os.ReadFile(path); err == nil {
-		if err := json.Unmarshal(data, &entries); err != nil {
-			return err
-		}
-	}
-	entries = mutate(entries)
-	if entries == nil {
-		entries = []string{}
-	}
-	data, err := json.MarshalIndent(entries, "", "  ")
-	if err != nil {
-		return err
-	}
-	return util.WriteFileAtomic(path, append(data, '\n'), 0644)
 }
 
 func saveQueue(dir string, entries []string) error {
@@ -554,18 +369,6 @@ func ResolveProcessingHost(cfg *Config, hostCandidate string, transport remote.R
 	return remote.ResolveProcessingHost(cfg, hostCandidate, transport)
 }
 
-func getRemoteTransport() remote.RemoteTransport {
-	return remote.GetRemoteTransport()
-}
-
-func isRemoteHostReachable(host string, transport remote.RemoteTransport) bool {
-	return remote.IsRemoteHostReachable(host, transport)
-}
-
-func loadDoneManifest(path string) (*remote.RemoteDoneManifest, error) {
-	return remote.LoadDoneManifest(path)
-}
-
 func formatPlayerTime(sec float64) string { return player.FormatPlayerTime(sec) }
 
 func runPlayerDaemon(audioPath, title, podcast string) error {
@@ -595,67 +398,10 @@ func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
 	})
 }
 
-func getABSClient(cfg Config, quiet bool) (*backend.AudiobookshelfBackend, error) {
-	return backend.NewAudiobookshelf(backend.Config{
-		Host:        cfg.AudiobookshelfURL,
-		User:        cfg.AudiobookshelfUser,
-		Pass:        cfg.AudiobookshelfPass,
-		Token:       cfg.AudiobookshelfToken,
-		DBPath:      cfg.AudiobookshelfDBPath,
-		PodcastsDir: cfg.PodcastsDir,
-		Quiet:       quiet,
-	}), nil
-}
-
 func isAudiobookshelfActive(cfg Config) bool { return backend.IsAudiobookshelfActive(&cfg) }
-func isPodfetchActive(cfg Config) bool       { return backend.IsPodfetchActive(&cfg) }
 
 func detectAdsLLM(transcriptText string, profile LLMProfile) ([]AdSegment, error) {
 	return detect.DetectAdsLLM(transcriptText, profile, profile.APIKey)
-}
-
-func isGeminiEngine(cfg Config, cli CLIOptions) bool {
-	if cli.WhisperEngine == string(WhisperEngineGemini) {
-		return true
-	}
-	wp := config.GetActiveWhisperProfile(&cfg)
-	return wp.Engine == WhisperEngineGemini
-}
-
-func sortAudioFilesByDuration(files []string) {
-	remote.SortAudioFilesByDuration(files)
-}
-
-func getActiveWhisperProfile(cfg Config) types.WhisperProfile {
-	return config.GetActiveWhisperProfile(&cfg)
-}
-
-func normalizeWhisperProfile(p types.WhisperProfile) types.WhisperProfile {
-	return config.NormalizeWhisperProfile(p)
-}
-
-func whisperEngineBadge(engine types.WhisperEngine) string {
-	return config.WhisperEngineBadge(engine)
-}
-
-func extractMetadataPrompt(sourceAudioFile string, id3TagsOut map[string]string, selectedProfile LLMProfile, cli CLIOptions) string {
-	return pipeline.ExtractMetadataPrompt(sourceAudioFile, id3TagsOut, selectedProfile, cli)
-}
-
-func detectWhisperDockerContainer(whisperURL string) string {
-	return transcribe.DetectWhisperDockerContainer(whisperURL)
-}
-
-func runWhisperCLITranscriptionContext(ctx context.Context, audioPath string, profile types.WhisperProfile, quiet, verbose bool, prompt, lang string) (*types.TranscriptionData, error) {
-	return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, profile, quiet, verbose, prompt, lang)
-}
-
-func transcribeChunks(audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, chunkDuration int, dockerContainer string, prompt, language string) (*types.TranscriptionData, error) {
-	return transcribe.TranscribeChunks(audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, chunkDuration, dockerContainer, prompt, language)
-}
-
-func transcribeWhisperContext(ctx context.Context, audioPath, whisperURL string, quiet, verbose bool, totalDuration, speedFactor float64, dockerContainer string, prompt, language string, pcmData []byte) (*types.TranscriptionData, error) {
-	return transcribe.TranscribeWhisperContext(ctx, audioPath, whisperURL, quiet, verbose, totalDuration, speedFactor, dockerContainer, prompt, language, pcmData)
 }
 
 func loadManifest(path string) (*types.RemoteBatchManifest, error) {
@@ -672,18 +418,6 @@ func recalculateManifestStats(m *types.RemoteBatchManifest) {
 
 func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg Config, chunkDurSec float64) (*types.TranscriptionData, []types.AdSegment, error) {
 	return gemini.ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDurSec)
-}
-
-func syncAudiobookshelfDuration(cfg *Config, filePath string, duration float64) {
-	remote.SyncAudiobookshelfDuration(cfg, filePath, duration)
-}
-
-func getPubMS(ep FeedEpisode) int64 {
-	return podcast.GetPubMS(ep)
-}
-
-func findPodcastDirForItem(item backend.Podcast, podcastsDir string) string {
-	return podcast.FindPodcastDirForItem(item, podcastsDir)
 }
 
 func cacheStats() (string, int, int64) {
@@ -711,14 +445,24 @@ func loadEpisodeStatus(path string) (*EpisodeStatusFile, error) {
 	return pipeline.LoadEpisodeStatus(path)
 }
 
-func defaultPodcastConfig() PodcastConfig {
-	return config.DefaultPodcastConfig(nil)
+func updateQueue(dir string, mutate func([]string) []string) error {
+	return pipeline.UpdateQueue(dir, mutate)
 }
 
-func addDoneEpisode(manifestPath string, item RemoteDoneItem) error {
-	return remote.AddDoneEpisode(manifestPath, item)
+func addEpisodeToQueueFile(podDir, filename string) bool {
+	return pipeline.AddToQueue(podDir, filename)
 }
 
-func setRemoteTransport(t remote.RemoteTransport) {
-	remote.SetRemoteTransport(t)
+func removeEpisodeFromQueueFile(podDir, filename string) bool {
+	return pipeline.RemoveFromQueue(podDir, filename)
+}
+
+func isEpisodeClean(mp3Path string) bool { return pipeline.IsEpisodeClean(mp3Path) }
+
+func getEpisodeDurations(mp3Path string, st *EpisodeStatusFile) (float64, float64) {
+	return pipeline.EpisodeDurations(mp3Path, st)
+}
+
+func filterMP3FilesByPodcastConfig(files []string, dir string, cfg PodcastConfig) []string {
+	return podcast.FilterByAdRemovalPolicy(files, dir, cfg)
 }

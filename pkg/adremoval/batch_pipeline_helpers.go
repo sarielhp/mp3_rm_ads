@@ -1,4 +1,4 @@
-package cli
+package adremoval
 
 import (
 	"context"
@@ -9,7 +9,11 @@ import (
 	"unicode"
 
 	"abs/pkg/config"
+	"abs/pkg/format"
+	"abs/pkg/gemini"
+	"abs/pkg/pipeline"
 	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, quiet bool) bool {
@@ -40,22 +44,22 @@ func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, qu
 	minRequiredCoverage := totalDuration * 0.85
 	var failedReasons []string
 	if wordCount < minExpectedWords {
-		failedReasons = append(failedReasons, fmt.Sprintf("Word count too low (%d words found, expected at least %d words for %s audio)", wordCount, minExpectedWords, formatClock(totalDuration)))
+		failedReasons = append(failedReasons, fmt.Sprintf("Word count too low (%d words found, expected at least %d words for %s audio)", wordCount, minExpectedWords, format.FormatClock(totalDuration)))
 	}
 	if totalDuration >= 30.0 && lastSegmentEnd < minRequiredCoverage {
-		failedReasons = append(failedReasons, fmt.Sprintf("Transcript ended prematurely at %s (expected coverage up to at least %s)", formatClock(lastSegmentEnd), formatClock(minRequiredCoverage)))
+		failedReasons = append(failedReasons, fmt.Sprintf("Transcript ended prematurely at %s (expected coverage up to at least %s)", format.FormatClock(lastSegmentEnd), format.FormatClock(minRequiredCoverage)))
 	}
 	if len(failedReasons) > 0 {
 		if !quiet {
-			fmt.Println("\n" + repeatStr("WARNING ", 5))
+			fmt.Println("\n" + util.RepeatStr("WARNING ", 5))
 			fmt.Println("TRANSCRIPT SANITY CHECK FAILED!")
-			fmt.Println(repeatStr("WARNING ", 5))
+			fmt.Println(util.RepeatStr("WARNING ", 5))
 			for _, reason := range failedReasons {
 				fmt.Printf("  - %s\n", reason)
 			}
 			fmt.Println("  - The Whisper transcription appears incomplete or corrupted.")
 			fmt.Println("  - Aborting ad detection and audio cutting for safety.")
-			fmt.Println(repeatStr("WARNING ", 5) + "\n")
+			fmt.Println(util.RepeatStr("WARNING ", 5) + "\n")
 		}
 		return false
 	}
@@ -102,35 +106,35 @@ func detectScriptLanguage(text string) string {
 
 func printTimingSummary(verbose bool, originalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println("\nTIMING SUMMARY:")
-	fmt.Printf("   - Original Length:     %s (%.1fs)\n", formatTime(originalDuration), originalDuration)
-	fmt.Printf("   - Time Cut:            %s (%.1fs)\n", formatTime(actualCut), actualCut)
-	fmt.Printf("   - New Episode Length:  %s (%.1fs)\n", formatTime(newDuration), newDuration)
+	fmt.Printf("   - Original Length:     %s (%.1fs)\n", format.FormatTime(originalDuration), originalDuration)
+	fmt.Printf("   - Time Cut:            %s (%.1fs)\n", format.FormatTime(actualCut), actualCut)
+	fmt.Printf("   - New Episode Length:  %s (%.1fs)\n", format.FormatTime(newDuration), newDuration)
 	if verbose {
 		fmt.Printf("   - Running Times:\n")
-		fmt.Printf("       - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
-		fmt.Printf("       - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
-		fmt.Printf("       - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
-		fmt.Printf("       - Total File Processing:  %s\n", formatClock(total.Seconds()))
+		fmt.Printf("       - Step 1 (Transcription): %s\n", format.FormatClock(step1.Seconds()))
+		fmt.Printf("       - Step 2 (Ad Detection):  %s\n", format.FormatClock(step2.Seconds()))
+		fmt.Printf("       - Step 3 (Audio Cut):     %s\n", format.FormatClock(step3.Seconds()))
+		fmt.Printf("       - Total File Processing:  %s\n", format.FormatClock(total.Seconds()))
 	} else {
-		fmt.Printf("   - Total Running Time:     %s\n", formatClock(total.Seconds()))
+		fmt.Printf("   - Total Running Time:     %s\n", format.FormatClock(total.Seconds()))
 	}
 }
 
 func printFullSummary(verbose bool, totalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println()
 	fmt.Println("DURATION & TIME SAVED SUMMARY:")
-	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", formatTime(totalDuration), totalDuration)
-	fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs across %d segment(s))\n", formatTime(actualCut), actualCut, numAds)
-	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", formatTime(newDuration), newDuration)
+	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", format.FormatTime(totalDuration), totalDuration)
+	fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs across %d segment(s))\n", format.FormatTime(actualCut), actualCut, numAds)
+	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", format.FormatTime(newDuration), newDuration)
 	fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
 	if verbose {
 		fmt.Printf("  - Running Times:\n")
-		fmt.Printf("      - Step 1 (Transcription): %s\n", formatClock(step1.Seconds()))
-		fmt.Printf("      - Step 2 (Ad Detection):  %s\n", formatClock(step2.Seconds()))
-		fmt.Printf("      - Step 3 (Audio Cut):     %s\n", formatClock(step3.Seconds()))
-		fmt.Printf("      - Total File Processing:  %s\n", formatClock(total.Seconds()))
+		fmt.Printf("      - Step 1 (Transcription): %s\n", format.FormatClock(step1.Seconds()))
+		fmt.Printf("      - Step 2 (Ad Detection):  %s\n", format.FormatClock(step2.Seconds()))
+		fmt.Printf("      - Step 3 (Audio Cut):     %s\n", format.FormatClock(step3.Seconds()))
+		fmt.Printf("      - Total File Processing:  %s\n", format.FormatClock(total.Seconds()))
 	} else {
-		fmt.Printf("  - Total Running Time:      %s\n", formatClock(total.Seconds()))
+		fmt.Printf("  - Total Running Time:      %s\n", format.FormatClock(total.Seconds()))
 	}
 }
 
@@ -178,14 +182,14 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	if config.ChunkDurationSec > 0 {
 		chunkDur = float64(config.ChunkDurationSec)
 	}
-	td, ads, err := ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
+	td, ads, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Error processing with Gemini Flash: %v\n", err)
 		return false
 	}
 
 	if cli.SaveTranscript {
-		_ = saveJSONTranscript(mainMP3File, td, jsonFile, cli.Quiet, map[string]string{})
+		_ = pipeline.SaveJSONTranscript(mainMP3File, td, jsonFile, cli.Quiet, map[string]string{})
 	}
 
 	if handleExportOrPreviewReturns(td, totalDuration, fileStartTime, sourceAudioFile, jsonFile, cli) {
@@ -193,7 +197,7 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	}
 
 	if len(ads) > 0 {
-		ads = mergeIntervals(ads)
+		ads = format.MergeIntervals(ads)
 	}
 
 	t0Step2 := time.Now()
@@ -204,7 +208,7 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 		return true
 	}
 
-	cutsResult := saveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, cli.Quiet)
+	cutsResult := format.SaveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, cli.Quiet)
 	t0Step3 := time.Now()
 	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, cli, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
 }

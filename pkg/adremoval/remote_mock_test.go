@@ -1,6 +1,7 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/util"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -90,7 +91,7 @@ func handleMockAckCmd(m *MockRemoteTransport, cmd string) {
 		}
 	}
 	dir := m.RemoteRoot
-	if len(rels) > 0 && fileExists(filepath.Join(m.RemoteRoot, "remote_root", rels[0])) {
+	if len(rels) > 0 && util.FileExists(filepath.Join(m.RemoteRoot, "remote_root", rels[0])) {
 		dir = filepath.Join(m.RemoteRoot, "remote_root")
 	}
 	_ = runRemoteAck(dir, rels)

@@ -1,42 +1,14 @@
 package cli
 
 import (
+	"abs/pkg/transcribe"
 	"bytes"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"time"
 )
-
-func wakeWhisperServer(whisperURL string, wakeCmd string, quiet bool) {
-	if whisperURL == "" {
-		return
-	}
-	if wakeCmd != "" {
-		if !quiet {
-			fmt.Printf("Running whisper wake command: %s\n", wakeCmd)
-		}
-		cmd := execCommand("/bin/sh", "-c", wakeCmd)
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		if err := cmd.Run(); err != nil && !quiet {
-			fmt.Printf("Warning: Whisper wake command failed: %v\n", err)
-		}
-	}
-	client := &http.Client{Timeout: 5 * time.Second}
-	req, err := http.NewRequest("GET", whisperURL, nil)
-	if err != nil {
-		return
-	}
-	resp, err := client.Do(req)
-	if err != nil {
-		return
-	}
-	io.Copy(io.Discard, resp.Body)
-	resp.Body.Close()
-}
 
 func testWhisperServer(whisperURL string, wakeCmd string, quiet bool) bool {
 	return testWhisperServerEx(whisperURL, wakeCmd, 5, 3*time.Second, quiet)
@@ -130,4 +102,8 @@ func buildTestWavPayload() ([]byte, string) {
 	w.Close()
 
 	return buf.Bytes(), w.FormDataContentType()
+}
+
+func wakeWhisperServer(whisperURL string, wakeCmd string, quiet bool) {
+	transcribe.WakeServer(whisperURL, wakeCmd, quiet)
 }

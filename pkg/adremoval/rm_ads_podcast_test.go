@@ -1,4 +1,4 @@
-package cli
+package adremoval
 
 import (
 	"encoding/json"
@@ -11,6 +11,10 @@ import (
 	"time"
 
 	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/types"
 )
 
 func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []string) (string, []string) {
@@ -18,22 +22,22 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 	if err := os.MkdirAll(podDir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	cfg := defaultPodcastConfig()
-	cfg.ID = generatePodcastShortID(podName)
-	if err := savePodcastConfig(podDir, cfg); err != nil {
+	cfg := config.DefaultPodcastConfig(nil)
+	cfg.ID = podcast.GeneratePodcastShortID(podName)
+	if err := config.SavePodcastConfig(podDir, cfg); err != nil {
 		t.Fatal(err)
 	}
 
 	var paths []string
 	for i, title := range titles {
-		filename := sanitizePodcastTitle(title) + ".mp3"
+		filename := podcast.SanitizeTitle(title) + ".mp3"
 		p := filepath.Join(podDir, filename)
 		if err := os.WriteFile(p, []byte("fake mp3 data "+title), 0644); err != nil {
 			t.Fatal(err)
 		}
-		st := getOrCreateEpisodeStatus(p)
+		st := pipeline.GetOrCreateEpisodeStatus(p)
 		st.PublishedAt = time.Now().Add(-time.Duration(len(titles)-i) * 24 * time.Hour).Format(time.RFC3339)
-		if err := saveEpisodeStatus(statusPathFor(p), st); err != nil {
+		if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(p), st); err != nil {
 			t.Fatal(err)
 		}
 		paths = append(paths, p)
@@ -42,11 +46,11 @@ func createTestPodcastWithEpisodes(t *testing.T, root, podName string, titles []
 }
 
 func markEpisodeClean(t *testing.T, mp3Path string) {
-	st := getOrCreateEpisodeStatus(mp3Path)
+	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
 	st.Status = StateDone
 	st.Original.DurationSec = 60.0
 	st.Cleaned.DurationSec = 50.0
-	if err := saveEpisodeStatus(statusPathFor(mp3Path), st); err != nil {
+	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(mp3Path), st); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -137,7 +141,7 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 	otherPodDir, otherPaths := createTestPodcastWithEpisodes(t, tmp, "Nature Show", []string{
 		"Birds",
 	})
-	addEpisodeToQueueFile(otherPodDir, filepath.Base(otherPaths[0]))
+	pipeline.AddToQueue(otherPodDir, filepath.Base(otherPaths[0]))
 
 	podCfg := loadPodcastConfig(podDir)
 	resolved := &ResolvedPodcast{
@@ -170,7 +174,7 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 		t.Fatalf("expected %s in queue, got %v", filepath.Base(paths[1]), queued)
 	}
 
-	if isEpisodeClean(paths[1]) {
+	if pipeline.IsEpisodeClean(paths[1]) {
 		t.Fatalf("episode should not have been cleaned immediately when multiple items in queue")
 	}
 }
@@ -202,7 +206,7 @@ func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
 	if _, err := os.Stat(qFile); err == nil {
 		t.Fatalf("expected queue.json not to be created in dry run")
 	}
-	if isEpisodeClean(paths[0]) {
+	if pipeline.IsEpisodeClean(paths[0]) {
 		t.Fatalf("episode should not be cleaned in dry run")
 	}
 }
@@ -273,7 +277,7 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 
 	cfg := Config{
 		PodcastsDir: tmp,
-		BackendConfig: BackendConfig{
+		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,
 			AudiobookshelfToken: "test-tok",
 		},
@@ -347,7 +351,7 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 
 	cfg := Config{
 		PodcastsDir: tmp,
-		BackendConfig: BackendConfig{
+		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,
 			AudiobookshelfToken: "test-tok",
 		},
@@ -365,15 +369,15 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 	})
 	targetAudio := paths[0]
 	epFilename := filepath.Base(targetAudio)
-	addEpisodeToQueueFile(podDir, epFilename)
+	pipeline.AddToQueue(podDir, epFilename)
 
 	markEpisodeClean(t, targetAudio)
 
 	cliLocal := CLIOptions{Quiet: true}
 	cliLocal.Local = true
-	err := processSingleQueuedTarget(podDir, targetAudio, "rm_ads", cliLocal, Config{PodcastsDir: tmp})
+	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", cliLocal, Config{PodcastsDir: tmp})
 	if err != nil {
-		t.Fatalf("processSingleQueuedTarget failed: %v", err)
+		t.Fatalf("ProcessQueuedTarget failed: %v", err)
 	}
 
 	qFile := filepath.Join(podDir, "queue.json")
@@ -412,7 +416,7 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 
 	cfg := Config{
 		PodcastsDir: tmp,
-		BackendConfig: BackendConfig{
+		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,
 			AudiobookshelfToken: "invalid",
 		},
@@ -448,11 +452,11 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 	cli.Local = true
 	config := Config{PodcastsDir: tmp}
 
-	addEpisodeToQueueFile(resolved.Dir, filepath.Base(paths[0]))
+	pipeline.AddToQueue(resolved.Dir, filepath.Base(paths[0]))
 
-	err := processSingleQueuedTarget(resolved.Dir, paths[0], "rm_ads", cli, config)
+	err := ProcessQueuedTarget(resolved.Dir, paths[0], "rm_ads", cli, config)
 	if err != nil {
-		t.Fatalf("processSingleQueuedTarget failed: %v", err)
+		t.Fatalf("ProcessQueuedTarget failed: %v", err)
 	}
 
 	qFile := filepath.Join(resolved.Dir, "queue.json")
@@ -477,12 +481,12 @@ func TestCountAllQueuedEpisodes(t *testing.T) {
 		t.Fatalf("expected 0 queued, got %d", count)
 	}
 
-	addEpisodeToQueueFile(p1, "E1.mp3")
+	pipeline.AddToQueue(p1, "E1.mp3")
 	if count := countAllQueuedEpisodes(tmp); count != 1 {
 		t.Fatalf("expected 1 queued, got %d", count)
 	}
 
-	addEpisodeToQueueFile(p2, "E2.mp3")
+	pipeline.AddToQueue(p2, "E2.mp3")
 	if count := countAllQueuedEpisodes(tmp); count != 2 {
 		t.Fatalf("expected 2 queued, got %d", count)
 	}
@@ -502,7 +506,7 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 	})
 	targetAudio := paths[0]
 	epFilename := filepath.Base(targetAudio)
-	addEpisodeToQueueFile(podDir, epFilename)
+	pipeline.AddToQueue(podDir, epFilename)
 
 	remoteWorkDir := filepath.Join(tempDir, "remote_root")
 	_ = os.MkdirAll(remoteWorkDir, 0755)
@@ -528,8 +532,8 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		remEpPath := filepath.Join(remoteWorkDir, relPath)
 		_ = os.MkdirAll(filepath.Dir(remEpPath), 0755)
 		_ = os.WriteFile(remEpPath, []byte("cleaned remote audio"), 0644)
-		remStat := statusPathFor(remEpPath)
-		_ = saveEpisodeStatus(remStat, &EpisodeStatusFile{
+		remStat := pipeline.StatusPathFor(remEpPath)
+		_ = pipeline.SaveEpisodeStatus(remStat, &EpisodeStatusFile{
 			MediaFile: "Ep 1.mp3",
 			Status:    StateReadyForCopyBack,
 			Original:  EpisodeAudioMeta{DurationSec: 100},
@@ -544,9 +548,9 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 		})
 	}()
 
-	err := processSingleQueuedTarget(podDir, targetAudio, "rm_ads", cli, cfg)
+	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", cli, cfg)
 	if err != nil {
-		t.Fatalf("processSingleQueuedTarget remote failed: %v", err)
+		t.Fatalf("ProcessQueuedTarget remote failed: %v", err)
 	}
 
 	qFile := filepath.Join(podDir, "queue.json")
@@ -631,8 +635,8 @@ func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
 	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
 		t.Fatalf("write mp3 failed: %v", err)
 	}
-	statPath := statusPathFor(mp3Path)
-	_ = saveEpisodeStatus(statPath, &EpisodeStatusFile{
+	statPath := pipeline.StatusPathFor(mp3Path)
+	_ = pipeline.SaveEpisodeStatus(statPath, &EpisodeStatusFile{
 		MediaFile: "podcast.mp3",
 		Status:    StateDownloaded,
 		Original:  EpisodeAudioMeta{DurationSec: 100},
@@ -705,7 +709,7 @@ func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
 
 	cfg := Config{
 		PodcastsDir: tmp,
-		BackendConfig: BackendConfig{
+		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,
 			AudiobookshelfToken: "test-tok",
 		},

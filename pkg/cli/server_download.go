@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/adremoval"
 	"abs/pkg/backend"
 	"abs/pkg/podcast"
 	"fmt"
@@ -145,7 +146,7 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 		if len(config.PostProcessors) > 0 {
 			runPostProcessors(config.PostProcessors, cli.Quiet)
 		} else {
-			processAudioFilesBatch(cli, config, "proc")
+			adremoval.ProcessBatch(cli, config, "proc")
 		}
 	}
 	return nil

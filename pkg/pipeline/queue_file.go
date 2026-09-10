@@ -1,0 +1,97 @@
+package pipeline
+
+import (
+	"encoding/json"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+
+	"abs/pkg/util"
+)
+
+// queueUpdateMu serialises queue writes within this process; the file lock
+// below serialises them against other processes. The CLI and the TUI each used
+// to keep their own copy of this function and their own mutex, so neither
+// excluded the other.
+var queueUpdateMu util.SyncMutex
+
+// UpdateQueue rewrites a podcast directory's queue.json under a file lock.
+func UpdateQueue(dir string, mutate func([]string) []string) error {
+	queueUpdateMu.Lock()
+	defer queueUpdateMu.Unlock()
+
+	path := filepath.Join(dir, "queue.json")
+	lock, err := util.AcquireFileLockWithTimeout(path, 5*time.Second)
+	if err != nil || lock == nil {
+		return fmt.Errorf("queue is locked: %w", err)
+	}
+	defer lock.Release()
+
+	var entries []string
+	if data, err := os.ReadFile(path); err == nil {
+		if err := json.Unmarshal(data, &entries); err != nil {
+			return err
+		}
+	}
+	entries = mutate(entries)
+	if entries == nil {
+		entries = []string{}
+	}
+	data, err := json.MarshalIndent(entries, "", "  ")
+	if err != nil {
+		return err
+	}
+	return util.WriteFileAtomic(path, append(data, '\n'), 0644)
+}
+
+// AddToQueue appends an episode to a podcast's queue, reporting whether it was
+// not already there.
+func AddToQueue(podDir, filename string) bool {
+	added := false
+	_ = UpdateQueue(podDir, func(entries []string) []string {
+		for _, e := range entries {
+			if strings.EqualFold(e, filename) {
+				return entries
+			}
+		}
+		added = true
+		return append(entries, filename)
+	})
+	return added
+}
+
+// RemoveFromQueue drops an episode from a podcast's queue, reporting whether it
+// was present.
+func RemoveFromQueue(podDir, filename string) bool {
+	found := false
+	_ = UpdateQueue(podDir, func(entries []string) []string {
+		var filtered []string
+		for _, e := range entries {
+			if strings.EqualFold(e, filename) {
+				found = true
+			} else {
+				filtered = append(filtered, e)
+			}
+		}
+		if found {
+			return filtered
+		}
+		return entries
+	})
+	return found
+}
+
+// QueuedEpisodes reports the episode filenames queued in a podcast directory.
+func QueuedEpisodes(podDir string) []string {
+	data, err := os.ReadFile(filepath.Join(podDir, "queue.json"))
+	if err != nil {
+		return nil
+	}
+	var filenames []string
+	if err := json.Unmarshal(data, &filenames); err != nil {
+		return nil
+	}
+	return filenames
+}

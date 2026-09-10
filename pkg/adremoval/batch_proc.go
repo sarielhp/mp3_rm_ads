@@ -1,6 +1,12 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/remote"
+	"abs/pkg/transcribe"
+	"abs/pkg/util"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -9,9 +15,9 @@ import (
 	"time"
 )
 
-func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
+func ProcessBatch(cli CLIOptions, config Config, action string) {
 	if cli.ProcSubcmd == "collect" {
-		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
+		if err := remote.RunRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
 			fatalError("Error collecting from remote %s: %v\n", cli.RemoteHost, err)
 		}
 		return
@@ -26,7 +32,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 		}
 	}
 
-	applyForceCLIOptions(&cli)
+	ApplyForceOptions(&cli)
 
 	args, ok := resolveTargetAudioArgs(cli, config)
 	if !ok {
@@ -55,7 +61,7 @@ func processAudioFilesBatch(cli CLIOptions, config Config, action string) {
 	executeLocalBatchProcessing(expandedArgs, cli, config, action)
 }
 
-func applyForceCLIOptions(cli *CLIOptions) {
+func ApplyForceOptions(cli *CLIOptions) {
 	if cli.Force == "" {
 		return
 	}
@@ -75,7 +81,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 	}
 
 	if cli.Podcast != "" {
-		targetDir, _, found := resolvePodcastDirByIDOrName(podcastsDir, cli.Podcast)
+		targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cli.Podcast)
 		if !found {
 			if !cli.Quiet {
 				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
@@ -88,7 +94,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 	if len(cli.Args) == 1 {
 		arg := cli.Args[0]
 		if !strings.HasSuffix(strings.ToLower(arg), ".mp3") && !strings.HasSuffix(strings.ToLower(arg), ".json") {
-			if targetDir, _, found := resolvePodcastDirByIDOrName(podcastsDir, arg); found {
+			if targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, arg); found {
 				return []string{targetDir}, true
 			}
 			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
@@ -133,7 +139,7 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 			if !cli.DryRun {
 				removeWorkDirs(arg)
 			}
-			rawMp3Files := findMP3Files(arg)
+			rawMp3Files := util.FindMP3Files(arg)
 			if len(rawMp3Files) == 0 {
 				if !cli.Quiet {
 					fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
@@ -165,7 +171,7 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 					}
 					continue
 				}
-				filtered := filterMP3FilesByPodcastConfig(fList, podFolder, podCfg)
+				filtered := podcast.FilterByAdRemovalPolicy(fList, podFolder, podCfg)
 				expandedArgs = append(expandedArgs, filtered...)
 			}
 		} else {
@@ -175,8 +181,8 @@ func expandDirectoryArgs(args []string, cli CLIOptions) []string {
 
 	if len(expandedArgs) > 1 {
 		sort.SliceStable(expandedArgs, func(i, j int) bool {
-			ti := getEpisodePublicationTime(expandedArgs[i])
-			tj := getEpisodePublicationTime(expandedArgs[j])
+			ti := podcast.GetEpisodePublicationTime(expandedArgs[i])
+			tj := podcast.GetEpisodePublicationTime(expandedArgs[j])
 			if ti.Equal(tj) {
 				return expandedArgs[i] < expandedArgs[j]
 			}
@@ -194,7 +200,7 @@ func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
 	if cli.Remote {
 		reqHost = config.RemoteHost
 	}
-	h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
+	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
 	if err == nil && isRem {
 		return h
 	}
@@ -203,7 +209,7 @@ func resolveRemoteProcessingTargetHost(cli CLIOptions, config Config) string {
 
 func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Config, targetHost string) {
 	if !cli.NoCollect && !cli.DryRun {
-		if err := runRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
+		if err := remote.RunRemotePull(&config, targetHost, nil, cli.Quiet, cli.Verbose); err != nil {
 			if !cli.Quiet {
 				fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
 			}
@@ -216,12 +222,12 @@ func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Co
 			continue
 		}
 		mainMP3File, _, _ := resolveAudioFiles(f, cli)
-		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (isEpisodeCompleted(mainMP3File) || isEpisodeInRemoteFlight(mainMP3File)) {
+		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && (pipeline.IsEpisodeCompleted(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
 			continue
 		}
 		filesToPush = append(filesToPush, f)
 	}
-	sortAudioFilesByDuration(filesToPush)
+	remote.SortAudioFilesByDuration(filesToPush)
 	if cli.Count > 0 && len(filesToPush) > cli.Count {
 		filesToPush = filesToPush[:cli.Count]
 	}
@@ -230,13 +236,13 @@ func handleRemoteBatchExecution(expandedArgs []string, cli CLIOptions, config Co
 		if remoteWorkDir == "" {
 			remoteWorkDir = "~/abs_remote"
 		}
-		_ = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
+		_ = remote.EnsureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
 		if !cli.Quiet {
 			fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 		}
 		return
 	}
-	if err := runRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
+	if err := remote.RunRemotePush(&config, filesToPush, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
 		fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
 	}
 }
@@ -247,7 +253,7 @@ func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config C
 		wp.Engine = WhisperEngine(cli.WhisperEngine)
 	}
 	if wp.Engine != WhisperEngineLocal && wp.Engine != WhisperEngineGemini {
-		wakeWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
+		transcribe.WakeServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet)
 	}
 
 	selectedProfile := selectProfile(config, cli.UseLLM)
@@ -268,7 +274,7 @@ func executeLocalBatchProcessing(expandedArgs []string, cli CLIOptions, config C
 
 	if (processedCount > 1 || totalFiles > 1) && !cli.Quiet {
 		batchDuration := time.Since(batchStartTime)
-		fmt.Printf("\nBatch Completed! Processed %d file(s) in %s.\n", processedCount, formatClock(batchDuration.Seconds()))
+		fmt.Printf("\nBatch Completed! Processed %d file(s) in %s.\n", processedCount, format.FormatClock(batchDuration.Seconds()))
 	}
 
 	os.Stdout.Sync()

@@ -1,6 +1,8 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/pipeline"
+	"abs/pkg/util"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -104,10 +106,10 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 	processSingleAudioFile(0, 1, 0, mp3,
 		cliTMin, Config{}, "proc", time.Now(), offlineProfile())
 
-	if fileExists(filepath.Join(dir, "ep.cuts.json")) {
+	if util.FileExists(filepath.Join(dir, "ep.cuts.json")) {
 		t.Errorf("--tminutes wrote ep.cuts.json; a preview run must not touch cut metadata")
 	}
-	if fileExists(mp3 + ".precut") {
+	if util.FileExists(mp3 + ".precut") {
 		t.Errorf("--tminutes created a .precut; it claims the original is not modified")
 	}
 	after, err := os.ReadFile(mp3)
@@ -133,7 +135,7 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 	processSingleAudioFile(0, 1, 0, mp3,
 		CLIOptions{Quiet: true}, Config{}, "proc", time.Now(), offlineProfile())
 
-	if fileExists(mp3 + ".precut") {
+	if util.FileExists(mp3 + ".precut") {
 		t.Errorf("no ads were detected, but the original was moved to .precut")
 	}
 	after, err := os.ReadFile(mp3)
@@ -168,15 +170,15 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	}
 
 	cutsFile := filepath.Join(dir, "ep.cuts.json")
-	if fileExists(cutsFile) {
+	if util.FileExists(cutsFile) {
 		t.Errorf("ep.cuts.json should not exist when LLM ad detection fails")
 	}
 
-	if isEpisodeCompleted(mp3) {
+	if pipeline.IsEpisodeCompleted(mp3) {
 		t.Errorf("episode must not be considered completed when ad detection fails")
 	}
 
-	st, err := loadEpisodeStatus(statusPathFor(mp3))
+	st, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3))
 	if err != nil || st == nil {
 		t.Fatalf("expected status file to exist: %v", err)
 	}

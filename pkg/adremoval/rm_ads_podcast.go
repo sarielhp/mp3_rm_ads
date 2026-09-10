@@ -1,4 +1,4 @@
-package cli
+package adremoval
 
 import (
 	"fmt"
@@ -9,6 +9,11 @@ import (
 	"unicode"
 
 	"abs/pkg/backend"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/remote"
+	"abs/pkg/util"
 )
 
 func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast, bool) {
@@ -41,15 +46,15 @@ func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast,
 		return nil, false
 	}
 
-	if res, err := resolveAnyID(podcastsDir, cleanCand); err == nil && res.IsPodcast() {
+	if res, err := podcast.ResolveAnyID(podcastsDir, cleanCand); err == nil && res.IsPodcast() {
 		if !isExcludedRootPodcastsDir(podcastsDir, res.Podcast.Dir) {
 			return res.Podcast, true
 		}
 	}
 
-	if dir, title, found := resolvePodcastDirByIDOrName(podcastsDir, cleanCand); found {
+	if dir, title, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cleanCand); found {
 		if !isExcludedRootPodcastsDir(podcastsDir, dir) {
-			shortID := getOrSetPodcastShortID(dir, title)
+			shortID := podcast.GetOrSetPodcastShortID(dir, title)
 			cfg := loadPodcastConfig(dir)
 			return &ResolvedPodcast{
 				Dir:        dir,
@@ -85,27 +90,27 @@ func handlePodcastRmAdsWorkflow(pod *ResolvedPodcast, cli CLIOptions, config Con
 
 	epFilename := queueItemFilename(pod.Dir, targetAudioPath)
 	displayEp := filepath.Base(targetAudioPath)
-	if strings.EqualFold(stripExt(displayEp), "podcast") {
-		if t := episodeTitleFromPath(targetAudioPath); t != "" {
+	if strings.EqualFold(util.StripExt(displayEp), "podcast") {
+		if t := podcast.EpisodeTitleFromPath(targetAudioPath); t != "" {
 			displayEp = t
 		}
 	}
 	if cli.DryRun {
 		if !cli.Quiet {
-			fmt.Printf("[Dry run] Would queue and process %s for ad removal.\n", displayName(displayEp))
+			fmt.Printf("[Dry run] Would queue and process %s for ad removal.\n", util.DisplayName(displayEp))
 		}
 		return nil
 	}
 
-	added := addEpisodeToQueueFile(pod.Dir, epFilename)
-	epID := getOrSetEpisodeShortID(pod.Dir, pod.ShortID, targetAudioPath)
-	title := episodeTitleFromPath(targetAudioPath)
+	added := pipeline.AddToQueue(pod.Dir, epFilename)
+	epID := podcast.GetOrSetEpisodeShortID(pod.Dir, pod.ShortID, targetAudioPath)
+	title := podcast.EpisodeTitleFromPath(targetAudioPath)
 
 	if !cli.Quiet {
 		if added {
-			fmt.Printf("Added to AdR queue: [%s] %s\n", boldCyan(epID), displayName(title))
+			fmt.Printf("Added to AdR queue: [%s] %s\n", util.BoldCyan(epID), util.DisplayName(title))
 		} else {
-			fmt.Printf("Already in AdR queue: [%s] %s\n", boldCyan(epID), displayName(title))
+			fmt.Printf("Already in AdR queue: [%s] %s\n", util.BoldCyan(epID), util.DisplayName(title))
 		}
 	}
 
@@ -121,18 +126,16 @@ func handlePodcastRmAdsWorkflow(pod *ResolvedPodcast, cli CLIOptions, config Con
 		return nil
 	}
 
-	return processSingleQueuedTarget(pod.Dir, targetAudioPath, action, cli, config)
+	return ProcessQueuedTarget(pod.Dir, targetAudioPath, action, cli, config)
 }
 
 func countAllQueuedEpisodes(podcastsDir string) int {
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
-	entries := scanPodcastDirs(podcastsDir)
 	total := 0
-	for _, p := range entries {
-		items := collectPodcastQueueItems(p)
-		total += len(items)
+	for _, p := range podcast.ScanPodcastDirs(podcastsDir) {
+		total += len(pipeline.QueuedEpisodes(p.Dir))
 	}
 	return total
 }
@@ -185,20 +188,20 @@ func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, confi
 
 	feedEpisodes, err := b.PodcastFeedEpisodes(feedURL)
 	if err != nil || len(feedEpisodes) == 0 {
-		feedEpisodes, _, _, _, _ = fetchFeedDirect(feedURL, "", "")
+		feedEpisodes, _, _, _, _ = podcast.FetchFeedDirect(feedURL, "", "")
 	}
 	if len(feedEpisodes) == 0 {
 		return "", false
 	}
 
 	sort.Slice(feedEpisodes, func(i, j int) bool {
-		return getPubMS(feedEpisodes[i]) > getPubMS(feedEpisodes[j])
+		return podcast.GetPubMS(feedEpisodes[i]) > podcast.GetPubMS(feedEpisodes[j])
 	})
 
 	for i, fe := range feedEpisodes {
 		localPath, isDownloaded := findLocalPathForFeedEpisode(pod.Dir, fe, targetItem)
 		if isDownloaded {
-			if isEpisodeClean(localPath) {
+			if pipeline.IsEpisodeClean(localPath) {
 				continue
 			}
 			return localPath, true
@@ -217,7 +220,7 @@ func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, confi
 	}
 
 	if !quiet {
-		fmt.Printf("All episodes for podcast %s already have ads removed.\n", displayName(pod.Title))
+		fmt.Printf("All episodes for podcast %s already have ads removed.\n", util.DisplayName(pod.Title))
 	}
 	return "", true
 }
@@ -225,7 +228,7 @@ func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, confi
 func resolveBackendPodcastAndFeed(b backend.Backend, pod *ResolvedPodcast, config Config) (string, *backend.Podcast) {
 	feedURL := ""
 	itemID := pod.UUID
-	if cached, _ := loadPodcastCache(pod.Dir); cached != nil {
+	if cached, _ := podcast.LoadPodcastCache(pod.Dir); cached != nil {
 		if cached.FeedURL != "" {
 			feedURL = cached.FeedURL
 		}
@@ -279,7 +282,7 @@ func isMatchingBackendPodcast(p *backend.Podcast, itemID string, pod *ResolvedPo
 	if pod.UUID != "" && p.ID == pod.UUID {
 		return true
 	}
-	if findPodcastDirForItem(*p, podcastsDir) == pod.Dir {
+	if podcast.FindPodcastDirForItem(*p, podcastsDir) == pod.Dir {
 		return true
 	}
 	if strings.EqualFold(p.Media.Metadata.Title, pod.Title) {
@@ -346,37 +349,37 @@ func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string,
 		if raw == "" {
 			return ""
 		}
-		if fileExists(raw) {
+		if util.FileExists(raw) {
 			return raw
 		}
-		if p := filepath.Join(podDir, raw); fileExists(p) {
+		if p := filepath.Join(podDir, raw); util.FileExists(p) {
 			return p
 		}
-		if p := filepath.Join(podDir, filepath.Base(raw)); fileExists(p) {
+		if p := filepath.Join(podDir, filepath.Base(raw)); util.FileExists(p) {
 			return p
 		}
 		epDirName := filepath.Base(filepath.Dir(raw))
 		if epDirName != "." && epDirName != "/" && epDirName != "" && epDirName != podBase {
-			if p := filepath.Join(podDir, epDirName, filepath.Base(raw)); fileExists(p) {
+			if p := filepath.Join(podDir, epDirName, filepath.Base(raw)); util.FileExists(p) {
 				return p
 			}
 		}
 
-		if p := filepath.Join(podRoot, raw); fileExists(p) {
+		if p := filepath.Join(podRoot, raw); util.FileExists(p) {
 			return p
 		}
 		trimmed := strings.TrimPrefix(raw, "/podcasts/")
 		trimmed = strings.TrimPrefix(trimmed, "podcasts/")
 		trimmed = strings.TrimPrefix(trimmed, "/")
-		if p := filepath.Join(podRoot, trimmed); fileExists(p) {
+		if p := filepath.Join(podRoot, trimmed); util.FileExists(p) {
 			return p
 		}
-		if p := filepath.Join(podDir, trimmed); fileExists(p) {
+		if p := filepath.Join(podDir, trimmed); util.FileExists(p) {
 			return p
 		}
 		if strings.HasPrefix(trimmed, podBase+"/") {
 			rel := strings.TrimPrefix(trimmed, podBase+"/")
-			if p := filepath.Join(podDir, rel); fileExists(p) {
+			if p := filepath.Join(podDir, rel); util.FileExists(p) {
 				return p
 			}
 		}
@@ -390,7 +393,7 @@ func resolveMatchingEpisodeAudioFile(podDir string, ep backend.Episode) (string,
 		return p, true
 	}
 	if ep.AudioFile.Metadata.Filename != "" {
-		if p := filepath.Join(podDir, ep.AudioFile.Metadata.Filename); fileExists(p) {
+		if p := filepath.Join(podDir, ep.AudioFile.Metadata.Filename); util.FileExists(p) {
 			return p, true
 		}
 	}
@@ -403,16 +406,16 @@ func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *ba
 	}
 
 	podBase := filepath.Base(podDir)
-	safeTitle := sanitizePodcastTitle(fe.Title)
+	safeTitle := podcast.SanitizeTitle(fe.Title)
 	feStripped := stripShowPrefix(fe.Title, podBase)
-	for _, mp3 := range findMP3Files(podDir) {
-		base := stripExt(filepath.Base(mp3))
-		title := episodeTitleFromPath(mp3)
+	for _, mp3 := range util.FindMP3Files(podDir) {
+		base := util.StripExt(filepath.Base(mp3))
+		title := podcast.EpisodeTitleFromPath(mp3)
 		baseStripped := stripShowPrefix(base, podBase)
 		titleStripped := stripShowPrefix(title, podBase)
 		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
 			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
-			strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
+			strings.EqualFold(podcast.SanitizeTitle(title), safeTitle) ||
 			strings.EqualFold(baseStripped, feStripped) ||
 			strings.EqualFold(titleStripped, feStripped) ||
 			isFuzzyEpisodeMatch(title, fe.Title) ||
@@ -423,7 +426,7 @@ func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *ba
 		if strings.EqualFold(base, "podcast") && title != "" {
 			detailKey = title + ".mp3"
 		}
-		if dt, _ := loadEpisodeDetails(podDir, detailKey); dt != nil {
+		if dt, _ := podcast.LoadEpisodeDetails(podDir, detailKey); dt != nil {
 			if (fe.GUID != "" && dt.Subtitle == fe.GUID) ||
 				(fe.Title != "" && strings.EqualFold(dt.Title, fe.Title)) {
 				return mp3, true
@@ -467,7 +470,7 @@ func downloadSingleFeedEpisode(b backend.Backend, item *backend.Podcast, podDir 
 	}
 
 	existingFiles := make(map[string]bool)
-	for _, f := range findMP3Files(podDir) {
+	for _, f := range util.FindMP3Files(podDir) {
 		existingFiles[f] = true
 	}
 
@@ -477,19 +480,19 @@ func downloadSingleFeedEpisode(b backend.Backend, item *backend.Podcast, podDir 
 
 	waitForBackendDownloads(b, itemID)
 
-	for _, f := range findMP3Files(podDir) {
+	for _, f := range util.FindMP3Files(podDir) {
 		if !existingFiles[f] {
 			return f, nil
 		}
 	}
 
-	safeTitle := sanitizePodcastTitle(fe.Title)
-	for _, f := range findMP3Files(podDir) {
-		base := stripExt(filepath.Base(f))
-		title := episodeTitleFromPath(f)
+	safeTitle := podcast.SanitizeTitle(fe.Title)
+	for _, f := range util.FindMP3Files(podDir) {
+		base := util.StripExt(filepath.Base(f))
+		title := podcast.EpisodeTitleFromPath(f)
 		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
 			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
-			strings.EqualFold(sanitizePodcastTitle(title), safeTitle) ||
+			strings.EqualFold(podcast.SanitizeTitle(title), safeTitle) ||
 			isFuzzyEpisodeMatch(title, fe.Title) {
 			return f, nil
 		}
@@ -502,7 +505,7 @@ func resolveDownloadPodcastID(item *backend.Podcast, podDir string) string {
 	if item != nil && item.ID != "" {
 		return item.ID
 	}
-	if cached, _ := loadPodcastCache(podDir); cached != nil {
+	if cached, _ := podcast.LoadPodcastCache(podDir); cached != nil {
 		return cached.ABSItemID
 	}
 	return ""
@@ -523,17 +526,17 @@ func waitForBackendDownloads(b backend.Backend, itemID string) {
 }
 
 func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (string, bool) {
-	mp3s := findMP3Files(podDir)
+	mp3s := util.FindMP3Files(podDir)
 	if len(mp3s) == 0 {
 		if !quiet {
-			fmt.Printf("All episodes for podcast %s already have ads removed.\n", displayName(podTitle))
+			fmt.Printf("All episodes for podcast %s already have ads removed.\n", util.DisplayName(podTitle))
 		}
 		return "", false
 	}
 
 	sort.Slice(mp3s, func(i, j int) bool {
-		ti := getEpisodePublicationTime(mp3s[i])
-		tj := getEpisodePublicationTime(mp3s[j])
+		ti := podcast.GetEpisodePublicationTime(mp3s[i])
+		tj := podcast.GetEpisodePublicationTime(mp3s[j])
 		if !ti.Equal(tj) {
 			return ti.After(tj)
 		}
@@ -541,23 +544,23 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 	})
 
 	for _, mp3 := range mp3s {
-		if !isEpisodeClean(mp3) {
+		if !pipeline.IsEpisodeClean(mp3) {
 			return mp3, true
 		}
 	}
 
 	if !quiet {
-		fmt.Printf("All episodes for podcast %s already have ads removed.\n", displayName(podTitle))
+		fmt.Printf("All episodes for podcast %s already have ads removed.\n", util.DisplayName(podTitle))
 	}
 	return "", false
 }
 
-func processSingleQueuedTarget(podDir, targetAudioPath, action string, cli CLIOptions, config Config) error {
+func ProcessQueuedTarget(podDir, targetAudioPath, action string, cli CLIOptions, config Config) error {
 	epFilename := queueItemFilename(podDir, targetAudioPath)
 	targetHost := resolveRemoteProcessingTargetHost(cli, config)
 
 	if targetHost != "" {
-		if err := runRemotePush(&config, []string{targetAudioPath}, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
+		if err := remote.RunRemotePush(&config, []string{targetAudioPath}, targetHost, nil, cli.Priority, cli.Quiet, cli.Verbose); err != nil {
 			return fmt.Errorf("error pushing episode to remote: %w", err)
 		}
 		if err := pollAndPullRemoteEpisode(config, cli, targetHost, targetAudioPath); err != nil {
@@ -567,8 +570,8 @@ func processSingleQueuedTarget(podDir, targetAudioPath, action string, cli CLIOp
 		executeLocalBatchProcessing([]string{targetAudioPath}, cli, config, action)
 	}
 
-	removeEpisodeFromQueueFile(podDir, epFilename)
-	removeEpisodeFromQueueFile(podDir, filepath.Base(targetAudioPath))
+	pipeline.RemoveFromQueue(podDir, epFilename)
+	pipeline.RemoveFromQueue(podDir, filepath.Base(targetAudioPath))
 	return nil
 }
 
@@ -585,8 +588,8 @@ func pollAndPullRemoteEpisode(config Config, cli CLIOptions, targetHost, targetA
 	}
 	startTime := time.Now()
 	for {
-		_ = runRemotePull(&config, targetHost, nil, true, cli.Verbose)
-		if isEpisodeClean(targetAudioPath) {
+		_ = remote.RunRemotePull(&config, targetHost, nil, true, cli.Verbose)
+		if pipeline.IsEpisodeClean(targetAudioPath) {
 			break
 		}
 		time.Sleep(3 * time.Second)
@@ -603,14 +606,14 @@ func printRemoteEpisodeSummary(targetAudioPath string, quiet bool) {
 	if quiet {
 		return
 	}
-	origDur, cleanDur := getEpisodeDurations(targetAudioPath, getOrCreateEpisodeStatus(targetAudioPath))
+	origDur, cleanDur := pipeline.EpisodeDurations(targetAudioPath, pipeline.GetOrCreateEpisodeStatus(targetAudioPath))
 	cutDur := origDur - cleanDur
 	pct := 0.0
 	if origDur > 0 {
 		pct = (cutDur / origDur) * 100
 	}
 	fmt.Printf("\nCompleted ad removal for %s\n", filepath.Base(targetAudioPath))
-	fmt.Printf("Original duration: %s\n", formatTime(origDur))
-	fmt.Printf("Cut duration:      %s (%.1f%% trimmed)\n", formatTime(cutDur), pct)
-	fmt.Printf("Cleaned duration:  %s\n", formatTime(cleanDur))
+	fmt.Printf("Original duration: %s\n", format.FormatTime(origDur))
+	fmt.Printf("Cut duration:      %s (%.1f%% trimmed)\n", format.FormatTime(cutDur), pct)
+	fmt.Printf("Cleaned duration:  %s\n", format.FormatTime(cleanDur))
 }

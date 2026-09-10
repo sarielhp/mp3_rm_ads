@@ -1,6 +1,8 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/gemini"
+	"abs/pkg/transcribe"
 	"context"
 	"fmt"
 	"strings"
@@ -86,18 +88,18 @@ type localRaceResult struct {
 
 func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp WhisperProfile, config Config, cli CLIOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
 	if wp.Engine == WhisperEngineLocal {
-		return runWhisperCLITranscriptionContext(ctx, audioPath, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
+		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, cli.Quiet, cli.Verbose, whisperPrompt, whisperLang)
 	}
 	chunkDuration := config.ChunkDurationSec
 	useChunks := cli.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 	if useChunks {
-		return transcribeChunks(
+		return transcribe.TranscribeChunks(
 			audioPath, wp.URL, cli.Quiet, cli.Verbose,
 			totalDuration, speedFactor, chunkDuration,
 			dockerContainer, whisperPrompt, whisperLang,
 		)
 	}
-	return transcribeWhisperContext(
+	return transcribe.TranscribeWhisperContext(
 		ctx, audioPath, wp.URL, cli.Quiet, cli.Verbose,
 		totalDuration, speedFactor, dockerContainer,
 		whisperPrompt, whisperLang, nil,
@@ -125,7 +127,7 @@ func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, con
 	}
 
 	go func() {
-		td, ads, err := ProcessWithGeminiConfig(ctx, audioPath, config, chunkDur)
+		td, ads, err := gemini.ProcessWithGeminiConfig(ctx, audioPath, config, chunkDur)
 		geminiCh <- geminiRaceResult{td: td, ads: ads, err: err}
 	}()
 

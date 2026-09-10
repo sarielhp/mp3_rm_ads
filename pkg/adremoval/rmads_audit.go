@@ -1,6 +1,10 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/audio"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -24,7 +28,7 @@ type transcriptAuditItem struct {
 	adFailed       bool
 }
 
-func runAuditTranscripts(config Config, cli CLIOptions) {
+func RunTranscriptAudit(config Config, cli CLIOptions) {
 	targets := cli.Args
 	if len(targets) == 0 {
 		if config.PodcastsDir == "" {
@@ -92,12 +96,12 @@ func auditDisplayName(p string) string {
 }
 
 func inspectEpisodeTranscript(audioPath string, minRatio float64, minChars int) *transcriptAuditItem {
-	base := stripExt(audioPath)
+	base := util.StripExt(audioPath)
 	transPath := base + ".transcript.json"
-	statPath := statusPathFor(audioPath)
+	statPath := pipeline.StatusPathFor(audioPath)
 	cutsPath := base + ".cuts.json"
 
-	if !fileExists(transPath) && !fileExists(statPath) {
+	if !util.FileExists(transPath) && !util.FileExists(statPath) {
 		return nil
 	}
 
@@ -108,17 +112,17 @@ func inspectEpisodeTranscript(audioPath string, minRatio float64, minChars int) 
 		cutsPath:       cutsPath,
 	}
 
-	st, _ := loadEpisodeStatus(statPath)
+	st, _ := pipeline.LoadEpisodeStatus(statPath)
 	if st != nil && st.Original.DurationSec > 0 {
 		item.audioDur = st.Original.DurationSec
 	} else {
-		item.audioDur = getAudioDuration(audioPath)
+		item.audioDur = audio.GetAudioDuration(audioPath)
 	}
 	if st != nil && st.AdDetectionSuccessful != nil && !*st.AdDetectionSuccessful {
 		item.adFailed = true
 	}
 
-	if !fileExists(transPath) {
+	if !util.FileExists(transPath) {
 		if item.adFailed {
 			return item
 		}
@@ -182,7 +186,7 @@ func evaluateTranscriptMetrics(item *transcriptAuditItem, td TranscriptionData, 
 func reportAndHealSuspicious(item *transcriptAuditItem, dryRun, quiet bool) {
 	if !quiet {
 		fmt.Printf("  [SUSPICIOUS] %s\n", auditDisplayName(item.audioPath))
-		fmt.Printf("      - Audio length:  %s (%.1fs)\n", formatTime(item.audioDur), item.audioDur)
+		fmt.Printf("      - Audio length:  %s (%.1fs)\n", format.FormatTime(item.audioDur), item.audioDur)
 		fmt.Printf("      - Issue:         %s\n", item.suspiciousMsg)
 		if dryRun {
 			fmt.Println("      - Action:        [DRY RUN] Would delete transcript and set status to NeedAdR")
@@ -191,13 +195,13 @@ func reportAndHealSuspicious(item *transcriptAuditItem, dryRun, quiet bool) {
 		}
 	}
 	if !dryRun {
-		if fileExists(item.transcriptPath) {
+		if util.FileExists(item.transcriptPath) {
 			_ = os.Remove(item.transcriptPath)
 		}
-		if fileExists(item.cutsPath) {
+		if util.FileExists(item.cutsPath) {
 			_ = os.Remove(item.cutsPath)
 		}
-		_ = updateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
+		_ = pipeline.UpdateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
 			st.Status = StateNeedsAdR
 			st.Cleaned = EpisodeAudioMeta{}
 			st.Ads = nil
@@ -217,7 +221,7 @@ func reportAndHealFailedAd(item *transcriptAuditItem, dryRun, quiet bool) {
 		}
 	}
 	if !dryRun {
-		_ = updateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
+		_ = pipeline.UpdateEpisodeStatus(item.audioPath, func(st *EpisodeStatusFile) {
 			st.Status = StateNeedsAdR
 		})
 	}
@@ -227,7 +231,7 @@ func printAuditSummary(scanned, suspicious, adFailed int, dryRun, quiet bool) {
 	if quiet {
 		return
 	}
-	fmt.Printf("\n%s\n", repeatStr("-", 50))
+	fmt.Printf("\n%s\n", util.RepeatStr("-", 50))
 	fmt.Println("TRANSCRIPT AUDIT SUMMARY:")
 	fmt.Printf("  - Scanned episodes:        %d\n", scanned)
 	fmt.Printf("  - Suspicious transcripts:  %d\n", suspicious)
@@ -235,7 +239,7 @@ func printAuditSummary(scanned, suspicious, adFailed int, dryRun, quiet bool) {
 	if dryRun {
 		fmt.Println("  (Dry-run mode: no files were modified or deleted)")
 	}
-	fmt.Printf("%s\n\n", repeatStr("-", 50))
+	fmt.Printf("%s\n\n", util.RepeatStr("-", 50))
 }
 
 func collectAudioFilesForAudit(targets []string) []string {
@@ -246,7 +250,7 @@ func collectAudioFilesForAudit(targets []string) []string {
 			continue
 		}
 		if fi.IsDir() {
-			files = append(files, findMP3Files(target)...)
+			files = append(files, util.FindMP3Files(target)...)
 		} else if strings.HasSuffix(strings.ToLower(target), ".mp3") {
 			files = append(files, target)
 		}

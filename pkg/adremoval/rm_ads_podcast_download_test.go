@@ -1,4 +1,4 @@
-package cli
+package adremoval
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"abs/pkg/backend"
+	"abs/pkg/types"
 )
 
 func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
@@ -77,7 +78,7 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 
 	cfg := Config{
 		PodcastsDir: tmp,
-		BackendConfig: BackendConfig{
+		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,
 			AudiobookshelfToken: "test-tok",
 		},

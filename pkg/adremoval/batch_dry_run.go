@@ -1,6 +1,9 @@
-package cli
+package adremoval
 
 import (
+	"abs/pkg/pipeline"
+	"abs/pkg/remote"
+	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -16,8 +19,8 @@ type dryRunFileStatus struct {
 
 func auditFileStatus(inputFile string, cli CLIOptions) (category string, statusText string) {
 	mainMP3File, precutFile, _ := resolveAudioFiles(inputFile, cli)
-	statFile := statusPathFor(mainMP3File)
-	st, _ := loadEpisodeStatus(statFile)
+	statFile := pipeline.StatusPathFor(mainMP3File)
+	st, _ := pipeline.LoadEpisodeStatus(statFile)
 
 	if st != nil {
 		switch st.Status {
@@ -30,20 +33,20 @@ func auditFileStatus(inputFile string, cli CLIOptions) (category string, statusT
 		}
 	}
 
-	baseName := stripExt(mainMP3File)
+	baseName := util.StripExt(mainMP3File)
 	jsonFile := cli.TranscriptPath
 	if jsonFile == "" {
 		jsonFile = baseName + ".transcript.json"
 	}
 	cutsFile := baseName + ".cuts.json"
 
-	if !fileExists(jsonFile) {
+	if !util.FileExists(jsonFile) {
 		return "needs_tx", "Needs Transcription"
 	}
-	if !fileExists(cutsFile) {
+	if !util.FileExists(cutsFile) {
 		return "needs_llm", "Needs Ad Detection (LLM)"
 	}
-	if fileExists(precutFile) {
+	if util.FileExists(precutFile) {
 		return "completed", "Completed (Ad-Free)"
 	}
 	data, err := os.ReadFile(cutsFile)
@@ -62,12 +65,12 @@ func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
 	if cli.Remote {
 		reqHost = config.RemoteHost
 	}
-	h, isRem, err := ResolveProcessingHost(&config, reqHost, nil)
+	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
 	if err != nil || !isRem || h == "" {
 		return 0, ""
 	}
-	transport := getRemoteTransport()
-	if !isRemoteHostReachable(h, transport) {
+	transport := remote.GetRemoteTransport()
+	if !remote.IsRemoteHostReachable(h, transport) {
 		return 0, h
 	}
 	remoteWorkDir := "~/abs_remote"
@@ -78,7 +81,7 @@ func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
 	remoteDoneFile := fmt.Sprintf("%s/done.json", remoteWorkDir)
 	remoteReadyOnServer := 0
 	if err := transport.Download(h, remoteDoneFile, tempDonePath); err == nil {
-		if doneM, err := loadDoneManifest(tempDonePath); err == nil && doneM != nil {
+		if doneM, err := remote.LoadDoneManifest(tempDonePath); err == nil && doneM != nil {
 			for _, it := range doneM.Episodes {
 				if it.Status == StateReadyForCopyBack {
 					remoteReadyOnServer++
@@ -93,7 +96,7 @@ func fetchRemoteReadyCount(cli CLIOptions, config Config) (int, string) {
 func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, cli CLIOptions, details []dryRunFileStatus) {
 	totalNeedingAction := needsTx + needsLLM + needsCut
 	fmt.Println()
-	fmt.Println(bold("DRY RUN: Audio Processing Pipeline Status"))
+	fmt.Println(util.Bold("DRY RUN: Audio Processing Pipeline Status"))
 	fmt.Println(strings.Repeat("─", 55))
 	fmt.Printf("  • Total Episodes Scanned:        %d\n", filesCount)
 	fmt.Printf("  • Needs Transcription (Whisper): %d\n", needsTx)
@@ -107,7 +110,7 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	}
 	fmt.Printf("  • Already Processed / Ad-Free:   %d\n", alreadyComplete)
 	fmt.Println(strings.Repeat("─", 55))
-	fmt.Printf("  Total Needing Local Processing:  %s\n", bold(fmt.Sprintf("%d", totalNeedingAction)))
+	fmt.Printf("  Total Needing Local Processing:  %s\n", util.Bold(fmt.Sprintf("%d", totalNeedingAction)))
 	if cli.Count > 0 && totalNeedingAction > cli.Count {
 		fmt.Printf("  (Limit -n %d: would process first %d of %d episodes)\n", cli.Count, cli.Count, totalNeedingAction)
 	}
@@ -116,7 +119,7 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	if cli.Verbose {
 		fmt.Println("Episode Details:")
 		for _, d := range details {
-			fmt.Printf("  [%s] %s\n", d.status, displayName(d.path))
+			fmt.Printf("  [%s] %s\n", d.status, util.DisplayName(d.path))
 		}
 		fmt.Println()
 	}

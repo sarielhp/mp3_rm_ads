@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/adremoval"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -245,20 +246,6 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 	return nil
 }
 
-func addEpisodeToQueueFile(podDir, filename string) bool {
-	added := false
-	_ = updateQueue(podDir, func(entries []string) []string {
-		for _, e := range entries {
-			if strings.EqualFold(e, filename) {
-				return entries
-			}
-		}
-		added = true
-		return append(entries, filename)
-	})
-	return added
-}
-
 func addPodcastEpisodesToQueue(podDir string) int {
 	mp3s := findMP3Files(podDir)
 	var candidates []string
@@ -311,25 +298,6 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 		}
 	}
 	return nil
-}
-
-func removeEpisodeFromQueueFile(podDir, filename string) bool {
-	found := false
-	_ = updateQueue(podDir, func(entries []string) []string {
-		var filtered []string
-		for _, e := range entries {
-			if strings.EqualFold(e, filename) {
-				found = true
-			} else {
-				filtered = append(filtered, e)
-			}
-		}
-		if found {
-			return filtered
-		}
-		return entries
-	})
-	return found
 }
 
 func handleQueueClear(podcastsDir, target string) error {
@@ -390,7 +358,7 @@ func handleQueueRun(cfg Config, cli CLIOptions, target string) error {
 		return nil
 	}
 
-	applyForceCLIOptions(&cli)
+	adremoval.ApplyForceOptions(&cli)
 	return executeQueueRun(items, cli, cfg)
 }
 
@@ -469,7 +437,7 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 			continue
 		}
 
-		err := processSingleQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli, cfg)
+		err := adremoval.ProcessQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli, cfg)
 		if err != nil {
 			if !cli.Quiet {
 				fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", it.Filename, err)

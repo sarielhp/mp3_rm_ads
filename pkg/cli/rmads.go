@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/adremoval"
 	"fmt"
 
 	"github.com/sarielhp/clihelp"
@@ -215,7 +216,7 @@ func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command
 
 func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 	if cli.ProcSubcmd == "audit" {
-		runAuditTranscripts(config, cli)
+		adremoval.RunTranscriptAudit(config, cli)
 		return nil
 	}
 	if cli.ProcSubcmd == "recut" {
@@ -237,6 +238,6 @@ func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 		}
 		return nil
 	}
-	processAudioFilesBatch(cli, config, action)
+	adremoval.ProcessBatch(cli, config, action)
 	return nil
 }
