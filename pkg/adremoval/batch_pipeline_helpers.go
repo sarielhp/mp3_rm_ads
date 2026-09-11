@@ -107,9 +107,9 @@ func detectScriptLanguage(text string) string {
 
 func printTimingSummary(verbose bool, originalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println("\nTIMING SUMMARY:")
-	fmt.Printf("   - Original Length:     %s (%.1fs)\n", format.FormatTime(originalDuration), originalDuration)
+	fmt.Printf("   - Original Length:     %s (%.1fs)\n", format.FormatMinutes(originalDuration), originalDuration)
 	fmt.Printf("   - Time Cut:            %s (%.1fs)\n", format.FormatTime(actualCut), actualCut)
-	fmt.Printf("   - New Episode Length:  %s (%.1fs)\n", format.FormatTime(newDuration), newDuration)
+	fmt.Printf("   - New Episode Length:  %s (%.1fs)\n", format.FormatMinutes(newDuration), newDuration)
 	if verbose {
 		fmt.Printf("   - Running Times:\n")
 		fmt.Printf("       - Step 1 (Transcription): %s\n", format.FormatClock(step1.Seconds()))
@@ -124,9 +124,9 @@ func printTimingSummary(verbose bool, originalDuration, newDuration, actualCut f
 func printFullSummary(verbose bool, totalDuration, newDuration, actualCut float64, pctCut float64, numAds int, step1, step2, step3 time.Duration, total time.Duration) {
 	fmt.Println()
 	fmt.Println("DURATION & TIME SAVED SUMMARY:")
-	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", format.FormatTime(totalDuration), totalDuration)
+	fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", format.FormatMinutes(totalDuration), totalDuration)
 	fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs across %d segment(s))\n", format.FormatTime(actualCut), actualCut, numAds)
-	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", format.FormatTime(newDuration), newDuration)
+	fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", format.FormatMinutes(newDuration), newDuration)
 	fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
 	if verbose {
 		fmt.Printf("  - Running Times:\n")
@@ -185,6 +185,7 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 		chunkDur = float64(config.ChunkDurationSec)
 	}
 	td, ads, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
+	transcribe.StampBackend(td, WhisperEngineGemini, config.GetGeminiModel())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nError processing with Gemini Flash: %v\n\n", err)
 		return false

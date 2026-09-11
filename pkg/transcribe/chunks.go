@@ -42,7 +42,7 @@ func TranscribeChunksContext(ctx context.Context, audioPath, whisperURL string, 
 
 	if !quiet {
 		fmt.Printf("   Converting to WAV and splitting %s audio into %d chunks of %s...\n",
-			format.FormatTime(totalDuration), numChunks, format.FormatTime(maxChunk))
+			format.FormatMinutes(totalDuration), numChunks, format.FormatMinutes(maxChunk))
 	}
 
 	workDir := util.WorkDirFor(audioPath)

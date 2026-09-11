@@ -13,6 +13,7 @@ import (
 	"abs/pkg/audio"
 	"abs/pkg/config"
 	"abs/pkg/format"
+	"abs/pkg/transcribe"
 	"abs/pkg/types"
 	"abs/pkg/util"
 )
@@ -255,7 +256,7 @@ func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg types.Co
 	if config.ResolveGeminiAPIKey(&cfg) != "" {
 		backendLabel, model = "Google AI Studio", cfg.GetGeminiModel()
 	}
-	fmt.Println("\n" + util.BoldCyan(fmt.Sprintf("Transcription: Gemini via %s (model: %s)", backendLabel, model)))
+	transcribe.AnnounceUsing(types.WhisperEngineGemini, fmt.Sprintf("(%s, model: %s)", backendLabel, model), false)
 	fmt.Println(util.BoldCyan(fmt.Sprintf("Ad detection: Gemini via %s (model: %s; combined with transcription)", backendLabel, model)))
 	totDur := audio.GetAudioDuration(audioPath)
 	if totDur <= 0 {

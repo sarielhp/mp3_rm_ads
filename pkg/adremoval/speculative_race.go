@@ -1,6 +1,7 @@
 package adremoval
 
 import (
+	"abs/pkg/detect"
 	"abs/pkg/gemini"
 	"abs/pkg/transcribe"
 	"abs/pkg/util"
@@ -51,29 +52,10 @@ func whisperProfileSupportsLanguage(wp WhisperProfile, lang string) bool {
 	return false
 }
 
+// resolveLocalWhisperProfile routes to the fastest backend that supports the
+// audio's language; detect owns the rule so every pipeline shares it.
 func resolveLocalWhisperProfile(config Config, isHebrew bool) WhisperProfile {
-	wp := getActiveWhisperProfile(config)
-	if !isHebrew {
-		if wp.Engine == WhisperEngineGemini {
-			fallbackCfg := prepareWhisperFallbackConfig(config)
-			return getActiveWhisperProfile(fallbackCfg)
-		}
-		return wp
-	}
-	if whisperProfileSupportsLanguage(wp, "he") && wp.Engine != WhisperEngineGemini {
-		return wp
-	}
-	for _, p := range config.WhisperProfiles {
-		if p.Engine == WhisperEngineDocker && whisperProfileSupportsLanguage(p, "he") {
-			return normalizeWhisperProfile(p)
-		}
-	}
-	for _, p := range config.WhisperProfiles {
-		if p.Engine != WhisperEngineGemini && whisperProfileSupportsLanguage(p, "he") {
-			return normalizeWhisperProfile(p)
-		}
-	}
-	return wp
+	return detect.ResolveLocalWhisperProfile(config, isHebrew)
 }
 
 type geminiRaceResult struct {
@@ -87,7 +69,8 @@ type localRaceResult struct {
 	err error
 }
 
-func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp WhisperProfile, config Config, opts ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*TranscriptionData, error) {
+func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp WhisperProfile, config Config, opts ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *TranscriptionData, err error) {
+	defer func() { transcribe.StampBackend(td, wp.Engine, wp.Model) }()
 	if wp.Engine == WhisperEngineLocal {
 		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
 	}
@@ -116,7 +99,7 @@ func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, con
 	if isHebrew && whisperLang == "" {
 		whisperLang = "he"
 	}
-	localWp := resolveLocalWhisperProfile(config, isHebrew)
+	localWp := detect.ResolveWhisperProfileForLanguage(config, detect.WhisperTargetLanguage(config, isHebrew, whisperLang))
 	if isHebrew && !opts.Quiet {
 		fmt.Printf("   Hebrew detected: routed local Whisper to %s (%s)\n", localWp.Name, whisperEngineBadge(localWp.Engine))
 	}
@@ -131,6 +114,7 @@ func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, con
 
 	go func() {
 		td, ads, err := gemini.ProcessWithGeminiConfig(ctx, audioPath, config, chunkDur)
+		transcribe.StampBackend(td, WhisperEngineGemini, config.GetGeminiModel())
 		geminiCh <- geminiRaceResult{td: td, ads: ads, err: err}
 	}()
 

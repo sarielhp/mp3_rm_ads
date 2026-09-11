@@ -35,3 +35,20 @@ func FormatSRTTime(seconds float64) string {
 	millis := int(math.Mod(sec, 1) * 1000)
 	return fmt.Sprintf("%02d:%02d:%02d,%03d", hrs, mins, secs, millis)
 }
+
+// FormatMinutes renders an audio length in whole minutes, the unit episode
+// lengths are reported in: a 1:40:00 episode reads as "100 minutes".
+func FormatMinutes(seconds float64) string {
+	if math.IsNaN(seconds) || math.IsInf(seconds, 0) || seconds <= 0 {
+		return "unknown"
+	}
+	mins := int(math.Round(seconds / 60))
+	switch {
+	case mins < 1:
+		return "<1 minute"
+	case mins == 1:
+		return "1 minute"
+	default:
+		return fmt.Sprintf("%d minutes", mins)
+	}
+}

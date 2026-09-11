@@ -3,6 +3,7 @@ package detect
 import (
 	"context"
 	"fmt"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -54,29 +55,76 @@ func WhisperProfileSupportsLanguage(wp types.WhisperProfile, lang string) bool {
 	return false
 }
 
+// WhisperTargetLanguage decides which language the Whisper backend has to
+// support: an explicitly requested language wins, Hebrew detection comes
+// next, and anything else is assumed to be English.
+func WhisperTargetLanguage(cfg types.Config, isHebrew bool, requested string) string {
+	if requested != "" && !strings.EqualFold(requested, "auto") {
+		return requested
+	}
+	if isHebrew {
+		return "he"
+	}
+	if cfg.WhisperLanguage != "" && !strings.EqualFold(cfg.WhisperLanguage, "auto") {
+		return cfg.WhisperLanguage
+	}
+	return "en"
+}
+
+// WhisperProfileUsable reports whether a profile can actually run, so
+// speed-based routing never picks a local program whose binary or model file
+// is missing. It is a variable so tests can route without touching the host.
+var WhisperProfileUsable = func(wp types.WhisperProfile) bool {
+	if wp.Engine != types.WhisperEngineLocal {
+		return wp.URL != ""
+	}
+	bin := transcribe.ResolveWhisperCLIBinary(wp.CliBinary)
+	if _, err := exec.LookPath(bin); err != nil {
+		return false
+	}
+	_, err := transcribe.ResolveWhisperModelPath(wp.Model)
+	return err == nil
+}
+
+// ResolveWhisperProfileForLanguage picks the fastest usable Whisper backend
+// that supports lang. Speed decides rather than the configured default,
+// because the backends differ by an order of magnitude: English routes to the
+// local whisper-cli program, while Hebrew, which the English-only models
+// cannot handle, falls back to the Docker server.
+func ResolveWhisperProfileForLanguage(cfg types.Config, lang string) types.WhisperProfile {
+	active := config.GetActiveWhisperProfile(&cfg)
+	var best types.WhisperProfile
+	found := false
+	for _, p := range cfg.WhisperProfiles {
+		wp := config.NormalizeWhisperProfile(p)
+		if wp.Engine == types.WhisperEngineGemini || !WhisperProfileSupportsLanguage(wp, lang) || !WhisperProfileUsable(wp) {
+			continue
+		}
+		if !found || fasterWhisperProfile(wp, best, active) {
+			best, found = wp, true
+		}
+	}
+	if found {
+		return best
+	}
+	if active.Engine == types.WhisperEngineGemini {
+		fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
+		return config.GetActiveWhisperProfile(&fallbackCfg)
+	}
+	return active
+}
+
+func fasterWhisperProfile(candidate, best, active types.WhisperProfile) bool {
+	if candidate.SpeedFactor != best.SpeedFactor {
+		return candidate.SpeedFactor > best.SpeedFactor
+	}
+	return candidate.ID == active.ID
+}
+
+// ResolveLocalWhisperProfile keeps the Hebrew/English shorthand used by the
+// speculative race, where Gemini is already the other racer.
 func ResolveLocalWhisperProfile(cfg types.Config, isHebrew bool) types.WhisperProfile {
-	wp := config.GetActiveWhisperProfile(&cfg)
-	if !isHebrew {
-		if wp.Engine == types.WhisperEngineGemini {
-			fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
-			return config.GetActiveWhisperProfile(&fallbackCfg)
-		}
-		return wp
-	}
-	if WhisperProfileSupportsLanguage(wp, "he") && wp.Engine != types.WhisperEngineGemini {
-		return wp
-	}
-	for _, p := range cfg.WhisperProfiles {
-		if p.Engine == types.WhisperEngineDocker && WhisperProfileSupportsLanguage(p, "he") {
-			return config.NormalizeWhisperProfile(p)
-		}
-	}
-	for _, p := range cfg.WhisperProfiles {
-		if p.Engine != types.WhisperEngineGemini && WhisperProfileSupportsLanguage(p, "he") {
-			return config.NormalizeWhisperProfile(p)
-		}
-	}
-	return wp
+	return ResolveWhisperProfileForLanguage(cfg, WhisperTargetLanguage(cfg, isHebrew, ""))
 }
 
 type GeminiRaceResult struct {
@@ -90,10 +138,12 @@ type LocalRaceResult struct {
 	Err error
 }
 
-func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp types.WhisperProfile, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*types.TranscriptionData, error) {
+func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp types.WhisperProfile, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *types.TranscriptionData, err error) {
+	defer func() { transcribe.StampBackend(td, wp.Engine, wp.Model) }()
 	if wp.Engine == types.WhisperEngineLocal {
 		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
 	}
+	transcribe.AnnounceWhisperServer(wp.URL, wp.Engine, dockerContainer, opts.Quiet)
 	chunkDuration := cfg.ChunkDurationSec
 	useChunks := opts.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 	if useChunks {
@@ -126,7 +176,7 @@ func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg
 	if isHebrew && whisperLang == "" {
 		whisperLang = "he"
 	}
-	localWp := ResolveLocalWhisperProfile(cfg, isHebrew)
+	localWp := ResolveWhisperProfileForLanguage(cfg, WhisperTargetLanguage(cfg, isHebrew, whisperLang))
 	if isHebrew && !opts.Quiet {
 		fmt.Printf("   Hebrew detected: routed local Whisper to %s (%s)\n", localWp.Name, config.WhisperEngineBadge(localWp.Engine))
 	}
@@ -141,6 +191,7 @@ func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg
 
 	go func() {
 		td, ads, err := gemini.ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDur)
+		transcribe.StampBackend(td, types.WhisperEngineGemini, cfg.GetGeminiModel())
 		geminiCh <- GeminiRaceResult{TD: td, Ads: ads, Err: err}
 	}()
 

@@ -5,6 +5,7 @@ import (
 	"abs/pkg/detect"
 	"abs/pkg/format"
 	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 	"abs/pkg/remote"
 	"abs/pkg/transcribe"
 	"abs/pkg/util"
@@ -279,17 +280,33 @@ func checkSkipOrLockAudioFile(mainMP3File, inputFile string, idx, totalFiles, pr
 	}
 
 	if !opts.Quiet {
-		if opts.Count > 0 {
-			fmt.Println()
-			fmt.Printf("Processing (%d/%d limit):\n  %s\n  %s\n", processedCount, opts.Count, filepath.Dir(inputFile), util.Bold(filepath.Base(inputFile)))
-		} else if totalFiles > 1 {
-			fmt.Println()
-			fmt.Printf("Processing (%d/%d):\n  %s\n  %s\n", idx+1, totalFiles, filepath.Dir(inputFile), util.Bold(filepath.Base(inputFile)))
-		} else {
-			fmt.Printf("Processing: %s\n", util.Bold(shortName))
-		}
+		printEpisodeHeader(inputFile, idx, totalFiles, processedCount, opts)
 	}
 	return fileLock, true, false
+}
+
+// printEpisodeHeader leads with the podcast and the episode, each on its own
+// line, so the two names are readable before any processing detail.
+func printEpisodeHeader(inputFile string, idx, totalFiles, processedCount int, opts ProcOptions) {
+	fmt.Println()
+	// Resolve first: a relative argument would otherwise name the podcast ".".
+	resolved := inputFile
+	if abs, err := filepath.Abs(inputFile); err == nil {
+		resolved = abs
+	}
+	podcastDir := podcast.DetectPodcastDirForAudio(resolved)
+	podcastName := filepath.Base(podcastDir)
+	episodeName := podcast.EpisodeTitleFromPath(resolved)
+	fmt.Printf("%s %s\n", util.BoldCyan("Podcast:"), util.Bold(util.DisplayName(podcastName)))
+	fmt.Printf("%s %s\n", util.BoldCyan("Episode:"), util.Bold(util.DisplayName(episodeName)))
+	switch {
+	case opts.Count > 0:
+		fmt.Printf("Processing (%d/%d limit): %s\n", processedCount, opts.Count, podcastDir)
+	case totalFiles > 1:
+		fmt.Printf("Processing (%d/%d): %s\n", idx+1, totalFiles, podcastDir)
+	default:
+		fmt.Printf("Processing: %s\n", podcastDir)
+	}
 }
 
 func detectAndSanitizeTranscriptLanguage(transcriptionData *TranscriptionData, whisperLanguage string, isNewlyTranscribed, quiet bool) {

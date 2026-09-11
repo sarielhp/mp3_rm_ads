@@ -33,6 +33,10 @@ type TranscriptionData struct {
 	Text     string                 `json:"text"`
 	Segments []TranscriptionSegment `json:"segments"`
 	Language string                 `json:"language,omitempty"`
+	// Backend and Model record which engine produced this transcript, so a
+	// saved transcript can be traced back to the backend that made it.
+	Backend string `json:"whisper_backend,omitempty"`
+	Model   string `json:"whisper_model,omitempty"`
 }
 
 type CutEntry struct {

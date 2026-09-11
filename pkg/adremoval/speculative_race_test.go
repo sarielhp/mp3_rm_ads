@@ -4,6 +4,9 @@ import (
 	"context"
 	"errors"
 	"testing"
+
+	"abs/pkg/detect"
+	"abs/pkg/types"
 )
 
 func TestContainsHebrew(t *testing.T) {
@@ -49,23 +52,29 @@ func TestWhisperProfileSupportsLanguage(t *testing.T) {
 }
 
 func TestResolveLocalWhisperProfileHebrewRouting(t *testing.T) {
+	restore := detect.WhisperProfileUsable
+	detect.WhisperProfileUsable = func(types.WhisperProfile) bool { return true }
+	defer func() { detect.WhisperProfileUsable = restore }()
+
 	cfg := Config{
 		WhisperConfig: WhisperConfig{
 			ActiveWhisperID: 1,
 			WhisperProfiles: []WhisperProfile{
 				{
-					ID:        1,
-					Name:      "Local CLI",
-					Engine:    WhisperEngineLocal,
-					Model:     "tiny.en",
-					Languages: []string{"en"},
+					ID:          1,
+					Name:        "Local CLI",
+					Engine:      WhisperEngineLocal,
+					Model:       "tiny.en",
+					SpeedFactor: 70,
+					Languages:   []string{"en"},
 				},
 				{
-					ID:        2,
-					Name:      "Docker Daemon",
-					Engine:    WhisperEngineDocker,
-					URL:       "http://localhost:8088/inference",
-					Languages: []string{"en", "he"},
+					ID:          2,
+					Name:        "Docker Daemon",
+					Engine:      WhisperEngineDocker,
+					URL:         "http://localhost:8088/inference",
+					SpeedFactor: 7,
+					Languages:   []string{"en", "he"},
 				},
 			},
 		},
@@ -79,6 +88,22 @@ func TestResolveLocalWhisperProfileHebrewRouting(t *testing.T) {
 	wpHe := resolveLocalWhisperProfile(cfg, true)
 	if wpHe.ID != 2 {
 		t.Errorf("expected profile 2 (Docker) for Hebrew, got %d", wpHe.ID)
+	}
+
+	// English must route to the faster local program even when the slower
+	// Docker server is the configured default.
+	cfg.ActiveWhisperID = 2
+	if wp := resolveLocalWhisperProfile(cfg, false); wp.ID != 1 {
+		t.Errorf("expected profile 1 (local program) for English with Docker active, got %d", wp.ID)
+	}
+	if wp := resolveLocalWhisperProfile(cfg, true); wp.ID != 2 {
+		t.Errorf("expected profile 2 (Docker) for Hebrew with Docker active, got %d", wp.ID)
+	}
+
+	// A local program that cannot run must never be routed to.
+	detect.WhisperProfileUsable = func(wp types.WhisperProfile) bool { return wp.Engine != WhisperEngineLocal }
+	if wp := resolveLocalWhisperProfile(cfg, false); wp.ID != 2 {
+		t.Errorf("expected profile 2 (Docker) when the local program is unusable, got %d", wp.ID)
 	}
 }
 

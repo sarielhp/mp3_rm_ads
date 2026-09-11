@@ -212,9 +212,9 @@ func FinishRecutStatusAndSummary(mainMP3File, precutFile, outputFile string, tot
 	if !opts.Quiet {
 		fmt.Println()
 		fmt.Println("DURATION & TIME SAVED SUMMARY (RECUT):")
-		fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", format.FormatTime(totalDuration), totalDuration)
+		fmt.Printf("  - Original Episode Length: %s (%.1fs)\n", format.FormatMinutes(totalDuration), totalDuration)
 		fmt.Printf("  - Total Ad Time Cut:       %s (%.1fs)\n", format.FormatTime(actualCut), actualCut)
-		fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", format.FormatTime(newDuration), newDuration)
+		fmt.Printf("  - New Episode Length:      %s (%.1fs)\n", format.FormatMinutes(newDuration), newDuration)
 		fmt.Printf("  - Reduction:               %.1f%% of episode trimmed\n", pctCut)
 		fmt.Printf("  - Total Recut Time:        %s\n", format.FormatClock(time.Since(fileStartTime).Seconds()))
 		fmt.Printf("Success! Recut ad-free episode saved to: '%s'\n", outputFile)
@@ -302,22 +302,32 @@ func ExtractMetadataPrompt(sourceAudioFile string, id3TagsOut map[string]string,
 	return extracted
 }
 
-func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (*types.TranscriptionData, error) {
+func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *types.TranscriptionData, err error) {
 	wp := config.GetActiveWhisperProfile(&cfg)
+	// wp is reassigned by routing and by the Gemini fallback, so the stamp is
+	// deferred until the backend that actually produced the result is known.
+	defer func() { transcribe.StampBackend(td, wp.Engine, wp.Model) }()
+	isHebrew := detect.IsHebrewAudio(sourceAudioFile, nil, whisperLang)
+	if isHebrew && whisperLang == "" {
+		whisperLang = "he"
+	}
 	if opts.WhisperEngine != "" {
 		wp.Engine = types.WhisperEngine(opts.WhisperEngine)
+	} else if wp.Engine != types.WhisperEngineGemini {
+		// Route by language: the backends differ by an order of magnitude in
+		// speed, and the English-only models cannot handle every language.
+		lang := detect.WhisperTargetLanguage(cfg, isHebrew, whisperLang)
+		routed := detect.ResolveWhisperProfileForLanguage(cfg, lang)
+		if routed.ID != wp.ID && !opts.Quiet {
+			fmt.Printf("   Language %s: routing to %s (%s)\n", strings.ToUpper(lang), routed.Name, config.WhisperEngineBadge(routed.Engine))
+		}
+		wp = routed
+		if wp.URL != "" {
+			cfg.WhisperURL = wp.URL
+		}
 	}
 	if opts.WhisperModel != "" {
 		wp.Model = opts.WhisperModel
-	}
-	if detect.IsHebrewAudio(sourceAudioFile, nil, whisperLang) {
-		if whisperLang == "" {
-			whisperLang = "he"
-		}
-		wp = detect.ResolveLocalWhisperProfile(cfg, true)
-		if !opts.Quiet {
-			fmt.Printf("   Hebrew detected: routing to %s (%s)\n", wp.Name, config.WhisperEngineBadge(wp.Engine))
-		}
 	}
 
 	if wp.Engine == types.WhisperEngineLocal {
@@ -350,7 +360,7 @@ func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts type
 				numChunks = 1
 			}
 			fmt.Printf("   Audio is %s long - splitting into %d chunks of %s for reliability...\n",
-				format.FormatTime(totalDuration), numChunks, format.FormatTime(float64(chunkDuration)))
+				format.FormatMinutes(totalDuration), numChunks, format.FormatMinutes(float64(chunkDuration)))
 		}
 		return transcribe.TranscribeChunks(
 			sourceAudioFile, cfg.WhisperURL, opts.Quiet, opts.Verbose,

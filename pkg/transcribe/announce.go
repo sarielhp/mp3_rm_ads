@@ -1,42 +1,80 @@
 package transcribe
 
 import (
+	"abs/pkg/format"
 	"abs/pkg/types"
 	"abs/pkg/util"
 	"fmt"
-	"math"
 	"net/url"
+	"strings"
 )
 
 func AnnounceStart(duration float64, quiet bool) {
 	if quiet {
 		return
 	}
-	length := "unknown"
-	if duration > 0 && !math.IsNaN(duration) && !math.IsInf(duration, 0) {
-		minutes := int(duration / 60)
-		length = fmt.Sprintf("%2d:%02d", minutes/60, minutes%60)
-	}
 	fmt.Println("\n" + util.BoldYellow("--transcribing---"))
-	fmt.Println(util.BoldCyan("Episode length: " + length))
+	fmt.Println(util.BoldCyan("Episode length: " + format.FormatMinutes(duration)))
 }
 
 func AnnounceWhisperServer(endpoint string, engine types.WhisperEngine, container string, quiet bool) {
 	if quiet {
 		return
 	}
-	label := "Transcription: Whisper HTTP server"
-	if engine == types.WhisperEngineDocker {
-		label = "Transcription: Whisper in DOCKER (HTTP server)"
-		if container != "" {
-			label += " [container: " + container + "]"
-		}
-	} else if engine == types.WhisperEngineRemote {
-		label = "Transcription: REMOTE Whisper HTTP server"
+	var parts []string
+	if engine == types.WhisperEngineDocker && container != "" {
+		parts = append(parts, "container: "+container)
 	}
-	label += " (model selected by server)"
 	if u, err := url.Parse(endpoint); err == nil && u.Hostname() != "" {
-		label += " on " + u.Hostname()
+		parts = append(parts, "host: "+u.Hostname())
 	}
-	fmt.Println("\n" + util.BoldCyan(label))
+	parts = append(parts, "model: chosen by server")
+	AnnounceUsing(engine, "("+strings.Join(parts, ", ")+")", false)
+}
+
+// BackendLabel names the backend that actually performs the transcription.
+// Both Whisper backends are whisper.cpp, so the distinction that matters to
+// the user is where it runs: "docker" is the whisper.cpp HTTP server in a
+// container, "program" is the whisper-cli binary invoked on this host.
+func BackendLabel(engine types.WhisperEngine) string {
+	switch engine {
+	case types.WhisperEngineLocal:
+		return "Whisper (program)"
+	case types.WhisperEngineDocker:
+		return "Whisper (docker)"
+	case types.WhisperEngineRemote:
+		return "Whisper (remote)"
+	case types.WhisperEngineGemini:
+		return "Gemini"
+	case "":
+		return "Whisper"
+	default:
+		return "Whisper (" + string(engine) + ")"
+	}
+}
+
+// AnnounceUsing prints the single line identifying the running backend.
+// detail is an already-formatted parenthesised suffix, or empty.
+func AnnounceUsing(engine types.WhisperEngine, detail string, quiet bool) {
+	if quiet {
+		return
+	}
+	line := "\n" + util.BoldGreen("Using: "+BackendLabel(engine))
+	if detail != "" {
+		line += " " + util.Cyan(detail)
+	}
+	fmt.Println(line)
+}
+
+// StampBackend records on the transcript which backend and model produced
+// it. Without this a saved transcript gives no way to tell whether it came
+// from the Docker server, the local program, or Gemini.
+func StampBackend(td *types.TranscriptionData, engine types.WhisperEngine, model string) {
+	if td == nil {
+		return
+	}
+	td.Backend = BackendLabel(engine)
+	if model != "" {
+		td.Model = model
+	}
 }

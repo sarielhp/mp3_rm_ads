@@ -225,9 +225,7 @@ func RunWhisperCLITranscription(audioPath string, profile types.WhisperProfile, 
 
 func RunWhisperCLITranscriptionContext(ctx context.Context, audioPath string, profile types.WhisperProfile, quiet, verbose bool, prompt, lang string) (*types.TranscriptionData, error) {
 	bin := ResolveWhisperCLIBinary(profile.CliBinary)
-	if !quiet {
-		fmt.Println("\n" + util.BoldCyan(fmt.Sprintf("Transcription: local Whisper COMMAND-LINE TOOL (%s; model: %s)", bin, profile.Model)))
-	}
+	AnnounceUsing(types.WhisperEngineLocal, fmt.Sprintf("(%s, model: %s)", bin, profile.Model), quiet)
 	modelPath, err := ResolveWhisperModelPath(profile.Model)
 	if err != nil {
 		return nil, err
