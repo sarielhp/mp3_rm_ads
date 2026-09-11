@@ -73,6 +73,25 @@ func buildServerFeedSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	}
 }
 
+func buildServerImportSubcommand(opts *CLIOptions, action *string) clihelp.Command {
+	return clihelp.Command{
+		Name:        "import",
+		Description: "Import subscriptions from OPML file or backend into local store",
+		UsageLine:   "abs server import [file]",
+		Parameters: []clihelp.Param{
+			{Name: "[file]", Description: "Optional OPML file to import (defaults to importing from backend)"},
+		},
+		Args: clihelp.RangeArgs(0, 1),
+		Run: func(ctx *clihelp.Context) error {
+			*action = "server"
+			opts.ServerSubcmd = "import"
+			opts.SyncSubcmd = "import"
+			opts.Args = ctx.Args
+			return nil
+		},
+	}
+}
+
 func handleServerAdd(cfg Config, cli CLIOptions) error {
 	if len(cli.Args) == 0 {
 		return fmt.Errorf("feed URL is required")
@@ -176,6 +195,40 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 	return nil
 }
 
+func handleServerImport(cfg Config, cli CLIOptions) error {
+	store, err := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+	if err != nil {
+		return fmt.Errorf("open subscriptions store: %w", err)
+	}
+	if len(cli.Args) > 0 {
+		data, err := os.ReadFile(cli.Args[0])
+		if err != nil {
+			return fmt.Errorf("read OPML file: %w", err)
+		}
+		n, err := store.ImportFromOPML(data)
+		if err != nil {
+			return fmt.Errorf("import OPML: %w", err)
+		}
+		if !cli.Quiet {
+			fmt.Printf("Imported %d new subscription(s) from %s\n", n, cli.Args[0])
+		}
+		return nil
+	}
+
+	reader, err := backend.ReaderFromAppConfig(&cfg, cli.Quiet)
+	if err != nil {
+		return fmt.Errorf("backend not available for import: %w", err)
+	}
+	n, err := store.ImportFromBackend(reader)
+	if err != nil {
+		return fmt.Errorf("backend import failed: %w", err)
+	}
+	if !cli.Quiet {
+		fmt.Printf("Imported %d new subscription(s) from backend into %s\n", n, store.FilePath())
+	}
+	return nil
+}
+
 func renderSubscriptionList(subs []podcast.Subscription, podcastsDir string, verbose bool) error {
 	fmt.Printf("%-8s %-32s %-6s %-20s %s\n", "ID", "TITLE", "EPS", "FOLDER", "FEED URL")
 	fmt.Println(strings.Repeat("-", 95))
@@ -267,8 +320,9 @@ func downloadSubEpisodes(cfg Config, cli CLIOptions, sub podcast.Subscription) e
 	}
 
 	downloader := podcast.NewDownloader()
+	shouldQueue := shouldQueueEpisode(sub, cfg)
 	for _, ep := range toDownload {
-		if err := executeSingleEpisodeDownload(downloader, podDir, ep, cli.Quiet); err != nil {
+		if err := executeSingleEpisodeDownload(downloader, podDir, ep, cli.Quiet, shouldQueue); err != nil {
 			fmt.Fprintf(os.Stderr, "    Download error for %q: %v\n", ep.Title, err)
 		}
 	}
@@ -312,7 +366,15 @@ func selectSubEpisodesToDownload(podDir string, feedEps []backend.FeedEpisode, s
 	return candidates
 }
 
-func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backend.FeedEpisode, quiet bool) error {
+func shouldQueueEpisode(sub podcast.Subscription, cfg Config) bool {
+	adPolicy := sub.AdRemoval
+	if adPolicy == "" {
+		adPolicy = cfg.DefaultAdRemoval
+	}
+	return config.NormalizeAdRemovalMode(adPolicy) != config.AdRemovalNone
+}
+
+func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backend.FeedEpisode, quiet bool, shouldQueue bool) error {
 	encURL := ep.EnclosureURL
 	if ep.Enclosure != nil && ep.Enclosure.URL != "" {
 		encURL = ep.Enclosure.URL
@@ -333,6 +395,8 @@ func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backe
 		return err
 	}
 
-	pipeline.AddToQueue(podDir, fn)
+	if shouldQueue {
+		pipeline.AddToQueue(podDir, fn)
+	}
 	return nil
 }

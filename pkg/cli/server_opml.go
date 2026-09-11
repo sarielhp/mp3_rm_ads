@@ -1,10 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/backend"
 	"fmt"
 	"os"
 	"strings"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/podcast"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -127,10 +130,13 @@ func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.C
 	}
 }
 
-func handleServerOPML(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+func handleServerOPML(cfg Config, cli CLIOptions) error {
+	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
+		return handleStandaloneOPML(cfg, cli)
+	}
+	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
 	if err != nil {
-		return fmt.Errorf("podcast server not configured: %w", err)
+		return handleStandaloneOPML(cfg, cli)
 	}
 	targetFile := cli.OPMLFile
 	if targetFile == "" && len(cli.Args) > 0 {
@@ -166,6 +172,52 @@ func handleServerOPML(config Config, cli CLIOptions) error {
 		}
 		if !cli.Quiet {
 			fmt.Printf("Imported %d new feed(s) from %s\n", res.Subscribed, targetFile)
+		}
+		return nil
+	default:
+		return fmt.Errorf("must specify 'import <file>' or 'export <file>'")
+	}
+}
+
+func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
+	store, err := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+	if err != nil {
+		return fmt.Errorf("open subscriptions store: %w", err)
+	}
+	targetFile := cli.OPMLFile
+	if targetFile == "" && len(cli.Args) > 0 {
+		targetFile = cli.Args[0]
+	}
+	switch cli.OPMLSubcmd {
+	case "export":
+		if targetFile == "" {
+			return fmt.Errorf("missing required <file> argument for 'abs server opml export <file>'")
+		}
+		data, err := store.ExportToOPML()
+		if err != nil {
+			return fmt.Errorf("OPML export failed: %w", err)
+		}
+		if err := os.WriteFile(targetFile, data, 0644); err != nil {
+			return fmt.Errorf("failed to write OPML file: %w", err)
+		}
+		if !cli.Quiet {
+			fmt.Printf("Exported podcast subscriptions to %s\n", targetFile)
+		}
+		return nil
+	case "import":
+		if targetFile == "" {
+			return fmt.Errorf("missing required <file> argument for 'abs server opml import <file>'")
+		}
+		data, err := os.ReadFile(targetFile)
+		if err != nil {
+			return fmt.Errorf("failed to read OPML file: %w", err)
+		}
+		n, err := store.ImportFromOPML(data)
+		if err != nil {
+			return fmt.Errorf("OPML import failed: %w", err)
+		}
+		if !cli.Quiet {
+			fmt.Printf("Imported %d new feed(s) from %s\n", n, targetFile)
 		}
 		return nil
 	default:

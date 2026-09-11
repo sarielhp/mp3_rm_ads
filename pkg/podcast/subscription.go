@@ -194,6 +194,19 @@ func (s *SubscriptionStore) ImportFromOPML(data []byte) (int, error) {
 	return count, nil
 }
 
+func (s *SubscriptionStore) ExportToOPML() ([]byte, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	feeds := make([]backend.OPMLFeed, 0, len(s.items))
+	for _, it := range s.items {
+		feeds = append(feeds, backend.OPMLFeed{
+			Title: it.Title,
+			URL:   it.FeedURL,
+		})
+	}
+	return backend.BuildOPMLXMLWithTitle(feeds, "ABS Podcast Subscriptions", "ABS Podcasts")
+}
+
 func (s *SubscriptionStore) ImportFromBackend(reader backend.PodcastReader) (int, error) {
 	if reader == nil {
 		return 0, errors.New("nil backend reader")
@@ -212,11 +225,18 @@ func (s *SubscriptionStore) ImportFromBackend(reader backend.PodcastReader) (int
 		if title == "" {
 			title = filepath.Base(p.Path)
 		}
+		folder := p.RelPath
+		if folder == "" && p.Path != "" {
+			folder = filepath.Base(p.Path)
+		}
+		if folder == "" || folder == "." {
+			folder = SanitizeTitle(title)
+		}
 		sub := Subscription{
 			ID:      p.ID,
 			Title:   title,
 			FeedURL: feedURL,
-			Folder:  filepath.Base(p.Path),
+			Folder:  folder,
 		}
 		if err := s.Add(sub); err == nil {
 			count++

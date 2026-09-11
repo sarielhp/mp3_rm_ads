@@ -7,8 +7,16 @@ import (
 	"abs/pkg/types"
 )
 
-func IsAudiobookshelfActive(cfg *types.Config) bool {
+func IsStandalone(cfg *types.Config) bool {
 	if cfg == nil {
+		return false
+	}
+	bt := strings.ToLower(strings.TrimSpace(cfg.BackendType))
+	return bt == "standalone" || bt == "local" || bt == "none"
+}
+
+func IsAudiobookshelfActive(cfg *types.Config) bool {
+	if cfg == nil || IsStandalone(cfg) {
 		return false
 	}
 	if strings.EqualFold(cfg.BackendType, "podfetch") || strings.EqualFold(cfg.BackendType, "pod_fetch") {
@@ -24,7 +32,7 @@ func IsAudiobookshelfActive(cfg *types.Config) bool {
 }
 
 func IsPodfetchActive(cfg *types.Config) bool {
-	if cfg == nil {
+	if cfg == nil || IsStandalone(cfg) {
 		return false
 	}
 	if strings.EqualFold(cfg.BackendType, "audiobookshelf") || strings.EqualFold(cfg.BackendType, "abs") {
@@ -39,6 +47,9 @@ func IsPodfetchActive(cfg *types.Config) bool {
 func FromAppConfig(cfg *types.Config, quiet bool) (Backend, error) {
 	if cfg == nil {
 		return nil, fmt.Errorf("config cannot be nil")
+	}
+	if IsStandalone(cfg) {
+		return nil, fmt.Errorf("backend is standalone")
 	}
 	if IsPodfetchActive(cfg) {
 		SetAudiobookshelfDisabled(true)
@@ -68,6 +79,41 @@ func FromAppConfig(cfg *types.Config, quiet bool) (Backend, error) {
 		Quiet:       quiet,
 	}
 	return New("audiobookshelf", bCfg)
+}
+
+// ReaderFromAppConfig returns a PodcastReader from configured backend settings, even in standalone mode.
+func ReaderFromAppConfig(cfg *types.Config, quiet bool) (PodcastReader, error) {
+	if cfg == nil {
+		return nil, fmt.Errorf("config cannot be nil")
+	}
+	if cfg.PodfetchDBPath != "" || cfg.PodfetchURL != "" {
+		SetAudiobookshelfDisabled(true)
+		SetPodfetchDisabled(false)
+		return New("podfetch", Config{
+			Host:        cfg.PodfetchURL,
+			User:        cfg.PodfetchUser,
+			Pass:        cfg.PodfetchPass,
+			Token:       cfg.PodfetchAPIKey,
+			APIKey:      cfg.PodfetchAPIKey,
+			DBPath:      cfg.PodfetchDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       quiet,
+		})
+	}
+	if cfg.AudiobookshelfDBPath != "" || cfg.AudiobookshelfURL != "" {
+		SetAudiobookshelfDisabled(false)
+		SetPodfetchDisabled(true)
+		return New("audiobookshelf", Config{
+			Host:        cfg.AudiobookshelfURL,
+			User:        cfg.AudiobookshelfUser,
+			Pass:        cfg.AudiobookshelfPass,
+			Token:       cfg.AudiobookshelfToken,
+			DBPath:      cfg.AudiobookshelfDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       quiet,
+		})
+	}
+	return nil, fmt.Errorf("no podcast backend configured")
 }
 
 // SyncEpisodeDuration synchronizes the duration of a cleaned episode back to the configured backend.

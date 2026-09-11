@@ -87,7 +87,7 @@ func CollectLocalEpisodes(podDir string, feedEpisodes []backend.FeedEpisode) []L
 		if err != nil || fi.IsDir() {
 			continue
 		}
-		item := buildEpisodeMeta(path, fi, feedMap)
+		item := buildEpisodeMeta(path, podDir, fi, feedMap)
 		list = append(list, item)
 	}
 
@@ -115,8 +115,14 @@ func buildFeedEpisodeLookup(eps []backend.FeedEpisode) map[string]backend.FeedEp
 	return m
 }
 
-func buildEpisodeMeta(path string, fi os.FileInfo, feedMap map[string]backend.FeedEpisode) LocalEpisodeMeta {
-	fn := filepath.Base(path)
+func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]backend.FeedEpisode) LocalEpisodeMeta {
+	relPath := filepath.Base(path)
+	if podDir != "" {
+		if r, err := filepath.Rel(podDir, path); err == nil && r != "" && !strings.HasPrefix(r, "..") {
+			relPath = filepath.ToSlash(r)
+		}
+	}
+	fn := relPath
 	title := EpisodeTitleFromPath(path)
 	cleanKey := strings.ToLower(SanitizeTitle(title))
 	matched, hasMatch := feedMap[cleanKey]
@@ -137,7 +143,7 @@ func buildEpisodeMeta(path string, fi os.FileInfo, feedMap map[string]backend.Fe
 		durSec = matched.DurationSeconds
 	}
 	if guid == "" {
-		h := sha256.Sum256([]byte(fn))
+		h := sha256.Sum256([]byte(relPath))
 		guid = "abs:ep:" + hex.EncodeToString(h[:8])
 	}
 	if pubMs <= 0 {
@@ -186,7 +192,7 @@ func GeneratePodcastFeedXML(sub Subscription, podDir string, episodes []LocalEpi
 	for _, ep := range episodes {
 		encURL := ""
 		if baseURL != "" {
-			encURL = fmt.Sprintf("%s/%s/%s", baseURL, url.PathEscape(folder), url.PathEscape(ep.Filename))
+			encURL = fmt.Sprintf("%s/%s/%s", baseURL, url.PathEscape(folder), escapeRelPath(ep.Filename))
 		}
 		itemXML := rssItemXML{
 			Title:       ep.Title,
@@ -248,4 +254,12 @@ func WritePodcastFeedXML(podDir string, sub Subscription, baseURL string, feedEp
 
 	feedFile := filepath.Join(podDir, "feed.xml")
 	return util.WriteFileAtomic(feedFile, data, 0644)
+}
+
+func escapeRelPath(p string) string {
+	parts := strings.Split(filepath.ToSlash(p), "/")
+	for i, seg := range parts {
+		parts[i] = url.PathEscape(seg)
+	}
+	return strings.Join(parts, "/")
 }
