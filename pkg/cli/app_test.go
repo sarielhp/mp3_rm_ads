@@ -6,6 +6,9 @@ import (
 	"strings"
 	"testing"
 
+	"abs/pkg/config"
+	"abs/pkg/util"
+
 	"github.com/sarielhp/clihelp"
 )
 
@@ -15,7 +18,7 @@ func TestFindMP3Files(t *testing.T) {
 	os.WriteFile(d+"/a.txt", []byte("x"), 0644)
 	os.MkdirAll(d+"/sub", 0755)
 	os.WriteFile(d+"/sub/b.mp3", []byte("x"), 0644)
-	files := findMP3Files(d)
+	files := util.FindMP3Files(d)
 	if len(files) != 2 {
 		t.Errorf("got %d files, want 2", len(files))
 	}
@@ -25,8 +28,8 @@ func TestSafeMove(t *testing.T) {
 	d := t.TempDir()
 	src, dst := d+"/s.txt", d+"/d.txt"
 	os.WriteFile(src, []byte("x"), 0644)
-	safeMove(src, dst)
-	if fileExists(src) || !fileExists(dst) {
+	util.SafeMove(src, dst)
+	if util.FileExists(src) || !util.FileExists(dst) {
 		t.Error("safeMove failed")
 	}
 }
@@ -35,21 +38,21 @@ func TestCopyFile(t *testing.T) {
 	d := t.TempDir()
 	src, dst := d+"/s.txt", d+"/d.txt"
 	os.WriteFile(src, []byte("x"), 0644)
-	copyFile(src, dst)
-	if !fileExists(dst) {
+	util.CopyFileErr(src, dst)
+	if !util.FileExists(dst) {
 		t.Error("copyFile failed")
 	}
 }
 
 func TestSelectProfile(t *testing.T) {
 	cfg := Config{ActiveProfileID: 2, Profiles: []LLMProfile{{ID: 1, Name: "One", Model: "m1"}, {ID: 2, Name: "Two", Model: "m2"}}}
-	if p := selectProfile(cfg, ""); p.ID != 2 {
+	if p, _ := config.SelectLLMProfile(&cfg, ""); p.ID != 2 {
 		t.Error("default profile")
 	}
-	if p := selectProfile(cfg, "1"); p.ID != 1 {
+	if p, _ := config.SelectLLMProfile(&cfg, "1"); p.ID != 1 {
 		t.Error("by id")
 	}
-	if p := selectProfile(cfg, "Two"); p.ID != 2 {
+	if p, _ := config.SelectLLMProfile(&cfg, "Two"); p.ID != 2 {
 		t.Error("by name")
 	}
 }

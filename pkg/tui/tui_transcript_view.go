@@ -5,6 +5,9 @@ import (
 	"regexp"
 	"strings"
 
+	"abs/pkg/player"
+	"abs/pkg/util"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -165,15 +168,15 @@ func (m *tuiModel) drawTranscriptScreen() string {
 			ep := eps[m.epIdx]
 			titleStr = ep.displayTitle()
 			if ep.duration > 0 {
-				durStr = formatPlayerTime(ep.duration)
+				durStr = player.FormatPlayerTime(ep.duration)
 			}
 		}
 	}
 
 	banner := tuiHeaderBanner.Render(" TRANSCRIPT ")
-	out.WriteString("  " + banner + "  " + tuiTitleStyle.Render(truncate(displayName(titleStr), max(10, m.width-20))) + "\n")
+	out.WriteString("  " + banner + "  " + tuiTitleStyle.Render(truncate(util.DisplayName(titleStr), max(10, m.width-20))) + "\n")
 
-	subInfo := displayName(podName)
+	subInfo := util.DisplayName(podName)
 	if durStr != "" {
 		subInfo += " • " + durStr
 	}

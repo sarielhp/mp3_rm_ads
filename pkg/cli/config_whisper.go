@@ -252,7 +252,7 @@ func addWhisperProfile(cfg *Config, spec string) {
 		cfg.ActiveWhisperID = nextID
 	}
 	resolveActiveWhisperProfile(cfg)
-	saveConfig(*cfg)
+	_ = config.SaveConfig(cfg)
 	badge := config.WhisperEngineBadge(newProfile.Engine)
 	fmt.Printf("Added Whisper server profile [%d] %s %s\n", nextID, newProfile.Name, badge)
 }
@@ -278,7 +278,7 @@ func removeWhisperProfile(cfg *Config, targetID int) {
 		}
 	}
 	resolveActiveWhisperProfile(cfg)
-	saveConfig(*cfg)
+	_ = config.SaveConfig(cfg)
 	fmt.Printf("Removed Whisper server profile [%d] %s\n", targetID, profileName)
 }
 
@@ -286,7 +286,7 @@ func setDefaultWhisperProfile(cfg *Config, targetID int) {
 	if targetID == 0 {
 		cfg.ActiveWhisperID = 0
 		resolveActiveWhisperProfile(cfg)
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Println("Default Whisper server updated to fallback/legacy configuration.")
 		return
 	}
@@ -294,7 +294,7 @@ func setDefaultWhisperProfile(cfg *Config, targetID int) {
 		if wp.ID == targetID {
 			cfg.ActiveWhisperID = targetID
 			resolveActiveWhisperProfile(cfg)
-			saveConfig(*cfg)
+			_ = config.SaveConfig(cfg)
 			engine := wp.Engine
 			if engine == "" {
 				engine = config.InferWhisperEngine(wp)

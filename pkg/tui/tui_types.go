@@ -1,11 +1,15 @@
 package tui
 
 import (
-	"abs/pkg/podcast"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 )
 
 type tuiPodcast struct {
@@ -16,8 +20,8 @@ type tuiPodcast struct {
 	feedURL     string
 	coverPath   string
 	episodes    []tuiEpisode
-	absData     *absItem
-	config      PodcastConfig
+	absData     *backend.Podcast
+	config      config.PodcastConfig
 }
 
 func (p tuiPodcast) transcribedCount() int {
@@ -57,7 +61,7 @@ type tuiEpisode struct {
 	durationDone  bool
 	season        string
 	episode       string
-	absData       *absEpisode
+	absData       *backend.Episode
 	isFeedOnly    bool
 	enclosureURL  string
 	guid          string
@@ -66,7 +70,7 @@ type tuiEpisode struct {
 
 func (e tuiEpisode) displayDate() time.Time {
 	if e.absData != nil {
-		if pub := parseABSEpisodePublishedAt(e.absData); pub > 0 {
+		if pub := pipeline.ParseABSEpisodePublishedAt(e.absData); pub > 0 {
 			return time.UnixMilli(pub)
 		}
 	}

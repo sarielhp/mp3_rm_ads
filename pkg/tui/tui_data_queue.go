@@ -7,9 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"abs/pkg/util"
 )
 
-var queueUpdateMu syncMutex
+var queueUpdateMu util.SyncMutex
 
 func loadAllQueues(pods []tuiPodcast) map[string][]string {
 	q := make(map[string][]string)
@@ -58,7 +60,7 @@ func updateQueue(dir string, mutate func([]string) []string) error {
 	defer queueUpdateMu.Unlock()
 
 	path := filepath.Join(dir, "queue.json")
-	lock, err := acquireFileLockWithTimeout(path, 5*time.Second)
+	lock, err := util.AcquireFileLockWithTimeout(path, 5*time.Second)
 	if err != nil || lock == nil {
 		return fmt.Errorf("queue is locked: %w", err)
 	}
@@ -78,11 +80,51 @@ func updateQueue(dir string, mutate func([]string) []string) error {
 	if err != nil {
 		return err
 	}
-	return writeFileAtomic(path, append(data, '\n'), 0644)
+	return util.WriteFileAtomic(path, append(data, '\n'), 0644)
 }
 
 func saveQueue(dir string, entries []string) error {
 	return updateQueue(dir, func([]string) []string {
 		return entries
 	})
+}
+
+type AdQueueItem struct {
+	PodcastDir    string
+	PodcastName   string
+	Filename      string
+	Title         string
+	HasAdsRemoved bool
+	PublishedAt   int64
+	Duration      float64
+}
+
+func getAllAdQueueItems(pods []tuiPodcast, q map[string][]string) []AdQueueItem {
+	var list []AdQueueItem
+	for _, pod := range pods {
+		filenames := q[pod.dir]
+		for _, fn := range filenames {
+			item := AdQueueItem{
+				PodcastDir:  pod.dir,
+				PodcastName: pod.name,
+				Filename:    fn,
+				Title:       fn,
+			}
+			hasAdsRemoved := false
+			for _, ep := range pod.episodes {
+				if ep.filename == fn {
+					item.Title = ep.displayTitle()
+					item.HasAdsRemoved = ep.hasAdsRemoved
+					item.PublishedAt = ep.publishedAt
+					item.Duration = ep.duration
+					hasAdsRemoved = ep.hasAdsRemoved
+					break
+				}
+			}
+			if !hasAdsRemoved {
+				list = append(list, item)
+			}
+		}
+	}
+	return list
 }

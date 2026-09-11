@@ -8,6 +8,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 )
 
 type lsPodcastItem struct {
@@ -52,12 +57,12 @@ type lsEpisodeJSON struct {
 }
 
 func podcastExistsByIndexOrID(podcastsDir, query string) bool {
-	res, err := resolveAnyID(podcastsDir, query)
+	res, err := podcast.ResolveAnyID(podcastsDir, query)
 	return err == nil && res != nil
 }
 
 func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
-	entries := scanPodcastDirs(podcastsDir)
+	entries := podcast.ScanPodcastDirs(podcastsDir)
 	if len(entries) == 0 {
 		if !cli.Quiet {
 			fmt.Println("No podcasts found.")
@@ -87,19 +92,19 @@ func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
 	return nil
 }
 
-func collectPodcastListItems(entries []podcastDirEntry) []lsPodcastItem {
+func collectPodcastListItems(entries []podcast.PodcastDirEntry) []lsPodcastItem {
 	var items []lsPodcastItem
 	for _, p := range entries {
-		mp3s := findMP3Files(p.dir)
-		cfg := loadPodcastConfig(p.dir)
+		mp3s := util.FindMP3Files(p.Dir)
+		cfg := config.LoadPodcastConfig(p.Dir, config.PodcastConfig{})
 		cleanCount := 0
 		var newestTime time.Time
 
 		for _, mp3 := range mp3s {
-			if isEpisodeClean(mp3) {
+			if pipeline.IsEpisodeClean(mp3) {
 				cleanCount++
 			}
-			pt := getEpisodePublicationTime(mp3)
+			pt := podcast.GetEpisodePublicationTime(mp3)
 			if pt.After(newestTime) {
 				newestTime = pt
 			}
@@ -116,8 +121,8 @@ func collectPodcastListItems(entries []podcastDirEntry) []lsPodcastItem {
 		}
 
 		items = append(items, lsPodcastItem{
-			ShortID:        p.shortID,
-			Title:          p.title,
+			ShortID:        p.ShortID,
+			Title:          p.Title,
 			EpisodeCount:   len(mp3s),
 			CleanCount:     cleanCount,
 			DownloadPolicy: cfg.DownloadPolicy,
@@ -148,15 +153,15 @@ func printPodcastsTable(items []lsPodcastItem) {
 }
 
 func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
-	podEntries := scanPodcastDirs(podcastsDir)
+	podEntries := podcast.ScanPodcastDirs(podcastsDir)
 	podIDMap := make(map[string]string)
 	podTitleMap := make(map[string]string)
 	for _, p := range podEntries {
-		podIDMap[p.dir] = p.shortID
-		podTitleMap[p.dir] = p.title
+		podIDMap[p.Dir] = p.ShortID
+		podTitleMap[p.Dir] = p.Title
 	}
 
-	allMp3s := findMP3Files(podcastsDir)
+	allMp3s := util.FindMP3Files(podcastsDir)
 	if len(allMp3s) == 0 {
 		if !cli.Quiet {
 			fmt.Println("No podcast audio files (.mp3) found.")
@@ -231,14 +236,14 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 		}
 		shortID := podIDMap[podDir]
 		if shortID == "" {
-			shortID = generatePodcastShortID(podTitle)
+			shortID = podcast.GeneratePodcastShortID(podTitle)
 		}
 
-		epShortID := getOrSetEpisodeShortID(podDir, shortID, mp3)
+		epShortID := podcast.GetOrSetEpisodeShortID(podDir, shortID, mp3)
 		statusStr, statusColor := getEpisodeStatusLabel(mp3)
-		st := getOrCreateEpisodeStatus(mp3)
-		origDur, cleanDur := getEpisodeDurations(mp3, st)
-		txPath := stripExt(mp3) + ".transcript.json"
+		st := pipeline.GetOrCreateEpisodeStatus(mp3)
+		origDur, cleanDur := pipeline.EpisodeDurations(mp3, st)
+		txPath := util.StripExt(mp3) + ".transcript.json"
 		_, errTx := os.Stat(txPath)
 
 		items = append(items, lsEpisodeItem{
@@ -248,7 +253,7 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 			podcastShortID: shortID,
 			episodeShortID: epShortID,
 			episodeName:    epName,
-			modTime:        getEpisodePublicationTime(mp3),
+			modTime:        podcast.GetEpisodePublicationTime(mp3),
 			sizeBytes:      fi.Size(),
 			origDuration:   origDur,
 			cleanDuration:  cleanDur,
@@ -295,8 +300,8 @@ func formatShortStatus(status string) string {
 }
 
 func getEpisodeStatusLabel(mp3Path string) (string, string) {
-	st := getOrCreateEpisodeStatus(mp3Path)
-	if st.Status == StateDone || st.Status == StateCopiedBack || isEpisodeCompleted(mp3Path) {
+	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
+	if st.Status == StateDone || st.Status == StateCopiedBack || pipeline.IsEpisodeCompleted(mp3Path) {
 		return "Clean", "green"
 	}
 	if st.Status == StateQueuedRemote {

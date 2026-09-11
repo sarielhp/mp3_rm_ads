@@ -55,7 +55,7 @@ func copyLLMFromOpenCode(cfg *Config) {
 				break
 			}
 		}
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Println("Successfully imported OpenCode configuration!")
 	}
 }

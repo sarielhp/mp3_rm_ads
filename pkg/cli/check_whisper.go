@@ -88,7 +88,7 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 
 func buildTestWavPayload() ([]byte, string) {
 	pcmData := make([]byte, 3200)
-	header := buildWavHeader(len(pcmData))
+	header := transcribe.BuildWavHeader(len(pcmData))
 	audioContent := append(header, pcmData...)
 
 	boundary := fmt.Sprintf("----WhisperBoundary%d", time.Now().UnixNano())

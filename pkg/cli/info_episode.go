@@ -1,6 +1,10 @@
 package cli
 
 import (
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -37,28 +41,28 @@ type EpisodeCutDTO struct {
 }
 
 func runTranscriptForEpisode(ep *ResolvedEpisode, cli CLIOptions) error {
-	jsonPath := stripExt(ep.Path) + ".transcript.json"
+	jsonPath := util.StripExt(ep.Path) + ".transcript.json"
 	if _, err := os.Stat(jsonPath); err != nil {
 		return fmt.Errorf("transcript file not found for episode [%s]: %s", ep.ShortID, jsonPath)
 	}
 
-	format := strings.ToLower(cli.ExportFormat)
+	exportFormat := strings.ToLower(cli.ExportFormat)
 	if cli.ExportTXT {
-		format = "txt"
+		exportFormat = "txt"
 	} else if cli.ExportSRT {
-		format = "srt"
+		exportFormat = "srt"
 	}
 
-	if format == "txt" {
-		out := convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
+	if exportFormat == "txt" {
+		out, _ := format.ConvertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
 		if !cli.Quiet {
 			fmt.Printf("Exported TXT: %s\n", out)
 		}
 		return nil
 	}
 
-	if format == "srt" {
-		out := convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
+	if exportFormat == "srt" {
+		out, _ := format.ConvertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
 		if !cli.Quiet {
 			fmt.Printf("Exported SRT: %s\n", out)
 		}
@@ -85,7 +89,7 @@ func inspectEpisodeInfo(ep *ResolvedEpisode, cli CLIOptions) error {
 }
 
 func getEpisodeTranscriptInfo(epPath string) (bool, string, int) {
-	txPath := stripExt(epPath) + ".transcript.json"
+	txPath := util.StripExt(epPath) + ".transcript.json"
 	hasTx := false
 	txSegments := 0
 	if data, err := os.ReadFile(txPath); err == nil {
@@ -100,7 +104,7 @@ func getEpisodeTranscriptInfo(epPath string) (bool, string, int) {
 
 func collectEpisodeCuts(epPath string, st *EpisodeStatusFile) []EpisodeCutDTO {
 	var cuts []EpisodeCutDTO
-	cutsFile := stripExt(epPath) + ".cuts.json"
+	cutsFile := util.StripExt(epPath) + ".cuts.json"
 	if data, err := os.ReadFile(cutsFile); err == nil {
 		var cd CutsData
 		if json.Unmarshal(data, &cd) == nil {
@@ -109,7 +113,7 @@ func collectEpisodeCuts(epPath string, st *EpisodeStatusFile) []EpisodeCutDTO {
 					StartFormatted: c.StartFormatted,
 					EndFormatted:   c.EndFormatted,
 					DurationSec:    c.DurationSec,
-					DurationStr:    formatClock(c.DurationSec),
+					DurationStr:    format.FormatClock(c.DurationSec),
 					Reason:         c.Reason,
 				})
 			}
@@ -120,10 +124,10 @@ func collectEpisodeCuts(epPath string, st *EpisodeStatusFile) []EpisodeCutDTO {
 		for _, ad := range st.Ads {
 			dur := ad.End - ad.Start
 			cuts = append(cuts, EpisodeCutDTO{
-				StartFormatted: formatClock(ad.Start),
-				EndFormatted:   formatClock(ad.End),
+				StartFormatted: format.FormatClock(ad.Start),
+				EndFormatted:   format.FormatClock(ad.End),
 				DurationSec:    dur,
-				DurationStr:    formatClock(dur),
+				DurationStr:    format.FormatClock(dur),
 				Reason:         ad.Reason,
 			})
 		}
@@ -138,16 +142,16 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 		fileSize = fi.Size()
 	}
 
-	st := getOrCreateEpisodeStatus(ep.Path)
+	st := pipeline.GetOrCreateEpisodeStatus(ep.Path)
 	statusStr, _ := getEpisodeStatusLabel(ep.Path)
-	origDur, cleanDur := getEpisodeDurations(ep.Path, st)
+	origDur, cleanDur := pipeline.EpisodeDurations(ep.Path, st)
 
 	pctReduction := 0.0
 	if origDur > 0 && cleanDur > 0 && origDur > cleanDur {
 		pctReduction = (origDur - cleanDur) / origDur * 100
 	}
 
-	pubTime := getEpisodePublicationTime(ep.Path)
+	pubTime := podcast.GetEpisodePublicationTime(ep.Path)
 	pubDateStr := "-"
 	if !pubTime.IsZero() {
 		pubDateStr = publicationDateTime(pubTime)
@@ -160,9 +164,9 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 	if strings.EqualFold(ep.Filename, "podcast.mp3") && ep.Title != "" {
 		detailKey = ep.Title + ".mp3"
 	}
-	if det, _ := loadEpisodeDetails(ep.PodcastDir, detailKey); det != nil && det.Description != "" {
+	if det, _ := podcast.LoadEpisodeDetails(ep.PodcastDir, detailKey); det != nil && det.Description != "" {
 		desc = det.Description
-	} else if det, _ := loadEpisodeDetails(ep.PodcastDir, ep.Filename); det != nil && det.Description != "" {
+	} else if det, _ := podcast.LoadEpisodeDetails(ep.PodcastDir, ep.Filename); det != nil && det.Description != "" {
 		desc = det.Description
 	}
 	if desc == "" {
@@ -199,25 +203,25 @@ func formatEpisodeInfo(info EpisodeInfoJSON, showCuts ...bool) string {
 	}
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("\n%s\n", strings.Repeat("=", 80)))
-	sb.WriteString(fmt.Sprintf("Episode: %s [%s]\n", bold(displayName(info.Title)), boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("Episode: %s [%s]\n", util.Bold(util.DisplayName(info.Title)), util.BoldCyan(info.ID)))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("=", 80)))
-	sb.WriteString(fmt.Sprintf("  Episode ID:       %s\n", boldCyan(info.ID)))
-	sb.WriteString(fmt.Sprintf("  Podcast:          %s [%s]\n", displayName(info.PodcastTitle), boldCyan(info.PodcastID)))
+	sb.WriteString(fmt.Sprintf("  Episode ID:       %s\n", util.BoldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("  Podcast:          %s [%s]\n", util.DisplayName(info.PodcastTitle), util.BoldCyan(info.PodcastID)))
 	sb.WriteString(fmt.Sprintf("  Published Date:   %s\n", info.PublishedDate))
 	sb.WriteString(fmt.Sprintf("  Audio Path:       %s\n", info.AudioPath))
 	sb.WriteString(fmt.Sprintf("  File Size:        %s\n", info.FileSizeFormatted))
-	sb.WriteString(fmt.Sprintf("  AdR Status:       %s\n", bold(info.Status)))
+	sb.WriteString(fmt.Sprintf("  AdR Status:       %s\n", util.Bold(info.Status)))
 
 	sb.WriteString("\n  Audio & Processing Stats:\n")
-	sb.WriteString(fmt.Sprintf("    Original Dur:   %s (%.1fs)\n", formatClock(info.OriginalDurationSec), info.OriginalDurationSec))
+	sb.WriteString(fmt.Sprintf("    Original Dur:   %s (%.1fs)\n", format.FormatClock(info.OriginalDurationSec), info.OriginalDurationSec))
 	cleanStr := "-"
 	if info.CleanDurationSec > 0 {
-		cleanStr = fmt.Sprintf("%s (%.1fs)", formatClock(info.CleanDurationSec), info.CleanDurationSec)
+		cleanStr = fmt.Sprintf("%s (%.1fs)", format.FormatClock(info.CleanDurationSec), info.CleanDurationSec)
 	}
 	sb.WriteString(fmt.Sprintf("    Cleaned Dur:    %s\n", cleanStr))
 	if info.PercentReduction > 0 {
 		diffSec := info.OriginalDurationSec - info.CleanDurationSec
-		sb.WriteString(fmt.Sprintf("    Reduction:      -%s (-%.1f%%)\n", formatClock(diffSec), info.PercentReduction))
+		sb.WriteString(fmt.Sprintf("    Reduction:      -%s (-%.1f%%)\n", format.FormatClock(diffSec), info.PercentReduction))
 	}
 
 	sb.WriteString(formatEpisodeCutsAndTranscript(info, sc))

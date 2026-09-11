@@ -2,8 +2,14 @@ package tui
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 	"time"
+
+	"abs/pkg/audio"
+	"abs/pkg/kitty"
+	"abs/pkg/types"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
@@ -89,7 +95,7 @@ type episodeDurationMsg struct {
 	duration float64
 }
 
-func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *Config) *tuiModel {
+func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *types.Config) *tuiModel {
 	if cfg != nil {
 		applyTUIColorConfig(cfg.TUIColor)
 	}
@@ -99,7 +105,7 @@ func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *Config) *tuiModel {
 		bk:               bk,
 		podcastsDir:      podcastsDir,
 		vp:               viewport.New(70, 20),
-		showCover:        isKittySupported(),
+		showCover:        kitty.IsKittySupported(),
 		selectedEpisodes: make(map[string]bool),
 	}
 }
@@ -292,4 +298,53 @@ func truncate(s string, max int) string {
 		return s[:max]
 	}
 	return s[:max-3] + "..."
+}
+
+func resolveLocalPath(path string) string {
+	if strings.HasPrefix(path, "~/") {
+		home, err := os.UserHomeDir()
+		if err == nil {
+			return filepath.Join(home, path[2:])
+		}
+	}
+	return path
+}
+
+func RunTUI(cfg *types.Config, podcastsDir string) error {
+	if podcastsDir == "" && cfg != nil && cfg.PodcastsDir != "" {
+		podcastsDir = cfg.PodcastsDir
+	}
+	if podcastsDir == "" {
+		podcastsDir = "~/podcasts"
+	}
+	podcastsDir = resolveLocalPath(podcastsDir)
+
+	bk := &TuiBackend{
+		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
+			return loadTUIPodcastsABS(dir, *cfg)
+		},
+		LoadQueues: loadAllQueues,
+		SaveQueue: func(dir string, entries []string) {
+			_ = saveQueue(dir, entries)
+		},
+		GetDuration: audio.GetAudioDuration,
+	}
+
+	p := tea.NewProgram(newTuiModel(bk, podcastsDir, cfg), tea.WithAltScreen())
+	_, err := p.Run()
+	return err
+}
+
+func prewarmPodcastCovers(podcasts []tuiPodcast, cols, rows int) {
+	go func() {
+		for _, pod := range podcasts {
+			cp := pod.coverPath
+			if cp == "" {
+				cp = kitty.FindCoverImage(pod.dir)
+			}
+			if cp != "" {
+				_, _ = kitty.EncodeKittyGraphicsFile(cp, cols, rows)
+			}
+		}
+	}()
 }

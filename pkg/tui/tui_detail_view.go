@@ -3,13 +3,18 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"abs/pkg/config"
+	"abs/pkg/kitty"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 )
 
 func (m *tuiModel) drawPodcastDetail() string {
 	out := &strings.Builder{}
 
-	if isKittyTerminal() {
-		out.WriteString(kittyClearGraphics())
+	if kitty.IsKittyTerminal() {
+		out.WriteString(kitty.KittyClearGraphics())
 	}
 
 	if m.podIdx >= len(m.podcasts) {
@@ -41,7 +46,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		if ep.absData != nil {
 			epGUID = ep.absData.ID
 		}
-		inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+		inDLQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
 		isQueued := isFileInQueue(ep.filename, queueEntries)
 		out.WriteString(renderPodcastDetailEpisodeRow(m, ep, i == m.epIdx, m.isEpisodeSelected(ep.path), inDLQueue, isQueued))
 		out.WriteByte('\n')
@@ -61,7 +66,7 @@ func isFileInQueue(filename string, queueEntries []string) bool {
 }
 
 func renderPodcastDetailHeader(pod tuiPodcast, eps []tuiEpisode, queuedCount, selCount, dividerWidth int, out *strings.Builder) {
-	out.WriteString(tuiTitleStyle.Render("  "+displayName(pod.name)) + "\n")
+	out.WriteString(tuiTitleStyle.Render("  "+util.DisplayName(pod.name)) + "\n")
 
 	done := 0
 	for _, e := range eps {
@@ -71,8 +76,8 @@ func renderPodcastDetailHeader(pod tuiPodcast, eps []tuiEpisode, queuedCount, se
 	}
 
 	txCount := pod.transcribedCount()
-	policyLabel := adRemovalModeLabel(pod.config.AdRemoval)
-	dlPolicyLabel := downloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
+	policyLabel := config.AdRemovalModeLabel(pod.config.AdRemoval)
+	dlPolicyLabel := config.DownloadPolicyLabel(pod.config.DownloadPolicy, pod.config.DownloadK)
 	selInfo := ""
 	if selCount > 0 {
 		selInfo = fmt.Sprintf(" • %d selected ('a' queue AdR, 'p' play)", selCount)
@@ -141,7 +146,7 @@ func renderWideDetailEpisodeRow(ep tuiEpisode, displayNameStr, dateStr, selPrefi
 		txBadgeWidth = 5
 	}
 	titleWidth := max(10, availWidth-16-qBadgeWidth-dlBadgeWidth-txBadgeWidth-len([]rune(selPrefix)))
-	truncTitle := truncate(displayName(displayNameStr), titleWidth)
+	truncTitle := truncate(util.DisplayName(displayNameStr), titleWidth)
 	padding := strings.Repeat(" ", max(0, titleWidth-len([]rune(truncTitle))))
 
 	chk, txBadge, qBadge, dlBadge := "  ", "", "", ""
@@ -200,7 +205,7 @@ func renderNarrowDetailEpisodeRow(ep tuiEpisode, displayNameStr, dateStr, selPre
 		if isQueued {
 			qBadge = " [Q]"
 		}
-		line := selPrefix + dateStr + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
+		line := selPrefix + dateStr + " " + chk + " " + txBadge + " " + util.DisplayName(displayNameStr) + qBadge
 		truncLine := truncate(line, max(1, width-1))
 		return tuiSelectedStyle.Render(truncLine + strings.Repeat(" ", max(0, (width-1)-len([]rune(truncLine)))))
 	}
@@ -216,7 +221,7 @@ func renderNarrowDetailEpisodeRow(ep tuiEpisode, displayNameStr, dateStr, selPre
 	if isQueued {
 		qBadge = " " + tuiBadgeQueued.Render("[Q]")
 	}
-	line := selPrefix + tuiSubtextStyle.Render(dateStr) + " " + chk + " " + txBadge + " " + displayName(displayNameStr) + qBadge
+	line := selPrefix + tuiSubtextStyle.Render(dateStr) + " " + chk + " " + txBadge + " " + util.DisplayName(displayNameStr) + qBadge
 	return truncate(line, max(1, width-1))
 }
 

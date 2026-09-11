@@ -6,6 +6,11 @@ import (
 	"sort"
 	"strings"
 	"time"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/podcast"
+	"abs/pkg/types"
 )
 
 func (m *tuiModel) fetchPodcastFullFeed() {
@@ -22,13 +27,25 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 		return
 	}
 
-	cfg := loadConfig()
-	var client *ABSClient
-	if isAudiobookshelfActive(cfg) {
-		client, _ = getABSClient(cfg, true)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		def := config.DefaultConfig()
+		cfg = &def
+	}
+	var client *backend.AudiobookshelfBackend
+	if backend.IsAudiobookshelfActive(cfg) {
+		client = backend.NewAudiobookshelf(backend.Config{
+			Host:        cfg.AudiobookshelfURL,
+			User:        cfg.AudiobookshelfUser,
+			Pass:        cfg.AudiobookshelfPass,
+			Token:       cfg.AudiobookshelfToken,
+			DBPath:      cfg.AudiobookshelfDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       true,
+		})
 	}
 
-	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, cfg, client, feedURL)
+	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, *cfg, client, feedURL)
 	if err != nil && len(feedEpisodes) == 0 {
 		m.showPopup(fmt.Sprintf("Failed to fetch feed: %v", err))
 		return
@@ -64,22 +81,26 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 	}
 }
 
-func fetchFeedEpisodesForPodcast(pod *tuiPodcast, cfg Config, client *ABSClient, feedURL string) ([]FeedEpisode, error) {
+func fetchFeedEpisodesForPodcast(pod *tuiPodcast, cfg types.Config, client *backend.AudiobookshelfBackend, feedURL string) ([]backend.FeedEpisode, error) {
 	itemID := ""
 	if pod.absData != nil {
 		itemID = pod.absData.ID
 	}
-	if isAudiobookshelfActive(cfg) {
-		_ = resetPodcastDateCheck(client, cfg.AudiobookshelfDBPath, itemID, pod.name)
+	if backend.IsAudiobookshelfActive(&cfg) {
+		if client != nil {
+			_ = client.ResetPodcastDateCheck(itemID, pod.name)
+		} else {
+			_ = backend.ResetPodcastDateCheckInDB(cfg.AudiobookshelfDBPath, itemID, pod.name)
+		}
 	}
 
-	var feedEpisodes []FeedEpisode
+	var feedEpisodes []backend.FeedEpisode
 	var err error
 	if client != nil {
 		feedEpisodes, err = client.PodcastFeedEpisodes(feedURL)
 	}
 	if len(feedEpisodes) == 0 {
-		feedEpisodes, _, _, _, err = fetchFeedDirect(feedURL, "", "")
+		feedEpisodes, _, _, _, err = podcast.FetchFeedDirect(feedURL, "", "")
 	}
 	return feedEpisodes, err
 }
@@ -106,8 +127,8 @@ func collectExistingEpisodeIdentifiers(episodes []tuiEpisode) (map[string]bool, 
 	return existingTitles, existingGUIDs, existingURLs
 }
 
-func convertFeedEpisodeToTUI(fe FeedEpisode, podDir string) tuiEpisode {
-	safeFilename := sanitizePodcastTitle(fe.Title) + ".mp3"
+func convertFeedEpisodeToTUI(fe backend.FeedEpisode, podDir string) tuiEpisode {
+	safeFilename := backend.SanitizePodcastTitle(fe.Title) + ".mp3"
 	desc := fe.Description
 	if desc == "" {
 		desc = fe.DescriptionPlain
@@ -118,7 +139,7 @@ func convertFeedEpisodeToTUI(fe FeedEpisode, podDir string) tuiEpisode {
 
 	pubTime := time.UnixMilli(fe.PublishedAt)
 	if fe.PublishedAt == 0 && fe.PubDate != "" {
-		pubTime = time.UnixMilli(parsePubDate(fe.PubDate))
+		pubTime = time.UnixMilli(backend.ParsePubDate(fe.PubDate))
 	}
 
 	encURL := fe.EnclosureURL
@@ -126,7 +147,7 @@ func convertFeedEpisodeToTUI(fe FeedEpisode, podDir string) tuiEpisode {
 		encURL = fe.Enclosure.URL
 	}
 
-	_ = saveEpisodeDetails(podDir, safeFilename, &CachedEpisodeDetails{
+	_ = podcast.SaveEpisodeDetails(podDir, safeFilename, &podcast.CachedEpisodeDetails{
 		Filename:    safeFilename,
 		Title:       fe.Title,
 		Subtitle:    fe.Subtitle,
@@ -161,7 +182,7 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 
 	m.fetchPodcastFullFeed()
 
-	var toDownload []FeedEpisode
+	var toDownload []backend.FeedEpisode
 	var count int
 
 	for _, ep := range pod.episodes {
@@ -170,13 +191,13 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 			if encURL == "" {
 				continue
 			}
-			fe := FeedEpisode{
+			fe := backend.FeedEpisode{
 				Title:           ep.title,
 				GUID:            ep.guid,
 				PublishedAt:     ep.publishedAt,
 				DurationSeconds: ep.duration,
 				EnclosureURL:    encURL,
-				Enclosure:       &FeedEnclosure{URL: encURL},
+				Enclosure:       &backend.FeedEnclosure{URL: encURL},
 				Description:     ep.description,
 			}
 			toDownload = append(toDownload, fe)
@@ -184,7 +205,7 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 			if pod.absData != nil {
 				podID = pod.absData.ID
 			}
-			item := DownloadQueueItem{
+			item := podcast.DownloadQueueItem{
 				PodcastTitle: pod.name,
 				PodcastDir:   pod.dir,
 				PodcastID:    podID,
@@ -194,14 +215,22 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 				DurationSec:  ep.duration,
 				EnclosureURL: encURL,
 			}
-			_, _ = EnqueueDownload(item, m.podcasts)
+			_, _ = podcast.DefaultDownloadQueue().Enqueue(item)
 			count++
 		}
 	}
 
-	cfg := loadConfig()
-	if isAudiobookshelfActive(cfg) {
-		client, _ := getABSClient(cfg, true)
+	cfg, _ := config.LoadConfig()
+	if cfg != nil && backend.IsAudiobookshelfActive(cfg) {
+		client := backend.NewAudiobookshelf(backend.Config{
+			Host:        cfg.AudiobookshelfURL,
+			User:        cfg.AudiobookshelfUser,
+			Pass:        cfg.AudiobookshelfPass,
+			Token:       cfg.AudiobookshelfToken,
+			DBPath:      cfg.AudiobookshelfDBPath,
+			PodcastsDir: cfg.PodcastsDir,
+			Quiet:       true,
+		})
 		if client != nil && len(toDownload) > 0 && pod.absData != nil {
 			_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
 		}

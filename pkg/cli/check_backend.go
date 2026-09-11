@@ -1,19 +1,24 @@
 package cli
 
 import (
+	"abs/pkg/backend"
+	"abs/pkg/format"
+	"abs/pkg/util"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 )
 
+const greenCheck = "\u2713"
+
 func printMappedEpisodeSummary(matched Episode, entryName string, hasCut bool) {
-	summary := fmt.Sprintf("  %s %s\n", greenCheck, displayName(entryName))
+	summary := fmt.Sprintf("  %s %s\n", greenCheck, util.DisplayName(entryName))
 	if matched.Title != "" && matched.Title != strings.TrimSuffix(entryName, ".mp3") {
-		summary += fmt.Sprintf("    Title:       %s\n", displayName(matched.Title))
+		summary += fmt.Sprintf("    Title:       %s\n", util.DisplayName(matched.Title))
 	}
 	if matched.Description != "" {
-		desc := stripHTML(matched.Description)
+		desc := backend.StripHTML(matched.Description)
 		if len(desc) > 120 {
 			desc = desc[:120] + "..."
 		}
@@ -23,7 +28,7 @@ func printMappedEpisodeSummary(matched Episode, entryName string, hasCut bool) {
 		summary += fmt.Sprintf("    Published:   %s\n", matched.PubDate)
 	}
 	if matched.Duration > 0 {
-		summary += fmt.Sprintf("    Duration:    %s\n", formatDurationShort(matched.Duration))
+		summary += fmt.Sprintf("    Duration:    %s\n", format.FormatClock(matched.Duration))
 	}
 	if hasCut {
 		summary += fmt.Sprintf("    Ads:         %s Removed\n", greenCheck)
@@ -32,7 +37,7 @@ func printMappedEpisodeSummary(matched Episode, entryName string, hasCut bool) {
 }
 
 func absMapPodcasts(cfg Config, quiet bool) bool {
-	b, err := getBackend(cfg, quiet)
+	b, err := backend.FromAppConfig(&cfg, quiet)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: audiobookshelf is not configured.")
 		return false
@@ -56,7 +61,7 @@ func absMapPodcasts(cfg Config, quiet bool) bool {
 			continue
 		}
 
-		fmt.Printf("\n%s %s\n", displayName(item.RelPath), tuiDimStyle.Render(fmt.Sprintf("(%s)", item.Media.Metadata.Title)))
+		fmt.Printf("\n%s %s\n", util.DisplayName(item.RelPath), util.Dim(fmt.Sprintf("(%s)", item.Media.Metadata.Title)))
 
 		epByAudioFile := make(map[string]Episode)
 		for _, ep := range item.Media.Episodes {
@@ -79,7 +84,7 @@ func absMapPodcasts(cfg Config, quiet bool) bool {
 			matched, ok := epByAudioFile[entry.Name()]
 			if !ok {
 				if !quiet {
-					fmt.Printf("  ? %s\n", displayName(entry.Name()))
+					fmt.Printf("  ? %s\n", util.DisplayName(entry.Name()))
 				}
 				continue
 			}
@@ -99,7 +104,7 @@ func printPodcastItemDetails(item Podcast) {
 		fmt.Printf("    Author: %s\n", item.Media.Metadata.Author)
 	}
 	if item.Media.Metadata.Description != "" {
-		desc := stripHTML(item.Media.Metadata.Description)
+		desc := backend.StripHTML(item.Media.Metadata.Description)
 		fmt.Printf("    Description: %s\n", desc)
 	}
 	if len(item.Media.Episodes) > 0 {
@@ -107,14 +112,14 @@ func printPodcastItemDetails(item Podcast) {
 		for i, ep := range item.Media.Episodes {
 			fmt.Printf("      %d. %s\n", i+1, ep.Title)
 			if ep.Description != "" {
-				desc := stripHTML(ep.Description)
+				desc := backend.StripHTML(ep.Description)
 				fmt.Printf("         Description: %s\n", desc)
 			}
 			if ep.PubDate != "" {
 				fmt.Printf("         Published: %s\n", ep.PubDate)
 			}
 			if ep.Duration > 0 {
-				fmt.Printf("         Duration: %s\n", formatDurationShort(ep.Duration))
+				fmt.Printf("         Duration: %s\n", format.FormatClock(ep.Duration))
 			}
 			if ep.AudioFile != nil && ep.AudioFile.Metadata != nil {
 				fmt.Printf("         Audio File: %s\n", ep.AudioFile.Metadata.Filename)
@@ -124,7 +129,7 @@ func printPodcastItemDetails(item Podcast) {
 }
 
 func absDownloadAllData(cfg Config, quiet bool) bool {
-	b, err := getBackend(cfg, quiet)
+	b, err := backend.FromAppConfig(&cfg, quiet)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, "Error: audiobookshelf is not configured.")
 		return false

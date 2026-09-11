@@ -6,11 +6,17 @@ import (
 	"strings"
 	"testing"
 
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/kitty"
+	"abs/pkg/transcribe"
+	"abs/pkg/types"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
 func TestRenderImageToHalfBlocks(t *testing.T) {
-	result, err := encodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
+	result, err := kitty.EncodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
 	if err == nil {
 		t.Error("encodeKittyGraphicsFile with non-existent file should return error")
 	}
@@ -20,14 +26,14 @@ func TestRenderImageToHalfBlocks(t *testing.T) {
 }
 
 func TestRenderImageFile(t *testing.T) {
-	_, err := encodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
+	_, err := kitty.EncodeKittyGraphicsFile("/nonexistent/image.jpg", 10, 10)
 	if err == nil {
 		t.Error("encodeKittyGraphicsFile with non-existent file should return error")
 	}
 }
 
 func TestTUIApplyColorConfig(t *testing.T) {
-	cfg := &TUIColorConfig{
+	cfg := &types.TUIColorConfig{
 		Cyan:   "#ff0000",
 		Yellow: "#00ff00",
 	}
@@ -44,8 +50,8 @@ func TestTUINewModelWithConfig(t *testing.T) {
 			return map[string][]string{}
 		},
 	}
-	cfg := &Config{
-		TUIColor: &TUIColorConfig{
+	cfg := &types.Config{
+		TUIColor: &types.TUIColorConfig{
 			Cyan: "#ff0000",
 		},
 	}
@@ -64,13 +70,13 @@ func TestTUISetTerminalTitle(t *testing.T) {
 }
 
 func TestKittyFunctionsExist(t *testing.T) {
-	_ = isKittySupported()
-	_ = findCoverImage("/tmp")
-	_ = kittyClearGraphics()
+	_ = kitty.IsKittySupported()
+	_ = kitty.FindCoverImage("/tmp")
+	_ = kitty.KittyClearGraphics()
 }
 
 func TestDetectImageFormat(t *testing.T) {
-	if detectImageFormat("/path/image.jpg") != 100 {
+	if kitty.DetectImageFormat("/path/image.jpg") != 100 {
 		t.Error("detectImageFormat should always return 100")
 	}
 }
@@ -89,7 +95,7 @@ func TestStripHTMLEntities(t *testing.T) {
 		{"<p>para</p>", "para"},
 	}
 	for _, c := range cases {
-		got := stripHTML(c.in)
+		got := backend.StripHTML(c.in)
 		if got != c.out {
 			t.Errorf("stripHTML(%q) = %q, want %q", c.in, got, c.out)
 		}
@@ -97,11 +103,11 @@ func TestStripHTMLEntities(t *testing.T) {
 }
 
 func TestMergeSegmentsText(t *testing.T) {
-	segs := []TranscriptionSegment{
+	segs := []types.TranscriptionSegment{
 		{Start: 0, End: 10, Text: "first part"},
 		{Start: 9, End: 20, Text: "second part"},
 	}
-	merged := mergeSegments(segs)
+	merged := transcribe.MergeSegments(segs)
 	if len(merged) != 1 {
 		t.Fatalf("expected 1 merged segment, got %d", len(merged))
 	}
@@ -114,11 +120,11 @@ func TestMergeSegmentsText(t *testing.T) {
 }
 
 func TestMergeSegmentsNoOverlap(t *testing.T) {
-	segs := []TranscriptionSegment{
+	segs := []types.TranscriptionSegment{
 		{Start: 0, End: 10, Text: "first"},
 		{Start: 20, End: 30, Text: "second"},
 	}
-	merged := mergeSegments(segs)
+	merged := transcribe.MergeSegments(segs)
 	if len(merged) != 2 {
 		t.Fatalf("expected 2 segments, got %d", len(merged))
 	}
@@ -230,26 +236,26 @@ func TestTUICyclePodcastConfig(t *testing.T) {
 	tempDir := t.TempDir()
 	m := makeTestModel()
 	m.podcasts[0].dir = tempDir
-	m.podcasts[0].config = PodcastConfig{AdRemoval: AdRemovalNone}
+	m.podcasts[0].config = config.PodcastConfig{AdRemoval: config.AdRemovalNone}
 	m.screen = screenPodcasts
 	m.podIdx = 0
 
 	m.handlePodcastConfigToggle()
-	if m.podcasts[0].config.AdRemoval != AdRemovalLatest {
+	if m.podcasts[0].config.AdRemoval != config.AdRemovalLatest {
 		t.Errorf("expected AdRemovalLatest, got %s", m.podcasts[0].config.AdRemoval)
 	}
-	loaded := loadPodcastConfig(tempDir)
-	if loaded.AdRemoval != AdRemovalLatest {
+	loaded := config.LoadPodcastConfig(tempDir, config.PodcastConfig{})
+	if loaded.AdRemoval != config.AdRemovalLatest {
 		t.Errorf("expected saved file to have latest, got %s", loaded.AdRemoval)
 	}
 
 	m.handlePodcastConfigToggle()
-	if m.podcasts[0].config.AdRemoval != AdRemovalAll {
+	if m.podcasts[0].config.AdRemoval != config.AdRemovalAll {
 		t.Errorf("expected AdRemovalAll, got %s", m.podcasts[0].config.AdRemoval)
 	}
 
 	m.handlePodcastConfigToggle()
-	if m.podcasts[0].config.AdRemoval != AdRemovalNone {
+	if m.podcasts[0].config.AdRemoval != config.AdRemovalNone {
 		t.Errorf("expected AdRemovalNone, got %s", m.podcasts[0].config.AdRemoval)
 	}
 }

@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"abs/pkg/format"
+	"abs/pkg/types"
 )
 
 func (m *tuiModel) exportTranscript() {
@@ -26,14 +29,14 @@ func (m *tuiModel) exportTranscript() {
 	jsonFile := base + ".transcript.json"
 
 	if raw, err := os.ReadFile(jsonFile); err == nil {
-		var td TranscriptionData
+		var td types.TranscriptionData
 		if err := json.Unmarshal(raw, &td); err == nil {
 			dur := 0.0
 			if m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
 				dur = m.podcasts[m.podIdx].episodes[m.epIdx].duration
 			}
-			convertJSONToSRT(jsonFile, &td, srtFile, true)
-			convertJSONToTXT(jsonFile, &td, dur, txtFile, true)
+			_, _ = format.ConvertJSONToSRT(jsonFile, &td, srtFile, true)
+			_, _ = format.ConvertJSONToTXT(jsonFile, &td, dur, txtFile, true)
 			m.showToast("Exported transcript to .srt and .txt", ToastSuccess)
 			return
 		}
@@ -59,8 +62,8 @@ func (m *tuiModel) exportTranscript() {
 			if len(parts) == 2 {
 				stSec := parseTimestampSeconds(parts[0])
 				enSec := parseTimestampSeconds(parts[1])
-				st := formatSRTTime(stSec)
-				en := formatSRTTime(enSec)
+				st := format.FormatSRTTime(stSec)
+				en := format.FormatSRTTime(enSec)
 				text := strings.TrimSpace(sub[2])
 				srtEntries = append(srtEntries, fmt.Sprintf("%d\n%s --> %s\n%s\n", idx, st, en, text))
 				idx++

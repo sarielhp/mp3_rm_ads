@@ -13,7 +13,7 @@ import (
 func TestResolveTranscriptAfterAudioRemoved(t *testing.T) {
 	root := t.TempDir()
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"episode"})
-	id := podcast.EpisodeShortIDReadOnly(dir, generatePodcastShortID("Show"), paths[0])
+	id := podcast.EpisodeShortIDReadOnly(dir, podcast.GeneratePodcastShortID("Show"), paths[0])
 	for _, suffix := range []string{".transcript.json", ".transcript.txt"} {
 		if err := os.WriteFile(strings.TrimSuffix(paths[0], ".mp3")+suffix, []byte("retained transcript"), 0644); err != nil {
 			t.Fatal(err)

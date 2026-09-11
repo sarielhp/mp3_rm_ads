@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"abs/pkg/config"
 	"abs/pkg/tui"
 	"abs/pkg/util"
 )
@@ -18,14 +19,14 @@ func Execute(args []string) int {
 	if action == "" {
 		return 0
 	}
-	ensureConfigExists()
-	config := loadConfig()
-	if err := preparePublicationSource(action, config, cli); err != nil {
+	_, _ = config.EnsureConfigExists()
+	appCfg := loadConfig()
+	if err := preparePublicationSource(action, appCfg, cli); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
 	if !cli.DryRun {
-		root := config.PodcastsDir
+		root := appCfg.PodcastsDir
 		if cli.PodcastsDir != "" {
 			root = cli.PodcastsDir
 		}
@@ -38,7 +39,7 @@ func Execute(args []string) int {
 		}
 	}
 
-	if err := dispatch(action, &config, cli); err != nil {
+	if err := dispatch(action, &appCfg, cli); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}

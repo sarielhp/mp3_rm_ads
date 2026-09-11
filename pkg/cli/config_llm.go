@@ -46,7 +46,7 @@ func setDefaultProfile(cfg *Config, targetID int) {
 		fatalError("Error: Profile ID [%d] not found in configuration.\n", targetID)
 		return
 	}
-	saveConfig(*cfg)
+	_ = config.SaveConfig(cfg)
 	for _, p := range cfg.Profiles {
 		if p.ID == targetID {
 			fmt.Printf("Default LLM profile updated to [%d] %s\n", targetID, p.Name)

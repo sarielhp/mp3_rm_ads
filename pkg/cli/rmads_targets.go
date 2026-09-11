@@ -5,6 +5,7 @@ package cli
 // and positional arguments; pkg/adremoval receives only the resolved paths.
 
 import (
+	"abs/pkg/config"
 	"abs/pkg/podcast"
 	"fmt"
 	"os"
@@ -95,7 +96,7 @@ func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast,
 	if dir, title, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cleanCand); found {
 		if !isExcludedRootPodcastsDir(podcastsDir, dir) {
 			shortID := podcast.GetOrSetPodcastShortID(dir, title)
-			cfg := loadPodcastConfig(dir)
+			cfg := config.LoadPodcastConfig(dir, config.PodcastConfig{})
 			return &ResolvedPodcast{
 				Dir:        dir,
 				Title:      title,

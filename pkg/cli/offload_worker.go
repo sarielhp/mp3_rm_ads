@@ -6,7 +6,12 @@ import (
 	"path/filepath"
 	"time"
 
+	"abs/pkg/audio"
+	"abs/pkg/config"
 	"abs/pkg/detect"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/remote"
 	"abs/pkg/types"
 	"abs/pkg/util"
 )
@@ -16,10 +21,10 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 		return fmt.Errorf("batch directory argument --batch-dir is required")
 	}
 
-	manifestPath := filepath.Join(batchDir, "manifest.json")
-	manifest, err := loadManifest(manifestPath)
+	manifestPath := filepath.Join(batchDir, "batch_manifest.json")
+	manifest, err := remote.LoadManifest(manifestPath)
 	if err != nil {
-		return fmt.Errorf("failed to load manifest from %s: %w", manifestPath, err)
+		return fmt.Errorf("failed to load manifest %s: %w", manifestPath, err)
 	}
 
 	outDir := filepath.Join(batchDir, "out")
@@ -31,9 +36,9 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 	saveManifestVerbose(manifestPath, manifest, verbose)
 
-	ensureConfigExists()
-	config := loadConfig()
-	selectedProfile := selectProfile(config, "")
+	_, _ = config.EnsureConfigExists()
+	appCfg := loadConfig()
+	selectedProfile, _ := config.SelectLLMProfile(&appCfg, "")
 
 	if !quiet {
 		fmt.Printf("Worker started processing batch %s (%d items)...\n", manifest.BatchID, len(manifest.Items))
@@ -49,7 +54,7 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 		manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 		saveManifestVerbose(manifestPath, manifest, verbose)
 
-		if err := processBatchItem(item, batchDir, outDir, config, selectedProfile, quiet, verbose); err != nil {
+		if err := processBatchItem(item, batchDir, outDir, appCfg, selectedProfile, quiet, verbose); err != nil {
 			item.Status = BatchStatusFailed
 			item.Error = err.Error()
 		} else {
@@ -60,15 +65,19 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 			}
 		}
 
-		recalculateManifestStats(manifest)
+		remote.RecalculateManifestStats(manifest)
 		saveManifestVerbose(manifestPath, manifest, verbose)
 	}
 
-	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	recalculateManifestStats(manifest)
-	if err := saveManifest(manifestPath, manifest); err != nil {
-		return fmt.Errorf("failed to save final manifest: %w", err)
+	manifest.Status = BatchStatusCompleted
+	for _, it := range manifest.Items {
+		if it.Status == BatchStatusFailed {
+			manifest.Status = BatchStatusFailed
+			break
+		}
 	}
+	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
+	saveManifestVerbose(manifestPath, manifest, verbose)
 
 	if !quiet {
 		fmt.Printf("Batch %s worker finished: %d completed, %d failed.\n", manifest.BatchID, manifest.CompletedItems, manifest.FailedItems)
@@ -76,25 +85,25 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 	return nil
 }
 
-func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config Config, selectedProfile LLMProfile, quiet, verbose bool) error {
+func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, appCfg Config, selectedProfile LLMProfile, quiet, verbose bool) error {
 	inputFile := filepath.Join(batchDir, "in", item.AudioFileName)
-	if !fileExists(inputFile) {
+	if !util.FileExists(inputFile) {
 		return fmt.Errorf("input file %s not found", inputFile)
 	}
 
-	baseName := stripExt(item.AudioFileName)
+	baseName := util.StripExt(item.AudioFileName)
 	outMP3 := filepath.Join(outDir, item.AudioFileName)
 	outTranscriptJSON := filepath.Join(outDir, baseName+".transcript.json")
 
-	origDuration := getAudioDuration(inputFile)
+	origDuration := audio.GetAudioDuration(inputFile)
 	if origDuration <= 0 {
-		origDuration = getMP3DiskDuration(inputFile)
+		origDuration = audio.GetAudioDuration(inputFile)
 	}
 
-	whisperLanguage := config.WhisperLanguage
-	whisperPrompt := config.WhisperPrompt
+	whisperLanguage := appCfg.WhisperLanguage
+	whisperPrompt := appCfg.WhisperPrompt
 	id3Tags := map[string]string{}
-	speedFactor := config.WhisperSpeedFactor
+	speedFactor := appCfg.WhisperSpeedFactor
 	if speedFactor <= 0 {
 		speedFactor = 7.0
 	}
@@ -106,21 +115,21 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 		Verbose:        verbose,
 	}
 
-	transcriptionData, err := loadOrTranscribe(inputFile, outTranscriptJSON, config, procOpts, selectedProfile, origDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0)
+	transcriptionData, err := pipeline.LoadOrTranscribe(inputFile, outTranscriptJSON, appCfg, procOpts, selectedProfile, origDuration, speedFactor, whisperLanguage, whisperPrompt, id3Tags, &isNewlyTranscribed, &t0)
 	if err != nil {
 		return fmt.Errorf("transcription error: %w", err)
 	}
 
-	saveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
+	pipeline.SaveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
 
-	formattedTranscript := formatTranscript(transcriptionData, origDuration)
+	formattedTranscript := pipeline.FormatTranscript(transcriptionData, origDuration)
 	detect.AnnounceAdDetection(selectedProfile, quiet)
-	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
+	adSegments, err := detect.DetectAdsLLM(formattedTranscript, selectedProfile, selectedProfile.APIKey)
 	if err != nil {
 		return fmt.Errorf("ad detection failed: %w", err)
 	}
 	if len(adSegments) > 0 {
-		adSegments = mergeIntervals(adSegments)
+		adSegments = format.MergeIntervals(adSegments)
 	}
 
 	cleanDuration := executeItemAudioCut(item, inputFile, outMP3, batchDir, origDuration, adSegments, selectedProfile, quiet)
@@ -135,13 +144,13 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 }
 
 func saveManifestVerbose(path string, m *types.RemoteBatchManifest, verbose bool) {
-	if err := saveManifest(path, m); err != nil && verbose {
+	if err := remote.SaveManifest(path, m); err != nil && verbose {
 		fmt.Fprintf(os.Stderr, "Warning: failed to save manifest %s: %v\n", path, err)
 	}
 }
 
 func executeItemAudioCut(item *RemoteBatchJobItem, inputFile, outMP3, batchDir string, origDuration float64, adSegments []AdSegment, selectedProfile LLMProfile, quiet bool) float64 {
-	cutsResult := saveCutsJSON(outMP3, origDuration, adSegments, &selectedProfile, quiet)
+	cutsResult := format.SaveCutsJSON(outMP3, origDuration, adSegments, &selectedProfile, quiet)
 	keepSegments := cutsResult.KeepSegments
 
 	cleanDuration := origDuration
@@ -149,29 +158,29 @@ func executeItemAudioCut(item *RemoteBatchJobItem, inputFile, outMP3, batchDir s
 		workDir := filepath.Join(batchDir, ".work")
 		if err := os.MkdirAll(workDir, 0755); err != nil {
 			fmt.Fprintf(os.Stderr, "Error creating work directory %s: %v\n", workDir, err)
-			copyFile(inputFile, outMP3)
+			util.CopyFileErr(inputFile, outMP3)
 			return origDuration
 		}
 		tempOut := filepath.Join(workDir, item.AudioFileName+".tmp.mp3")
 		if err := util.VerifyTempFile(tempOut); err != nil {
 			fmt.Fprintf(os.Stderr, "Error: invalid temp file %s: %v\n", tempOut, err)
-			copyFile(inputFile, outMP3)
+			util.CopyFileErr(inputFile, outMP3)
 			return origDuration
 		}
 
-		if cutAudioFFmpeg(inputFile, keepSegments, tempOut) {
-			if mvErr := safeMove(tempOut, outMP3); mvErr != nil {
+		if audio.CutAudioFFmpeg(inputFile, keepSegments, tempOut) {
+			if mvErr := util.SafeMove(tempOut, outMP3); mvErr != nil {
 				fmt.Fprintf(os.Stderr, "Error: could not install the cut audio for %s: %v\n", outMP3, mvErr)
-				copyFile(inputFile, outMP3)
+				util.CopyFileErr(inputFile, outMP3)
 			} else {
-				cleanDuration = getAudioDuration(outMP3)
+				cleanDuration = audio.GetAudioDuration(outMP3)
 			}
 		} else {
-			copyFile(inputFile, outMP3)
+			util.CopyFileErr(inputFile, outMP3)
 		}
 		_ = os.RemoveAll(workDir)
 	} else {
-		copyFile(inputFile, outMP3)
+		util.CopyFileErr(inputFile, outMP3)
 	}
 	return cleanDuration
 }

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/backend"
+	"abs/pkg/util"
 	"fmt"
 
 	"github.com/sarielhp/clihelp"
@@ -37,7 +38,7 @@ func handleServerTimeline(config Config, cli CLIOptions) error {
 	}
 	for _, item := range podcasts {
 		if !cli.Quiet {
-			fmt.Printf("\nTimeline for %s (%d episodes):\n", bold(item.Media.Metadata.Title), len(item.Media.Episodes))
+			fmt.Printf("\nTimeline for %s (%d episodes):\n", util.Bold(item.Media.Metadata.Title), len(item.Media.Episodes))
 		}
 		for i, ep := range item.Media.Episodes {
 			if i >= 10 && !cli.Verbose {

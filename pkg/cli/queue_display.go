@@ -1,24 +1,26 @@
 package cli
 
 import (
+	"abs/pkg/audio"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"fmt"
 	"path/filepath"
 	"strings"
 	"time"
 )
 
-func collectQueueDisplayItems(p podcastDirEntry) ([]queueEpisodeItem, error) {
-	entries, err := pipeline.ReadQueue(p.dir)
+func collectQueueDisplayItems(p podcast.PodcastDirEntry) ([]queueEpisodeItem, error) {
+	entries, err := pipeline.ReadQueue(p.Dir)
 	if err != nil {
 		return nil, err
 	}
-	metadata := queueEpisodeMetadata(p.dir)
+	metadata := queueEpisodeMetadata(p.Dir)
 	items := make([]queueEpisodeItem, 0, len(entries))
 	for _, entry := range entries {
-		item := queueEpisodeItem{PodcastID: p.shortID, PodcastDir: p.dir, Filename: entry}
-		path, err := pipeline.ResolveQueueAudioPath(p.dir, entry)
+		item := queueEpisodeItem{PodcastID: p.ShortID, PodcastDir: p.Dir, Filename: entry}
+		path, err := pipeline.ResolveQueueAudioPath(p.Dir, entry)
 		if err != nil {
 			item.Title = "Unresolved queue entry"
 			if strings.Contains(err.Error(), "ambiguous") {
@@ -27,7 +29,7 @@ func collectQueueDisplayItems(p podcastDirEntry) ([]queueEpisodeItem, error) {
 			item.ResolutionError = err.Error()
 		} else {
 			item.AudioPath = path
-			item.EpisodeID = podcast.EpisodeShortIDReadOnly(p.dir, p.shortID, path)
+			item.EpisodeID = podcast.EpisodeShortIDReadOnly(p.Dir, p.ShortID, path)
 			populateQueueEpisodeDetails(&item, metadata[filepath.Clean(path)])
 		}
 		items = append(items, item)
@@ -57,7 +59,7 @@ func queueEpisodeMetadata(dir string) map[string]podcast.CachedEpisodeSummary {
 func populateQueueEpisodeDetails(item *queueEpisodeItem, ep podcast.CachedEpisodeSummary) {
 	item.Title = strings.TrimSpace(ep.Title)
 	if item.Title == "" {
-		item.Title = episodeTitleFromPath(item.AudioPath)
+		item.Title = podcast.EpisodeTitleFromPath(item.AudioPath)
 	}
 	item.DurationSec = ep.Duration
 	if ep.PublishedAt > 0 {
@@ -78,7 +80,7 @@ func populateQueueEpisodeDetails(item *queueEpisodeItem, ep podcast.CachedEpisod
 		}
 	}
 	if item.DurationSec <= 0 {
-		item.DurationSec = getAudioDuration(item.AudioPath)
+		item.DurationSec = audio.GetAudioDuration(item.AudioPath)
 	}
 }
 
@@ -128,5 +130,5 @@ func shortenedQueueTitle(title string) string {
 	if shortened == "" {
 		shortened = title
 	}
-	return truncateDisplayName(shortened, 48)
+	return util.TruncateDisplayName(shortened, 48)
 }

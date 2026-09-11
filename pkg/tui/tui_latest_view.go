@@ -5,6 +5,13 @@ import (
 	"sort"
 	"strings"
 
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/player"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -139,9 +146,9 @@ func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) stri
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 	}
-	inQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+	inQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
 
-	podTag := fmt.Sprintf("[%s]", truncate(displayName(item.podcastName), 18))
+	podTag := fmt.Sprintf("[%s]", truncate(util.DisplayName(item.podcastName), 18))
 	availWidth := width - 2
 
 	badgeStr := ""
@@ -158,7 +165,7 @@ func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) stri
 
 	durStr := ""
 	if ep.duration > 0 {
-		durStr = " (" + formatPlayerTime(ep.duration) + ")"
+		durStr = " (" + player.FormatPlayerTime(ep.duration) + ")"
 	}
 
 	rowContent := fmt.Sprintf("%s %-20s %s%s%s%s", dateStr, podTag, displayNameStr, durStr, txStr, badgeStr)
@@ -185,7 +192,7 @@ func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) stri
 	if ep.duration > 0 {
 		durRender = tuiDimStyle.Render(durStr)
 	}
-	titleRender := truncate(displayName(displayNameStr), max(10, availWidth-42-visibleRuneCount(durStr)-visibleRuneCount(badgeStr)-visibleRuneCount(txStr)))
+	titleRender := truncate(util.DisplayName(displayNameStr), max(10, availWidth-42-visibleRuneCount(durStr)-visibleRuneCount(badgeStr)-visibleRuneCount(txStr)))
 	return fmt.Sprintf("  %s %s %s%s%s%s\n", dRender, pTagRender, titleRender, durRender, txRender, badgeRender)
 }
 
@@ -213,13 +220,13 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 		pubDate = ep.absData.PubDate
-		pubAt = parseABSEpisodePublishedAt(ep.absData)
+		pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
 	}
 	if pubAt == 0 && ep.publishedAt > 0 {
 		pubAt = ep.publishedAt
 	}
 
-	dlItem := DownloadQueueItem{
+	dlItem := podcast.DownloadQueueItem{
 		PodcastTitle: item.podcastName,
 		PodcastDir:   item.podcastDir,
 		PodcastID:    item.podcastID,
@@ -230,17 +237,20 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 		DurationSec:  ep.duration,
 	}
 
-	ok, reason := EnqueueDownload(dlItem, m.podcasts)
+	ok, reason := podcast.DefaultDownloadQueue().Enqueue(dlItem)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
-		var absCli *ABSClient
+		var bCli backend.Backend
 		if m.podcastsDir != "" {
-			cfg := loadConfig()
-			if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+			cfg, err := config.LoadConfig()
+			if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+				bCli = backend.NewAudiobookshelf(backend.Config{
+					Host:  cfg.AudiobookshelfURL,
+					Token: cfg.AudiobookshelfToken,
+				})
 			}
 		}
-		TriggerDownloadQueueWorker(absCli)
+		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {

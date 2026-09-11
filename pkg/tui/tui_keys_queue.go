@@ -1,6 +1,10 @@
 package tui
 
 import (
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/podcast"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -119,7 +123,7 @@ func (m *tuiModel) handleAdQueueKey(s string) (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
-	items := GetDownloadQueueItems()
+	items := podcast.DefaultDownloadQueue().Items()
 	switch s {
 	case "up", "k":
 		if m.dlqIdx > 0 {
@@ -138,26 +142,29 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 		}
 	case "d", "D", "x", "X":
 		if len(items) > 0 && m.dlqIdx < len(items) {
-			RemoveDownloadQueueItemAt(m.dlqIdx)
+			podcast.DefaultDownloadQueue().Remove(items[m.dlqIdx].ID)
 			m.showToast("Removed from download queue", ToastInfo)
 			if m.dlqIdx >= len(items)-1 && m.dlqIdx > 0 {
 				m.dlqIdx--
 			}
 		}
 	case "c", "C":
-		ClearDownloadQueue()
+		podcast.DefaultDownloadQueue().Clear()
 		m.showToast("Download queue cleared", ToastInfo)
 		m.dlqIdx = 0
 		m.dlqScroll = 0
 	case "enter":
-		var absCli *ABSClient
+		var bCli backend.Backend
 		if m.podcastsDir != "" {
-			cfg := loadConfig()
-			if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-				absCli = NewABSClient(cfg.AudiobookshelfURL, cfg.AudiobookshelfToken)
+			cfg, err := config.LoadConfig()
+			if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+				bCli = backend.NewAudiobookshelf(backend.Config{
+					Host:  cfg.AudiobookshelfURL,
+					Token: cfg.AudiobookshelfToken,
+				})
 			}
 		}
-		TriggerDownloadQueueWorker(absCli)
+		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 		m.showToast("Triggered download processing", ToastInfo)
 	case "esc", "q", "Q":
 		m.handleEscape()

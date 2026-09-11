@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/backend"
+	"abs/pkg/config"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
@@ -61,7 +62,7 @@ func resolveFlushPodcast(root, query string, items []backend.Podcast) (backend.P
 		if err != nil {
 			continue
 		}
-		local := loadPodcastConfig(dir)
+		local := config.LoadPodcastConfig(dir, config.PodcastConfig{})
 		if query == item.ID || strings.EqualFold(query, item.Media.Metadata.Title) ||
 			(local.ID != "" && strings.EqualFold(query, local.ID)) {
 			matches = append(matches, item)
@@ -129,12 +130,12 @@ func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli 
 		}
 		return nil
 	}
-	local := loadPodcastConfig(dir)
+	local := config.LoadPodcastConfig(dir, config.PodcastConfig{})
 	if err := b.UpdatePodcastSettings(item.ID, false, local.IsAutoCleanupEnabled(), local.AutoCleanupDays); err != nil {
 		return fmt.Errorf("disable server downloads before flushing: %w", err)
 	}
 	local.SetAutoDownload(false)
-	if err := savePodcastConfig(dir, local); err != nil {
+	if err := config.SavePodcastConfig(dir, local); err != nil {
 		return err
 	}
 	if err := queue.FlushPodcast(item.ID, dir); err != nil {
@@ -157,7 +158,7 @@ func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli 
 			return fmt.Errorf("flush %s: %w", path, err)
 		}
 	}
-	if err := saveQueue(dir, nil); err != nil {
+	if err := pipeline.UpdateQueue(dir, func([]string) []string { return nil }); err != nil {
 		return err
 	}
 	if !cli.Quiet {

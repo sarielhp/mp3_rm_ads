@@ -8,6 +8,11 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 )
 
 func TestQueueListEmpty(t *testing.T) {
@@ -37,7 +42,7 @@ func TestQueueListEmpty(t *testing.T) {
 func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
 	root := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"Episode One"})
-	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
+	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
 	for _, command := range []string{"list", "ls"} {
 		var action string
 		var opts CLIOptions
@@ -149,9 +154,9 @@ func TestQueueAddRemoveAndClear(t *testing.T) {
 	_ = os.WriteFile(ep1, []byte("audio1"), 0644)
 	_ = os.WriteFile(ep2, []byte("audio2"), 0644)
 
-	podID := getOrSetPodcastShortID(podDir, "Show_Q")
-	ep1ID := getOrSetEpisodeShortID(podDir, podID, ep1)
-	_ = getOrSetEpisodeShortID(podDir, podID, ep2)
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Show_Q")
+	ep1ID := podcast.GetOrSetEpisodeShortID(podDir, podID, ep1)
+	_ = podcast.GetOrSetEpisodeShortID(podDir, podID, ep2)
 
 	cfg := Config{PodcastsDir: tempDir}
 	testQueueAddAndList(t, cfg, podDir, ep1ID)
@@ -167,7 +172,7 @@ func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
 		wg.Add(1)
 		go func(name string) {
 			defer wg.Done()
-			addEpisodeToQueueFile(tempDir, name)
+			pipeline.AddToQueue(tempDir, name)
 		}(fn)
 	}
 	wg.Wait()
@@ -190,7 +195,7 @@ func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
 		wg.Add(1)
 		go func(name string) {
 			defer wg.Done()
-			removeEpisodeFromQueueFile(tempDir, name)
+			pipeline.RemoveFromQueue(tempDir, name)
 		}(fn)
 	}
 	wg.Wait()
@@ -225,7 +230,7 @@ func TestPrintQueueTableHebrew(t *testing.T) {
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
 
-	expected := displayName("פרק מיוחד בעברית")
+	expected := util.DisplayName("פרק מיוחד בעברית")
 	if !strings.Contains(out, expected) {
 		t.Errorf("expected queue table to contain %q, got: %s", expected, out)
 	}
@@ -248,8 +253,8 @@ func TestQueueRun_Empty(t *testing.T) {
 func TestQueueRun_DryRun(t *testing.T) {
 	tempDir := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "DryShow", []string{"Ep1", "Ep2"})
-	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
-	addEpisodeToQueueFile(podDir, filepath.Base(paths[1]))
+	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
+	pipeline.AddToQueue(podDir, filepath.Base(paths[1]))
 
 	cfg := Config{PodcastsDir: tempDir}
 	cli := CLIOptions{
@@ -275,8 +280,8 @@ func TestQueueRun_DryRun(t *testing.T) {
 func TestQueueRun_CleansAndDequeues(t *testing.T) {
 	tempDir := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "QueueShow", []string{"Ep1", "Ep2"})
-	addEpisodeToQueueFile(podDir, filepath.Base(paths[0]))
-	addEpisodeToQueueFile(podDir, filepath.Base(paths[1]))
+	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
+	pipeline.AddToQueue(podDir, filepath.Base(paths[1]))
 
 	markEpisodeClean(t, paths[0])
 	markEpisodeClean(t, paths[1])
@@ -307,13 +312,13 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 	pod1Dir, paths1 := createTestPodcastWithEpisodes(t, tempDir, "PodA", []string{"EpA"})
 	pod2Dir, paths2 := createTestPodcastWithEpisodes(t, tempDir, "PodB", []string{"EpB"})
 
-	addEpisodeToQueueFile(pod1Dir, filepath.Base(paths1[0]))
-	addEpisodeToQueueFile(pod2Dir, filepath.Base(paths2[0]))
+	pipeline.AddToQueue(pod1Dir, filepath.Base(paths1[0]))
+	pipeline.AddToQueue(pod2Dir, filepath.Base(paths2[0]))
 
 	markEpisodeClean(t, paths1[0])
 	markEpisodeClean(t, paths2[0])
 
-	pod1Cfg := loadPodcastConfig(pod1Dir)
+	pod1Cfg := config.LoadPodcastConfig(pod1Dir, config.PodcastConfig{})
 	cfg := Config{PodcastsDir: tempDir}
 	cli := CLIOptions{
 		ProcOptions: ProcOptions{
@@ -345,7 +350,7 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 func TestQueueRun_MissingFileRetained(t *testing.T) {
 	tempDir := t.TempDir()
 	podDir, _ := createTestPodcastWithEpisodes(t, tempDir, "MissingShow", []string{})
-	addEpisodeToQueueFile(podDir, "nonexistent.mp3")
+	pipeline.AddToQueue(podDir, "nonexistent.mp3")
 
 	cfg := Config{PodcastsDir: tempDir}
 	cli := CLIOptions{
@@ -422,7 +427,7 @@ func TestQueueRunResolvesLegacyNestedFilename(t *testing.T) {
 	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	addEpisodeToQueueFile(podDir, filepath.Base(audioPath))
+	pipeline.AddToQueue(podDir, filepath.Base(audioPath))
 	markEpisodeClean(t, audioPath)
 
 	cfg := Config{PodcastsDir: tempDir}

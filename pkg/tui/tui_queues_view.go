@@ -3,6 +3,11 @@ package tui
 import (
 	"fmt"
 	"strings"
+
+	"abs/pkg/player"
+	"abs/pkg/podcast"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func (m *tuiModel) drawPlayerScreen() string {
@@ -22,39 +27,34 @@ func (m *tuiModel) drawPlayerScreen() string {
 		} else if !pv.IsPlaying {
 			statusBadge = tuiPlayerPaused.Render("⏸ LOADED")
 		}
-		out.WriteString("  " + statusBadge + "  " + tuiTitleStyle.Render(displayName(pv.Title)) + "\n")
-		out.WriteString("    " + tuiSubtitleStyle.Render("in "+displayName(pv.Podcast)) + "\n\n")
+		out.WriteString("  " + statusBadge + "  " + tuiTitleStyle.Render(util.DisplayName(pv.Title)) + "\n")
+		out.WriteString("    " + tuiSubtitleStyle.Render("in "+util.DisplayName(pv.Podcast)) + "\n\n")
 
 		barW := max(20, m.width-8)
 		out.WriteString("    " + tuiCyanStyle.Render(globalPlayer.RenderProgressBar(barW)) + "\n\n")
 	} else {
-		out.WriteString("  " + tuiPlayerStopped.Render("⏹ STOPPED") + "  " + tuiDimStyle.Render("No track currently playing. Press F2 or select an episode to play.") + "\n\n")
-		out.WriteString("    " + tuiDimStyle.Render("[────────────────────────] 00:00 / 00:00") + "\n\n")
+		out.WriteString(tuiPlayerStopped.Render("  ⏹ STOPPED") + "  " + tuiDimStyle.Render("No track playing. Press 'p' on any episode to play.") + "\n\n")
 	}
 
-	out.WriteString(tuiSectionTitle.Render("  Audio Output & Volume") + "\n")
-	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-	speaker := pv.CurrentSpeaker
-	if speaker == "" {
-		speaker = "Default Audio Sink"
+	out.WriteString(tuiLabelStyle.Render("  Volume & Output:") + "\n")
+	spk := pv.CurrentSpeaker
+	if spk == "" {
+		spk = "Default Audio Sink"
 	}
-	out.WriteString(fmt.Sprintf("    Speaker: %s %s\n", tuiYellowStyle.Render(speaker), tuiDimStyle.Render("('s' to cycle)")))
-	out.WriteString(fmt.Sprintf("    Volume:  %s %s\n\n", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(30)), tuiDimStyle.Render("(+/- volume, 'm' mute)")))
+	out.WriteString(fmt.Sprintf("    Speaker: %s  %s\n", tuiYellowStyle.Render(spk), tuiDimStyle.Render("('s' to switch)")))
+	out.WriteString(fmt.Sprintf("    Volume:  %s\n\n", tuiGreenStyle.Render(globalPlayer.RenderVolumeBar(24))))
 
-	qLen := len(pv.Queue)
-	out.WriteString(tuiSectionTitle.Render(fmt.Sprintf("  Up Next in Queue (%d queued)", qLen)) + "\n")
-	out.WriteString(tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
-
-	if qLen > 0 {
+	out.WriteString(tuiLabelStyle.Render("  Upcoming in Queue:") + "\n")
+	if len(pv.Queue) == 0 {
+		out.WriteString(tuiDimStyle.Render("    Queue is empty.") + "\n")
+	} else {
 		for i, track := range pv.Queue {
 			if i >= 5 {
-				out.WriteString(fmt.Sprintf("    %s\n", tuiDimStyle.Render(fmt.Sprintf("... and %d more (Press F2 to view full queue)", qLen-5))))
+				out.WriteString(tuiDimStyle.Render(fmt.Sprintf("    ... and %d more", len(pv.Queue)-5)) + "\n")
 				break
 			}
-			out.WriteString(fmt.Sprintf("    %d. %s %s\n", i+1, displayName(track.Title), tuiDimStyle.Render("("+displayName(track.Podcast)+")")))
+			out.WriteString(fmt.Sprintf("    %d. %s %s\n", i+1, util.DisplayName(track.Title), tuiDimStyle.Render("("+util.DisplayName(track.Podcast)+")")))
 		}
-	} else {
-		out.WriteString("    " + tuiDimStyle.Render("Playback queue is empty.") + "\n")
 	}
 
 	out.WriteString("\n" + tuiDividerStyle.Render("  "+strings.Repeat("─", dividerWidth)) + "\n")
@@ -116,18 +116,18 @@ func adjustPlayQueueScroll(m *tuiModel, total, maxVis int) {
 	}
 }
 
-func renderPlayQueueItem(item UnifiedQueueItem, i int, m *tuiModel, availW int) string {
+func renderPlayQueueItem(item types.UnifiedQueueItem, i int, m *tuiModel, availW int) string {
 	track := item.Track
-	titleStr := displayName(track.Title)
-	podStr := " [" + displayName(track.Podcast) + "]"
+	titleStr := util.DisplayName(track.Title)
+	podStr := " [" + util.DisplayName(track.Podcast) + "]"
 
 	durStr := ""
 	if item.IsCurrent {
-		curT := formatPlayerTime(item.Position)
-		totT := formatPlayerTime(item.Duration)
+		curT := player.FormatPlayerTime(item.Position)
+		totT := player.FormatPlayerTime(item.Duration)
 		durStr = fmt.Sprintf(" (%s / %s)", curT, totT)
 	} else if track.Duration > 0 {
-		durStr = " (" + formatPlayerTime(track.Duration) + ")"
+		durStr = " (" + player.FormatPlayerTime(track.Duration) + ")"
 	}
 
 	if item.IsCurrent {
@@ -208,8 +208,8 @@ func (m *tuiModel) drawAdQueueScreen() string {
 	for i := m.adqScroll; i < end; i++ {
 		item := adItems[i]
 		idxPrefix := fmt.Sprintf("%2d. ", i+1)
-		podPrefix := "[" + displayName(item.PodcastName) + "] "
-		titleStr := displayName(item.Title)
+		podPrefix := "[" + util.DisplayName(item.PodcastName) + "] "
+		titleStr := util.DisplayName(item.Title)
 
 		status := ""
 		if item.HasAdsRemoved {
@@ -247,7 +247,7 @@ func (m *tuiModel) drawAdQueueScreen() string {
 func (m *tuiModel) drawDownloadQueueScreen() string {
 	out := &strings.Builder{}
 
-	items := GetDownloadQueueItems()
+	items := podcast.DefaultDownloadQueue().Items()
 	total := len(items)
 
 	banner := tuiHeaderBanner.Render(fmt.Sprintf(" DOWNLOAD QUEUE — %d items ", total))
@@ -281,8 +281,8 @@ func (m *tuiModel) drawDownloadQueueScreen() string {
 	for i := m.dlqScroll; i < end; i++ {
 		item := items[i]
 		idxPrefix := fmt.Sprintf("%2d. ", i+1)
-		podPrefix := "[" + displayName(item.PodcastTitle) + "] "
-		titleStr := displayName(item.EpisodeTitle)
+		podPrefix := "[" + util.DisplayName(item.PodcastTitle) + "] "
+		titleStr := util.DisplayName(item.EpisodeTitle)
 
 		statusBadge := ""
 		switch item.Status {

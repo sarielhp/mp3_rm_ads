@@ -44,7 +44,7 @@ func resolveTranscriptEpisode(root, id string) (*podcast.ResolvedEpisode, error)
 	var matches []*podcast.ResolvedEpisode
 	seen := make(map[string]bool)
 	for _, pod := range scanQueuePodcasts(root) {
-		err := filepath.WalkDir(pod.dir, func(path string, entry os.DirEntry, err error) error {
+		err := filepath.WalkDir(pod.Dir, func(path string, entry os.DirEntry, err error) error {
 			if err != nil {
 				return err
 			}
@@ -64,9 +64,9 @@ func resolveTranscriptEpisode(root, id string) (*podcast.ResolvedEpisode, error)
 				return nil
 			}
 			seen[audio] = true
-			episodeID := podcast.EpisodeShortIDReadOnly(pod.dir, pod.shortID, audio)
+			episodeID := podcast.EpisodeShortIDReadOnly(pod.Dir, pod.ShortID, audio)
 			if strings.EqualFold(id, episodeID) {
-				matches = append(matches, &podcast.ResolvedEpisode{Path: audio, ShortID: episodeID, Title: episodeTitleFromPath(audio), PodcastDir: pod.dir})
+				matches = append(matches, &podcast.ResolvedEpisode{Path: audio, ShortID: episodeID, Title: podcast.EpisodeTitleFromPath(audio), PodcastDir: pod.Dir})
 			}
 			return nil
 		})

@@ -126,7 +126,7 @@ func handleConfigMigrate(cfg *Config, source string) {
 	}
 
 	if migrated {
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Printf("Configuration saved to '%s'\n", config.ConfigPath())
 	} else {
 		fmt.Println("No legacy configuration found to migrate or settings already up-to-date.")
@@ -163,7 +163,7 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 		}
 		if !exists {
 			cfg.PostProcessors = append(cfg.PostProcessors, fullPath)
-			saveConfig(*cfg)
+			_ = config.SaveConfig(cfg)
 		}
 		fmt.Printf("Added post-processor: %s\n", fullPath)
 
@@ -187,7 +187,7 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 		}
 		removed := cfg.PostProcessors[idx-1]
 		cfg.PostProcessors = append(cfg.PostProcessors[:idx-1], cfg.PostProcessors[idx:]...)
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Printf("Deleted post-processor #%d: %s\n", idx, removed)
 
 	default:

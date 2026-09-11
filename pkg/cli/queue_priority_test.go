@@ -48,7 +48,7 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 			t.Errorf("accepted %s", value)
 		}
 	}
-	id := podcast.EpisodeShortIDReadOnly(a, generatePodcastShortID("Alpha"), ap[0])
+	id := podcast.EpisodeShortIDReadOnly(a, podcast.GeneratePodcastShortID("Alpha"), ap[0])
 	if err := handleQueuePriority(root, []string{id, "8"}); err == nil {
 		t.Fatal("accepted permanent episode priority")
 	}
@@ -63,7 +63,7 @@ func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
 	if _, err := pipeline.AddToQueueChecked(dir, filepath.Base(paths[0])); err != nil {
 		t.Fatal(err)
 	}
-	id := podcast.EpisodeShortIDReadOnly(dir, generatePodcastShortID("Show"), paths[1])
+	id := podcast.EpisodeShortIDReadOnly(dir, podcast.GeneratePodcastShortID("Show"), paths[1])
 	cfg := Config{PodcastsDir: root}
 	cli := CLIOptions{Args: []string{id}, ProcOptions: ProcOptions{DryRun: true, Quiet: true, Local: true}}
 	before := queueTree(t, root)

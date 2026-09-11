@@ -5,6 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"abs/pkg/player"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
@@ -48,7 +52,7 @@ func (m *tuiModel) renderTopNavBar() string {
 	for _, q := range m.queue {
 		adQueueCount += len(q)
 	}
-	dlQueueCount := len(GetDownloadQueueItems())
+	dlQueueCount := len(podcast.DefaultDownloadQueue().Items())
 
 	tabs := []tabInfo{
 		{num: 1, label: "Podcasts", screen: screenPodcasts},
@@ -80,11 +84,11 @@ func (m *tuiModel) renderTopNavBar() string {
 	pathParts = append(pathParts, "Podcasts")
 	if m.podIdx >= 0 && m.podIdx < len(m.podcasts) && m.screen != screenPodcasts && m.screen != screenLatestEpisodes && m.screen != screenDownloadQueue {
 		pod := m.podcasts[m.podIdx]
-		pathParts = append(pathParts, truncate(displayName(pod.name), 25))
+		pathParts = append(pathParts, truncate(util.DisplayName(pod.name), 25))
 		if m.screen == screenEpisodeDetail || m.screen == screenTranscript {
 			eps := m.filteredEpisodes()
 			if m.epIdx >= 0 && m.epIdx < len(eps) {
-				pathParts = append(pathParts, truncate(displayName(eps[m.epIdx].displayTitle()), 30))
+				pathParts = append(pathParts, truncate(util.DisplayName(eps[m.epIdx].displayTitle()), 30))
 			}
 		}
 		if m.screen == screenTranscript {
@@ -129,10 +133,10 @@ func (m *tuiModel) renderMiniPlayerBar() string {
 		statusIcon = "⏸"
 	}
 
-	curT := formatPlayerTime(pv.Position)
-	totT := formatPlayerTime(pv.Duration)
-	title := truncate(displayName(pv.Title), max(10, m.width/3))
-	pod := truncate(displayName(pv.Podcast), 20)
+	curT := player.FormatPlayerTime(pv.Position)
+	totT := player.FormatPlayerTime(pv.Duration)
+	title := truncate(util.DisplayName(pv.Title), max(10, m.width/3))
+	pod := truncate(util.DisplayName(pv.Podcast), 20)
 
 	trackInfo := fmt.Sprintf("%s [%s / %s] %s • %s [Vol: %d%%]",
 		statusIcon, curT, totT, title, pod, pv.Volume)

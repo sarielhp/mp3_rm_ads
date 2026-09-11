@@ -1,6 +1,10 @@
 package cli
 
-import "fmt"
+import (
+	"fmt"
+
+	"abs/pkg/backend"
+)
 
 func runCheckCommand(config Config, cli CLIOptions) error {
 	if cli.TestABSMap {
@@ -14,7 +18,11 @@ func runCheckCommand(config Config, cli CLIOptions) error {
 	} else if cli.TestKitty {
 		testKittyImage(cli.Args)
 	} else if cli.TestABS {
-		if !testAudiobookshelfServer(config, cli.Quiet) {
+		b, err := backend.FromAppConfig(&config, cli.Quiet)
+		if err != nil {
+			return fmt.Errorf("audiobookshelf test failed: %w", err)
+		}
+		if ok, _ := b.TestConnection(cli.Quiet); !ok {
 			return fmt.Errorf("audiobookshelf test failed")
 		}
 	} else {

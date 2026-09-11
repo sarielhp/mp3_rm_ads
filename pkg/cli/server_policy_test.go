@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"abs/pkg/config"
+	"abs/pkg/podcast"
 	"encoding/json"
 	"io"
 	"os"
@@ -14,7 +16,7 @@ func TestPolicyDisplayAndJSON(t *testing.T) {
 	podDir := filepath.Join(tempDir, "Tech_Show")
 	_ = os.MkdirAll(podDir, 0755)
 
-	podID := getOrSetPodcastShortID(podDir, "Tech Show")
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Tech Show")
 	cfg := Config{PodcastsDir: tempDir}
 
 	// Text mode
@@ -72,7 +74,7 @@ func TestPolicyUpdate(t *testing.T) {
 	podDir := filepath.Join(tempDir, "News_Cast")
 	_ = os.MkdirAll(podDir, 0755)
 
-	podID := getOrSetPodcastShortID(podDir, "News Cast")
+	podID := podcast.GetOrSetPodcastShortID(podDir, "News Cast")
 	cfg := Config{PodcastsDir: tempDir}
 
 	cli := CLIOptions{
@@ -100,7 +102,7 @@ func TestPolicyUpdate(t *testing.T) {
 		t.Fatalf("runPolicyCommand update failed: %v", err)
 	}
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
 	if podCfg.IsAutoDownloadEnabled() {
 		t.Errorf("expected AutoDownload to be false")
 	}
@@ -120,7 +122,7 @@ func TestPolicyShorthandNumber(t *testing.T) {
 	podDir := filepath.Join(tempDir, "Shorthand_Show")
 	_ = os.MkdirAll(podDir, 0755)
 
-	podID := getOrSetPodcastShortID(podDir, "Shorthand Show")
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Shorthand Show")
 	cfg := Config{PodcastsDir: tempDir}
 
 	cli1 := CLIOptions{
@@ -138,7 +140,7 @@ func TestPolicyShorthandNumber(t *testing.T) {
 		t.Fatalf("runPolicyCommand with shorthand 1 failed: %v", err)
 	}
 
-	podCfg1 := loadPodcastConfig(podDir)
+	podCfg1 := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
 	if !podCfg1.IsAutoDownloadEnabled() {
 		t.Errorf("expected AutoDownload true for shorthand 1")
 	}
@@ -167,7 +169,7 @@ func TestPolicyShorthandNumber(t *testing.T) {
 		t.Fatalf("runPolicyCommand with shorthand 5 failed: %v", err)
 	}
 
-	podCfg5 := loadPodcastConfig(podDir)
+	podCfg5 := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
 	if podCfg5.DownloadK != 5 {
 		t.Errorf("expected DownloadK 5, got %d", podCfg5.DownloadK)
 	}

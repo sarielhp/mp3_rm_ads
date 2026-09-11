@@ -2,6 +2,8 @@ package tui
 
 import (
 	"strings"
+
+	"abs/pkg/kitty"
 )
 
 func (m *tuiModel) drawPopup() string {
@@ -52,8 +54,8 @@ func (m *tuiModel) View() string {
 	}
 
 	var body strings.Builder
-	if isKittyTerminal() {
-		body.WriteString(kittyClearGraphics())
+	if kitty.IsKittyTerminal() {
+		body.WriteString(kitty.KittyClearGraphics())
 	}
 	body.WriteString(m.renderTopNavBar())
 

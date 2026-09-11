@@ -3,6 +3,7 @@ package cli
 import (
 	"abs/pkg/backend"
 	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"fmt"
 	"strconv"
 
@@ -77,7 +78,7 @@ func handleServerList(config Config, cli CLIOptions) error {
 	}
 	for idx, p := range podcasts {
 		shortID := podcast.GeneratePodcastShortID(p.Media.Metadata.Title)
-		fmt.Printf("%3d. %s [%s] (%d episodes)\n", idx+1, bold(p.Media.Metadata.Title), boldCyan(shortID), len(p.Media.Episodes))
+		fmt.Printf("%3d. %s [%s] (%d episodes)\n", idx+1, util.Bold(p.Media.Metadata.Title), util.BoldCyan(shortID), len(p.Media.Episodes))
 		if cli.Verbose {
 			fmt.Printf("     ID:      %s\n", p.ID)
 			if p.Media.Metadata.FeedURL != "" {

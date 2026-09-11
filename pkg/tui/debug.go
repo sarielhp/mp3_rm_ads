@@ -7,10 +7,13 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"abs/pkg/kitty"
+	"abs/pkg/util"
 )
 
 var (
-	debugLoggerMu syncMutex
+	debugLoggerMu util.SyncMutex
 	debugFile     *os.File
 	debugEnabled  bool
 	snapshotSeq   int
@@ -48,7 +51,7 @@ func initDebugLogger(enabled bool) {
 		debugFile = f
 		now := time.Now().Format("2006-01-02 15:04:05.000")
 		_, _ = fmt.Fprintf(debugFile, "\n=== ABS TUI Debug Session Started at %s ===\n", now)
-		_, _ = fmt.Fprintf(debugFile, "PID: %d | TERM: %s | KittyTerminal: %v\n", os.Getpid(), os.Getenv("TERM"), isKittyTerminal())
+		_, _ = fmt.Fprintf(debugFile, "PID: %d | TERM: %s | KittyTerminal: %v\n", os.Getpid(), os.Getenv("TERM"), kitty.IsKittyTerminal())
 	}
 }
 

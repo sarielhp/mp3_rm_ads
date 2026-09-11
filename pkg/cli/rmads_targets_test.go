@@ -1,13 +1,14 @@
 package cli
 
 import (
+	"abs/pkg/config"
 	"testing"
 )
 
 func TestResolvePodcastTarget(t *testing.T) {
 	tmp := t.TempDir()
 	podDir, _ := createTestPodcastWithEpisodes(t, tmp, "Daily Tech", []string{"Ep 1"})
-	cfg := loadPodcastConfig(podDir)
+	cfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
 
 	cliShort := CLIOptions{Podcast: cfg.ID}
 	p1, ok1 := resolvePodcastTarget(tmp, cliShort)

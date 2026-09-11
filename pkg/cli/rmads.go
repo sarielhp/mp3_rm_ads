@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/adremoval"
+	"abs/pkg/remote"
 	"fmt"
 
 	"github.com/sarielhp/clihelp"
@@ -226,13 +227,13 @@ func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 		return nil
 	}
 	if cli.ProcSubcmd == "collect" {
-		if err := runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
+		if err := remote.RunRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
 			return fmt.Errorf("error collecting from remote %s: %w", cli.RemoteHost, err)
 		}
 		return nil
 	}
 	if cli.ProcSubcmd == "clear" {
-		if err := runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
+		if err := remote.RunRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
 			return fmt.Errorf("error clearing remote queue on %s: %w", cli.RemoteHost, err)
 		}
 		return nil

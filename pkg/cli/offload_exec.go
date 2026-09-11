@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/remote"
 	"os"
 )
 
@@ -8,15 +9,15 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 	var err error
 	switch cli.RemoteSubcmd {
 	case "deploy":
-		err = runRemoteDeploy(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		err = remote.RunRemoteDeploy(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "push":
-		err = runRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Priority, cli.Quiet, cli.Verbose)
+		err = remote.RunRemotePush(&config, cli.Args, cli.RemoteHost, nil, cli.Priority, cli.Quiet, cli.Verbose)
 	case "pull":
-		err = runRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		err = remote.RunRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "clear":
-		err = runRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
+		err = remote.RunRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet)
 	case "stop":
-		err = runRemoteStop(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		err = remote.RunRemoteStop(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "scan", "start":
 		hostCandidate := cli.RemoteHost
 		if hostCandidate == "" && len(cli.Args) > 0 {
@@ -25,19 +26,19 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 				hostCandidate = arg
 			}
 		}
-		targetHost, isRem, _ := ResolveProcessingHost(&config, hostCandidate, nil)
+		targetHost, isRem, _ := remote.ResolveProcessingHost(&config, hostCandidate, nil)
 		if isRem {
 			remoteWorkDir := config.RemoteWorkDir
 			if remoteWorkDir == "" {
 				remoteWorkDir = "~/abs_remote"
 			}
-			err = ensureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
+			err = remote.EnsureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, cli.Quiet)
 		} else {
 			targetDir := ""
 			if len(cli.Args) > 0 {
 				targetDir = cli.Args[0]
 			}
-			err = runRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
+			err = remote.RunRemoteScan(&config, targetDir, cli.IfDirty, cli.Quiet, cli.Verbose)
 		}
 	case "worker":
 		if cli.BatchWorkerDir != "" {
@@ -48,7 +49,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		if len(cli.Args) > 0 {
 			targetDir = cli.Args[0]
 		}
-		err = runRemoteWorkerLoop(&config, targetDir, cli.Daemon, cli.Quiet, cli.Verbose)
+		err = remote.RunRemoteWorkerLoop(&config, targetDir, cli.Daemon, cli.Quiet, cli.Verbose)
 	case "ack":
 		targetDir := cli.RemoteWorkDir
 		if targetDir == "" {
@@ -57,9 +58,9 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		if targetDir == "" {
 			targetDir = "~/abs_remote"
 		}
-		err = runRemoteAck(targetDir, cli.Args)
+		err = remote.RunRemoteAck(targetDir, cli.Args)
 	case "status":
-		err = runRemoteStatus(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
+		err = remote.RunRemoteStatus(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose)
 	case "cancel":
 		host := cli.RemoteHost
 		batchID := ""
@@ -69,7 +70,7 @@ func handleRemoteCommand(config Config, cli CLIOptions) {
 		if len(cli.Args) > 1 {
 			batchID = cli.Args[1]
 		}
-		err = runRemoteCancel(&config, host, batchID, nil, cli.Quiet)
+		err = remote.RunRemoteCancel(&config, host, batchID, nil, cli.Quiet)
 	default:
 		return
 	}

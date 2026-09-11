@@ -6,6 +6,13 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/remote"
+	"abs/pkg/util"
 )
 
 type podcastStatusEntry struct {
@@ -56,20 +63,20 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 				continue
 			}
 			podPath := filepath.Join(podcastsDir, de.Name())
-			mp3s := findMP3Files(podPath)
+			mp3s := util.FindMP3Files(podPath)
 			if len(mp3s) == 0 {
 				continue
 			}
 			podcastsCount++
 			totalEpisodes += len(mp3s)
-			podCfg := loadPodcastConfig(podPath)
+			podCfg := config.LoadPodcastConfig(podPath, config.PodcastConfig{})
 			if podCfg.AdRemoval == AdRemovalNone {
 				continue
 			}
-			filtered := filterMP3FilesByPodcastConfig(mp3s, podPath, podCfg)
+			filtered := podcast.FilterByAdRemovalPolicy(mp3s, podPath, podCfg)
 			for _, mp3 := range filtered {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
+				_ = pipeline.GetOrCreateEpisodeStatus(mp3)
+				if !pipeline.IsEpisodeCompleted(mp3) {
 					totalNeedsAd++
 				}
 			}
@@ -83,16 +90,16 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 		fmt.Printf("  - Podcasts:          %d\n", podcastsCount)
 		fmt.Printf("  - Total Episodes:    %d\n", totalEpisodes)
 		if totalNeedsAd > 0 {
-			fmt.Printf("  - AdR Status:        %s\n", boldYellow(fmt.Sprintf("%d episode(s) need AdR", totalNeedsAd)))
+			fmt.Printf("  - AdR Status:        %s\n", util.BoldYellow(fmt.Sprintf("%d episode(s) need AdR", totalNeedsAd)))
 		} else {
-			fmt.Printf("  - AdR Status:        %s\n", boldGreen("0 (All clean)"))
+			fmt.Printf("  - AdR Status:        %s\n", util.BoldGreen("0 (All clean)"))
 		}
 	}
 	return podcastsCount, totalEpisodes, totalNeedsAd
 }
 
 func renderRemoteStatusSection(cfg *Config, targetHost string, transport RemoteTransport, quiet bool) {
-	_ = runRemoteStatus(cfg, targetHost, transport, quiet, false)
+	_ = remote.RunRemoteStatus(cfg, targetHost, transport, quiet, false)
 }
 
 func renderLocalLibraryStatus(cfg Config, quiet bool) {
@@ -102,7 +109,7 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 	}
 
 	renderedABS := false
-	if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+	if backend.IsAudiobookshelfActive(&cfg) && cfg.AudiobookshelfURL != "" {
 		if err := renderABSPodcastStatus(cfg, cfg.AudiobookshelfURL, "", podcastsDir, quiet); err == nil {
 			renderedABS = true
 		}
@@ -114,7 +121,7 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 }
 
 func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quiet bool) error {
-	b, err := getBackend(cfg, quiet)
+	b, err := backend.FromAppConfig(&cfg, quiet)
 	if err != nil {
 		return err
 	}
@@ -147,7 +154,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 
 	for idx, item := range allItems {
 		title := item.Media.Metadata.Title
-		dName := displayName(title)
+		dName := util.DisplayName(title)
 		if len(dName) > 48 {
 			dName = dName[:45] + "..."
 		}
@@ -170,25 +177,23 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 	return nil
 }
 
-func buildPodcastMapsForStatus(podcastsDir string) (map[string]tuiPodcast, map[string]string) {
-	localPodcasts, _ := loadTUIPodcasts(podcastsDir)
-	localByName := make(map[string]tuiPodcast)
-	for _, lp := range localPodcasts {
-		localByName[strings.ToLower(lp.name)] = lp
-		localByName[strings.ToLower(filepath.Base(lp.dir))] = lp
-	}
-
-	podEntries := scanPodcastDirs(podcastsDir)
+func buildPodcastMapsForStatus(podcastsDir string) (map[string]podcast.PodcastDirEntry, map[string]string) {
+	podEntries := podcast.ScanPodcastDirs(podcastsDir)
+	localByName := make(map[string]podcast.PodcastDirEntry)
 	podIDByDir := make(map[string]string)
 	for _, p := range podEntries {
-		podIDByDir[p.dir] = p.shortID
-		podIDByDir[strings.ToLower(p.title)] = p.shortID
-		podIDByDir[strings.ToLower(p.folderName)] = p.shortID
+		localByName[strings.ToLower(p.Title)] = p
+		localByName[strings.ToLower(p.FolderName)] = p
+		localByName[strings.ToLower(filepath.Base(p.Dir))] = p
+
+		podIDByDir[p.Dir] = p.ShortID
+		podIDByDir[strings.ToLower(p.Title)] = p.ShortID
+		podIDByDir[strings.ToLower(p.FolderName)] = p.ShortID
 	}
 	return localByName, podIDByDir
 }
 
-func calculateItemAdRemovalCount(item Podcast, localByName map[string]tuiPodcast, podIDByDir map[string]string) (string, int) {
+func calculateItemAdRemovalCount(item Podcast, localByName map[string]podcast.PodcastDirEntry, podIDByDir map[string]string) (string, int) {
 	title := item.Media.Metadata.Title
 	relBase := filepath.Base(item.RelPath)
 	lp, ok := localByName[strings.ToLower(title)]
@@ -199,17 +204,17 @@ func calculateItemAdRemovalCount(item Podcast, localByName map[string]tuiPodcast
 	needsAdRemoval := 0
 	shortID := ""
 	if ok {
-		shortID = podIDByDir[lp.dir]
+		shortID = podIDByDir[lp.Dir]
 		if shortID == "" {
-			shortID = getOrSetPodcastShortID(lp.dir, title)
+			shortID = podcast.GetOrSetPodcastShortID(lp.Dir, title)
 		}
-		mp3Files, _ := filepath.Glob(filepath.Join(lp.dir, "*.mp3"))
-		podCfg := loadPodcastConfig(lp.dir)
-		if podCfg.AdRemoval != AdRemovalNone {
-			filtered := filterMP3FilesByPodcastConfig(mp3Files, lp.dir, podCfg)
+		mp3Files, _ := filepath.Glob(filepath.Join(lp.Dir, "*.mp3"))
+		podCfg := config.LoadPodcastConfig(lp.Dir, config.PodcastConfig{})
+		if podCfg.AdRemoval != config.AdRemovalNone {
+			filtered := podcast.FilterByAdRemovalPolicy(mp3Files, lp.Dir, podCfg)
 			for _, mp3 := range filtered {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
+				_ = pipeline.GetOrCreateEpisodeStatus(mp3)
+				if !pipeline.IsEpisodeCompleted(mp3) {
 					needsAdRemoval++
 				}
 			}
@@ -217,34 +222,34 @@ func calculateItemAdRemovalCount(item Podcast, localByName map[string]tuiPodcast
 	} else {
 		shortID = podIDByDir[strings.ToLower(title)]
 		if shortID == "" {
-			shortID = generatePodcastShortID(title)
+			shortID = podcast.GeneratePodcastShortID(title)
 		}
 	}
 	return shortID, needsAdRemoval
 }
 
 func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
-	podEntries := scanPodcastDirs(podcastsDir)
+	podEntries := podcast.ScanPodcastDirs(podcastsDir)
 	var entries []podcastStatusEntry
 	for _, pe := range podEntries {
-		mp3s := findMP3Files(pe.dir)
+		mp3s := util.FindMP3Files(pe.Dir)
 		if len(mp3s) == 0 {
 			continue
 		}
 		needsAd := 0
-		podCfg := loadPodcastConfig(pe.dir)
-		if podCfg.AdRemoval != AdRemovalNone {
-			filtered := filterMP3FilesByPodcastConfig(mp3s, pe.dir, podCfg)
+		podCfg := config.LoadPodcastConfig(pe.Dir, config.PodcastConfig{})
+		if podCfg.AdRemoval != config.AdRemovalNone {
+			filtered := podcast.FilterByAdRemovalPolicy(mp3s, pe.Dir, podCfg)
 			for _, mp3 := range filtered {
-				_ = getOrCreateEpisodeStatus(mp3)
-				if !isEpisodeCompleted(mp3) {
+				_ = pipeline.GetOrCreateEpisodeStatus(mp3)
+				if !pipeline.IsEpisodeCompleted(mp3) {
 					needsAd++
 				}
 			}
 		}
 		entries = append(entries, podcastStatusEntry{
-			id:             pe.shortID,
-			name:           pe.title,
+			id:             pe.ShortID,
+			name:           pe.Title,
 			episodes:       len(mp3s),
 			needsAdRemoval: needsAd,
 		})
@@ -268,7 +273,7 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	totalNeedsAdRemoval := 0
 
 	for idx, e := range entries {
-		dName := displayName(e.name)
+		dName := util.DisplayName(e.name)
 		if len(dName) > 48 {
 			dName = dName[:45] + "..."
 		}

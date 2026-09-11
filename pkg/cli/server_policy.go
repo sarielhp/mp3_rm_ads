@@ -1,6 +1,10 @@
 package cli
 
 import (
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
@@ -37,7 +41,7 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 	}
 
 	target := cli.Args[0]
-	resolved, err := resolveAnyID(podcastsDir, target)
+	resolved, err := podcast.ResolveAnyID(podcastsDir, target)
 	if err != nil {
 		return err
 	}
@@ -118,16 +122,16 @@ func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 }
 
 func printPodcastPolicyDetails(res PodcastPolicyResult) {
-	fmt.Printf("\nPolicy for %s [%s]:\n", bold(res.Title), boldCyan(res.ID))
+	fmt.Printf("\nPolicy for %s [%s]:\n", util.Bold(res.Title), util.BoldCyan(res.ID))
 	fmt.Printf("%s\n", strings.Repeat("=", 65))
-	dlBadge := downloadPolicyBadge(res.DownloadPolicy, res.DownloadK)
+	dlBadge := config.DownloadPolicyBadge(res.DownloadPolicy, res.DownloadK)
 	fmt.Printf("  Auto Download:    %-5v %s\n", res.AutoDownload, dlBadge)
 	retStr := "Disabled"
 	if res.AutoCleanupDays > 0 {
 		retStr = fmt.Sprintf("%d days retention", res.AutoCleanupDays)
 	}
 	fmt.Printf("  Auto Cleanup:     %-5v (%s)\n", res.AutoCleanup, retStr)
-	adBadge := adRemovalModeBadge(res.AdRemoval)
+	adBadge := config.AdRemovalModeBadge(res.AdRemoval)
 	fmt.Printf("  Ad Removal:       %-8s %s\n", res.AdRemoval, adBadge)
 	fmt.Printf("  Backend Sync:     %s\n", res.BackendSync)
 	fmt.Printf("%s\n\n", strings.Repeat("=", 65))
@@ -136,7 +140,7 @@ func printPodcastPolicyDetails(res PodcastPolicyResult) {
 func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 	applyPolicyOptionChanges(&pod.Config, cli)
 
-	if err := savePodcastConfig(pod.Dir, pod.Config); err != nil {
+	if err := config.SavePodcastConfig(pod.Dir, pod.Config); err != nil {
 		return fmt.Errorf("failed to save podcast config: %w", err)
 	}
 
@@ -163,7 +167,7 @@ func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 	}
 
 	fmt.Printf("Policy updated for %s [%s]: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
-		bold(pod.Title), boldCyan(pod.ShortID), autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
+		util.Bold(pod.Title), util.BoldCyan(pod.ShortID), autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
 	return nil
 }
 
@@ -172,7 +176,7 @@ func applyPolicyOptionChanges(cfg *PodcastConfig, cli CLIOptions) {
 		cfg.SetAutoDownload(parseBoolString(cli.AutoDownloadStr))
 	}
 	if cli.DownloadPolicy != "" {
-		cfg.DownloadPolicy = normalizeDownloadPolicy(cli.DownloadPolicy)
+		cfg.DownloadPolicy = config.NormalizeDownloadPolicy(cli.DownloadPolicy)
 	}
 	if cli.DownloadK > 0 {
 		cfg.DownloadK = cli.DownloadK
@@ -186,7 +190,7 @@ func applyPolicyOptionChanges(cfg *PodcastConfig, cli CLIOptions) {
 		cfg.AutoCleanup = &autoCl
 	}
 	if cli.AdRemovalMode != "" {
-		cfg.AdRemoval = normalizeAdRemovalMode(cli.AdRemovalMode)
+		cfg.AdRemoval = config.NormalizeAdRemovalMode(cli.AdRemovalMode)
 	}
 }
 
@@ -199,7 +203,7 @@ func parseBoolString(s string) bool {
 }
 
 func getBackendSyncInfo(pod *ResolvedPodcast, cfg Config) string {
-	b, err := getBackend(cfg, true)
+	b, err := backend.FromAppConfig(&cfg, true)
 	if err != nil || b == nil {
 		return "Backend not connected"
 	}
@@ -208,7 +212,7 @@ func getBackendSyncInfo(pod *ResolvedPodcast, cfg Config) string {
 
 func syncPolicyWithBackend(pod *ResolvedPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) string {
 	cfg := loadConfig()
-	b, err := getBackend(cfg, true)
+	b, err := backend.FromAppConfig(&cfg, true)
 	if err != nil || b == nil {
 		return "Local only (no backend)"
 	}

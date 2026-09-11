@@ -71,13 +71,13 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		if err != nil {
 			return err
 		}
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Printf("Updated '%s' = '%s'\n", key, val)
 		return nil
 	}
 	normKey := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 	if handleConfigSetBackend(cfg, normKey, val) {
-		saveConfig(*cfg)
+		_ = config.SaveConfig(cfg)
 		fmt.Printf("Updated '%s' = '%s'\n", key, val)
 		return nil
 	}
@@ -109,7 +109,7 @@ func handleConfigSet(cfg *Config, key, val string) error {
 			return fmt.Errorf("invalid whisper id: %s", val)
 		}
 	case "default-download-policy", "default-download-mode", "download-policy":
-		cfg.DefaultDownloadPolicy = normalizeDownloadPolicy(val)
+		cfg.DefaultDownloadPolicy = config.NormalizeDownloadPolicy(val)
 	case "default-download-k", "default-k", "download-k":
 		if k, err := strconv.Atoi(val); err == nil && k > 0 {
 			cfg.DefaultDownloadK = k
@@ -117,7 +117,7 @@ func handleConfigSet(cfg *Config, key, val string) error {
 			return fmt.Errorf("invalid default download k: %s", val)
 		}
 	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
-		cfg.DefaultAdRemoval = normalizeAdRemovalMode(val)
+		cfg.DefaultAdRemoval = config.NormalizeAdRemovalMode(val)
 	case "remote-host", "remote.host", "rhost":
 		cfg.RemoteHost = val
 	case "default-processing", "default.processing", "processing":
@@ -131,7 +131,7 @@ func handleConfigSet(cfg *Config, key, val string) error {
 	default:
 		return fmt.Errorf("unknown configuration key: '%s'", key)
 	}
-	saveConfig(*cfg)
+	_ = config.SaveConfig(cfg)
 	fmt.Printf("Updated '%s' = '%s'\n", key, val)
 	return nil
 }
@@ -187,7 +187,7 @@ func handleConfigGet(cfg Config, key string) error {
 	case "openrouter-api-key-enabled":
 		fmt.Println(cfg.IsOpenRouterAPIKeyEnabled())
 	case "gemini-api-key":
-		fmt.Println(resolveGeminiAPIKey(cfg))
+		fmt.Println(config.ResolveGeminiAPIKey(&cfg))
 	case "gemini-model":
 		fmt.Println(cfg.GetGeminiModel())
 	default:
@@ -198,7 +198,7 @@ func handleConfigGet(cfg Config, key string) error {
 
 func setPodcastsDir(cfg *Config, dir string) {
 	cfg.PodcastsDir = dir
-	saveConfig(*cfg)
+	_ = config.SaveConfig(cfg)
 	fmt.Printf("Default podcasts directory updated to: '%s'\n", dir)
 }
 

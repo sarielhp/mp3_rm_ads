@@ -7,11 +7,15 @@ import (
 	"runtime/debug"
 	"strings"
 
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/util"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
 var (
-	testSyncPolicyMu   syncMutex
+	testSyncPolicyMu   util.SyncMutex
 	testSyncPolicyHook func(pod *tuiPodcast)
 )
 
@@ -36,7 +40,7 @@ func (m *tuiModel) drawDownloadPolicyModal() string {
 
 	var lines []string
 	lines = append(lines, tuiTitleStyle.Render("PODCAST POLICY"))
-	lines = append(lines, tuiSubtitleStyle.Render(truncate("for "+displayName(pod.name), boxWidth-6)))
+	lines = append(lines, tuiSubtitleStyle.Render(truncate("for "+util.DisplayName(pod.name), boxWidth-6)))
 	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
 	lines = append(lines, "")
 
@@ -116,7 +120,7 @@ func (m *tuiModel) openDownloadPolicyModal() {
 	} else if !m.policyAutoCleanup {
 		m.policyCleanupDays = -1
 	}
-	m.policyAdRemoval = normalizeAdRemovalMode(pod.config.AdRemoval)
+	m.policyAdRemoval = config.NormalizeAdRemovalMode(pod.config.AdRemoval)
 	m.downloadPolicyModalIdx = 0
 	m.downloadPolicyModalK = pod.config.DownloadK
 	if m.downloadPolicyModalK <= 0 {
@@ -145,7 +149,7 @@ func (m *tuiModel) togglePolicyModalField(idx int) {
 			m.policyCleanupDays = -1
 		}
 	case 3:
-		m.policyAdRemoval = cycleAdRemovalMode(m.policyAdRemoval)
+		m.policyAdRemoval = config.CycleAdRemovalMode(m.policyAdRemoval)
 	}
 }
 
@@ -163,7 +167,7 @@ func (m *tuiModel) adjustPolicyModalField(delta int) {
 	case 2:
 		m.adjustCleanupDaysField(delta)
 	case 3:
-		m.policyAdRemoval = cycleAdRemovalMode(m.policyAdRemoval)
+		m.policyAdRemoval = config.CycleAdRemovalMode(m.policyAdRemoval)
 	}
 }
 
@@ -203,7 +207,7 @@ func (m *tuiModel) applyDownloadPolicyModal() {
 		pod.config.DownloadK = m.downloadPolicyModalK
 	}
 
-	if err := savePodcastConfig(pod.dir, pod.config); err != nil {
+	if err := config.SavePodcastConfig(pod.dir, pod.config); err != nil {
 		m.showToast("Failed to save config: "+err.Error(), ToastError)
 	} else {
 		m.showToast("Policy saved: DL="+boolStatus(m.policyAutoDownload)+", Cleanup="+boolStatus(m.policyAutoCleanup)+", Ads="+m.policyAdRemoval, ToastSuccess)
@@ -233,8 +237,11 @@ func syncPolicyToBackend(pod *tuiPodcast, autoDownload, autoCleanup bool, autoCl
 		hook(pod)
 		return
 	}
-	cfg := loadConfig()
-	b, err := getBackend(cfg, true)
+	cfg, err := config.LoadConfig()
+	if err != nil {
+		return
+	}
+	b, err := backend.FromAppConfig(cfg, true)
 	if err != nil || b == nil {
 		return
 	}

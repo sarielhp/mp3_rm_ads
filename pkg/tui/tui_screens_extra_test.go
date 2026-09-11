@@ -4,6 +4,8 @@ import (
 	"strings"
 	"testing"
 
+	"abs/pkg/config"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -180,7 +182,7 @@ func testDownloadPolicyModalKeys(t *testing.T, m *tuiModel, tempDir string) {
 		t.Errorf("expected auto cleanup enabled with days %d, got %+v", daysBefore+2, m.podcasts[0].config)
 	}
 
-	diskCfg := loadPodcastConfig(tempDir)
+	diskCfg := config.LoadPodcastConfig(tempDir, config.PodcastConfig{})
 	if !diskCfg.IsAutoCleanupEnabled() || diskCfg.AutoCleanupDays != daysBefore+2 {
 		t.Errorf("expected saved config on disk to match, got %+v", diskCfg)
 	}

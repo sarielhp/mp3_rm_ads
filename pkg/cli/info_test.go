@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"encoding/json"
 	"io"
 	"os"
@@ -17,7 +19,7 @@ func TestInfoPodcastCardAndJSON(t *testing.T) {
 	ep1 := filepath.Join(podDir, "ep1.mp3")
 	_ = os.WriteFile(ep1, []byte("audio"), 0644)
 
-	podID := getOrSetPodcastShortID(podDir, "Huberman Lab")
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Huberman Lab")
 	cfg := Config{PodcastsDir: tempDir}
 
 	// Test text card
@@ -78,8 +80,8 @@ func TestInfoEpisodeCardAndJSON(t *testing.T) {
 	ep1 := filepath.Join(podDir, "ep1.mp3")
 	_ = os.WriteFile(ep1, []byte("audio"), 0644)
 
-	podID := getOrSetPodcastShortID(podDir, "Daily Cast")
-	epID := getOrSetEpisodeShortID(podDir, podID, ep1)
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Daily Cast")
+	epID := podcast.GetOrSetEpisodeShortID(podDir, podID, ep1)
 
 	cfg := Config{PodcastsDir: tempDir}
 
@@ -153,10 +155,10 @@ func TestInfoEpisodeWithCuts(t *testing.T) {
 		},
 	}
 	cutsBytes, _ := json.Marshal(cutsData)
-	_ = os.WriteFile(stripExt(ep1)+".cuts.json", cutsBytes, 0644)
+	_ = os.WriteFile(util.StripExt(ep1)+".cuts.json", cutsBytes, 0644)
 
-	podID := getOrSetPodcastShortID(podDir, "ShowWithAds")
-	epID := getOrSetEpisodeShortID(podDir, podID, ep1)
+	podID := podcast.GetOrSetPodcastShortID(podDir, "ShowWithAds")
+	epID := podcast.GetOrSetEpisodeShortID(podDir, podID, ep1)
 
 	cfg := Config{PodcastsDir: tempDir}
 
@@ -202,9 +204,9 @@ func TestFormatPodcastInfoHebrew(t *testing.T) {
 
 	out := formatPodcastInfo(info)
 
-	expectedTitle := displayName("פודקאסט חדשות")
-	expectedAuthor := displayName("יוסי כהן")
-	expectedEp := displayName("פרק ראשון")
+	expectedTitle := util.DisplayName("פודקאסט חדשות")
+	expectedAuthor := util.DisplayName("יוסי כהן")
+	expectedEp := util.DisplayName("פרק ראשון")
 
 	if !strings.Contains(out, expectedTitle) {
 		t.Errorf("expected output to contain %q, got: %s", expectedTitle, out)
@@ -229,8 +231,8 @@ func TestFormatEpisodeInfoHebrew(t *testing.T) {
 
 	out := formatEpisodeInfo(info)
 
-	expectedPod := displayName("פודקאסט היסטוריה")
-	expectedTitle := displayName("פרק 1 - העת העתיקה")
+	expectedPod := util.DisplayName("פודקאסט היסטוריה")
+	expectedTitle := util.DisplayName("פרק 1 - העת העתיקה")
 
 	if !strings.Contains(out, expectedPod) {
 		t.Errorf("expected output to contain %q, got: %s", expectedPod, out)

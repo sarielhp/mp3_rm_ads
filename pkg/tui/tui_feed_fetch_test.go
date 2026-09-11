@@ -5,6 +5,8 @@ import (
 	"net/http/httptest"
 	"path/filepath"
 	"testing"
+
+	"abs/pkg/podcast"
 )
 
 func TestTUIFeedFetchAndDownloadAll(t *testing.T) {
@@ -54,11 +56,14 @@ func TestTUIFeedFetchAndDownloadAll(t *testing.T) {
 		t.Errorf("expected episode to have isFeedOnly true")
 	}
 
-	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+	podcast.DefaultDownloadQueue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
+	defer func() {
+		podcast.DefaultDownloadQueue().WaitWorkerForTest()
+		podcast.DefaultDownloadQueue().SetFilePath("")
+	}()
 
 	model.downloadAllForSelectedPodcast()
-	items := GetDownloadQueueItems()
+	items := podcast.DefaultDownloadQueue().Items()
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items in download queue, got %d", len(items))
 	}
@@ -66,10 +71,13 @@ func TestTUIFeedFetchAndDownloadAll(t *testing.T) {
 
 func TestTUIBatchQueueDownload_DelegatesToWorkerOnly(t *testing.T) {
 	tempDir := t.TempDir()
-	testDownloadQueuePath = filepath.Join(tempDir, "download_queue.json")
-	defer func() { WaitDownloadWorkerForTest(); testDownloadQueuePath = "" }()
+	podcast.DefaultDownloadQueue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
+	defer func() {
+		podcast.DefaultDownloadQueue().WaitWorkerForTest()
+		podcast.DefaultDownloadQueue().SetFilePath("")
+	}()
 
-	ClearDownloadQueue()
+	podcast.DefaultDownloadQueue().Clear()
 
 	ep1 := tuiEpisode{
 		path:         filepath.Join(tempDir, "ep1.mp3"),
@@ -101,7 +109,7 @@ func TestTUIBatchQueueDownload_DelegatesToWorkerOnly(t *testing.T) {
 
 	model.batchQueueDownload()
 
-	items := GetDownloadQueueItems()
+	items := podcast.DefaultDownloadQueue().Items()
 	if len(items) != 1 || items[0].EpisodeTitle != "Batch Episode 1" {
 		t.Fatalf("expected batch item in download queue, got %+v", items)
 	}
@@ -111,7 +119,7 @@ func TestTUIBatchQueueDownload_DelegatesToWorkerOnly(t *testing.T) {
 
 	model.epIdx = 1
 	model.enqueueCurrentEpisodeDownload()
-	items = GetDownloadQueueItems()
+	items = podcast.DefaultDownloadQueue().Items()
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items in download queue after single enqueue, got %d", len(items))
 	}

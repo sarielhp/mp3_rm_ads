@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"abs/pkg/format"
+	"abs/pkg/util"
 	"fmt"
 	"strconv"
 	"strings"
@@ -198,12 +200,12 @@ func latestEpisodeTableColumns(podWidth, titleWidth int) []TableColumn {
 }
 
 func buildPodcastRowCells(item lsPodcastItem, titleWidth int) []string {
-	pName := truncateDisplayName(item.Title, titleWidth)
+	pName := util.TruncateDisplayName(item.Title, titleWidth)
 	dlStr := compactDownloadPolicy(item.DownloadPolicy, 3)
 	adStr := compactAdRemoval(item.AdRemoval)
 	lastDateStr := formatRelativeDateStr(item.LastEpisode)
 	return []string{
-		boldCyan(item.ShortID),
+		util.BoldCyan(item.ShortID),
 		pName,
 		strconv.Itoa(item.EpisodeCount),
 		strconv.Itoa(item.CleanCount),
@@ -216,25 +218,25 @@ func buildPodcastRowCells(item lsPodcastItem, titleWidth int) []string {
 
 func buildLatestEpisodeRowCells(item lsEpisodeItem, podWidth, titleWidth int) []string {
 	dStr := formatRelativeDateTime(item.modTime)
-	pName := truncateDisplayName(item.podcastTitle, podWidth)
+	pName := util.TruncateDisplayName(item.podcastTitle, podWidth)
 	shortStatus := formatShortStatus(item.statusStr)
 	coloredStatus := shortStatus
 	if item.statusColor == "green" {
-		coloredStatus = boldGreen(shortStatus)
+		coloredStatus = util.BoldGreen(shortStatus)
 	} else if item.statusColor == "yellow" {
-		coloredStatus = boldYellow(shortStatus)
+		coloredStatus = util.BoldYellow(shortStatus)
 	} else if item.statusColor == "cyan" {
-		coloredStatus = bold(shortStatus)
+		coloredStatus = util.Bold(shortStatus)
 	}
 	durStr := "-"
 	if item.origDuration > 0 {
-		durStr = formatClock(item.origDuration)
+		durStr = format.FormatClock(item.origDuration)
 	}
-	epName := truncateDisplayName(item.episodeName, titleWidth)
+	epName := util.TruncateDisplayName(item.episodeName, titleWidth)
 	return []string{
 		dStr,
 		item.podcastShortID,
-		boldCyan(item.episodeShortID),
+		util.BoldCyan(item.episodeShortID),
 		pName,
 		coloredStatus,
 		durStr,

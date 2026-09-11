@@ -1,6 +1,11 @@
 package cli
 
 import (
+	"abs/pkg/config"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"database/sql"
 	"encoding/json"
 	"fmt"
@@ -75,14 +80,14 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisod
 		if err == nil {
 			totalSize += fi.Size()
 		}
-		if isEpisodeClean(mp3) {
+		if pipeline.IsEpisodeClean(mp3) {
 			cleanCount++
 		}
-		st := getOrCreateEpisodeStatus(mp3)
-		od, _ := getEpisodeDurations(mp3, st)
+		st := pipeline.GetOrCreateEpisodeStatus(mp3)
+		od, _ := pipeline.EpisodeDurations(mp3, st)
 		totalDur += od
 
-		pt := getEpisodePublicationTime(mp3)
+		pt := podcast.GetEpisodePublicationTime(mp3)
 		epList = append(epList, epTime{path: mp3, pt: pt, fi: fi})
 	}
 
@@ -100,22 +105,22 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisod
 	}
 	for i := 0; i < limit; i++ {
 		mp3 := epList[i].path
-		epID := getOrSetEpisodeShortID(pod.Dir, pod.ShortID, mp3)
+		epID := podcast.GetOrSetEpisodeShortID(pod.Dir, pod.ShortID, mp3)
 		st, _ := getEpisodeStatusLabel(mp3)
-		od, _ := getEpisodeDurations(mp3, getOrCreateEpisodeStatus(mp3))
+		od, _ := pipeline.EpisodeDurations(mp3, pipeline.GetOrCreateEpisodeStatus(mp3))
 		recent = append(recent, RecentEpisodeDTO{
 			ID:       epID,
-			Title:    episodeTitleFromPath(mp3),
+			Title:    podcast.EpisodeTitleFromPath(mp3),
 			Date:     publicationDateTime(epList[i].pt),
 			Status:   formatShortStatus(st),
-			Duration: formatClock(od),
+			Duration: format.FormatClock(od),
 		})
 	}
 	return cleanCount, totalDur, totalSize, recent
 }
 
 func getPodcastMetadataFields(pod *ResolvedPodcast) (string, string, string, string, string) {
-	cached, _ := loadPodcastCache(pod.Dir)
+	cached, _ := podcast.LoadPodcastCache(pod.Dir)
 	author, feedURL, desc, uuid := "", "", "", pod.UUID
 	coverPath := findCoverImageInDir(pod.Dir)
 
@@ -149,7 +154,7 @@ func checkSQLiteSyncStatus() string {
 }
 
 func buildPodcastInfoDTO(pod *ResolvedPodcast, maxEpisodes int) PodcastInfoJSON {
-	mp3s := findMP3Files(pod.Dir)
+	mp3s := util.FindMP3Files(pod.Dir)
 	cleanCount, totalDur, totalSize, recent := collectPodcastStatsAndRecent(pod, mp3s, maxEpisodes)
 	author, feedURL, coverPath, desc, uuid := getPodcastMetadataFields(pod)
 	sqliteSync := checkSQLiteSyncStatus()
@@ -184,15 +189,15 @@ func buildPodcastInfoDTO(pod *ResolvedPodcast, maxEpisodes int) PodcastInfoJSON 
 func formatPodcastInfo(info PodcastInfoJSON) string {
 	var sb strings.Builder
 	sb.WriteString(fmt.Sprintf("\n%s\n", strings.Repeat("=", 80)))
-	sb.WriteString(fmt.Sprintf("Podcast: %s [%s]\n", bold(displayName(info.Title)), boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("Podcast: %s [%s]\n", util.Bold(util.DisplayName(info.Title)), util.BoldCyan(info.ID)))
 	sb.WriteString(fmt.Sprintf("%s\n", strings.Repeat("=", 80)))
-	sb.WriteString(fmt.Sprintf("  Short ID:         %s\n", boldCyan(info.ID)))
+	sb.WriteString(fmt.Sprintf("  Short ID:         %s\n", util.BoldCyan(info.ID)))
 	if info.UUID != "" {
 		sb.WriteString(fmt.Sprintf("  UUID:             %s\n", info.UUID))
 	}
 	sb.WriteString(fmt.Sprintf("  Directory:        %s\n", info.Directory))
 	if info.Author != "" {
-		sb.WriteString(fmt.Sprintf("  Author:           %s\n", displayName(info.Author)))
+		sb.WriteString(fmt.Sprintf("  Author:           %s\n", util.DisplayName(info.Author)))
 	}
 	if info.FeedURL != "" {
 		sb.WriteString(fmt.Sprintf("  Feed URL:         %s\n", info.FeedURL))
@@ -203,15 +208,15 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 
 	sb.WriteString("\n  Policy & Sync:\n")
 	sb.WriteString(fmt.Sprintf("    SQLite Sync:    %s\n", info.SQLiteSync))
-	dlBadge := downloadPolicyBadge(info.DownloadPolicy, info.DownloadK)
+	dlBadge := config.DownloadPolicyBadge(info.DownloadPolicy, info.DownloadK)
 	sb.WriteString(fmt.Sprintf("    Auto Download:  %v %s\n", info.AutoDownload, dlBadge))
 	retStr := "Disabled"
 	if info.AutoCleanupDays > 0 {
 		retStr = fmt.Sprintf("%dd retention", info.AutoCleanupDays)
 	}
 	sb.WriteString(fmt.Sprintf("    Auto Cleanup:   %v (%s)\n", info.AutoCleanup, retStr))
-	adBadge := adRemovalModeBadge(info.AdRemoval)
-	sb.WriteString(fmt.Sprintf("    AdR Policy:     %s %s\n", adRemovalModeLabel(info.AdRemoval), adBadge))
+	adBadge := config.AdRemovalModeBadge(info.AdRemoval)
+	sb.WriteString(fmt.Sprintf("    AdR Policy:     %s %s\n", config.AdRemovalModeLabel(info.AdRemoval), adBadge))
 
 	sb.WriteString("\n  Library Stats:\n")
 	cleanPct := 0.0
@@ -232,7 +237,7 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 		sb.WriteString("\n  Recent Episodes:\n")
 		for _, ep := range info.RecentEpisodes {
 			sb.WriteString(fmt.Sprintf("    %-6s  %-10s  [%-7s]  %-7s  %s\n",
-				boldCyan(ep.ID), ep.Date, ep.Status, ep.Duration, truncate(displayName(ep.Title), 35)))
+				util.BoldCyan(ep.ID), ep.Date, ep.Status, ep.Duration, util.Truncate(util.DisplayName(ep.Title), 35)))
 		}
 	}
 	sb.WriteString(fmt.Sprintf("%s\n\n", strings.Repeat("=", 80)))

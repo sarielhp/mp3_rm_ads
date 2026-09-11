@@ -6,6 +6,9 @@ import (
 	"strings"
 	"time"
 
+	"abs/pkg/pipeline"
+	"abs/pkg/util"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -47,7 +50,7 @@ func getPodcastLastEpisodesOnlineTimeline(pod tuiPodcast, maxEpisodes int) []Epi
 		if !d.IsZero() {
 			source = "Feed"
 			localStr = d.Local().Format("2006-01-02 15:04:05 MST")
-			if ep.publishedAt > 0 || (ep.absData != nil && parseABSEpisodePublishedAt(ep.absData) > 0) {
+			if ep.publishedAt > 0 || (ep.absData != nil && pipeline.ParseABSEpisodePublishedAt(ep.absData) > 0) {
 				source = "Feed"
 			}
 		}
@@ -101,7 +104,7 @@ func formatEpisodesTimelineTable(releases []EpisodeOnlineRelease, podName string
 			txStr = "✓ Yes"
 		}
 		titleWidth := max(10, termWidth-66)
-		truncTitle := truncate(displayName(r.Title), titleWidth)
+		truncTitle := truncate(util.DisplayName(r.Title), titleWidth)
 
 		row := fmt.Sprintf("  %2d. │ %-24s │ %-7s │ %-8s │ %-8s │ %-4s │ %s\n",
 			r.Index, r.ExactTimeLocal, r.Age, r.Duration, adsStr, txStr, truncTitle)
@@ -149,7 +152,7 @@ func (m *tuiModel) drawTimelineScreen() string {
 	releases := getPodcastLastEpisodesOnlineTimeline(pod, 20)
 
 	banner := tuiHeaderBanner.Render(" ONLINE AVAILABILITY TIMELINE ")
-	out.WriteString("  " + banner + "  " + tuiTitleStyle.Render(displayName(pod.name)) + "\n")
+	out.WriteString("  " + banner + "  " + tuiTitleStyle.Render(util.DisplayName(pod.name)) + "\n")
 	out.WriteString(fmt.Sprintf("    %s\n", tuiSubtitleStyle.Render(fmt.Sprintf("Exact availability timestamps for the last %d episode(s)", len(releases)))))
 
 	dividerWidth := max(20, m.width-4)
@@ -190,7 +193,7 @@ func (m *tuiModel) drawTimelineScreen() string {
 		}
 
 		titleWidth := max(10, m.width-62)
-		truncTitle := truncate(displayName(r.Title), titleWidth)
+		truncTitle := truncate(util.DisplayName(r.Title), titleWidth)
 
 		row := fmt.Sprintf("  %2d. │ %s │ %-7s │ %-8s │ %s │ %s │ %s\n",
 			r.Index,

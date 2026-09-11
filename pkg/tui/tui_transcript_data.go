@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"abs/pkg/format"
+	"abs/pkg/types"
 )
 
 func loadEpisodeAdIntervals(epPath string) [][2]float64 {
@@ -14,7 +17,7 @@ func loadEpisodeAdIntervals(epPath string) [][2]float64 {
 	if err != nil {
 		return nil
 	}
-	var cuts CutsData
+	var cuts types.CutsData
 	if err := json.Unmarshal(data, &cuts); err != nil {
 		return nil
 	}
@@ -52,14 +55,14 @@ func loadEpisodeTranscriptData(epPath string) ([]transcriptItem, []string, error
 
 	jsonFile := base + ".transcript.json"
 	if data, err := os.ReadFile(jsonFile); err == nil {
-		var td TranscriptionData
+		var td types.TranscriptionData
 		if err := json.Unmarshal(data, &td); err == nil && len(td.Segments) > 0 {
 			var items []transcriptItem
 			var lines []string
 			for _, seg := range td.Segments {
-				st := formatTime(seg.Start)
-				en := formatTime(seg.End)
-				stShort := formatClock(seg.Start)
+				st := format.FormatTime(seg.Start)
+				en := format.FormatTime(seg.End)
+				stShort := format.FormatClock(seg.Start)
 				tFull := fmt.Sprintf("[%s -> %s]", st, en)
 				tShort := fmt.Sprintf("[%s]", stShort)
 				txt := strings.TrimSpace(seg.Text)

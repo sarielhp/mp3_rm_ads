@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"strings"
 	"time"
+
+	"abs/pkg/config"
+	"abs/pkg/kitty"
+	"abs/pkg/util"
 )
 
 func (m *tuiModel) drawPodcastsList() string {
@@ -80,7 +84,7 @@ func renderPodcastSidebarLines(pods []tuiPodcast, start, end, selectedIdx, leftW
 				doneCount++
 			}
 		}
-		nameStr := displayName(p.name)
+		nameStr := util.DisplayName(p.name)
 		statsStr := fmt.Sprintf("(%d/%d)", len(p.episodes), doneCount)
 		line := fmt.Sprintf("  %s %s", nameStr, statsStr)
 		truncLine := truncate(line, leftW-2)
@@ -97,13 +101,13 @@ func renderPodcastSidebarLines(pods []tuiPodcast, start, end, selectedIdx, leftW
 
 func renderPodcastDetailPaneLines(m *tuiModel, selPod tuiPodcast, rightW, maxVis int) []string {
 	var rightLines []string
-	if isKittySupported() && m.showCover {
+	if kitty.IsKittySupported() && m.showCover {
 		rightLines = append(rightLines, renderCoverImageLines(selPod)...)
 	}
 
-	rightLines = append(rightLines, tuiTitleStyle.Render(truncate(displayName(selPod.name), rightW-2)))
+	rightLines = append(rightLines, tuiTitleStyle.Render(truncate(util.DisplayName(selPod.name), rightW-2)))
 	if author := selPod.displayAuthor(); author != "" {
-		rightLines = append(rightLines, tuiSubtitleStyle.Render(truncate("by "+displayName(author), rightW-2)))
+		rightLines = append(rightLines, tuiSubtitleStyle.Render(truncate("by "+util.DisplayName(author), rightW-2)))
 	}
 
 	selDone, totalDurSec, newestDate, oldestDate := summarizePodcastEpisodes(selPod.episodes)
@@ -126,9 +130,9 @@ func renderPodcastDetailPaneLines(m *tuiModel, selPod tuiPodcast, rightW, maxVis
 	}
 	rightLines = append(rightLines, tuiStatStyle.Render(truncate(strings.Join(statParts, " • "), rightW-2)))
 
-	policyLine := fmt.Sprintf("Ad Policy: %s ('c' change, 'e' timeline)", adRemovalModeLabel(selPod.config.AdRemoval))
+	policyLine := fmt.Sprintf("Ad Policy: %s ('c' change, 'e' timeline)", config.AdRemovalModeLabel(selPod.config.AdRemoval))
 	rightLines = append(rightLines, tuiBadgePolicy.Render(truncate(policyLine, rightW-2)))
-	dlPolicyLine := fmt.Sprintf("Download: %s ('d' change)", downloadPolicyLabel(selPod.config.DownloadPolicy, selPod.config.DownloadK))
+	dlPolicyLine := fmt.Sprintf("Download: %s ('d' change)", config.DownloadPolicyLabel(selPod.config.DownloadPolicy, selPod.config.DownloadK))
 	rightLines = append(rightLines, tuiBadgePolicy.Render(truncate(dlPolicyLine, rightW-2)))
 
 	if !newestDate.IsZero() {
@@ -168,18 +172,18 @@ func summarizePodcastEpisodes(episodes []tuiEpisode) (int, float64, time.Time, t
 func renderCoverImageLines(selPod tuiPodcast) []string {
 	coverPath := selPod.coverPath
 	if coverPath == "" {
-		coverPath = findCoverImage(selPod.dir)
+		coverPath = kitty.FindCoverImage(selPod.dir)
 	}
 	if coverPath == "" {
 		return nil
 	}
 	imgW, imgH := 24, 7
-	imgEsc, err := encodeKittyGraphicsFile(coverPath, imgW, imgH)
+	imgEsc, err := kitty.EncodeKittyGraphicsFile(coverPath, imgW, imgH)
 	if err != nil || imgEsc == "" {
 		return nil
 	}
 	var lines []string
-	if isKittyTerminal() {
+	if kitty.IsKittyTerminal() {
 		lines = append(lines, imgEsc)
 		for h := 1; h < imgH; h++ {
 			lines = append(lines, strings.Repeat(" ", imgW))
@@ -256,11 +260,11 @@ func renderPodcastsNarrowView(m *tuiModel, pods []tuiPodcast, start, end int, ou
 				doneCount++
 			}
 		}
-		nameStr := displayName(p.name)
+		nameStr := util.DisplayName(p.name)
 		statsStr := fmt.Sprintf("(%d/%d)", len(p.episodes), doneCount)
 		authorStr := ""
 		if author := p.displayAuthor(); author != "" {
-			authorStr = fmt.Sprintf(" [%s]", displayName(author))
+			authorStr = fmt.Sprintf(" [%s]", util.DisplayName(author))
 		}
 		line := truncate(fmt.Sprintf("  %s  %s%s", nameStr, statsStr, authorStr), max(1, m.width-1))
 		if i == m.podIdx {

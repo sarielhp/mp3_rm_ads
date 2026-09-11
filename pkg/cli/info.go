@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/podcast"
 	"fmt"
 	"strconv"
 
@@ -46,7 +47,7 @@ func runInfoCommand(cfg Config, cli CLIOptions) error {
 		return listLatestEpisodes(podcastsDir, n, cli)
 	}
 
-	resolved, err := resolveAnyID(podcastsDir, target)
+	resolved, err := podcast.ResolveAnyID(podcastsDir, target)
 	if err != nil {
 		return err
 	}

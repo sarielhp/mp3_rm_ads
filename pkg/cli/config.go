@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/podcast"
 	"fmt"
 	"strconv"
 	"strings"
@@ -351,13 +352,13 @@ func runConfigCommand(config *Config, cli CLIOptions) error {
 	case "whisper-list", "whisper-default", "whisper-add", "whisper-del":
 		return runWhisperConfig(config, cli)
 	case "cache-show":
-		dir, entries, size := cacheStats()
+		dir, entries, size := podcast.CacheStats()
 		fmt.Printf("Cache directory: %q\n", dir)
 		fmt.Printf("  entries: %d\n", entries)
 		fmt.Printf("  size:    %.1f MB\n", float64(size)/(1024*1024))
 		fmt.Println("Run 'abs config cache clear' to delete it.")
 	case "cache-reset":
-		if err := resetCache(); err != nil {
+		if err := podcast.ResetCache(); err != nil {
 			return fmt.Errorf("error resetting cache: %w", err)
 		}
 		if !cli.Quiet {

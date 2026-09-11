@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/backend"
+	"abs/pkg/config"
 	"abs/pkg/podcast"
 	"errors"
 	"os"
@@ -73,7 +74,7 @@ func TestFlushPreservesTranscriptsAndDisablesDownloads(t *testing.T) {
 				}
 			}
 			if mode == "flush" {
-				cfg := loadPodcastConfig(dir)
+				cfg := config.LoadPodcastConfig(dir, config.PodcastConfig{})
 				if !b.disabled || cfg.IsAutoDownloadEnabled() {
 					t.Fatal("downloads still enabled")
 				}

@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"reflect"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -303,6 +304,14 @@ func (q *DownloadQueue) Finalize(itemID string, dlErr error) error {
 	return q.Save(persist)
 }
 
+func isNilBackend(b backend.Backend) bool {
+	if b == nil {
+		return true
+	}
+	v := reflect.ValueOf(b)
+	return v.Kind() == reflect.Ptr && v.IsNil()
+}
+
 func (q *DownloadQueue) ProcessNext(client backend.Backend) (bool, error) {
 	item, claimed, err := q.Claim()
 	if err != nil || !claimed {
@@ -310,7 +319,7 @@ func (q *DownloadQueue) ProcessNext(client backend.Backend) (bool, error) {
 	}
 
 	podcastID := item.PodcastID
-	if podcastID == "" && client != nil {
+	if podcastID == "" && !isNilBackend(client) {
 		if pods, err := client.Podcasts(); err == nil {
 			for _, p := range pods {
 				if strings.EqualFold(strings.TrimSpace(p.Media.Metadata.Title), strings.TrimSpace(item.PodcastTitle)) {
@@ -324,7 +333,7 @@ func (q *DownloadQueue) ProcessNext(client backend.Backend) (bool, error) {
 	var dlErr error
 	if hook := q.getTestHook(); hook != nil {
 		dlErr = hook(item)
-	} else if client == nil {
+	} else if isNilBackend(client) {
 		dlErr = fmt.Errorf("download client is unavailable")
 	} else if podcastID == "" {
 		dlErr = fmt.Errorf("podcast ID not found for '%s'", item.PodcastTitle)

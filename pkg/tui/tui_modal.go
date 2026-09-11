@@ -4,6 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"abs/pkg/config"
+	"abs/pkg/types"
+	"abs/pkg/util"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -95,7 +99,7 @@ func (m *tuiModel) drawAdPolicyModal() string {
 
 	var lines []string
 	lines = append(lines, tuiTitleStyle.Render("AD REMOVAL POLICY"))
-	lines = append(lines, tuiSubtitleStyle.Render(truncate("for "+displayName(pod.name), boxWidth-6)))
+	lines = append(lines, tuiSubtitleStyle.Render(truncate("for "+util.DisplayName(pod.name), boxWidth-6)))
 	lines = append(lines, tuiDividerStyle.Render(strings.Repeat("─", boxWidth-4)))
 	lines = append(lines, "")
 
@@ -105,12 +109,12 @@ func (m *tuiModel) drawAdPolicyModal() string {
 		name string
 		desc string
 	}{
-		{1, AdRemovalNone, "1. No Ad Removal (none)", "Leave audio files completely untouched (default)"},
-		{2, AdRemovalLatest, "2. Latest Episode Only (latest)", "Auto-clean only the newest downloaded episode"},
-		{3, AdRemovalAll, "3. All Episodes (all)", "Remove ads from every episode in this directory"},
+		{1, config.AdRemovalNone, "1. No Ad Removal (none)", "Leave audio files completely untouched (default)"},
+		{2, config.AdRemovalLatest, "2. Latest Episode Only (latest)", "Auto-clean only the newest downloaded episode"},
+		{3, config.AdRemovalAll, "3. All Episodes (all)", "Remove ads from every episode in this directory"},
 	}
 
-	curMode := normalizeAdRemovalMode(pod.config.AdRemoval)
+	curMode := config.NormalizeAdRemovalMode(pod.config.AdRemoval)
 	for i, opt := range options {
 		isSel := (i == m.policyModalIdx)
 		isCurrent := (opt.mode == curMode)
@@ -144,7 +148,7 @@ func (m *tuiModel) drawAdPolicyModal() string {
 		Render(content)
 }
 
-func renderVisualAdCutTimeline(totalDuration float64, cuts []CutEntry, barWidth int) string {
+func renderVisualAdCutTimeline(totalDuration float64, cuts []types.CutEntry, barWidth int) string {
 	if totalDuration <= 0 || barWidth < 10 {
 		return ""
 	}
@@ -202,12 +206,12 @@ func (m *tuiModel) handlePodcastConfigToggle() {
 		return
 	}
 	pod := &m.podcasts[m.podIdx]
-	pod.config.AdRemoval = cycleAdRemovalMode(pod.config.AdRemoval)
-	if err := savePodcastConfig(pod.dir, pod.config); err != nil {
+	pod.config.AdRemoval = config.CycleAdRemovalMode(pod.config.AdRemoval)
+	if err := config.SavePodcastConfig(pod.dir, pod.config); err != nil {
 		m.showToast("Failed to save config: "+err.Error(), ToastError)
 		return
 	}
-	m.showToast("Ad removal: "+adRemovalModeLabel(pod.config.AdRemoval)+" (saved)", ToastSuccess)
+	m.showToast("Ad removal: "+config.AdRemovalModeLabel(pod.config.AdRemoval)+" (saved)", ToastSuccess)
 }
 
 func (m *tuiModel) openPolicyModal() {
@@ -215,10 +219,10 @@ func (m *tuiModel) openPolicyModal() {
 		return
 	}
 	pod := &m.podcasts[m.podIdx]
-	cur := normalizeAdRemovalMode(pod.config.AdRemoval)
-	if cur == AdRemovalLatest {
+	cur := config.NormalizeAdRemovalMode(pod.config.AdRemoval)
+	if cur == config.AdRemovalLatest {
 		m.policyModalIdx = 1
-	} else if cur == AdRemovalAll {
+	} else if cur == config.AdRemovalAll {
 		m.policyModalIdx = 2
 	} else {
 		m.policyModalIdx = 0
@@ -232,13 +236,13 @@ func (m *tuiModel) applyPolicyModal() {
 		return
 	}
 	pod := &m.podcasts[m.podIdx]
-	modes := []string{AdRemovalNone, AdRemovalLatest, AdRemovalAll}
+	modes := []string{config.AdRemovalNone, config.AdRemovalLatest, config.AdRemovalAll}
 	if m.policyModalIdx >= 0 && m.policyModalIdx < len(modes) {
 		pod.config.AdRemoval = modes[m.policyModalIdx]
-		if err := savePodcastConfig(pod.dir, pod.config); err != nil {
+		if err := config.SavePodcastConfig(pod.dir, pod.config); err != nil {
 			m.showToast("Failed to save config: "+err.Error(), ToastError)
 		} else {
-			m.showToast("Saved ad policy: "+adRemovalModeLabel(pod.config.AdRemoval), ToastSuccess)
+			m.showToast("Saved ad policy: "+config.AdRemovalModeLabel(pod.config.AdRemoval), ToastSuccess)
 		}
 	}
 	m.showPolicyModal = false

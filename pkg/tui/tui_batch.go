@@ -2,6 +2,11 @@ package tui
 
 import (
 	"fmt"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 )
 
 func (m *tuiModel) toggleEpisodeSelection(path string) {
@@ -101,7 +106,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 		pubDate = ep.absData.PubDate
-		pubAt = parseABSEpisodePublishedAt(ep.absData)
+		pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
 	}
 	if epGUID == "" && ep.guid != "" {
 		epGUID = ep.guid
@@ -113,7 +118,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 	if pod.absData != nil {
 		podID = pod.absData.ID
 	}
-	item := DownloadQueueItem{
+	item := podcast.DownloadQueueItem{
 		PodcastTitle: pod.name,
 		PodcastDir:   pod.dir,
 		PodcastID:    podID,
@@ -124,15 +129,23 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		DurationSec:  ep.duration,
 		EnclosureURL: ep.enclosureURL,
 	}
-	ok, reason := EnqueueDownload(item, m.podcasts)
+	ok, reason := podcast.DefaultDownloadQueue().Enqueue(item)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
-		cfg := loadConfig()
-		var absCli *ABSClient
-		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-			absCli, _ = getABSClient(cfg, true)
+		cfg, err := config.LoadConfig()
+		var bCli backend.Backend
+		if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+			bCli = backend.NewAudiobookshelf(backend.Config{
+				Host:        cfg.AudiobookshelfURL,
+				User:        cfg.AudiobookshelfUser,
+				Pass:        cfg.AudiobookshelfPass,
+				Token:       cfg.AudiobookshelfToken,
+				DBPath:      cfg.AudiobookshelfDBPath,
+				PodcastsDir: cfg.PodcastsDir,
+				Quiet:       true,
+			})
 		}
-		TriggerDownloadQueueWorker(absCli)
+		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {
@@ -160,7 +173,7 @@ func (m *tuiModel) batchQueueDownload() {
 		if ep.absData != nil {
 			epGUID = ep.absData.ID
 			pubDate = ep.absData.PubDate
-			pubAt = parseABSEpisodePublishedAt(ep.absData)
+			pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
 		}
 		if epGUID == "" && ep.guid != "" {
 			epGUID = ep.guid
@@ -172,7 +185,7 @@ func (m *tuiModel) batchQueueDownload() {
 		if pod.absData != nil {
 			podID = pod.absData.ID
 		}
-		item := DownloadQueueItem{
+		item := podcast.DownloadQueueItem{
 			PodcastTitle: pod.name,
 			PodcastDir:   pod.dir,
 			PodcastID:    podID,
@@ -183,7 +196,7 @@ func (m *tuiModel) batchQueueDownload() {
 			DurationSec:  ep.duration,
 			EnclosureURL: ep.enclosureURL,
 		}
-		ok, _ := EnqueueDownload(item, m.podcasts)
+		ok, _ := podcast.DefaultDownloadQueue().Enqueue(item)
 		if ok {
 			queuedCount++
 		}
@@ -191,12 +204,20 @@ func (m *tuiModel) batchQueueDownload() {
 	m.clearSelectedEpisodes()
 	if queuedCount > 0 {
 		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
-		cfg := loadConfig()
-		var absCli *ABSClient
-		if isAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-			absCli, _ = getABSClient(cfg, true)
+		cfg, err := config.LoadConfig()
+		var bCli backend.Backend
+		if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
+			bCli = backend.NewAudiobookshelf(backend.Config{
+				Host:        cfg.AudiobookshelfURL,
+				User:        cfg.AudiobookshelfUser,
+				Pass:        cfg.AudiobookshelfPass,
+				Token:       cfg.AudiobookshelfToken,
+				DBPath:      cfg.AudiobookshelfDBPath,
+				PodcastsDir: cfg.PodcastsDir,
+				Quiet:       true,
+			})
 		}
-		TriggerDownloadQueueWorker(absCli)
+		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else {
 		m.showToast("No new episodes enqueued", ToastWarning)
 	}

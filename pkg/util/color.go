@@ -20,6 +20,7 @@ var (
 	BoldCyan  = color.New(color.FgCyan, color.Bold).Sprint
 	BoldBlue  = color.New(color.FgBlue, color.Bold).Sprint
 	BoldGreen = color.New(color.FgGreen, color.Bold).Sprint
+	Dim       = color.New(color.Faint).Sprint
 )
 
 func BoldYellow(s string) string {

@@ -5,6 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"abs/pkg/format"
+	"abs/pkg/util"
 )
 
 func runExportCommand(cli CLIOptions) {
@@ -19,20 +22,20 @@ func runExportCommand(cli CLIOptions) {
 			files, _ := filepath.Glob(filepath.Join(arg, "*.transcript.json"))
 			for _, f := range files {
 				if cli.ExportTXT || cli.ExportFormat == "txt" {
-					convertJSONToTXT(f, nil, 0, cli.Output, cli.Quiet)
+					_, _ = format.ConvertJSONToTXT(f, nil, 0, cli.Output, cli.Quiet)
 				} else {
-					convertJSONToSRT(f, nil, cli.Output, cli.Quiet)
+					_, _ = format.ConvertJSONToSRT(f, nil, cli.Output, cli.Quiet)
 				}
 			}
 		} else {
 			jsonPath := arg
 			if !strings.HasSuffix(jsonPath, ".json") {
-				jsonPath = stripExt(arg) + ".transcript.json"
+				jsonPath = util.StripExt(arg) + ".transcript.json"
 			}
 			if cli.ExportTXT || cli.ExportFormat == "txt" {
-				convertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
+				_, _ = format.ConvertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
 			} else {
-				convertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
+				_, _ = format.ConvertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
 			}
 		}
 	}

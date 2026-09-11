@@ -1,12 +1,17 @@
 package tui
 
 import (
-	"abs/pkg/podcast"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"abs/pkg/backend"
+	"abs/pkg/config"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 )
 
 func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
@@ -34,16 +39,16 @@ func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {
 }
 
 func loadSingleTUIPodcast(podDir, name string) *tuiPodcast {
-	_ = ensureABSIgnore(podDir)
+	_ = pipeline.EnsureABSIgnore(podDir)
 	pod := tuiPodcast{
 		name:   name,
 		dir:    podDir,
-		config: loadPodcastConfig(podDir),
+		config: config.LoadPodcastConfig(podDir, config.PodcastConfig{}),
 	}
 
-	cachedIdx, _ := loadPodcastCache(podDir)
-	cachedByPath := make(map[string]CachedEpisodeSummary)
-	cachedByName := make(map[string]CachedEpisodeSummary)
+	cachedIdx, _ := podcast.LoadPodcastCache(podDir)
+	cachedByPath := make(map[string]podcast.CachedEpisodeSummary)
+	cachedByName := make(map[string]podcast.CachedEpisodeSummary)
 	if cachedIdx != nil {
 		pod.author = cachedIdx.Author
 		pod.description = cachedIdx.Description
@@ -59,7 +64,7 @@ func loadSingleTUIPodcast(podDir, name string) *tuiPodcast {
 		}
 	}
 
-	mp3Files := findMP3Files(podDir)
+	mp3Files := util.FindMP3Files(podDir)
 	if len(mp3Files) == 0 {
 		return nil
 	}
@@ -77,11 +82,11 @@ func loadSingleTUIPodcast(podDir, name string) *tuiPodcast {
 	return &pod
 }
 
-func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]CachedEpisodeSummary) tuiEpisode {
+func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]podcast.CachedEpisodeSummary) tuiEpisode {
 	absPath, _ := filepath.Abs(mp3)
 	base := strings.TrimSuffix(mp3, ".mp3")
-	hasCut := fileExists(base + ".cuts.json")
-	hasTx := fileExists(base+".transcript.json") || fileExists(base+".transcript.txt")
+	hasCut := util.FileExists(base + ".cuts.json")
+	hasTx := util.FileExists(base+".transcript.json") || util.FileExists(base+".transcript.txt")
 	var fSize int64
 	var modTime time.Time
 	if fi, err := os.Stat(mp3); err == nil {
@@ -117,7 +122,7 @@ func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]Cach
 	return ep
 }
 
-func applyCachedSummaryToEpisode(ep *tuiEpisode, ce CachedEpisodeSummary) {
+func applyCachedSummaryToEpisode(ep *tuiEpisode, ce podcast.CachedEpisodeSummary) {
 	ep.title = ce.Title
 	ep.publishedAt = ce.PublishedAt
 	ep.duration = ce.Duration
@@ -133,7 +138,7 @@ func savePodcastToCache(pod *tuiPodcast) {
 		return
 	}
 	absPodDir, _ := filepath.Abs(pod.dir)
-	var summaries []CachedEpisodeSummary
+	var summaries []podcast.CachedEpisodeSummary
 	for _, ep := range pod.episodes {
 		sum := buildCachedEpisodeSummary(ep, pod.dir, pod.absData)
 		summaries = append(summaries, sum)
@@ -156,7 +161,7 @@ func savePodcastToCache(pod *tuiPodcast) {
 			feedURL = pod.absData.Media.Metadata.FeedURL
 		}
 	}
-	index := CachedPodcastIndex{
+	index := podcast.CachedPodcastIndex{
 		PodcastName: pod.name,
 		PodcastDir:  absPodDir,
 		ABSItemID:   absItemID,
@@ -167,10 +172,10 @@ func savePodcastToCache(pod *tuiPodcast) {
 		UpdatedAt:   time.Now(),
 		Episodes:    summaries,
 	}
-	_ = savePodcastCache(pod.dir, &index)
+	_ = podcast.SavePodcastCache(pod.dir, &index)
 }
 
-func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *PodcastItem) CachedEpisodeSummary {
+func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *backend.Podcast) podcast.CachedEpisodeSummary {
 	absPath, _ := filepath.Abs(ep.path)
 	title := ep.displayTitle()
 	pubAt := ep.publishedAt
@@ -187,7 +192,7 @@ func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *Podcast
 		if ep.absData.Title != "" {
 			title = ep.absData.Title
 		}
-		if pub := parseABSEpisodePublishedAt(ep.absData); pub > 0 {
+		if pub := pipeline.ParseABSEpisodePublishedAt(ep.absData); pub > 0 {
 			pubAt = pub
 		}
 		if ep.absData.Duration > 0 {
@@ -200,7 +205,7 @@ func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *Podcast
 			episode = ep.absData.Episode
 		}
 
-		det := CachedEpisodeDetails{
+		det := podcast.CachedEpisodeDetails{
 			Path:        absPath,
 			Filename:    ep.filename,
 			Title:       title,
@@ -213,10 +218,10 @@ func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *Podcast
 			det.Author = podABSData.Media.Metadata.Author
 			det.FeedURL = podABSData.Media.Metadata.FeedURL
 		}
-		_ = saveEpisodeDetails(podDir, ep.filename, &det)
+		_ = podcast.SaveEpisodeDetails(podDir, ep.filename, &det)
 	}
 
-	return CachedEpisodeSummary{
+	return podcast.CachedEpisodeSummary{
 		Path:          absPath,
 		Filename:      ep.filename,
 		Title:         title,

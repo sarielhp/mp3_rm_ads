@@ -3,6 +3,8 @@ package tui
 import (
 	"fmt"
 
+	"abs/pkg/player"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -30,13 +32,13 @@ func handlePlayerControlKey(m *tuiModel, s string) bool {
 	case "right", "l", ">":
 		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(30)
-			m.showPopup("+30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
+			m.showPopup("+30s (" + player.FormatPlayerTime(globalPlayer.View().Position) + ")")
 		}
 		return true
 	case "left", "h", "<":
 		if globalPlayer.View().IsPlaying {
 			globalPlayer.Seek(-30)
-			m.showPopup("-30s (" + formatPlayerTime(globalPlayer.View().Position) + ")")
+			m.showPopup("-30s (" + player.FormatPlayerTime(globalPlayer.View().Position) + ")")
 		}
 		return true
 	case "+", "=", "]":

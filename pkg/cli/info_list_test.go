@@ -1,6 +1,9 @@
 package cli
 
 import (
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"io"
 	"os"
 	"path/filepath"
@@ -26,14 +29,14 @@ func TestLsLatestCommand(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	_ = os.WriteFile(ep3, []byte("audio3"), 0644)
 
-	_ = saveEpisodeStatus(statusPathFor(ep3), &EpisodeStatusFile{
+	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(ep3), &EpisodeStatusFile{
 		Status: StateDone,
 	})
 	for i, path := range []string{ep1, ep2, ep3} {
-		st := getOrCreateEpisodeStatus(path)
+		st := pipeline.GetOrCreateEpisodeStatus(path)
 		st.PublicationSource = "source"
 		st.PublishedAt = time.Date(2026, 9, 8+i, 9, 0, 0, 0, time.UTC).Format(time.RFC3339)
-		if err := saveEpisodeStatus(statusPathFor(path), st); err != nil {
+		if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(path), st); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -83,7 +86,7 @@ func TestLsSinglePodcastCommand(t *testing.T) {
 	ep1 := filepath.Join(pod1, "ep1.mp3")
 	_ = os.WriteFile(ep1, []byte("audio"), 0644)
 
-	id := getOrSetPodcastShortID(pod1, "ShowA")
+	id := podcast.GetOrSetPodcastShortID(pod1, "ShowA")
 
 	cfg := Config{
 		PodcastsDir: tempDir,
@@ -123,8 +126,8 @@ func TestLsAllPodcastsCommand(t *testing.T) {
 	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
 	_ = os.WriteFile(filepath.Join(pod2, "ep2.mp3"), []byte("audio"), 0644)
 
-	id1 := getOrSetPodcastShortID(pod1, "Alpha Show")
-	id2 := getOrSetPodcastShortID(pod2, "Beta Cast")
+	id1 := podcast.GetOrSetPodcastShortID(pod1, "Alpha Show")
+	id2 := podcast.GetOrSetPodcastShortID(pod2, "Beta Cast")
 
 	cfg := Config{PodcastsDir: tempDir}
 
@@ -155,7 +158,7 @@ func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
 	pod1 := filepath.Join(tempDir, "Gamma_Show")
 	_ = os.MkdirAll(pod1, 0755)
 	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
-	id1 := getOrSetPodcastShortID(pod1, "Gamma Show")
+	id1 := podcast.GetOrSetPodcastShortID(pod1, "Gamma Show")
 
 	cfg := Config{PodcastsDir: tempDir}
 
@@ -205,7 +208,7 @@ func TestLsSinglePodcastJSON(t *testing.T) {
 	pod1 := filepath.Join(tempDir, "Delta_Show")
 	_ = os.MkdirAll(pod1, 0755)
 	_ = os.WriteFile(filepath.Join(pod1, "ep1.mp3"), []byte("audio"), 0644)
-	id1 := getOrSetPodcastShortID(pod1, "Delta Show")
+	id1 := podcast.GetOrSetPodcastShortID(pod1, "Delta Show")
 
 	cfg := Config{PodcastsDir: tempDir}
 
@@ -263,7 +266,7 @@ func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
 	out := string(outBytes)
 
 	rawTitle := "פרק 1 - שלום עולם"
-	expectedTitle := displayName(rawTitle)
+	expectedTitle := util.DisplayName(rawTitle)
 	if !strings.Contains(out, expectedTitle) {
 		t.Errorf("expected latest episodes table to contain displayName reordered %q, got: %s", expectedTitle, out)
 	}
@@ -280,7 +283,7 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 	epHebrew := filepath.Join(pod, "פרק ראשון של הפודקאסט.mp3")
 	_ = os.WriteFile(epHebrew, []byte("audio"), 0644)
 
-	id := getOrSetPodcastShortID(pod, "פודקאסט_בעברית")
+	id := podcast.GetOrSetPodcastShortID(pod, "פודקאסט_בעברית")
 	cfg := Config{PodcastsDir: tempDir}
 
 	r, w, _ := os.Pipe()
@@ -303,11 +306,11 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 	out := string(outBytes)
 
 	rawTitle := "פרק ראשון של הפודקאסט"
-	expectedTitle := truncate(displayName(rawTitle), 35)
+	expectedTitle := util.Truncate(util.DisplayName(rawTitle), 35)
 	if !strings.Contains(out, expectedTitle) {
 		t.Errorf("expected single podcast table to contain displayName reordered %q, got: %s", expectedTitle, out)
 	}
-	expectedPodTitle := displayName("פודקאסט_בעברית")
+	expectedPodTitle := util.DisplayName("פודקאסט_בעברית")
 	if !strings.Contains(out, expectedPodTitle) {
 		t.Errorf("expected header to contain displayName reordered podcast title %q, got: %s", expectedPodTitle, out)
 	}
@@ -339,8 +342,8 @@ func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
 	outBytes, _ := io.ReadAll(r)
 	out := string(outBytes)
 
-	expectedEp := displayName("פרק בדיקה עם עברית")
-	expectedPod := displayName("חדשות הבוקר")
+	expectedEp := util.DisplayName("פרק בדיקה עם עברית")
+	expectedPod := util.DisplayName("חדשות הבוקר")
 
 	if !strings.Contains(out, expectedEp) {
 		t.Errorf("expected table to contain %q, got: %s", expectedEp, out)

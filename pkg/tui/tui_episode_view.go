@@ -5,6 +5,13 @@ import (
 	"fmt"
 	"os"
 	"strings"
+
+	"abs/pkg/backend"
+	"abs/pkg/kitty"
+	"abs/pkg/player"
+	"abs/pkg/podcast"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func (m *tuiModel) drawEpisodeDetail() string {
@@ -25,8 +32,8 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	ep := eps[m.epIdx]
 	absEp := resolveABSEpisode(pod.dir, ep)
 
-	if isKittyTerminal() {
-		out.WriteString(kittyClearGraphics())
+	if kitty.IsKittyTerminal() {
+		out.WriteString(kitty.KittyClearGraphics())
 	}
 
 	fullTitle, dateStr, totalDurStr, badgeLeft, descClean := formatEpisodeDetailFields(pod, ep, absEp, m.epIdx)
@@ -39,13 +46,13 @@ func (m *tuiModel) drawEpisodeDetail() string {
 	return renderEpisodeDetailFullView(m, fullTitle, dateStr, badgeLeft, descClean, maxLines)
 }
 
-func resolveABSEpisode(podDir string, ep tuiEpisode) *absEpisode {
+func resolveABSEpisode(podDir string, ep tuiEpisode) *backend.Episode {
 	absEp := ep.absData
 	if absEp == nil {
-		if cachedDet, err := loadEpisodeDetails(podDir, ep.filename); err == nil && cachedDet != nil {
+		if cachedDet, err := podcast.LoadEpisodeDetails(podDir, ep.filename); err == nil && cachedDet != nil {
 			absEp = cachedDet.RawABS
 			if absEp == nil && (cachedDet.Description != "" || cachedDet.Subtitle != "") {
-				absEp = &absEpisode{
+				absEp = &backend.Episode{
 					Title:       cachedDet.Title,
 					Subtitle:    cachedDet.Subtitle,
 					Description: cachedDet.Description,
@@ -57,7 +64,7 @@ func resolveABSEpisode(podDir string, ep tuiEpisode) *absEpisode {
 	return absEp
 }
 
-func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode, epIdx int) (string, string, string, string, string) {
+func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *backend.Episode, epIdx int) (string, string, string, string, string) {
 	epNum := ep.displayEpisodeNum(epIdx + 1)
 	displayHeader := ep.displayTitle()
 	d := ep.displayDate()
@@ -68,7 +75,7 @@ func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode,
 
 	totalDurStr := "--:--"
 	if ep.duration > 0 {
-		totalDurStr = formatPlayerTime(ep.duration)
+		totalDurStr = player.FormatPlayerTime(ep.duration)
 	}
 
 	titlePrefix := ""
@@ -81,7 +88,7 @@ func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode,
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 	}
-	inDLQueue := IsEpisodeInDownloadQueue(epGUID, "", ep.displayTitle()) || IsEpisodeInDownloadQueue(epGUID, "", ep.filename)
+	inDLQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
 
 	badgeLeft := ""
 	if inDLQueue {
@@ -102,7 +109,7 @@ func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *absEpisode,
 	if totalDurStr != "" {
 		badgeLeft += tuiBadgeDuration.Render(totalDurStr) + " "
 	}
-	badgeLeft += tuiSubtitleStyle.Render("• " + displayName(pod.name))
+	badgeLeft += tuiSubtitleStyle.Render("• " + util.DisplayName(pod.name))
 
 	descRaw := ""
 	if absEp != nil && absEp.Description != "" {
@@ -144,7 +151,7 @@ func renderEpisodeDetailSplitView(m *tuiModel, ep tuiEpisode, fullTitle, dateStr
 
 func renderEpisodeDetailLeftPane(m *tuiModel, fullTitle, dateStr, badgeLeft, descClean string, leftW, maxLines int) []string {
 	var leftLines []string
-	leftLines = append(leftLines, tuiTitleStyle.Render(truncate(displayName(fullTitle), leftW-2)))
+	leftLines = append(leftLines, tuiTitleStyle.Render(truncate(util.DisplayName(fullTitle), leftW-2)))
 
 	dateRender := ""
 	if dateStr != "" {
@@ -193,8 +200,8 @@ func renderEpisodeDetailPlayerPane(ep tuiEpisode, totalDurStr string, rightW int
 		if pv.IsPaused {
 			statusBadge = tuiPlayerPaused.Render("⏸ PAUSED")
 		}
-		rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(displayName(pv.Title), rightW-16)+" "))
-		rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+displayName(pv.Podcast)))
+		rightLines = append(rightLines, statusBadge+" "+tuiSelectedStyle.Render(" "+truncate(util.DisplayName(pv.Title), rightW-16)+" "))
+		rightLines = append(rightLines, tuiSubtextStyle.Render("  in "+util.DisplayName(pv.Podcast)))
 		rightLines = append(rightLines, "  "+tuiCyanStyle.Render(globalPlayer.RenderProgressBar(rightW-4)))
 	} else {
 		rightLines = append(rightLines, tuiPlayerStopped.Render("⏹ STOPPED")+" "+tuiDimStyle.Render("Press 'p' or Enter to play"))
@@ -205,7 +212,7 @@ func renderEpisodeDetailPlayerPane(ep tuiEpisode, totalDurStr string, rightW int
 	basePath := strings.TrimSuffix(ep.path, ".mp3")
 	cutsFile := basePath + ".cuts.json"
 	if data, err := os.ReadFile(cutsFile); err == nil {
-		var cd CutsData
+		var cd types.CutsData
 		if json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
 			dur := ep.duration
 			if dur <= 0 {
@@ -239,7 +246,7 @@ func renderEpisodeDetailPlayerPane(ep tuiEpisode, totalDurStr string, rightW int
 				rightLines = append(rightLines, tuiDimStyle.Render(fmt.Sprintf("  ... and %d more", len(pv.Queue)-3)))
 				break
 			}
-			rightLines = append(rightLines, tuiSubtextStyle.Render(fmt.Sprintf("  %d. %s", qIdx+1, truncate(displayName(qTrack.Title), rightW-8))))
+			rightLines = append(rightLines, tuiSubtextStyle.Render(fmt.Sprintf("  %d. %s", qIdx+1, truncate(util.DisplayName(qTrack.Title), rightW-8))))
 		}
 		rightLines = append(rightLines, tuiDimStyle.Render("  ('n' next track, 'c' clear queue)"))
 	} else {
@@ -257,7 +264,7 @@ func renderEpisodeDetailPlayerPane(ep tuiEpisode, totalDurStr string, rightW int
 func renderEpisodeDetailFullView(m *tuiModel, fullTitle, dateStr, badgeLeft, descClean string, maxLines int) string {
 	out := &strings.Builder{}
 	contentW := max(20, m.width-4)
-	out.WriteString("  " + tuiTitleStyle.Render(truncate(displayName(fullTitle), contentW)) + "\n")
+	out.WriteString("  " + tuiTitleStyle.Render(truncate(util.DisplayName(fullTitle), contentW)) + "\n")
 
 	dateRender := ""
 	if dateStr != "" {

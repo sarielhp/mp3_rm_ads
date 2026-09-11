@@ -89,5 +89,7 @@ func clearPodcastQueue(dir string) error {
 			return err
 		}
 	}
-	return saveQueue(dir, []string{})
+	return pipeline.UpdateQueue(dir, func([]string) []string {
+		return []string{}
+	})
 }

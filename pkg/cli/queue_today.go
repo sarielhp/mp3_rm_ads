@@ -3,6 +3,7 @@ package cli
 import (
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"fmt"
 	"path/filepath"
 	"strings"
@@ -32,7 +33,7 @@ func buildQueueTodaySubcommand(opts *CLIOptions, action *string) clihelp.Command
 
 func todayQueueCandidates(dir string, now time.Time, source map[string]time.Time) []string {
 	cached := make(map[string]time.Time)
-	if index, _ := loadPodcastCache(dir); index != nil {
+	if index, _ := podcast.LoadPodcastCache(dir); index != nil {
 		for _, ep := range index.Episodes {
 			if ep.PublishedAt > 0 {
 				path := ep.Path
@@ -48,7 +49,7 @@ func todayQueueCandidates(dir string, now time.Time, source map[string]time.Time
 	start := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
 	end := start.AddDate(0, 0, 1)
 	var candidates []string
-	for _, path := range findMP3Files(dir) {
+	for _, path := range util.FindMP3Files(dir) {
 		if !pipeline.IsQueueAudioPath(path) {
 			continue
 		}
@@ -62,7 +63,7 @@ func todayQueueCandidates(dir string, now time.Time, source map[string]time.Time
 		} else if date, ok := podcast.SourcePublicationTime(path); ok {
 			published = date
 		}
-		if !published.IsZero() && !published.Before(start) && published.Before(end) && !isEpisodeClean(path) {
+		if !published.IsZero() && !published.Before(start) && published.Before(end) && !pipeline.IsEpisodeClean(path) {
 			candidates = append(candidates, queueFilenameForPath(dir, path))
 		}
 	}
@@ -76,17 +77,17 @@ func handleQueueToday(root string, cli CLIOptions, now time.Time) error {
 func handleQueueTodaySource(root string, cli CLIOptions, now time.Time, source map[string]time.Time) error {
 	total := 0
 	for _, pod := range scanQueuePodcasts(root) {
-		candidates := todayQueueCandidates(pod.dir, now, source)
+		candidates := todayQueueCandidates(pod.Dir, now, source)
 		if cli.DryRun {
 			for _, filename := range candidates {
-				fmt.Printf("[dry-run] Would queue for AdR: %s\n", filepath.Join(pod.dir, filename))
+				fmt.Printf("[dry-run] Would queue for AdR: %s\n", filepath.Join(pod.Dir, filename))
 			}
 			continue
 		}
 		if len(candidates) == 0 {
 			continue
 		}
-		err := updateQueue(pod.dir, func(entries []string) []string {
+		err := pipeline.UpdateQueue(pod.Dir, func(entries []string) []string {
 			existing := make(map[string]bool)
 			for _, entry := range entries {
 				existing[strings.ToLower(entry)] = true
@@ -102,7 +103,7 @@ func handleQueueTodaySource(root string, cli CLIOptions, now time.Time, source m
 			return entries
 		})
 		if err != nil {
-			return fmt.Errorf("queue today's episodes for %s: %w", pod.title, err)
+			return fmt.Errorf("queue today's episodes for %s: %w", pod.Title, err)
 		}
 	}
 	if !cli.Quiet && !cli.DryRun {

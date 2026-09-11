@@ -5,6 +5,8 @@ import (
 	"testing"
 	"time"
 
+	"abs/pkg/config"
+
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -93,7 +95,7 @@ func TestTUIDownloadPolicyModalNavigationAndKeys(t *testing.T) {
 		t.Errorf("expected auto cleanup enabled 30 days, got %+v", m.podcasts[0].config)
 	}
 
-	saved := loadPodcastConfig(tempDir)
+	saved := config.LoadPodcastConfig(tempDir, config.PodcastConfig{})
 	if !saved.IsAutoCleanupEnabled() || saved.AutoCleanupDays != 30 {
 		t.Errorf("expected saved config to match cleanup 30 days, got %+v", saved)
 	}
@@ -103,7 +105,7 @@ func TestTUIDownloadPolicyModalRenderingAndCancel(t *testing.T) {
 	tempDir := t.TempDir()
 	m := makeTestModel()
 	m.podcasts[0].dir = tempDir
-	m.podcasts[0].config.DownloadPolicy = DownloadPolicyAll
+	m.podcasts[0].config.DownloadPolicy = config.DownloadPolicyAll
 	m.podIdx = 0
 	m.width = 80
 
