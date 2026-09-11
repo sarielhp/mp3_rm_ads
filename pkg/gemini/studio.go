@@ -11,6 +11,8 @@ import (
 	"net/textproto"
 	"os"
 	"path/filepath"
+	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -222,6 +224,9 @@ func CallGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 
 		if attempt < maxAttempts {
 			delay := time.Duration(attempt*2) * time.Second
+			if requested := ExtractGeminiRetryDelay(body); requested > 0 && requested <= 60*time.Second {
+				delay = requested
+			}
 			select {
 			case <-ctx.Done():
 				return nil, ctx.Err()
@@ -330,19 +335,49 @@ func extractGeminiQuotaDetails(errResp *geminiErrorResponse) string {
 	return ""
 }
 
+var geminiRetryRegex = regexp.MustCompile(`(?i)(?:please retry in|retry in)\s+([0-9.]+)\s*(s(?:ec(?:ond)?)?|m(?:in(?:ute)?)?)?`)
+
+func ExtractGeminiRetryDelay(body []byte) time.Duration {
+	matches := geminiRetryRegex.FindSubmatch(body)
+	if len(matches) < 2 {
+		return 0
+	}
+	val, err := strconv.ParseFloat(string(matches[1]), 64)
+	if err != nil || val <= 0 {
+		return 0
+	}
+	unit := ""
+	if len(matches) >= 3 {
+		unit = strings.ToLower(string(matches[2]))
+	}
+	if strings.HasPrefix(unit, "m") {
+		return time.Duration(val*60*float64(time.Second)) + time.Second
+	}
+	return time.Duration((val + 1.0) * float64(time.Second))
+}
+
 func IsGeminiDailyQuotaExhausted(body []byte) bool {
 	var errResp geminiErrorResponse
 	if err := json.Unmarshal(body, &errResp); err != nil {
 		return false
 	}
+	msg := strings.ToLower(errResp.Error.Message)
+	if strings.Contains(msg, "please retry in") || strings.Contains(msg, "retry after") {
+		return false
+	}
 	for _, d := range errResp.Error.Details {
 		limit := d.Metadata["quota_limit"]
 		val := d.Metadata["quota_limit_value"]
+		if strings.Contains(limit, "PerMinute") || val == "15" || val == "20" {
+			return false
+		}
 		if strings.Contains(limit, "PerDay") || val == "1500" {
 			return true
 		}
 	}
-	msg := strings.ToLower(errResp.Error.Message)
+	if strings.Contains(msg, "free_tier_requests") && (strings.Contains(msg, "limit: 15") || strings.Contains(msg, "limit: 20")) {
+		return false
+	}
 	return strings.Contains(msg, "exceeded your current quota") && !strings.Contains(msg, "per minute")
 }
 

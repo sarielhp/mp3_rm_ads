@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"abs/pkg/types"
 	"cloud.google.com/go/vertexai/genai"
@@ -400,5 +401,47 @@ func TestProcessGeminiChunksParallelCancelledContext(t *testing.T) {
 	_, err := ProcessGeminiChunksParallel(ctx, chunks, types.Config{})
 	if err == nil {
 		t.Fatal("expected error with cancelled context, got nil")
+	}
+}
+
+func TestExtractGeminiRetryDelay(t *testing.T) {
+	body := []byte(`{
+		"error": {
+			"code": 429,
+			"message": "You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\nPlease retry in 9.229033412s.",
+			"status": "RESOURCE_EXHAUSTED"
+		}
+	}`)
+	delay := ExtractGeminiRetryDelay(body)
+	if delay < 10*time.Second || delay > 11*time.Second {
+		t.Errorf("expected ~10.2s delay, got %v", delay)
+	}
+
+	delayWithUnit := ExtractGeminiRetryDelay([]byte("Please retry in 15s."))
+	if delayWithUnit != 16*time.Second {
+		t.Errorf("expected 16s delay, got %v", delayWithUnit)
+	}
+
+	delayMinuteUnit := ExtractGeminiRetryDelay([]byte("please retry in 2m"))
+	if delayMinuteUnit != 121*time.Second {
+		t.Errorf("expected 121s delay, got %v", delayMinuteUnit)
+	}
+
+	delayNone := ExtractGeminiRetryDelay([]byte("random error"))
+	if delayNone != 0 {
+		t.Errorf("expected 0 delay, got %v", delayNone)
+	}
+}
+
+func TestIsGeminiDailyQuotaExhaustedWithRetryIn(t *testing.T) {
+	body := []byte(`{
+		"error": {
+			"code": 429,
+			"message": "You exceeded your current quota, please check your plan and billing details.\n* Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.8-flash\nPlease retry in 9.229033412s.",
+			"status": "RESOURCE_EXHAUSTED"
+		}
+	}`)
+	if IsGeminiDailyQuotaExhausted(body) {
+		t.Errorf("expected IsGeminiDailyQuotaExhausted to be false when retry-in is present")
 	}
 }
