@@ -84,17 +84,20 @@ func (c *AudiobookshelfBackend) ResetPodcastDateCheckAPI(itemID string) error {
 
 func (c *AudiobookshelfBackend) ResetPodcastDateCheck(itemID, title string) error {
 	var errs []string
+	attempted := 0
 	if c.DBPath != "" {
+		attempted++
 		if err := ResetPodcastDateCheckInDB(c.DBPath, itemID, title); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
 	if c.Host != "" && itemID != "" {
+		attempted++
 		if err := c.ResetPodcastDateCheckAPI(itemID); err != nil {
 			errs = append(errs, err.Error())
 		}
 	}
-	if len(errs) > 0 && c.DBPath == "" && c.Host == "" {
+	if attempted > 0 && len(errs) == attempted {
 		return fmt.Errorf("%s", strings.Join(errs, "; "))
 	}
 	return nil

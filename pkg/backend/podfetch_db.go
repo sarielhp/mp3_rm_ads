@@ -405,14 +405,23 @@ func resetPodFetchDateCheckDB(dbPath, itemID, title string) error {
 		return err
 	}
 
+	dateCol := "last_build_date"
+	if !podfetchHasColumn(db, "podcasts", dateCol) {
+		if podfetchHasColumn(db, "podcasts", "created_at") {
+			dateCol = "created_at"
+		} else {
+			return nil
+		}
+	}
+
 	if itemID != "" {
-		_, err = db.Exec("UPDATE podcasts SET created_at = '1970-01-01 00:00:00' WHERE id = ?", itemID)
+		_, err = db.Exec(fmt.Sprintf("UPDATE podcasts SET %s = '1970-01-01 00:00:00' WHERE id = ?", dateCol), itemID)
 		if err == nil {
 			return nil
 		}
 	}
 	if title != "" {
-		_, err = db.Exec("UPDATE podcasts SET created_at = '1970-01-01 00:00:00' WHERE name = ?", title)
+		_, err = db.Exec(fmt.Sprintf("UPDATE podcasts SET %s = '1970-01-01 00:00:00' WHERE name = ?", dateCol), title)
 		return err
 	}
 	return nil

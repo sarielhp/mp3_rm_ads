@@ -31,7 +31,8 @@ func setupTestPodFetchDB(t *testing.T) string {
 			author TEXT,
 			keywords TEXT,
 			explicit INTEGER,
-			created_at TEXT
+			created_at TEXT,
+			last_build_date TEXT
 		);
 		CREATE TABLE podcast_episodes (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -130,10 +131,10 @@ func TestPodFetchDurationSyncAndDateReset(t *testing.T) {
 		t.Fatalf("ResetPodcastDateCheck failed: %v", err)
 	}
 
-	var createdAt string
-	_ = db.QueryRow("SELECT created_at FROM podcasts WHERE id = 1").Scan(&createdAt)
-	if !strings.HasPrefix(createdAt, "1970-01-01") {
-		t.Errorf("expected 1970 date check reset, got %s", createdAt)
+	var lastBuild, createdAt string
+	_ = db.QueryRow("SELECT last_build_date, created_at FROM podcasts WHERE id = 1").Scan(&lastBuild, &createdAt)
+	if !strings.HasPrefix(lastBuild, "1970-01-01") && !strings.HasPrefix(createdAt, "1970-01-01") {
+		t.Errorf("expected 1970 date check reset, got lastBuild=%s, createdAt=%s", lastBuild, createdAt)
 	}
 }
 

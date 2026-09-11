@@ -2,6 +2,8 @@ package cli
 
 import (
 	"fmt"
+	"os"
+	"strings"
 	"time"
 
 	"abs/pkg/backend"
@@ -76,6 +78,9 @@ func checkServerFeeds(b backend.Backend, podcasts []backend.Podcast, cli CLIOpti
 	}
 
 	summary.Refreshed = wakeServerForFeeds(b, results, cli.DryRun)
+	if summary.Refreshed > 0 {
+		waitForServerIndexing(b, results, cli.Quiet || cli.DryRun)
+	}
 	summary.Elapsed = time.Since(start)
 	return summary
 }
@@ -124,13 +129,71 @@ func wakeServerForFeeds(b backend.Backend, results []podcast.FeedCheckResult, dr
 	return refreshed
 }
 
+func waitForServerIndexing(b backend.Backend, results []podcast.FeedCheckResult, quiet bool) {
+	if b == nil || b.Name() != "podfetch" {
+		return
+	}
+	pending := make(map[string]map[string]bool)
+	for _, r := range results {
+		if !r.NeedsServer() || len(r.New) == 0 {
+			continue
+		}
+		guids := make(map[string]bool, len(r.New))
+		for _, ep := range r.New {
+			if g := strings.TrimSpace(ep.GUID); g != "" {
+				guids[g] = true
+			}
+		}
+		if len(guids) > 0 {
+			pending[r.Podcast.ID] = guids
+		}
+	}
+	if len(pending) == 0 {
+		return
+	}
+	pollCatalogUntilIndexed(b, pending, quiet)
+}
+
+func pollCatalogUntilIndexed(b backend.Backend, pending map[string]map[string]bool, quiet bool) {
+	deadline := time.Now().Add(25 * time.Second)
+	indexer, ok := b.(backend.CatalogIndexer)
+	if !ok {
+		return
+	}
+	for time.Now().Before(deadline) {
+		time.Sleep(1 * time.Second)
+		eps, err := indexer.CatalogEpisodes()
+		if err != nil {
+			return
+		}
+		for _, ep := range eps {
+			if guids, exists := pending[ep.PodcastID]; exists {
+				delete(guids, ep.GUID)
+				if len(guids) == 0 {
+					delete(pending, ep.PodcastID)
+				}
+			}
+		}
+		if len(pending) == 0 {
+			break
+		}
+		if !quiet {
+			fmt.Printf("\rWaiting for server to index %d podcast(s)...\x1b[K", len(pending))
+			os.Stdout.Sync()
+		}
+	}
+	if !quiet {
+		fmt.Print("\r\x1b[K")
+	}
+}
+
 func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {
 	if cli.Quiet {
 		return
 	}
 	for i := range summary.Results {
 		r := &summary.Results[i]
-		if cli.Verbose || r.Status != podcast.FeedUnchanged {
+		if cli.Verbose || r.Status != podcast.FeedUnchanged || len(r.New) > 0 {
 			printFeedCheckLine(r, cli.Verbose)
 		}
 	}
@@ -148,13 +211,10 @@ func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {
 }
 
 func printFeedCheckLine(r *podcast.FeedCheckResult, verbose bool) {
-	switch r.Status {
-	case podcast.FeedUnchanged:
-		fmt.Printf("  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
-			r.Title, r.Reason, r.EpisodeCount, r.Undownloaded)
-	case podcast.FeedUnknown:
+	switch {
+	case r.Status == podcast.FeedUnknown:
 		fmt.Printf("! %s: could not read feed: %v\n", r.Title, r.Err)
-	default:
+	case len(r.New) > 0:
 		fmt.Printf("+ %s: %d new episode(s) (%d in feed, %d undownloaded)\n",
 			r.Title, len(r.New), r.EpisodeCount, r.Undownloaded)
 		if verbose {
@@ -162,6 +222,9 @@ func printFeedCheckLine(r *podcast.FeedCheckResult, verbose bool) {
 				fmt.Printf("    + %s (%s)\n", ep.Title, ep.PubDate)
 			}
 		}
+	default:
+		fmt.Printf("  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
+			r.Title, r.Reason, r.EpisodeCount, r.Undownloaded)
 	}
 }
 

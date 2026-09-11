@@ -251,6 +251,11 @@ func (c *PodFetchBackend) findEpisodeIDForDownload(podcastID string, ep FeedEpis
 				isDone := fileEpPath.Valid && strings.TrimSpace(fileEpPath.String) != ""
 				return epID.String, isDone, nil
 			}
+			fallbackQuery := "SELECT episode_id, file_episode_path FROM podcast_episodes WHERE guid = ? OR url = ? OR lower(name) = lower(?) LIMIT 1"
+			if err := db.QueryRow(fallbackQuery, ep.GUID, ep.EnclosureURL, title).Scan(&epID, &fileEpPath); err == nil {
+				isDone := fileEpPath.Valid && strings.TrimSpace(fileEpPath.String) != ""
+				return epID.String, isDone, nil
+			}
 		}
 	}
 	if c.Host != "" {

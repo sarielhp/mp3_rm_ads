@@ -14,6 +14,7 @@ type PodcastEpisodeIndex struct {
 	downloaded map[string]bool
 	titles     map[string]bool
 	dlTitles   map[string]bool
+	fallback   *PodcastEpisodeIndex
 	total      int
 	withAudio  int
 }
@@ -102,7 +103,13 @@ func (idx *PodcastEpisodeIndex) Knows(ep backend.FeedEpisode) bool {
 	if idx == nil {
 		return false
 	}
-	return idx.matches(ep, idx.known, idx.titles)
+	if idx.matches(ep, idx.known, idx.titles) {
+		return true
+	}
+	if idx.fallback != nil {
+		return idx.fallback.Knows(ep)
+	}
+	return false
 }
 
 // HasAudio reports whether the server holds a downloaded audio file for this
@@ -111,7 +118,13 @@ func (idx *PodcastEpisodeIndex) HasAudio(ep backend.FeedEpisode) bool {
 	if idx == nil {
 		return false
 	}
-	return idx.matches(ep, idx.downloaded, idx.dlTitles)
+	if idx.matches(ep, idx.downloaded, idx.dlTitles) {
+		return true
+	}
+	if idx.fallback != nil {
+		return idx.fallback.HasAudio(ep)
+	}
+	return false
 }
 
 // EpisodeIndex maps a podcast ID to the episodes the server holds for it.
@@ -155,6 +168,7 @@ func BuildEpisodeIndex(b backend.Backend, podcasts []backend.Podcast) EpisodeInd
 
 func buildIndexFromCatalog(catalog []backend.CatalogEpisode, podcasts []backend.Podcast) EpisodeIndex {
 	index := make(EpisodeIndex, len(podcasts))
+	global := newPodcastEpisodeIndex(len(catalog))
 	for _, p := range podcasts {
 		index[p.ID] = newPodcastEpisodeIndex(0)
 	}
@@ -165,6 +179,10 @@ func buildIndexFromCatalog(catalog []backend.CatalogEpisode, podcasts []backend.
 			index[ep.PodcastID] = idx
 		}
 		idx.add(ep.GUID, ep.EnclosureURL, ep.Title, ep.Downloaded)
+		global.add(ep.GUID, ep.EnclosureURL, ep.Title, ep.Downloaded)
+	}
+	for _, idx := range index {
+		idx.fallback = global
 	}
 	return index
 }
@@ -178,12 +196,18 @@ func BuildEpisodeIndexFromPodcasts(b backend.Backend, podcasts []backend.Podcast
 	audioImplied := b == nil || b.Name() != "podfetch"
 
 	index := make(EpisodeIndex, len(podcasts))
+	global := newPodcastEpisodeIndex(len(podcasts) * 50)
 	for _, p := range podcasts {
 		idx := newPodcastEpisodeIndex(len(p.Media.Episodes))
 		for _, ep := range p.Media.Episodes {
-			idx.add(ep.GUID, ep.EnclosureURL, ep.Title, audioImplied || ep.AudioFile != nil)
+			dl := audioImplied || ep.AudioFile != nil
+			idx.add(ep.GUID, ep.EnclosureURL, ep.Title, dl)
+			global.add(ep.GUID, ep.EnclosureURL, ep.Title, dl)
 		}
 		index[p.ID] = idx
+	}
+	for _, idx := range index {
+		idx.fallback = global
 	}
 	return index
 }

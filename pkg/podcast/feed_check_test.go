@@ -216,3 +216,32 @@ func TestCheckFeedsForUpdatesEmptyInput(t *testing.T) {
 		t.Fatalf("expected no results, got %d", len(res))
 	}
 }
+
+func TestCheckFeedsForUpdatesCatchesUnindexedEpisodeEvenIfOriginUnchanged(t *testing.T) {
+	ep1 := feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000")
+	ep2 := feedItem("Ep 2", "g2", "Tue, 02 Sep 2026 10:00:00 -0000")
+	body := feedXML("Tue, 02 Sep 2026 10:00:00 -0000", ep2, ep1)
+	srv, _ := etagServer(t, `"v2"`, body)
+
+	pods := []backend.Podcast{testPodcast("p1", "Show", srv.URL,
+		backend.Episode{GUID: "g1", Title: "Ep 1", AudioFile: &backend.PodcastAudioFile{Duration: 1}})}
+	index := BuildEpisodeIndexFromPodcasts(nil, pods)
+
+	cache := newTestCache(t)
+	cache.Put(srv.URL, &FeedCacheEntry{
+		FeedURL:       srv.URL,
+		ETag:          `"v2"`,
+		LatestGUID:    "g2",
+		EpisodeCount:  2,
+		LastBuildDate: "Tue, 02 Sep 2026 10:00:00 -0000",
+		LastChecked:   time.Now(),
+	})
+
+	res := CheckFeedsForUpdates(pods, index, checkOpts(cache))
+	if len(res) != 1 || len(res[0].New) != 1 || res[0].New[0].GUID != "g2" {
+		t.Fatalf("expected new episode g2, got %+v", res)
+	}
+	if !res[0].NeedsServer() {
+		t.Error("expected NeedsServer() to be true when catalog lacks latest episode")
+	}
+}

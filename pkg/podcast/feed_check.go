@@ -68,11 +68,7 @@ type FeedCheckResult struct {
 // point of checking feeds directly first.
 func (r *FeedCheckResult) NeedsServer() bool {
 	switch r.Status {
-	case FeedUnchanged:
-		return false
 	case FeedUnknown:
-		// The feed could not be read from here; let the server try, since it
-		// may reach origins this host cannot.
 		return true
 	default:
 		return len(r.New) > 0
@@ -145,7 +141,7 @@ func checkOneFeed(item backend.Podcast, index EpisodeIndex, cache *FeedCacheMana
 		MaxAttempts: opts.MaxAttempts,
 		Client:      client,
 	}
-	if entry != nil && !opts.Force {
+	if entry != nil && !opts.Force && serverKnowsLatest(entry, index[item.ID]) {
 		fetchOpts.ETag = entry.ETag
 		fetchOpts.LastModified = entry.LastModified
 	}
@@ -167,6 +163,19 @@ func checkOneFeed(item backend.Podcast, index EpisodeIndex, cache *FeedCacheMana
 	return classifyFetchedFeed(res, fetched, entry, index, cache, opts)
 }
 
+func serverKnowsLatest(entry *FeedCacheEntry, pIndex *PodcastEpisodeIndex) bool {
+	if entry == nil || pIndex == nil {
+		return false
+	}
+	if entry.LatestGUID != "" && !pIndex.Knows(backend.FeedEpisode{GUID: entry.LatestGUID}) {
+		return false
+	}
+	if entry.EpisodeCount > 0 && pIndex.Total() < entry.EpisodeCount {
+		return false
+	}
+	return true
+}
+
 func unchangedResult(res FeedCheckResult, entry *FeedCacheEntry, index EpisodeIndex, cache *FeedCacheManager, reason string) FeedCheckResult {
 	res.Status = FeedUnchanged
 	res.Reason = reason
@@ -175,6 +184,12 @@ func unchangedResult(res FeedCheckResult, entry *FeedCacheEntry, index EpisodeIn
 		res.EpisodeCount = entry.EpisodeCount
 		entry.LastChecked = time.Now()
 		cache.Put(res.FeedURL, entry)
+		if !serverKnowsLatest(entry, index[res.Podcast.ID]) {
+			res.Reason = "server catalog missing latest episode"
+			if entry.LatestGUID != "" {
+				res.New = []backend.FeedEpisode{{GUID: entry.LatestGUID}}
+			}
+		}
 	}
 	if res.EpisodeCount == 0 {
 		res.EpisodeCount = index[res.Podcast.ID].Total()
@@ -204,18 +219,18 @@ func classifyFetchedFeed(res FeedCheckResult, fetched FeedFetchResult, entry *Fe
 	}
 	cache.Put(res.FeedURL, updated)
 
+	res.Episodes = doc.Episodes
+	res.New = index.Unknown(res.Podcast.ID, doc.Episodes)
+	res.Undownloaded = len(index.Undownloaded(res.Podcast.ID, doc.Episodes))
+
 	if !opts.Force && feedMarkersUnchanged(entry, doc, latest) {
 		res.Status = FeedUnchanged
 		res.Reason = "content markers unchanged"
-		res.Undownloaded = index[res.Podcast.ID].Pending()
 		return res
 	}
 
 	res.Status = FeedChanged
 	res.Reason = "feed body changed"
-	res.Episodes = doc.Episodes
-	res.New = index.Unknown(res.Podcast.ID, doc.Episodes)
-	res.Undownloaded = len(index.Undownloaded(res.Podcast.ID, doc.Episodes))
 	return res
 }
 
