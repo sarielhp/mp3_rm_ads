@@ -13,6 +13,10 @@ import (
 func Execute(args []string) int {
 	action, cli, err := parseFlagsArgs(args)
 	if err != nil {
+		if len(args) > 0 && args[0] == "block" {
+			fmt.Fprintf(os.Stderr, "Error: %v (use 'abs server disable-hourly' to disable hourly podcasts)\n", err)
+			return 1
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}
