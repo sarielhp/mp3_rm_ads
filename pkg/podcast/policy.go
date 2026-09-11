@@ -2,6 +2,7 @@ package podcast
 
 import (
 	"fmt"
+	"time"
 
 	"abs/pkg/backend"
 	"abs/pkg/config"
@@ -22,9 +23,66 @@ func SelectEpisodesByDownloadPolicy(sortedCatalog []backend.FeedEpisode, isDownl
 		return selectLatestKEpisodes(sortedCatalog, isDownloaded, k, oldest)
 	case config.DownloadPolicyAll:
 		return selectAllEpisodes(sortedCatalog, isDownloaded, oldest)
+	case config.DownloadPolicyNew:
+		return selectNewEpisodes(sortedCatalog, nil, isDownloaded, nil)
 	default:
 		return nil, nil
 	}
+}
+
+func selectNewEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, favoriteSince *time.Time) ([]backend.FeedEpisode, []string) {
+	if len(sortedCatalog) == 0 {
+		return nil, nil
+	}
+
+	if len(downloadedIndices) == 0 && isDownloaded != nil {
+		for idx, ep := range sortedCatalog {
+			if isDownloaded(ep) {
+				downloadedIndices = append(downloadedIndices, idx)
+			}
+		}
+	}
+
+	if len(downloadedIndices) > 0 {
+		maxIdx := -1
+		for _, idx := range downloadedIndices {
+			if idx > maxIdx {
+				maxIdx = idx
+			}
+		}
+		var newEpisodes []backend.FeedEpisode
+		if maxIdx+1 < len(sortedCatalog) {
+			for _, ep := range sortedCatalog[maxIdx+1:] {
+				if hasDownloadableEnclosure(ep) && !isDownloaded(ep) {
+					newEpisodes = append(newEpisodes, ep)
+				}
+			}
+		}
+		if len(newEpisodes) > 0 {
+			for i, j := 0, len(newEpisodes)-1; i < j; i, j = i+1, j-1 {
+				newEpisodes[i], newEpisodes[j] = newEpisodes[j], newEpisodes[i]
+			}
+			return newEpisodes, []string{fmt.Sprintf("%d new episode(s) (policy: new)", len(newEpisodes))}
+		}
+		return nil, nil
+	}
+
+	var newEpisodes []backend.FeedEpisode
+	if favoriteSince != nil {
+		cutoffMS := favoriteSince.UnixMilli()
+		for _, ep := range sortedCatalog {
+			if GetPubMS(ep) >= cutoffMS && hasDownloadableEnclosure(ep) && !isDownloaded(ep) {
+				newEpisodes = append(newEpisodes, ep)
+			}
+		}
+	}
+	if len(newEpisodes) == 0 {
+		return nil, nil
+	}
+	for i, j := 0, len(newEpisodes)-1; i < j; i, j = i+1, j-1 {
+		newEpisodes[i], newEpisodes[j] = newEpisodes[j], newEpisodes[i]
+	}
+	return newEpisodes, []string{fmt.Sprintf("%d new episode(s) (policy: new)", len(newEpisodes))}
 }
 
 func hasDownloadableEnclosure(ep backend.FeedEpisode) bool {

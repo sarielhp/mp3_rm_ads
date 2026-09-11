@@ -133,6 +133,9 @@ func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.Fee
 		return eps, reasons
 	}
 	if !opts.Fill && !opts.CountGiven {
+		if podCfg.Favorite || podCfg.DownloadPolicy == config.DownloadPolicyNew {
+			return selectNewEpisodes(sortedCatalog, downloadedIndices, isDownloaded, podCfg.FavoriteSince)
+		}
 		return SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, podCfg.DownloadPolicy, podCfg.DownloadK, opts.Oldest)
 	}
 	if opts.ForceNewOnly {

@@ -69,6 +69,7 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 		buildServerDownloadSubcommand(opts, action, countVal, keepVal),
 		buildServerPruneSubcommand(opts, action, keepVal),
 		buildServerPolicySubcommand(opts, action),
+		buildServerFavoriteSubcommand(opts, action),
 		buildServerListSubcommand(opts, action),
 		buildServerAddSubcommand(opts, action),
 		buildServerRemoveSubcommand(opts, action),
@@ -111,6 +112,8 @@ func handleServerCommand(config Config, cli CLIOptions) error {
 		return handleServerKeep(config, cli)
 	case "policy":
 		return runPolicyCommand(config, cli)
+	case "favorite":
+		return handleServerFavorite(config, cli)
 	case "list":
 		return handleServerList(config, cli)
 	case "get-info", "get_info":

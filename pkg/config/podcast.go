@@ -22,11 +22,14 @@ const (
 	DownloadPolicyLatest  = "latest"
 	DownloadPolicyLatestK = "latest_k"
 	DownloadPolicyAll     = "all"
+	DownloadPolicyNew     = "new"
 )
 
 type PodcastConfig struct {
 	ID              string                      `json:"id,omitempty"`
 	Priority        int                         `json:"priority"`
+	Favorite        bool                        `json:"favorite,omitempty"`
+	FavoriteSince   *time.Time                  `json:"favorite_since,omitempty"`
 	AdRemoval       string                      `json:"ad_removal"`
 	DownloadPolicy  string                      `json:"download_policy,omitempty"`
 	DownloadK       int                         `json:"download_k,omitempty"`
@@ -35,6 +38,25 @@ type PodcastConfig struct {
 	AutoCleanupDays int                         `json:"auto_cleanup_days,omitempty"`
 	Frequency       *types.PodcastFrequencyInfo `json:"frequency,omitempty"`
 	UpdatedAt       time.Time                   `json:"updated_at,omitempty"`
+}
+
+func (c *PodcastConfig) SetFavorite(fav bool) {
+	c.Favorite = fav
+	if fav {
+		now := time.Now().UTC()
+		if c.FavoriteSince == nil {
+			c.FavoriteSince = &now
+		}
+		autoDl := true
+		c.AutoDownload = &autoDl
+		c.AdRemoval = AdRemovalAll
+		c.DownloadPolicy = DownloadPolicyNew
+	} else {
+		c.FavoriteSince = nil
+		if c.DownloadPolicy == DownloadPolicyNew {
+			c.DownloadPolicy = DownloadPolicyNone
+		}
+	}
 }
 
 func (c *PodcastConfig) IsAutoDownloadEnabled() bool {
@@ -150,6 +172,8 @@ func NormalizeDownloadPolicy(policy string) string {
 		return DownloadPolicyLatestK
 	case "all", "every", "full":
 		return DownloadPolicyAll
+	case "new", "favorite", "fav":
+		return DownloadPolicyNew
 	case "none", "off", "disabled", "no", "manual":
 		return DownloadPolicyNone
 	default:
@@ -164,6 +188,8 @@ func CycleDownloadPolicy(current string) string {
 	case DownloadPolicyLatest:
 		return DownloadPolicyLatestK
 	case DownloadPolicyLatestK:
+		return DownloadPolicyNew
+	case DownloadPolicyNew:
 		return DownloadPolicyAll
 	case DownloadPolicyAll:
 		return DownloadPolicyNone
@@ -181,6 +207,8 @@ func DownloadPolicyLabel(policy string, k int) string {
 		return "Latest episode only (latest)"
 	case DownloadPolicyLatestK:
 		return fmt.Sprintf("Latest %d episodes (latest_k)", k)
+	case DownloadPolicyNew:
+		return "New episodes only (new/favorite)"
 	case DownloadPolicyAll:
 		return "All episodes (all)"
 	default:
@@ -197,6 +225,8 @@ func DownloadPolicyBadge(policy string, k int) string {
 		return "[DL: Latest]"
 	case DownloadPolicyLatestK:
 		return fmt.Sprintf("[DL: Latest %d]", k)
+	case DownloadPolicyNew:
+		return "[DL: New]"
 	case DownloadPolicyAll:
 		return "[DL: All]"
 	default:

@@ -17,6 +17,7 @@ import (
 type PodcastPolicyResult struct {
 	ID              string `json:"id"`
 	Title           string `json:"title"`
+	Favorite        bool   `json:"favorite"`
 	AutoDownload    bool   `json:"auto_download"`
 	DownloadPolicy  string `json:"download_policy"`
 	DownloadK       int    `json:"download_k"`
@@ -258,6 +259,7 @@ func checkHasPolicyUpdates(cli CLIOptions) bool {
 		cli.AutoCleanupStr != "" ||
 		cli.CleanupDays > 0 ||
 		cli.AdRemovalMode != "" ||
+		cli.FavoriteStr != "" ||
 		cli.SetDefaultPolicy
 }
 
@@ -268,6 +270,7 @@ func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 	res := PodcastPolicyResult{
 		ID:              pod.ShortID,
 		Title:           pod.Title,
+		Favorite:        pod.Config.Favorite,
 		AutoDownload:    pod.Config.IsAutoDownloadEnabled(),
 		DownloadPolicy:  pod.Config.DownloadPolicy,
 		DownloadK:       pod.Config.DownloadK,
@@ -293,6 +296,11 @@ func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 func printPodcastPolicyDetails(res PodcastPolicyResult) {
 	fmt.Printf("\nPolicy for %s [%s]:\n", util.Bold(res.Title), util.BoldCyan(res.ID))
 	fmt.Printf("%s\n", strings.Repeat("=", 65))
+	favStr := "No"
+	if res.Favorite {
+		favStr = util.BoldGreen("⭐ Yes")
+	}
+	fmt.Printf("  Favorite:         %s\n", favStr)
 	dlBadge := config.DownloadPolicyBadge(res.DownloadPolicy, res.DownloadK)
 	fmt.Printf("  Auto Download:    %-5v %s\n", res.AutoDownload, dlBadge)
 	retStr := "Disabled"
@@ -320,6 +328,7 @@ func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 	res := PodcastPolicyResult{
 		ID:              pod.ShortID,
 		Title:           pod.Title,
+		Favorite:        pod.Config.Favorite,
 		AutoDownload:    autoDl,
 		DownloadPolicy:  pod.Config.DownloadPolicy,
 		DownloadK:       pod.Config.DownloadK,
@@ -335,12 +344,19 @@ func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 		return nil
 	}
 
-	fmt.Printf("Policy updated for %s [%s]: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
-		util.Bold(pod.Title), util.BoldCyan(pod.ShortID), autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
+	favBadge := ""
+	if pod.Config.Favorite {
+		favBadge = " ⭐ [Favorite]"
+	}
+	fmt.Printf("Policy updated for %s [%s]%s: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
+		util.Bold(pod.Title), util.BoldCyan(pod.ShortID), favBadge, autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
 	return nil
 }
 
 func applyPolicyOptionChanges(cfg *PodcastConfig, cli CLIOptions) {
+	if cli.FavoriteStr != "" {
+		cfg.SetFavorite(parseBoolString(cli.FavoriteStr))
+	}
 	if cli.AutoDownloadStr != "" {
 		cfg.SetAutoDownload(parseBoolString(cli.AutoDownloadStr))
 	}
@@ -414,6 +430,7 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.PolicyAll, "--all", false, "Apply policy to all podcasts in library"),
 			clihelp.Bool(&opts.SetDefaultPolicy, "--set-default", false, "Also update global default configuration for new podcasts"),
+			clihelp.String(&opts.FavoriteStr, "--favorite <bool>", "", "Set as favorite (auto-downloads all new episodes and removes ads)"),
 			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable automatic downloads (true/false)"),
 			clihelp.String(&opts.DownloadPolicy, "--download-policy <mode>", "", "Policy mode ('none', 'latest', 'latest_k', 'all')"),
 			clihelp.Int(&opts.DownloadK, "--download-k <num>", 0, "Number of latest episodes to download"),

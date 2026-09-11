@@ -151,6 +151,7 @@ type PolicyOptions struct {
 	AutoCleanupStr   string
 	CleanupDays      int
 	AdRemovalMode    string
+	FavoriteStr      string
 	PolicyAll        bool
 	SetDefaultPolicy bool
 }
@@ -207,6 +208,7 @@ type CLIOptions struct {
 	Podcast        string
 	Fill           bool
 	DownloadAll    bool
+	FavoriteOff    bool
 	KeepCount      *int
 	CheckNew       bool
 	Oldest         bool
