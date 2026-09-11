@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/backend"
+	"abs/pkg/config"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
 	"fmt"
@@ -61,9 +62,21 @@ func buildServerGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	}
 }
 
-func handleServerList(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+func handleServerList(cfg Config, cli CLIOptions) error {
+	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
+		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+		if storeErr == nil {
+			return renderSubscriptionList(store.List(), cfg.PodcastsDir, cli.Verbose)
+		}
+		return fmt.Errorf("load subscriptions: %w", storeErr)
+	}
+
+	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
 	if err != nil {
+		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+		if storeErr == nil && len(store.List()) > 0 {
+			return renderSubscriptionList(store.List(), cfg.PodcastsDir, cli.Verbose)
+		}
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
 	podcasts, err := b.Podcasts()

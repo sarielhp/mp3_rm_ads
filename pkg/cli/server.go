@@ -70,6 +70,9 @@ func buildServerSubcommands(opts *CLIOptions, action *string, countVal, keepVal 
 		buildServerPruneSubcommand(opts, action, keepVal),
 		buildServerPolicySubcommand(opts, action),
 		buildServerListSubcommand(opts, action),
+		buildServerAddSubcommand(opts, action),
+		buildServerRemoveSubcommand(opts, action),
+		buildServerFeedSubcommand(opts, action),
 		buildServerGetInfoSubcommand(opts, action),
 		buildServerRescanSubcommand(opts, action),
 		buildServerTimelineSubcommand(opts, action),
@@ -95,6 +98,12 @@ func handleServerCommand(config Config, cli CLIOptions) error {
 		return handleServerFeeds(config, cli)
 	case "download":
 		return handleServerDownload(config, cli)
+	case "add":
+		return handleServerAdd(config, cli)
+	case "remove":
+		return handleServerRemove(config, cli)
+	case "feed":
+		return handleServerFeed(config, cli)
 	case "prune", "keep":
 		return handleServerKeep(config, cli)
 	case "policy":

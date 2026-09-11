@@ -3,6 +3,7 @@ package cli
 import (
 	"abs/pkg/adremoval"
 	"abs/pkg/backend"
+	"abs/pkg/config"
 	"abs/pkg/podcast"
 	"fmt"
 	"os"
@@ -61,12 +62,24 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 	}
 }
 
-func handleServerDownload(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+func handleServerDownload(cfg Config, cli CLIOptions) error {
+	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
+		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+		if storeErr == nil {
+			return runSubscriptionDirectDownloads(store, cfg, cli)
+		}
+		return fmt.Errorf("load subscriptions: %w", storeErr)
+	}
+
+	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
 	if err != nil {
+		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+		if storeErr == nil && len(store.List()) > 0 {
+			return runSubscriptionDirectDownloads(store, cfg, cli)
+		}
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
-	return runServerDownloads(b, config, cli)
+	return runServerDownloads(b, cfg, cli)
 }
 
 func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error {

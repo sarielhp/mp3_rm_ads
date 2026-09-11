@@ -290,13 +290,15 @@ type SpeculativeConfig struct {
 }
 
 type Config struct {
-	Instructions     string          `json:"_instructions"`
-	PodcastsDir      string          `json:"podcasts_dir"`
-	ChunkDurationSec int             `json:"chunk_duration_sec"`
-	ActiveProfileID  int             `json:"active_profile_id"`
-	Profiles         []LLMProfile    `json:"profiles"`
-	PostProcessors   []string        `json:"post_processors,omitempty"`
-	TUIColor         *TUIColorConfig `json:"tui_color,omitempty"`
+	Instructions      string          `json:"_instructions"`
+	PodcastsDir       string          `json:"podcasts_dir"`
+	ServerBaseURL     string          `json:"server_base_url,omitempty"`
+	SubscriptionsFile string          `json:"subscriptions_file,omitempty"`
+	ChunkDurationSec  int             `json:"chunk_duration_sec"`
+	ActiveProfileID   int             `json:"active_profile_id"`
+	Profiles          []LLMProfile    `json:"profiles"`
+	PostProcessors    []string        `json:"post_processors,omitempty"`
+	TUIColor          *TUIColorConfig `json:"tui_color,omitempty"`
 
 	WhisperConfig
 	BackendConfig

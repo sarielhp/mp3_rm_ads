@@ -1,6 +1,7 @@
 package adremoval
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"sort"
@@ -9,6 +10,7 @@ import (
 	"unicode"
 
 	"abs/pkg/backend"
+	"abs/pkg/config"
 	"abs/pkg/format"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
@@ -384,9 +386,34 @@ func findMatchingEpisodeInItem(podDir string, fe backend.FeedEpisode, item *back
 	return "", false
 }
 
+func tryDirectDownloadEpisode(podDir string, fe backend.FeedEpisode, quiet bool) (string, bool) {
+	encURL := fe.EnclosureURL
+	if fe.Enclosure != nil && fe.Enclosure.URL != "" {
+		encURL = fe.Enclosure.URL
+	}
+	if encURL == "" {
+		return "", false
+	}
+	safeTitle := podcast.SanitizeTitle(fe.Title)
+	destPath := filepath.Join(podDir, safeTitle+".mp3")
+	d := podcast.NewDownloader()
+	if err := d.DownloadEpisode(context.Background(), encURL, destPath, quiet); err == nil {
+		return destPath, true
+	}
+	return "", false
+}
+
 func downloadSingleFeedEpisode(b backend.Backend, item *backend.Podcast, podDir string, fe backend.FeedEpisode, quiet bool) (string, error) {
 	if !quiet {
 		fmt.Printf("Downloading latest episode: %s\n", fe.Title)
+	}
+
+	if destPath, ok := tryDirectDownloadEpisode(podDir, fe, quiet); ok {
+		return destPath, nil
+	}
+
+	if b == nil {
+		return "", fmt.Errorf("direct download failed and no backend available")
 	}
 
 	itemID := resolveDownloadPodcastID(item, podDir)
@@ -505,7 +532,23 @@ func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts types.Proc
 		return fmt.Errorf("episode did not complete ad removal; retained in queue: %s", targetAudioPath)
 	}
 	_, err = pipeline.RemoveQueuedAudio(podDir, targetAudioPath)
+	refreshPodcastFeedXML(podDir, cfg)
 	return err
+}
+
+func refreshPodcastFeedXML(podDir string, cfg types.Config) {
+	store, _ := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
+	var sub podcast.Subscription
+	if store != nil {
+		if s := store.Get(filepath.Base(podDir)); s != nil {
+			sub = *s
+		}
+	}
+	if sub.Title == "" {
+		sub.Title = filepath.Base(podDir)
+		sub.Folder = filepath.Base(podDir)
+	}
+	_ = podcast.WritePodcastFeedXML(podDir, sub, cfg.ServerBaseURL, nil)
 }
 
 func queueItemFilename(podDir, audioPath string) string {

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"abs/pkg/types"
@@ -169,6 +170,12 @@ func applyBackendEnv(cfg *types.Config) {
 	if v := os.Getenv("PODCASTS_DIR"); v != "" {
 		cfg.PodcastsDir = v
 	}
+	if v := os.Getenv("SERVER_BASE_URL"); v != "" {
+		cfg.ServerBaseURL = v
+	}
+	if v := os.Getenv("SUBSCRIPTIONS_FILE"); v != "" {
+		cfg.SubscriptionsFile = v
+	}
 }
 
 func applyWhisperEnv(cfg *types.Config) {
@@ -207,4 +214,11 @@ func applyRemoteEnv(cfg *types.Config) {
 	if v := os.Getenv("DEFAULT_AD_REMOVAL"); v != "" {
 		cfg.DefaultAdRemoval = NormalizeAdRemovalMode(v)
 	}
+}
+
+func SubscriptionsFilePath(cfg *types.Config) string {
+	if cfg != nil && cfg.SubscriptionsFile != "" {
+		return cfg.SubscriptionsFile
+	}
+	return filepath.Join(ConfigDir(), "podcasts.json")
 }

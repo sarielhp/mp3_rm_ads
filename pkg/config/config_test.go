@@ -6,6 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"abs/pkg/types"
 )
 
 func TestDefaultConfigNoUsername(t *testing.T) {
@@ -74,5 +76,17 @@ func TestPodcastConfigCycle(t *testing.T) {
 	mode = CycleAdRemovalMode(mode)
 	if mode != AdRemovalNone {
 		t.Errorf("expected AdRemovalNone, got %s", mode)
+	}
+}
+
+func TestSubscriptionsFilePath(t *testing.T) {
+	defaultPath := SubscriptionsFilePath(nil)
+	if !strings.HasSuffix(defaultPath, "podcasts.json") {
+		t.Errorf("expected default path to end in podcasts.json, got %s", defaultPath)
+	}
+
+	customCfg := &types.Config{SubscriptionsFile: "/tmp/my_subs.json"}
+	if got := SubscriptionsFilePath(customCfg); got != "/tmp/my_subs.json" {
+		t.Errorf("expected /tmp/my_subs.json, got %s", got)
 	}
 }
