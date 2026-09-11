@@ -139,11 +139,54 @@ func DetectAdsLLM(transcriptText string, profile types.LLMProfile, apiKey string
 	return DetectAdsLLMTimeout(transcriptText, profile, apiKey, DefaultLLMTimeout)
 }
 
+// EmptyResultConfirmations is how many extra agreeing answers are required
+// before "no ads" is believed. An empty answer is the one result that is
+// cheap for the model to produce and expensive to get wrong: it is written
+// to the cuts file, marks the episode clean, and makes every later run skip
+// it. Sampling the same model repeatedly shows it returns an empty array on
+// roughly one call in eight for an episode that plainly contains an ad, so a
+// single empty answer is not evidence of an ad-free episode.
+var EmptyResultConfirmations = 2
+
+// DetectAdsLLMOnce asks exactly once and returns whatever comes back.
+// Callers that only need to know the endpoint answers correctly — the
+// profile probe, for one — use this, so a legitimately empty answer does not
+// cost three requests.
+func DetectAdsLLMOnce(transcriptText string, profile types.LLMProfile, apiKey string, timeout time.Duration) ([]types.AdSegment, error) {
+	if profile.URL == "" {
+		return nil, nil
+	}
+	return askForAdSegments(profile, adUserPrompt(transcriptText), timeout, apiKey)
+}
+
+func adUserPrompt(transcriptText string) string {
+	return fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
+}
+
 func DetectAdsLLMTimeout(transcriptText string, profile types.LLMProfile, apiKey string, timeout time.Duration) ([]types.AdSegment, error) {
 	if profile.URL == "" {
 		return nil, nil
 	}
-	userPrompt := fmt.Sprintf("Here is the podcast transcript with timestamps in seconds:\n\n%s", transcriptText)
+	userPrompt := adUserPrompt(transcriptText)
+	segs, err := askForAdSegments(profile, userPrompt, timeout, apiKey)
+	if err != nil || len(segs) > 0 {
+		return segs, err
+	}
+	// Empty answer: re-ask before accepting it. Any confirmation run that
+	// does find ads wins, because a miss is what an empty answer looks like.
+	for i := 0; i < EmptyResultConfirmations; i++ {
+		retry, retryErr := askForAdSegments(profile, userPrompt, timeout, apiKey)
+		if retryErr != nil {
+			return segs, nil
+		}
+		if len(retry) > 0 {
+			return retry, nil
+		}
+	}
+	return segs, nil
+}
+
+func askForAdSegments(profile types.LLMProfile, userPrompt string, timeout time.Duration, apiKey string) ([]types.AdSegment, error) {
 	content, err := CallLLMChat(profile, SystemPrompt, userPrompt, 0, timeout, apiKey)
 	if err != nil {
 		return nil, fmt.Errorf("LLM ad detection failed: %w", err)

@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"abs/pkg/detect"
 )
 
 func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {
@@ -43,8 +45,10 @@ func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {
 			t.Fatal("runtime credential was written into configuration")
 		}
 	}
-	if requests != 4 {
-		t.Fatalf("requests=%d", requests)
+	// The stub always answers "[]", so each query also pays for the
+	// empty-answer confirmations before that verdict is believed.
+	if want := 4 * (1 + detect.EmptyResultConfirmations); requests != want {
+		t.Fatalf("requests=%d, want %d", requests, want)
 	}
 	enabled = false
 	if profile := selectProfile(cfg, "3"); profile.APIKey != "" {

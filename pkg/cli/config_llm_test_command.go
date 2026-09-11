@@ -59,7 +59,9 @@ func probeLLMProfile(cfg Config, profile LLMProfile) error {
 		return err
 	}
 	const sample = "[0.0s -> 10.0s] Welcome to our discussion of astronomy.\n[10.0s -> 20.0s] This episode is sponsored by Example Coffee. Visit example.com and use code PODCAST for ten percent off.\n[20.0s -> 30.0s] Back to our discussion of distant stars."
-	ads, err := detect.DetectAdsLLMTimeout(sample, profile, key, 15*time.Second)
+	// A probe only needs one answer; an empty one here means the endpoint
+	// works, not that an ad was missed, so it must not trigger confirmations.
+	ads, err := detect.DetectAdsLLMOnce(sample, profile, key, 15*time.Second)
 	if err != nil {
 		message := err.Error()
 		if key != "" {
