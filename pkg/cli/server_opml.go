@@ -193,7 +193,7 @@ func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
 		if targetFile == "" {
 			return fmt.Errorf("missing required <file> argument for 'abs server opml export <file>'")
 		}
-		data, err := store.ExportToOPML()
+		data, err := store.ExportToOPML(cfg.ServerBaseURL)
 		if err != nil {
 			return fmt.Errorf("OPML export failed: %w", err)
 		}

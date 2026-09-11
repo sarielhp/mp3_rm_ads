@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -194,14 +195,23 @@ func (s *SubscriptionStore) ImportFromOPML(data []byte) (int, error) {
 	return count, nil
 }
 
-func (s *SubscriptionStore) ExportToOPML() ([]byte, error) {
+func (s *SubscriptionStore) ExportToOPML(serverBaseURL string) ([]byte, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 	feeds := make([]backend.OPMLFeed, 0, len(s.items))
+	serverBaseURL = strings.TrimRight(strings.TrimSpace(serverBaseURL), "/")
 	for _, it := range s.items {
+		u := it.FeedURL
+		if serverBaseURL != "" {
+			folder := it.Folder
+			if folder == "" {
+				folder = SanitizeTitle(it.Title)
+			}
+			u = fmt.Sprintf("%s/%s/feed.xml", serverBaseURL, url.PathEscape(folder))
+		}
 		feeds = append(feeds, backend.OPMLFeed{
 			Title: it.Title,
-			URL:   it.FeedURL,
+			URL:   u,
 		})
 	}
 	return backend.BuildOPMLXMLWithTitle(feeds, "ABS Podcast Subscriptions", "ABS Podcasts")
