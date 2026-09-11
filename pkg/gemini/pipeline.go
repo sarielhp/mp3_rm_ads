@@ -147,13 +147,13 @@ func ProcessSingleGeminiChunk(ctx context.Context, ch types.GeminiChunkInfo, cfg
 	if apiKey != "" {
 		fileURI, fileName, err := UploadAudioToGeminiStudio(ctx, apiKey, ch.FilePath)
 		if err != nil {
-			return nil, fmt.Errorf("chunk %d studio upload failed: %w", ch.Index, err)
+			return nil, fmt.Errorf("chunk %d studio upload failed:\n   %w", ch.Index, err)
 		}
 		defer DeleteGeminiStudioFile(ctx, apiKey, fileName)
 
 		payload, err := CallGeminiStudioProcessor(ctx, apiKey, cfg.GetGeminiModel(), fileURI)
 		if err != nil {
-			return nil, fmt.Errorf("chunk %d studio processing failed: %w", ch.Index, err)
+			return nil, fmt.Errorf("chunk %d studio processing failed:\n   %w", ch.Index, err)
 		}
 		return &types.GeminiChunkResult{
 			Index:    ch.Index,
@@ -168,13 +168,13 @@ func ProcessSingleGeminiChunk(ctx context.Context, ch types.GeminiChunkInfo, cfg
 
 	gcsURI, err := UploadAudioToGCS(ctx, bucketName, ch.FilePath)
 	if err != nil {
-		return nil, fmt.Errorf("chunk %d upload failed: %w", ch.Index, err)
+		return nil, fmt.Errorf("chunk %d upload failed:\n   %w", ch.Index, err)
 	}
 	defer DeleteGCSObject(ctx, bucketName, gcsURI)
 
 	payload, err := CallGeminiAudioProcessor(ctx, projectID, location, gcsURI)
 	if err != nil {
-		return nil, fmt.Errorf("chunk %d processing failed: %w", ch.Index, err)
+		return nil, fmt.Errorf("chunk %d processing failed:\n   %w", ch.Index, err)
 	}
 
 	return &types.GeminiChunkResult{

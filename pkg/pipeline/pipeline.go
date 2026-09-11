@@ -332,7 +332,11 @@ func handleGeminiWhisperFallback(ctx context.Context, sourceAudioFile string, cf
 		return td, types.WhisperProfile{}, cfg, nil
 	}
 	if !opts.Quiet {
-		fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v). Falling back to Whisper...", err)) + "\n")
+		fmt.Printf("\n%s\n   %s\n   ➔ %s\n\n",
+			util.BoldYellow("Transcription: Gemini failed:"),
+			util.BoldYellow(strings.ReplaceAll(err.Error(), "\n", "\n   ")),
+			util.Bold("Falling back to Whisper..."),
+		)
 	}
 	fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
 	fallbackWp := config.GetActiveWhisperProfile(&fallbackCfg)

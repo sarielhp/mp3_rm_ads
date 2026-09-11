@@ -51,6 +51,11 @@
   "gemini_model": "gemini-flash-latest",
   "gemini_api_key_enabled": true,
   "openrouter_api_key_enabled": false,
+  "speculative_transcription": false,
+  "competing_services": [
+    "gemini",
+    "whisper"
+  ],
   "audiobookshelf_url": "http://127.0.0.1:8080",
   "audiobookshelf_user": "admin",
   "audiobookshelf_pass": "password",

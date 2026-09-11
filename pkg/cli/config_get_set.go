@@ -30,6 +30,24 @@ func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {
 	case "gemini-model":
 		cfg.GeminiModel = val
 		return true, nil
+	case "speculative-transcription", "speculative-competition":
+		b, err := strconv.ParseBool(val)
+		if err != nil {
+			return true, fmt.Errorf("invalid boolean value for %s: %s", key, val)
+		}
+		cfg.SpeculativeTranscription = &b
+		return true, nil
+	case "competing-services", "speculative-services":
+		parts := strings.Split(val, ",")
+		var services []string
+		for _, p := range parts {
+			trimmed := strings.TrimSpace(p)
+			if trimmed != "" {
+				services = append(services, trimmed)
+			}
+		}
+		cfg.CompetingServices = services
+		return true, nil
 	}
 	return false, nil
 }
@@ -190,6 +208,10 @@ func handleConfigGet(cfg Config, key string) error {
 		fmt.Println(config.ResolveGeminiAPIKey(&cfg))
 	case "gemini-model":
 		fmt.Println(cfg.GetGeminiModel())
+	case "speculative-transcription", "speculative-competition":
+		fmt.Println(cfg.IsSpeculativeTranscriptionEnabled())
+	case "competing-services", "speculative-services":
+		fmt.Println(strings.Join(cfg.GetCompetingServices(), ", "))
 	default:
 		return fmt.Errorf("unknown configuration key %q; run 'abs config show' to list keys", key)
 	}
@@ -265,4 +287,6 @@ func printConfig(cfg Config) {
 	}
 	fmt.Printf("  gemini_api_key_enabled:   %v\n", cfg.IsGeminiAPIKeyEnabled())
 	fmt.Printf("  openrouter_api_key_enabled: %v\n", cfg.IsOpenRouterAPIKeyEnabled())
+	fmt.Printf("  speculative_transcription: %v\n", cfg.IsSpeculativeTranscriptionEnabled())
+	fmt.Printf("  competing_services:       %s\n", strings.Join(cfg.GetCompetingServices(), ", "))
 }

@@ -34,15 +34,20 @@ func TestConfigFlags(t *testing.T) {
 	if cfg.IsOpenRouterAPIKeyEnabled() {
 		t.Error("expected default OpenRouterAPIKeyEnabled to be false")
 	}
-	if !cfg.IsSpeculativeTranscriptionEnabled() {
-		t.Error("expected default SpeculativeTranscription to be true")
+	if cfg.IsSpeculativeTranscriptionEnabled() {
+		t.Error("expected default SpeculativeTranscription to be false")
+	}
+	defaultSvcs := cfg.GetCompetingServices()
+	if len(defaultSvcs) != 2 || defaultSvcs[0] != "gemini" || defaultSvcs[1] != "whisper" {
+		t.Errorf("unexpected default competing services: %v", defaultSvcs)
 	}
 
 	f := false
 	tr := true
 	cfg.GeminiAPIKeyEnabled = &f
 	cfg.OpenRouterAPIKeyEnabled = &tr
-	cfg.SpeculativeTranscription = &f
+	cfg.SpeculativeTranscription = &tr
+	cfg.CompetingServices = []string{"local", "docker"}
 
 	if cfg.IsGeminiAPIKeyEnabled() {
 		t.Error("expected GeminiAPIKeyEnabled to be false")
@@ -50,7 +55,16 @@ func TestConfigFlags(t *testing.T) {
 	if !cfg.IsOpenRouterAPIKeyEnabled() {
 		t.Error("expected OpenRouterAPIKeyEnabled to be true")
 	}
+	if !cfg.IsSpeculativeTranscriptionEnabled() {
+		t.Error("expected SpeculativeTranscription to be true")
+	}
+	svcs := cfg.GetCompetingServices()
+	if len(svcs) != 2 || svcs[0] != "local" || svcs[1] != "docker" {
+		t.Errorf("unexpected competing services: %v", svcs)
+	}
+
+	cfg.SpeculativeTranscription = &f
 	if cfg.IsSpeculativeTranscriptionEnabled() {
-		t.Error("expected SpeculativeTranscription to be false")
+		t.Error("expected SpeculativeTranscription to be false when explicitly disabled")
 	}
 }

@@ -3,6 +3,8 @@ package pipeline
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
 	"abs/pkg/config"
@@ -12,15 +14,18 @@ import (
 	"abs/pkg/util"
 )
 
-type GeminiRaceResult struct {
-	TD  *types.TranscriptionData
-	Ads []types.AdSegment
-	Err error
+type SpeculativeRacer struct {
+	Name     string
+	IsGemini bool
+	Profile  types.WhisperProfile
 }
 
-type LocalRaceResult struct {
-	TD  *types.TranscriptionData
-	Err error
+type SpeculativeCandidateResult struct {
+	ServiceName string
+	TD          *types.TranscriptionData
+	Ads         []types.AdSegment
+	IsGemini    bool
+	Err         error
 }
 
 func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp types.WhisperProfile, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *types.TranscriptionData, err error) {
@@ -46,6 +51,82 @@ func RunLocalCandidateTranscription(ctx context.Context, audioPath string, wp ty
 	)
 }
 
+func ResolveSpeculativeRacers(cfg types.Config, opts types.ProcOptions, lang string) []SpeculativeRacer {
+	if !cfg.IsSpeculativeTranscriptionEnabled() {
+		return nil
+	}
+	services := cfg.GetCompetingServices()
+	var racers []SpeculativeRacer
+	seen := make(map[string]bool)
+
+	for _, raw := range services {
+		name := strings.ToLower(strings.TrimSpace(raw))
+		switch name {
+		case "gemini", "google":
+			if !seen["gemini"] && canIncludeGeminiRacer(cfg, opts) {
+				seen["gemini"] = true
+				racers = append(racers, SpeculativeRacer{
+					Name:     "Gemini",
+					IsGemini: true,
+				})
+			}
+		case "whisper", "default":
+			wp := transcribe.ResolveWhisperProfileForLanguage(cfg, lang)
+			key := fmt.Sprintf("whisper-%d-%s", wp.ID, wp.Name)
+			if !seen[key] && transcribe.WhisperProfileUsable(wp) {
+				seen[key] = true
+				racers = append(racers, SpeculativeRacer{
+					Name:    wp.Name,
+					Profile: wp,
+				})
+			}
+		default:
+			if wp, ok := matchWhisperProfileForRacer(cfg, name, lang); ok {
+				key := fmt.Sprintf("whisper-%d-%s", wp.ID, wp.Name)
+				if !seen[key] {
+					seen[key] = true
+					racers = append(racers, SpeculativeRacer{
+						Name:    wp.Name,
+						Profile: wp,
+					})
+				}
+			}
+		}
+	}
+	return racers
+}
+
+func canIncludeGeminiRacer(cfg types.Config, opts types.ProcOptions) bool {
+	if !cfg.IsGeminiAPIKeyEnabled() || config.ResolveGeminiAPIKey(&cfg) == "" {
+		return false
+	}
+	if opts.WhisperEngine != "" && opts.WhisperEngine != string(types.WhisperEngineGemini) {
+		return false
+	}
+	if isOpen, _, _ := gemini.IsCircuitBreakerOpen(); isOpen {
+		return false
+	}
+	return true
+}
+
+func matchWhisperProfileForRacer(cfg types.Config, target, lang string) (types.WhisperProfile, bool) {
+	targetLower := strings.ToLower(strings.TrimSpace(target))
+	for _, p := range cfg.WhisperProfiles {
+		wp := config.NormalizeWhisperProfile(p)
+		if !transcribe.WhisperProfileSupportsLanguage(wp, lang) || !transcribe.WhisperProfileUsable(wp) {
+			continue
+		}
+		if strconv.Itoa(wp.ID) == targetLower ||
+			strings.EqualFold(string(wp.Engine), targetLower) ||
+			strings.EqualFold(wp.Name, target) ||
+			strings.Contains(strings.ToLower(wp.Name), targetLower) ||
+			(wp.CliBinary != "" && strings.EqualFold(wp.CliBinary, targetLower)) {
+			return wp, true
+		}
+	}
+	return types.WhisperProfile{}, false
+}
+
 func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string, isHebrew bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
 	transcribe.AnnounceStart(totalDuration, opts.Quiet)
 	var (
@@ -62,87 +143,85 @@ func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg
 	if isHebrew && whisperLang == "" {
 		whisperLang = "he"
 	}
-	localWp := transcribe.ResolveWhisperProfileForLanguage(cfg, transcribe.WhisperTargetLanguage(cfg, isHebrew, whisperLang))
-	if isHebrew && !opts.Quiet {
-		fmt.Printf("   Hebrew detected: routed local Whisper to %s (%s)\n", localWp.Name, config.WhisperEngineBadge(localWp.Engine))
+	lang := transcribe.WhisperTargetLanguage(cfg, isHebrew, whisperLang)
+	racers := ResolveSpeculativeRacers(cfg, opts, lang)
+	if len(racers) < 2 {
+		return nil, nil, false, fmt.Errorf("insufficient competing services for speculative race (found %d)", len(racers))
 	}
 
-	geminiCh := make(chan GeminiRaceResult, 1)
-	localCh := make(chan LocalRaceResult, 1)
+	if !opts.Quiet {
+		racerNames := make([]string, len(racers))
+		for i, r := range racers {
+			racerNames[i] = r.Name
+		}
+		fmt.Printf("   Speculative competition: racing %s\n", strings.Join(racerNames, " vs "))
+	}
 
+	resultCh := make(chan SpeculativeCandidateResult, len(racers))
 	chunkDur := gemini.DefaultGeminiChunkSec
 	if cfg.ChunkDurationSec > 0 {
 		chunkDur = float64(cfg.ChunkDurationSec)
 	}
 
-	go func() {
-		td, ads, err := gemini.ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDur)
-		transcribe.StampBackend(td, types.WhisperEngineGemini, cfg.GetGeminiModel())
-		geminiCh <- GeminiRaceResult{TD: td, Ads: ads, Err: err}
-	}()
+	for _, racer := range racers {
+		if racer.IsGemini {
+			go func() {
+				td, ads, err := gemini.ProcessWithGeminiConfig(ctx, audioPath, cfg, chunkDur)
+				if err == nil && td != nil {
+					transcribe.StampBackend(td, types.WhisperEngineGemini, cfg.GetGeminiModel())
+				}
+				resultCh <- SpeculativeCandidateResult{
+					ServiceName: "Gemini",
+					TD:          td,
+					Ads:         ads,
+					IsGemini:    true,
+					Err:         err,
+				}
+			}()
+		} else {
+			go func(r SpeculativeRacer) {
+				td, err := RunLocalCandidateTranscription(ctx, audioPath, r.Profile, cfg, opts, totalDuration, speedFactor, whisperPrompt, whisperLang, dockerContainer)
+				resultCh <- SpeculativeCandidateResult{
+					ServiceName: r.Name,
+					TD:          td,
+					IsGemini:    false,
+					Err:         err,
+				}
+			}(racer)
+		}
+	}
 
-	go func() {
-		td, err := RunLocalCandidateTranscription(ctx, audioPath, localWp, cfg, opts, totalDuration, speedFactor, whisperPrompt, whisperLang, dockerContainer)
-		localCh <- LocalRaceResult{TD: td, Err: err}
-	}()
-
-	return AwaitRaceResults(ctx, cancel, geminiCh, localCh, localWp, opts.Quiet)
+	return AwaitRaceResults(ctx, cancel, resultCh, len(racers), opts.Quiet)
 }
 
-func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <-chan GeminiRaceResult, localCh <-chan LocalRaceResult, localWp types.WhisperProfile, quiet bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
-	var geminiRes *GeminiRaceResult
-	var localRes *LocalRaceResult
+func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, resultCh <-chan SpeculativeCandidateResult, totalRacers int, quiet bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
+	remaining := totalRacers
+	var errors []string
 
-	for geminiRes == nil || localRes == nil {
+	for remaining > 0 {
 		select {
-		case gr := <-geminiCh:
-			geminiRes = &gr
-			if gr.Err == nil {
+		case res := <-resultCh:
+			if res.Err == nil {
 				cancel()
 				if !quiet {
-					fmt.Println("\n" + util.BoldGreen("Transcription complete: using Gemini result (including ad detection)."))
+					fmt.Println("\n" + util.BoldGreen(fmt.Sprintf("Transcription complete: using %s result.", res.ServiceName)))
 				}
-				return gr.TD, gr.Ads, true, nil
+				return res.TD, res.Ads, res.IsGemini, nil
 			}
+			remaining--
+			errors = append(errors, fmt.Sprintf("%s:\n   %v", res.ServiceName, res.Err))
 			if !quiet {
-				fmt.Printf("\n%s\n", util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v)", gr.Err)))
-				target := localWp.URL
-				if target == "" {
-					target = localWp.Name
+				fmt.Printf("\n%s\n   %s\n",
+					util.BoldYellow(fmt.Sprintf("Transcription: %s failed:", res.ServiceName)),
+					util.BoldYellow(strings.ReplaceAll(res.Err.Error(), "\n", "\n   ")),
+				)
+				if remaining > 0 {
+					fmt.Printf("   ➔ %s\n\n", util.Bold("Continuing with remaining services..."))
 				}
-				if target == "" {
-					target = "local service"
-				}
-				fmt.Printf("   ➔ %s\n\n", util.Bold(fmt.Sprintf("Continuing with running Whisper service (%s: %s)...", localWp.Name, target)))
-			}
-			if localRes != nil {
-				if localRes.Err == nil {
-					return localRes.TD, nil, false, nil
-				}
-				return nil, nil, false, fmt.Errorf("both Gemini and local Whisper failed: gemini=%v, local=%v", gr.Err, localRes.Err)
-			}
-		case lr := <-localCh:
-			localRes = &lr
-			if lr.Err == nil {
-				cancel()
-				if !quiet {
-					fmt.Println("\n" + util.BoldGreen("Transcription complete: using Whisper result."))
-				}
-				return lr.TD, nil, false, nil
-			}
-			if !quiet {
-				fmt.Printf("\n%s\n", util.BoldYellow(fmt.Sprintf("Transcription: Whisper failed (%v)", lr.Err)))
-				fmt.Printf("   ➔ %s\n\n", util.Bold("Continuing with running Gemini service..."))
-			}
-			if geminiRes != nil {
-				if geminiRes.Err == nil {
-					return geminiRes.TD, geminiRes.Ads, true, nil
-				}
-				return nil, nil, false, fmt.Errorf("both local Whisper and Gemini failed: local=%v, gemini=%v", lr.Err, geminiRes.Err)
 			}
 		case <-ctx.Done():
 			return nil, nil, false, ctx.Err()
 		}
 	}
-	return nil, nil, false, fmt.Errorf("speculative transcription race finished with no winner")
+	return nil, nil, false, fmt.Errorf("all competing services failed:\n   %s", strings.Join(errors, "\n   "))
 }

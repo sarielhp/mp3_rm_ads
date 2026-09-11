@@ -99,18 +99,18 @@ func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile strin
 }
 
 func canRunSpeculativeRace(cfg types.Config, opts types.ProcOptions) bool {
-	if !cfg.IsSpeculativeTranscriptionEnabled() {
+	if !cfg.IsSpeculativeTranscriptionEnabled() || opts.WhisperEngine != "" {
 		return false
 	}
-	if !cfg.IsGeminiAPIKeyEnabled() || config.ResolveGeminiAPIKey(&cfg) == "" {
-		return false
-	}
-	if opts.WhisperEngine != "" && opts.WhisperEngine != string(types.WhisperEngineGemini) {
-		return false
-	}
-	if isOpen, until, reason := gemini.IsCircuitBreakerOpen(); isOpen {
-		if !opts.Quiet {
-			fmt.Printf("   %s\n", util.BoldYellow(fmt.Sprintf("Gemini in cooldown until %s (%s); skipping speculative race and using Whisper directly.", until.Format("15:04:05"), reason)))
+	racers := pipeline.ResolveSpeculativeRacers(cfg, opts, cfg.WhisperLanguage)
+	if len(racers) < 2 {
+		if isOpen, until, reason := gemini.IsCircuitBreakerOpen(); isOpen && !opts.Quiet {
+			for _, s := range cfg.GetCompetingServices() {
+				if strings.EqualFold(s, "gemini") || strings.EqualFold(s, "google") {
+					fmt.Printf("   %s\n", util.BoldYellow(fmt.Sprintf("Gemini in cooldown until %s (%s); skipping speculative race and using direct transcription.", until.Format("15:04:05"), reason)))
+					break
+				}
+			}
 		}
 		return false
 	}

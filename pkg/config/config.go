@@ -49,6 +49,10 @@ func DefaultConfig() types.Config {
 			GeminiAPIKeyEnabled:     &defaultKeyEnabled,
 			OpenRouterAPIKeyEnabled: &defaultKeyDisabled,
 		},
+		SpeculativeConfig: types.SpeculativeConfig{
+			SpeculativeTranscription: &defaultKeyDisabled,
+			CompetingServices:        []string{"gemini", "whisper"},
+		},
 	}
 }
 

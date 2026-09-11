@@ -273,14 +273,20 @@ type PolicyConfig struct {
 }
 
 type GeminiConfig struct {
-	GeminiProjectID          string `json:"gemini_project_id,omitempty"`
-	GeminiStagingBucket      string `json:"gemini_staging_bucket,omitempty"`
-	GeminiLocation           string `json:"gemini_location,omitempty"`
-	GeminiAPIKey             string `json:"gemini_api_key,omitempty"`
-	GeminiModel              string `json:"gemini_model,omitempty"`
-	GeminiAPIKeyEnabled      *bool  `json:"gemini_api_key_enabled,omitempty"`
-	OpenRouterAPIKeyEnabled  *bool  `json:"openrouter_api_key_enabled,omitempty"`
-	SpeculativeTranscription *bool  `json:"speculative_transcription,omitempty"`
+	GeminiProjectID         string `json:"gemini_project_id,omitempty"`
+	GeminiStagingBucket     string `json:"gemini_staging_bucket,omitempty"`
+	GeminiLocation          string `json:"gemini_location,omitempty"`
+	GeminiAPIKey            string `json:"gemini_api_key,omitempty"`
+	GeminiModel             string `json:"gemini_model,omitempty"`
+	GeminiAPIKeyEnabled     *bool  `json:"gemini_api_key_enabled,omitempty"`
+	OpenRouterAPIKeyEnabled *bool  `json:"openrouter_api_key_enabled,omitempty"`
+}
+
+type SpeculativeConfig struct {
+	SpeculativeTranscription *bool    `json:"speculative_transcription,omitempty"`
+	SpeculativeCompetition   *bool    `json:"speculative_competition,omitempty"`
+	SpeculativeServices      []string `json:"speculative_services,omitempty"`
+	CompetingServices        []string `json:"competing_services,omitempty"`
 }
 
 type Config struct {
@@ -297,6 +303,7 @@ type Config struct {
 	RemoteConfig
 	PolicyConfig
 	GeminiConfig
+	SpeculativeConfig
 }
 
 func (c *Config) IsGeminiAPIKeyEnabled() bool {
@@ -314,10 +321,29 @@ func (c *Config) IsOpenRouterAPIKeyEnabled() bool {
 }
 
 func (c *Config) IsSpeculativeTranscriptionEnabled() bool {
-	if c != nil && c.SpeculativeTranscription != nil {
+	if c == nil {
+		return false
+	}
+	if c.SpeculativeCompetition != nil {
+		return *c.SpeculativeCompetition
+	}
+	if c.SpeculativeTranscription != nil {
 		return *c.SpeculativeTranscription
 	}
-	return true
+	return false
+}
+
+func (c *Config) GetCompetingServices() []string {
+	if c == nil {
+		return []string{"gemini", "whisper"}
+	}
+	if len(c.CompetingServices) > 0 {
+		return c.CompetingServices
+	}
+	if len(c.SpeculativeServices) > 0 {
+		return c.SpeculativeServices
+	}
+	return []string{"gemini", "whisper"}
 }
 
 func (c *Config) GetGeminiModel() string {
