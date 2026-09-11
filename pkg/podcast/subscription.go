@@ -24,6 +24,7 @@ type Subscription struct {
 	DownloadPolicy string `json:"download_policy,omitempty"`
 	DownloadK      int    `json:"download_k,omitempty"`
 	AdRemoval      string `json:"ad_removal,omitempty"`
+	ImageURL       string `json:"image_url,omitempty"`
 	CreatedAt      int64  `json:"created_at,omitempty"`
 }
 
@@ -148,6 +149,9 @@ func (s *SubscriptionStore) Add(sub Subscription) error {
 
 	for i, existing := range s.items {
 		if existing.FeedURL == sub.FeedURL || existing.ID == sub.ID {
+			if sub.ImageURL == "" && existing.ImageURL != "" {
+				sub.ImageURL = existing.ImageURL
+			}
 			s.items[i] = sub
 			return nil
 		}
@@ -180,8 +184,9 @@ func (s *SubscriptionStore) ImportFromOPML(data []byte) (int, error) {
 	count := 0
 	for _, f := range feeds {
 		sub := Subscription{
-			Title:   f.Title,
-			FeedURL: f.URL,
+			Title:    f.Title,
+			FeedURL:  f.URL,
+			ImageURL: f.ImageURL,
 		}
 		if err := s.Add(sub); err == nil {
 			count++
@@ -210,8 +215,9 @@ func (s *SubscriptionStore) ExportToOPML(serverBaseURL string) ([]byte, error) {
 			u = fmt.Sprintf("%s/%s/feed.xml", serverBaseURL, url.PathEscape(folder))
 		}
 		feeds = append(feeds, backend.OPMLFeed{
-			Title: it.Title,
-			URL:   u,
+			Title:    it.Title,
+			URL:      u,
+			ImageURL: it.ImageURL,
 		})
 	}
 	return backend.BuildOPMLXMLWithTitle(feeds, "ABS Podcast Subscriptions", "ABS Podcasts")
@@ -243,10 +249,11 @@ func (s *SubscriptionStore) ImportFromBackend(reader backend.PodcastReader) (int
 			folder = SanitizeTitle(title)
 		}
 		sub := Subscription{
-			ID:      p.ID,
-			Title:   title,
-			FeedURL: feedURL,
-			Folder:  folder,
+			ID:       p.ID,
+			Title:    title,
+			FeedURL:  feedURL,
+			Folder:   folder,
+			ImageURL: p.Media.Metadata.ImageURL,
 		}
 		if err := s.Add(sub); err == nil {
 			count++

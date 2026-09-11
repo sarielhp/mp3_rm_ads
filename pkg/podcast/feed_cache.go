@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ type FeedCacheEntry struct {
 	LastModified string                `json:"last_modified,omitempty"`
 	LastChecked  time.Time             `json:"last_checked"`
 	LatestGUID   string                `json:"latest_guid,omitempty"`
+	ImageURL     string                `json:"image_url,omitempty"`
 	Episodes     []backend.FeedEpisode `json:"episodes,omitempty"`
 
 	// Channel-level freshness markers, used for feeds that serve no usable
@@ -231,10 +233,23 @@ type rssXML struct {
 }
 
 type channelXML struct {
-	Title         string    `xml:"title"`
-	LastBuildDate string    `xml:"lastBuildDate"`
-	PubDate       string    `xml:"pubDate"`
-	Items         []itemXML `xml:"item"`
+	Title         string                `xml:"title"`
+	LastBuildDate string                `xml:"lastBuildDate"`
+	PubDate       string                `xml:"pubDate"`
+	Image         channelImageXML       `xml:"image"`
+	ITunesImage   channelItunesImageXML `xml:"http://www.itunes.com/dtds/podcast-1.0.dtd image"`
+	ITunesImage2  channelItunesImageXML `xml:"http://www.itunes.com/DTDs/Podcast-1.0.dtd image"`
+	Items         []itemXML             `xml:"item"`
+}
+
+type channelImageXML struct {
+	URL  string `xml:"url"`
+	Href string `xml:"href,attr"`
+}
+
+type channelItunesImageXML struct {
+	Href string `xml:"href,attr"`
+	URL  string `xml:"url,attr"`
 }
 
 type itemXML struct {
@@ -309,10 +324,55 @@ func ParseFeedDate(pubDate string) (int64, string) {
 	return 0, pubDate
 }
 
+var (
+	itunesImageRegex = regexp.MustCompile(`(?i)<itunes:image[^>]+href=["']([^"']+)["']`)
+	rssImageRegex    = regexp.MustCompile(`(?i)<image>[\s\S]*?<url>([^<]+)</url>`)
+)
+
+func extractChannelImageURL(c channelXML, data []byte) string {
+	if u := strings.TrimSpace(c.ITunesImage.Href); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(c.ITunesImage.URL); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(c.ITunesImage2.Href); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(c.Image.URL); u != "" {
+		return u
+	}
+	if u := strings.TrimSpace(c.Image.Href); u != "" {
+		return u
+	}
+	return scanRawXMLForImage(data)
+}
+
+func scanRawXMLForImage(data []byte) string {
+	s := string(data)
+	channelIdx := strings.Index(s, "<channel")
+	if channelIdx == -1 {
+		return ""
+	}
+	itemIdx := strings.Index(s, "<item")
+	channelHeader := s[channelIdx:]
+	if itemIdx > channelIdx {
+		channelHeader = s[channelIdx:itemIdx]
+	}
+	if m := itunesImageRegex.FindStringSubmatch(channelHeader); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	if m := rssImageRegex.FindStringSubmatch(channelHeader); len(m) > 1 {
+		return strings.TrimSpace(m[1])
+	}
+	return ""
+}
+
 // FeedDocument is a parsed RSS feed: its episodes plus the channel-level
 // freshness markers used to decide whether the feed changed at all.
 type FeedDocument struct {
 	Title          string
+	ImageURL       string
 	LastBuildDate  string
 	ChannelPubDate string
 	Episodes       []backend.FeedEpisode
@@ -370,6 +430,7 @@ func ParseRSSFeed(data []byte) (*FeedDocument, error) {
 
 	doc := &FeedDocument{
 		Title:          strings.TrimSpace(rss.Channel.Title),
+		ImageURL:       extractChannelImageURL(rss.Channel, data),
 		LastBuildDate:  strings.TrimSpace(rss.Channel.LastBuildDate),
 		ChannelPubDate: strings.TrimSpace(rss.Channel.PubDate),
 	}
@@ -560,9 +621,6 @@ func readFeedResponse(resp *http.Response) (FeedFetchResult, bool, error) {
 	return res, false, nil
 }
 
-// FetchFeedDirect fetches a feed conditionally and reports its episodes. It
-// keeps the longer timeout and retry budget suited to one-off interactive
-// fetches; sweeps over many feeds should call FetchFeedConditional directly.
 func FetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]backend.FeedEpisode, string, string, bool, error) {
 	res, err := FetchFeedConditional(feedURL, FeedFetchOptions{
 		ETag:         cachedETag,
@@ -576,5 +634,34 @@ func FetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]backen
 	if res.NotModified {
 		return nil, res.ETag, res.LastModified, true, nil
 	}
+	if res.Doc != nil && res.Doc.ImageURL != "" {
+		cacheDocImage(feedURL, res.Doc.ImageURL)
+	}
 	return res.Doc.Episodes, res.ETag, res.LastModified, false, nil
+}
+
+func cacheDocImage(feedURL, imageURL string) {
+	entry := DefaultFeedCache().Get(feedURL)
+	if entry != nil {
+		if entry.ImageURL == "" {
+			entry.ImageURL = imageURL
+			DefaultFeedCache().Put(feedURL, entry)
+		}
+		return
+	}
+	DefaultFeedCache().Put(feedURL, &FeedCacheEntry{
+		FeedURL:  feedURL,
+		ImageURL: imageURL,
+	})
+}
+
+func FetchFeedDoc(feedURL string) (*FeedDocument, error) {
+	res, err := FetchFeedConditional(feedURL, FeedFetchOptions{
+		Timeout:     60 * time.Second,
+		MaxAttempts: 3,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return res.Doc, nil
 }

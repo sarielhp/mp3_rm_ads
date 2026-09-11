@@ -14,6 +14,7 @@ type opmlOutline struct {
 	Type     string        `xml:"type,attr,omitempty"`
 	XMLURL   string        `xml:"xmlUrl,attr,omitempty"`
 	HTMLURL  string        `xml:"htmlUrl,attr,omitempty"`
+	ImageURL string        `xml:"imageUrl,attr,omitempty"`
 	Outlines []opmlOutline `xml:"outline,omitempty"`
 }
 
@@ -41,10 +42,11 @@ func BuildOPMLXMLWithTitle(feeds []OPMLFeed, headTitle, groupText string) ([]byt
 			title = "Podcast Feed"
 		}
 		itemOutlines = append(itemOutlines, opmlOutline{
-			Text:   title,
-			Title:  title,
-			Type:   "rss",
-			XMLURL: f.URL,
+			Text:     title,
+			Title:    title,
+			Type:     "rss",
+			XMLURL:   f.URL,
+			ImageURL: f.ImageURL,
 		})
 	}
 
@@ -100,8 +102,9 @@ func ParseOPMLXML(data []byte) ([]OPMLFeed, error) {
 					title = o.Text
 				}
 				feeds = append(feeds, OPMLFeed{
-					Title: title,
-					URL:   feedURL,
+					Title:    title,
+					URL:      feedURL,
+					ImageURL: strings.TrimSpace(o.ImageURL),
 				})
 			}
 			if len(o.Outlines) > 0 {

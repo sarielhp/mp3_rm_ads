@@ -76,7 +76,106 @@ func TestGeneratePodcastFeedXML(t *testing.T) {
 		t.Fatalf("expected 1 item, got %d", len(parsedDoc.Channel.Items))
 	}
 	item := parsedDoc.Channel.Items[0]
+	if !strings.Contains(content, "<itunes:image href=\"http://myserver.tailscale.net:8080/podcasts/Hardcore_History/cover.jpg\"") {
+		t.Errorf("channel <itunes:image> missing from XML:\n%s", content)
+	}
+	if !strings.Contains(content, "<url>http://myserver.tailscale.net:8080/podcasts/Hardcore_History/cover.jpg</url>") {
+		t.Errorf("channel <image><url> missing from XML:\n%s", content)
+	}
 	if item.GUID.Value != "guid-ep-69" {
 		t.Errorf("expected GUID guid-ep-69, got %s", item.GUID.Value)
+	}
+}
+
+func TestGeneratePodcastFeedXML_FallbackToRemoteImage(t *testing.T) {
+	tmpDir := t.TempDir()
+	podDir := filepath.Join(tmpDir, "Show_No_Local_Cover")
+	_ = os.MkdirAll(podDir, 0755)
+
+	ep1 := filepath.Join(podDir, "ep1.mp3")
+	_ = os.WriteFile(ep1, []byte("fake mp3 data"), 0644)
+
+	sub := Subscription{
+		Title:    "Show Without Local Cover",
+		ImageURL: "https://remote.example.com/art.jpg",
+		Folder:   "Show_No_Local_Cover",
+	}
+	eps := CollectLocalEpisodes(podDir, nil)
+	data, err := GeneratePodcastFeedXML(sub, podDir, eps, "http://server:8080/podcasts")
+	if err != nil {
+		t.Fatalf("GeneratePodcastFeedXML failed: %v", err)
+	}
+
+	content := string(data)
+	if !strings.Contains(content, "<url>https://remote.example.com/art.jpg</url>") {
+		t.Errorf("expected remote image in <image><url>, got:\n%s", content)
+	}
+	if !strings.Contains(content, "<itunes:image href=\"https://remote.example.com/art.jpg\"") {
+		t.Errorf("expected remote image in <itunes:image>, got:\n%s", content)
+	}
+}
+
+func TestParseRSSFeedExtractsImage(t *testing.T) {
+	itunesXML := []byte(`<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+		<channel>
+			<title>Itunes Show</title>
+			<itunes:image href="https://example.com/itunes_cover.jpg"/>
+			<item>
+				<title>Ep 1</title>
+				<guid>g1</guid>
+				<enclosure url="https://example.com/1.mp3" type="audio/mpeg"/>
+			</item>
+		</channel>
+	</rss>`)
+	doc, err := ParseRSSFeed(itunesXML)
+	if err != nil {
+		t.Fatalf("ParseRSSFeed failed: %v", err)
+	}
+	if doc.ImageURL != "https://example.com/itunes_cover.jpg" {
+		t.Errorf("expected itunes image url, got %q", doc.ImageURL)
+	}
+
+	rss20XML := []byte(`<rss version="2.0">
+		<channel>
+			<title>RSS2 Show</title>
+			<image>
+				<url>https://example.com/rss2_cover.png</url>
+				<title>RSS2 Show</title>
+				<link>https://example.com</link>
+			</image>
+			<item>
+				<title>Ep 1</title>
+				<guid>g1</guid>
+				<enclosure url="https://example.com/1.mp3" type="audio/mpeg"/>
+			</item>
+		</channel>
+	</rss>`)
+	doc2, err := ParseRSSFeed(rss20XML)
+	if err != nil {
+		t.Fatalf("ParseRSSFeed rss20 failed: %v", err)
+	}
+	if doc2.ImageURL != "https://example.com/rss2_cover.png" {
+		t.Errorf("expected rss2 image url, got %q", doc2.ImageURL)
+	}
+}
+
+func TestEnsurePodcastCoverCopiesDetailsCache(t *testing.T) {
+	tmpDir := t.TempDir()
+	podDir := filepath.Join(tmpDir, "TestShow")
+	detailsDir := filepath.Join(podDir, ".cache", "details")
+	_ = os.MkdirAll(detailsDir, 0755)
+
+	cachedCover := filepath.Join(detailsDir, "cover.jpg")
+	_ = os.WriteFile(cachedCover, []byte("cached image data"), 0644)
+
+	sub := Subscription{Title: "TestShow", Folder: "TestShow"}
+	resolved := EnsurePodcastCover(podDir, &sub)
+	target := filepath.Join(podDir, "cover.jpg")
+	if resolved != target {
+		t.Fatalf("expected resolved cover at %s, got %s", target, resolved)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil || string(data) != "cached image data" {
+		t.Errorf("unexpected target cover data: %s, err: %v", string(data), err)
 	}
 }

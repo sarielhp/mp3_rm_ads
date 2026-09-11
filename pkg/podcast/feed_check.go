@@ -208,11 +208,15 @@ func classifyFetchedFeed(res FeedCheckResult, fetched FeedFetchResult, entry *Fe
 		LastModified:   fetched.LastModified,
 		LastChecked:    time.Now(),
 		LatestGUID:     latest,
+		ImageURL:       doc.ImageURL,
 		LastBuildDate:  doc.LastBuildDate,
 		ChannelPubDate: doc.ChannelPubDate,
 		EpisodeCount:   len(doc.Episodes),
 	}
 	if entry != nil {
+		if updated.ImageURL == "" {
+			updated.ImageURL = entry.ImageURL
+		}
 		// The sweep replaces the entry outright, so carry over the publication
 		// history the frequency analysis maintains rather than discarding it.
 		updated.PubDates = entry.PubDates

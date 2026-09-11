@@ -178,8 +178,9 @@ type ActiveDownload struct {
 }
 
 type OPMLFeed struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
+	Title    string `json:"title"`
+	URL      string `json:"url"`
+	ImageURL string `json:"image_url,omitempty"`
 }
 
 type OPMLDoc struct {

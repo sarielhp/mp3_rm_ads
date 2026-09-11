@@ -77,11 +77,12 @@ This updates the OPML file served by Caddy so you can re-import any new feeds in
 - Caddy serves audio files with full HTTP Range request support (`206 Partial Content`).
 - AntennaPod can seek forward/backward within audio files and resume partially streamed episodes instantly without re-downloading.
 
-### Feed Updates
-- Each podcast folder in `/media/podcasts/abs/<show>/` contains a standard iTunes-compatible `feed.xml`.
-- When `abs` downloads new episodes or completes ad removal, it updates `feed.xml` with:
+### Feed Updates & Cover Art
+- Each podcast folder in `/media/podcasts/abs/<show>/` contains a standard iTunes-compatible `feed.xml` and local cover image (`cover.jpg` / `cover.png`).
+- When `abs` downloads new episodes, adds subscriptions, or completes ad removal, it updates `feed.xml` with:
   - Exact file size (`length`) and MIME type (`audio/mpeg`).
   - Audio duration (`itunes:duration`).
   - Stable, deterministic episode GUIDs.
   - Properly escaped Tailscale enclosure URLs.
+  - Channel and episode cover art icons via both standard RSS `<image><url>` and `<itunes:image href="...">` for seamless AntennaPod icon rendering.
 - AntennaPod checks `feed.xml` on its standard refresh schedule or when pulled down manually.

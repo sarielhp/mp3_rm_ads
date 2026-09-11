@@ -5,6 +5,7 @@ import (
 	"errors"
 	"testing"
 
+	"abs/pkg/transcribe"
 	"abs/pkg/types"
 )
 
@@ -74,6 +75,10 @@ func TestResolveSpeculativeRacersDefaultDisabled(t *testing.T) {
 }
 
 func TestResolveSpeculativeRacersCustomServices(t *testing.T) {
+	origUsable := transcribe.WhisperProfileUsable
+	transcribe.WhisperProfileUsable = func(wp types.WhisperProfile) bool { return true }
+	t.Cleanup(func() { transcribe.WhisperProfileUsable = origUsable })
+
 	enabled := true
 	cfg := types.Config{
 		SpeculativeConfig: types.SpeculativeConfig{

@@ -118,7 +118,11 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("open subscriptions store: %w", err)
 	}
 
-	sub := podcast.Subscription{Title: title, FeedURL: feedURL}
+	imgURL := ""
+	if entry := podcast.DefaultFeedCache().Get(feedURL); entry != nil {
+		imgURL = entry.ImageURL
+	}
+	sub := podcast.Subscription{Title: title, FeedURL: feedURL, ImageURL: imgURL}
 	if err := store.Add(sub); err != nil {
 		return fmt.Errorf("add subscription: %w", err)
 	}
@@ -188,6 +192,13 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 		if err := podcast.WritePodcastFeedXML(podDir, sub, cfg.ServerBaseURL, nil); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write feed for %s: %v\n", sub.Title, err)
 			continue
+		}
+		if sub.ImageURL == "" {
+			if entry := podcast.DefaultFeedCache().Get(sub.FeedURL); entry != nil && entry.ImageURL != "" {
+				sub.ImageURL = entry.ImageURL
+				_ = store.Add(sub)
+				_ = store.Save()
+			}
 		}
 		eps := podcast.CollectLocalEpisodes(podDir, nil)
 		fmt.Printf("Updated feed: %s (%d episodes)\n", filepath.Join(podDir, "feed.xml"), len(eps))

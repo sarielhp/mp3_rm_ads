@@ -79,3 +79,22 @@ func TestDownloaderContextCancelled(t *testing.T) {
 		t.Fatalf("expected error on cancelled context")
 	}
 }
+
+func TestDownloadCoverImage(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "image/jpeg")
+		_, _ = w.Write([]byte("fake cover image bytes"))
+	}))
+	defer ts.Close()
+
+	tmpDir := t.TempDir()
+	dest := filepath.Join(tmpDir, "cover.jpg")
+	if err := DownloadCoverImage(ts.URL+"/cover.jpg", dest); err != nil {
+		t.Fatalf("DownloadCoverImage failed: %v", err)
+	}
+
+	data, err := os.ReadFile(dest)
+	if err != nil || string(data) != "fake cover image bytes" {
+		t.Errorf("unexpected cover file data: %s, err: %v", string(data), err)
+	}
+}
