@@ -139,7 +139,7 @@ func TestHandleServerDisableHourly(t *testing.T) {
 	}
 }
 
-func TestExecuteBlockHourlyHint(t *testing.T) {
+func TestExecuteBlockUnknownCommand(t *testing.T) {
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()
 	os.Stderr = w
@@ -156,7 +156,7 @@ func TestExecuteBlockHourlyHint(t *testing.T) {
 	if code != 1 {
 		t.Errorf("expected exit code 1, got %d", code)
 	}
-	if !strings.Contains(out, "use 'abs server disable-hourly' to disable hourly podcasts") {
-		t.Errorf("expected stderr to contain hint, got: %q", out)
+	if !strings.Contains(out, `unknown command "block" for "abs"`) {
+		t.Errorf("expected stderr to report unknown command, got: %q", out)
 	}
 }
