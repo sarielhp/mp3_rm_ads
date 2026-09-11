@@ -109,7 +109,7 @@ func isAudiobookshelfHostedFeed(feedURL, absBaseURL string) bool {
 	return false
 }
 
-func sanitizePodcastTitle(title string) string {
+func SanitizePodcastTitle(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
 		return "Untitled Podcast"
@@ -123,4 +123,8 @@ func sanitizePodcastTitle(title string) string {
 		return "Untitled Podcast"
 	}
 	return title
+}
+
+func sanitizePodcastTitle(title string) string {
+	return SanitizePodcastTitle(title)
 }

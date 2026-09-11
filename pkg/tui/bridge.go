@@ -215,16 +215,7 @@ func resetPodcastDateCheck(client *backend.AudiobookshelfBackend, dbPath, itemID
 }
 
 func sanitizePodcastTitle(title string) string {
-	invalidChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|"}
-	result := title
-	for _, ch := range invalidChars {
-		result = strings.ReplaceAll(result, ch, "_")
-	}
-	result = strings.TrimSpace(result)
-	if result == "." || result == ".." || result == "" {
-		return "podcast"
-	}
-	return result
+	return backend.SanitizePodcastTitle(title)
 }
 
 func fetchFeedDirect(feedURL, cachedETag, cachedLastModified string) ([]backend.FeedEpisode, string, string, bool, error) {
@@ -232,26 +223,7 @@ func fetchFeedDirect(feedURL, cachedETag, cachedLastModified string) ([]backend.
 }
 
 func parsePubDate(pubStr string) int64 {
-	if pubStr == "" {
-		return 0
-	}
-	layouts := []string{
-		time.RFC1123Z,
-		time.RFC1123,
-		time.RFC3339,
-		time.RFC3339Nano,
-		"Mon, 02 Jan 2006 15:04:05 -0700",
-		"02 Jan 2006 15:04:05 -0700",
-		"2006-01-02 15:04:05",
-		"2006-01-02",
-	}
-	trimmed := strings.TrimSpace(pubStr)
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, trimmed); err == nil {
-			return t.UnixMilli()
-		}
-	}
-	return 0
+	return backend.ParsePubDate(pubStr)
 }
 
 func loadConfig() Config {

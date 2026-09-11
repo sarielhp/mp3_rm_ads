@@ -1,24 +1,26 @@
 package adremoval
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
 	"os"
 	"path/filepath"
 	"testing"
+
+	"abs/pkg/pipeline"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func TestQueueRemoteHostSelection(t *testing.T) {
-	cfg := Config{}
+	cfg := types.Config{}
 	cfg.RemoteHost = "other"
-	host, err := resolveRemoteProcessingTargetHost(ProcOptions{Remote: true, RemoteHost: "chosen"}, cfg)
+	host, err := resolveRemoteProcessingTargetHost(types.ProcOptions{Remote: true, RemoteHost: "chosen"}, cfg)
 	if err != nil || host != "chosen" {
 		t.Fatalf("host=%q error=%v", host, err)
 	}
-	if _, err := resolveRemoteProcessingTargetHost(ProcOptions{Remote: true}, Config{}); err == nil {
+	if _, err := resolveRemoteProcessingTargetHost(types.ProcOptions{Remote: true}, types.Config{}); err == nil {
 		t.Fatal("missing remote host accepted")
 	}
-	host, err = resolveRemoteProcessingTargetHost(ProcOptions{Local: true, RemoteHost: "chosen"}, Config{})
+	host, err = resolveRemoteProcessingTargetHost(types.ProcOptions{Local: true, RemoteHost: "chosen"}, types.Config{})
 	if err != nil || host != "" {
 		t.Fatalf("local host=%q error=%v", host, err)
 	}
@@ -30,10 +32,10 @@ func TestQueuedCompletedEpisodeWithoutTranscriptIsNotSkipped(t *testing.T) {
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(path), &EpisodeStatusFile{Status: StateDone}); err != nil {
+	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(path), &types.EpisodeStatusFile{Status: types.StateDone}); err != nil {
 		t.Fatal(err)
 	}
-	lock, process, stop := checkSkipOrLockAudioFile(path, path, 0, 1, 0, ProcOptions{Quiet: true})
+	lock, process, stop := checkSkipOrLockAudioFile(path, path, 0, 1, 0, types.ProcOptions{Quiet: true})
 	if lock != nil {
 		defer lock.Release()
 	}
@@ -54,8 +56,8 @@ func TestQueueRetainsLockedEpisode(t *testing.T) {
 		t.Fatalf("lock: %v", err)
 	}
 	defer lock.Release()
-	opts := ProcOptions{Quiet: true, Local: true, WhisperEngine: "local"}
-	if err := ProcessQueuedTarget(dir, path, "rm_ads", opts, Config{}); err == nil {
+	opts := types.ProcOptions{Quiet: true, Local: true, WhisperEngine: "local"}
+	if err := ProcessQueuedTarget(dir, path, "rm_ads", opts, types.Config{}); err == nil {
 		t.Fatal("skipped processing reported success")
 	}
 	if got := pipeline.QueuedEpisodes(dir); len(got) != 1 || got[0] != "episode.mp3" {

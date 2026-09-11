@@ -13,15 +13,16 @@ import (
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/remote"
+	"abs/pkg/types"
 	"abs/pkg/util"
 )
 
 // ProcessPodcast removes ads from one podcast the caller has already resolved,
 // queueing or processing episodes according to that podcast's own policy.
-func ProcessPodcast(pod *ResolvedPodcast, opts ProcOptions, config Config, action string) error {
+func ProcessPodcast(pod *podcast.ResolvedPodcast, opts types.ProcOptions, cfg types.Config, action string) error {
 	opts.Normalize()
 
-	targetAudioPath, err := resolveTargetEpisodeForRmAds(pod, opts, config)
+	targetAudioPath, err := resolveTargetEpisodeForRmAds(pod, opts, cfg)
 	if err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func ProcessPodcast(pod *ResolvedPodcast, opts ProcOptions, config Config, actio
 		}
 	}
 
-	podcastsDir := config.PodcastsDir
+	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
@@ -67,7 +68,7 @@ func ProcessPodcast(pod *ResolvedPodcast, opts ProcOptions, config Config, actio
 		return nil
 	}
 
-	return ProcessQueuedTarget(pod.Dir, targetAudioPath, action, opts, config)
+	return ProcessQueuedTarget(pod.Dir, targetAudioPath, action, opts, cfg)
 }
 
 func countAllQueuedEpisodes(podcastsDir string) int {
@@ -81,10 +82,10 @@ func countAllQueuedEpisodes(podcastsDir string) int {
 	return total
 }
 
-func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, opts ProcOptions, config Config) (string, error) {
-	b := getActiveBackendForPodcast(config, opts.Quiet)
+func resolveTargetEpisodeForRmAds(pod *podcast.ResolvedPodcast, opts types.ProcOptions, cfg types.Config) (string, error) {
+	b := getActiveBackendForPodcast(cfg, opts.Quiet)
 	if b != nil {
-		if targetPath, handled := findTargetEpisodeFromBackend(b, pod, config, opts.Quiet); handled {
+		if targetPath, handled := findTargetEpisodeFromBackend(b, pod, cfg, opts.Quiet); handled {
 			return targetPath, nil
 		}
 	}
@@ -96,33 +97,16 @@ func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, opts ProcOptions, config
 	return targetPath, nil
 }
 
-func getActiveBackendForPodcast(config Config, quiet bool) backend.Backend {
-	if isPodfetchActive(config) {
-		if config.PodfetchURL != "" || config.PodfetchDBPath != "" {
-			b, err := getPodfetchBackend(config, quiet)
-			if err == nil {
-				return b
-			}
-		}
-		return nil
-	}
-	if isAudiobookshelfActive(config) {
-		if config.AudiobookshelfURL != "" || config.AudiobookshelfDBPath != "" {
-			b, err := getABSClient(config, quiet)
-			if err == nil {
-				return b
-			}
-			b2, err2 := getBackend(config, quiet)
-			if err2 == nil {
-				return b2
-			}
-		}
+func getActiveBackendForPodcast(cfg types.Config, quiet bool) backend.Backend {
+	b, err := backend.FromAppConfig(&cfg, quiet)
+	if err == nil {
+		return b
 	}
 	return nil
 }
 
-func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, config Config, quiet bool) (string, bool) {
-	feedURL, targetItem := resolveBackendPodcastAndFeed(b, pod, config)
+func findTargetEpisodeFromBackend(b backend.Backend, pod *podcast.ResolvedPodcast, cfg types.Config, quiet bool) (string, bool) {
+	feedURL, targetItem := resolveBackendPodcastAndFeed(b, pod, cfg)
 	if feedURL == "" {
 		return "", false
 	}
@@ -166,7 +150,7 @@ func findTargetEpisodeFromBackend(b backend.Backend, pod *ResolvedPodcast, confi
 	return "", true
 }
 
-func resolveBackendPodcastAndFeed(b backend.Backend, pod *ResolvedPodcast, config Config) (string, *backend.Podcast) {
+func resolveBackendPodcastAndFeed(b backend.Backend, pod *podcast.ResolvedPodcast, cfg types.Config) (string, *backend.Podcast) {
 	feedURL := ""
 	itemID := pod.UUID
 	if cached, _ := podcast.LoadPodcastCache(pod.Dir); cached != nil {
@@ -198,7 +182,7 @@ func resolveBackendPodcastAndFeed(b backend.Backend, pod *ResolvedPodcast, confi
 	var targetItem *backend.Podcast
 	for i := range podcasts {
 		p := &podcasts[i]
-		if isMatchingBackendPodcast(p, itemID, pod, config.PodcastsDir) {
+		if isMatchingBackendPodcast(p, itemID, pod, cfg.PodcastsDir) {
 			targetItem = p
 			break
 		}
@@ -216,7 +200,7 @@ func resolveBackendPodcastAndFeed(b backend.Backend, pod *ResolvedPodcast, confi
 	return feedURL, targetItem
 }
 
-func isMatchingBackendPodcast(p *backend.Podcast, itemID string, pod *ResolvedPodcast, podcastsDir string) bool {
+func isMatchingBackendPodcast(p *backend.Podcast, itemID string, pod *podcast.ResolvedPodcast, podcastsDir string) bool {
 	if itemID != "" && p.ID == itemID {
 		return true
 	}
@@ -496,23 +480,23 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 	return "", false
 }
 
-func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts ProcOptions, config Config) error {
+func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts types.ProcOptions, cfg types.Config) error {
 	opts.Normalize()
 
-	targetHost, err := resolveRemoteProcessingTargetHost(opts, config)
+	targetHost, err := resolveRemoteProcessingTargetHost(opts, cfg)
 	if err != nil {
 		return err
 	}
 
 	if targetHost != "" {
-		if err := remote.RunRemotePush(&config, []string{targetAudioPath}, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
+		if err := remote.RunRemotePush(&cfg, []string{targetAudioPath}, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
 			return fmt.Errorf("error pushing episode to remote: %w", err)
 		}
-		if err := pollAndPullRemoteEpisode(config, opts, targetHost, targetAudioPath); err != nil {
+		if err := pollAndPullRemoteEpisode(cfg, opts, targetHost, targetAudioPath); err != nil {
 			return err
 		}
 	} else {
-		if err := executeLocalBatchProcessing([]string{targetAudioPath}, opts, config, action); err != nil {
+		if err := executeLocalBatchProcessing([]string{targetAudioPath}, opts, cfg, action); err != nil {
 			return err
 		}
 	}
@@ -531,13 +515,13 @@ func queueItemFilename(podDir, audioPath string) string {
 	return filepath.Base(audioPath)
 }
 
-func pollAndPullRemoteEpisode(config Config, opts ProcOptions, targetHost, targetAudioPath string) error {
+func pollAndPullRemoteEpisode(cfg types.Config, opts types.ProcOptions, targetHost, targetAudioPath string) error {
 	if !opts.Quiet {
 		fmt.Printf("Waiting for remote processing on %s to complete...\n", targetHost)
 	}
 	startTime := time.Now()
 	for {
-		_ = remote.RunRemotePull(&config, targetHost, nil, true, opts.Verbose)
+		_ = remote.RunRemotePull(&cfg, targetHost, nil, true, opts.Verbose)
 		if pipeline.IsEpisodeClean(targetAudioPath) {
 			break
 		}

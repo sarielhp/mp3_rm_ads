@@ -134,7 +134,16 @@ func SaveCutsJSON(mainFile string, totalDuration float64, adSegments []types.AdS
 			Changed:      false,
 		}
 	}
-	_ = util.WriteFileAtomic(cutsFile, append(data, '\n'), 0644)
+	if err := util.WriteFileAtomic(cutsFile, append(data, '\n'), 0644); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Error: could not write cuts metadata: %v\n", err)
+		}
+		return types.CutsResult{
+			CutsFile:     cutsFile,
+			KeepSegments: keep,
+			Changed:      false,
+		}
+	}
 
 	if !quiet {
 		fmt.Printf("Saved updated cut metadata (.json) to: '%s'\n", cutsFile)

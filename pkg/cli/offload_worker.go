@@ -1,11 +1,14 @@
 package cli
 
 import (
-	"abs/pkg/detect"
 	"fmt"
 	"os"
 	"path/filepath"
 	"time"
+
+	"abs/pkg/detect"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func runBatchWorker(batchDir string, quiet, verbose bool) error {
@@ -26,7 +29,7 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 
 	manifest.Status = BatchStatusProcessing
 	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-	_ = saveManifest(manifestPath, manifest)
+	saveManifestVerbose(manifestPath, manifest, verbose)
 
 	ensureConfigExists()
 	config := loadConfig()
@@ -44,7 +47,7 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 
 		item.Status = BatchStatusProcessing
 		manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
-		_ = saveManifest(manifestPath, manifest)
+		saveManifestVerbose(manifestPath, manifest, verbose)
 
 		if err := processBatchItem(item, batchDir, outDir, config, selectedProfile, quiet, verbose); err != nil {
 			item.Status = BatchStatusFailed
@@ -58,7 +61,7 @@ func runBatchWorker(batchDir string, quiet, verbose bool) error {
 		}
 
 		recalculateManifestStats(manifest)
-		_ = saveManifest(manifestPath, manifest)
+		saveManifestVerbose(manifestPath, manifest, verbose)
 	}
 
 	manifest.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
@@ -131,6 +134,12 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 	return nil
 }
 
+func saveManifestVerbose(path string, m *types.RemoteBatchManifest, verbose bool) {
+	if err := saveManifest(path, m); err != nil && verbose {
+		fmt.Fprintf(os.Stderr, "Warning: failed to save manifest %s: %v\n", path, err)
+	}
+}
+
 func executeItemAudioCut(item *RemoteBatchJobItem, inputFile, outMP3, batchDir string, origDuration float64, adSegments []AdSegment, selectedProfile LLMProfile, quiet bool) float64 {
 	cutsResult := saveCutsJSON(outMP3, origDuration, adSegments, &selectedProfile, quiet)
 	keepSegments := cutsResult.KeepSegments
@@ -138,9 +147,17 @@ func executeItemAudioCut(item *RemoteBatchJobItem, inputFile, outMP3, batchDir s
 	cleanDuration := origDuration
 	if len(adSegments) > 0 && len(keepSegments) > 0 {
 		workDir := filepath.Join(batchDir, ".work")
-		_ = os.MkdirAll(workDir, 0755)
+		if err := os.MkdirAll(workDir, 0755); err != nil {
+			fmt.Fprintf(os.Stderr, "Error creating work directory %s: %v\n", workDir, err)
+			copyFile(inputFile, outMP3)
+			return origDuration
+		}
 		tempOut := filepath.Join(workDir, item.AudioFileName+".tmp.mp3")
-		verifyTempFile(tempOut)
+		if err := util.VerifyTempFile(tempOut); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: invalid temp file %s: %v\n", tempOut, err)
+			copyFile(inputFile, outMP3)
+			return origDuration
+		}
 
 		if cutAudioFFmpeg(inputFile, keepSegments, tempOut) {
 			if mvErr := safeMove(tempOut, outMP3); mvErr != nil {

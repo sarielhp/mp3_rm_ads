@@ -177,7 +177,7 @@ func DetectAdsLLMTimeout(transcriptText string, profile types.LLMProfile, apiKey
 	for i := 0; i < EmptyResultConfirmations; i++ {
 		retry, retryErr := askForAdSegments(profile, userPrompt, timeout, apiKey)
 		if retryErr != nil {
-			return segs, nil
+			return nil, fmt.Errorf("ad detection confirmation failed: %w", retryErr)
 		}
 		if len(retry) > 0 {
 			return retry, nil

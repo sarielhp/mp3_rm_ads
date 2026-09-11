@@ -69,3 +69,18 @@ func FromAppConfig(cfg *types.Config, quiet bool) (Backend, error) {
 	}
 	return New("audiobookshelf", bCfg)
 }
+
+// SyncEpisodeDuration synchronizes the duration of a cleaned episode back to the configured backend.
+func SyncEpisodeDuration(cfg *types.Config, filePath string, duration float64) error {
+	if cfg == nil {
+		return nil
+	}
+	if cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" && cfg.PodfetchURL == "" && cfg.PodfetchDBPath == "" {
+		return nil
+	}
+	b, err := FromAppConfig(cfg, true)
+	if err != nil || b == nil {
+		return err
+	}
+	return b.SyncDuration(filePath, duration)
+}

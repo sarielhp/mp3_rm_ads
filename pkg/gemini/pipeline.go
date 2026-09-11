@@ -185,6 +185,12 @@ func ProcessSingleGeminiChunk(ctx context.Context, ch types.GeminiChunkInfo, cfg
 }
 
 func ProcessGeminiChunksParallel(ctx context.Context, chunks []types.GeminiChunkInfo, cfg types.Config) ([]*types.GeminiChunkResult, error) {
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
 	results := make([]*types.GeminiChunkResult, len(chunks))
 	var wg util.WaitGroup
 	var mu util.Mutex
@@ -194,11 +200,20 @@ func ProcessGeminiChunksParallel(ctx context.Context, chunks []types.GeminiChunk
 		wg.Add(1)
 		go func(idx int, chunk types.GeminiChunkInfo) {
 			defer wg.Done()
+			if ctx.Err() != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = ctx.Err()
+				}
+				mu.Unlock()
+				return
+			}
 			res, err := ProcessSingleGeminiChunk(ctx, chunk, cfg)
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil && firstErr == nil {
 				firstErr = err
+				cancel()
 			}
 			results[idx] = res
 		}(i, ch)
@@ -207,6 +222,9 @@ func ProcessGeminiChunksParallel(ctx context.Context, chunks []types.GeminiChunk
 
 	if firstErr != nil {
 		return nil, firstErr
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	return results, nil
 }

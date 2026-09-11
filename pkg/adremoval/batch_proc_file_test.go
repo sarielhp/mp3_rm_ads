@@ -1,13 +1,15 @@
 package adremoval
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"testing"
 	"time"
+
+	"abs/pkg/pipeline"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 func writeRealMP3(t *testing.T, path string, seconds int) {
@@ -47,8 +49,8 @@ func writeSaneTranscript(t *testing.T, path string, dur float64) {
 }
 
 // offlineProfile has no URL, so detectAdsLLM returns nil without any network call.
-func offlineProfile() LLMProfile {
-	return LLMProfile{ID: 1, Name: "offline", Type: "ollama", Model: "none"}
+func offlineProfile() types.LLMProfile {
+	return types.LLMProfile{ID: 1, Name: "offline", Type: "ollama", Model: "none"}
 }
 
 func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
@@ -62,9 +64,9 @@ func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		ProcOptions{
+		types.ProcOptions{
 			Quiet: true,
-		}, Config{}, "proc", time.Now(), offlineProfile())
+		}, types.Config{}, "proc", time.Now(), offlineProfile())
 
 	if !hasError {
 		t.Errorf("expected hasError=true when the transcript cannot be parsed")
@@ -86,12 +88,12 @@ func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	optsRecut := ProcOptions{
+	optsRecut := types.ProcOptions{
 		Quiet: true,
 	}
 	optsRecut.Recut = true
 	processSingleAudioFile(0, 1, 0, mp3,
-		optsRecut, Config{}, "recut", time.Now(), offlineProfile())
+		optsRecut, types.Config{}, "recut", time.Now(), offlineProfile())
 }
 
 func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
@@ -105,12 +107,12 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	optsTMin := ProcOptions{
+	optsTMin := types.ProcOptions{
 		Quiet: true,
 	}
 	optsTMin.TranscribeMin = "1"
 	processSingleAudioFile(0, 1, 0, mp3,
-		optsTMin, Config{}, "proc", time.Now(), offlineProfile())
+		optsTMin, types.Config{}, "proc", time.Now(), offlineProfile())
 
 	if util.FileExists(filepath.Join(dir, "ep.cuts.json")) {
 		t.Errorf("--tminutes wrote ep.cuts.json; a preview run must not touch cut metadata")
@@ -139,9 +141,9 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 	}
 
 	processSingleAudioFile(0, 1, 0, mp3,
-		ProcOptions{
+		types.ProcOptions{
 			Quiet: true,
-		}, Config{}, "proc", time.Now(), offlineProfile())
+		}, types.Config{}, "proc", time.Now(), offlineProfile())
 
 	if util.FileExists(mp3 + ".precut") {
 		t.Errorf("no ads were detected, but the original was moved to .precut")
@@ -162,7 +164,7 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	writeRealMP3(t, mp3, 10)
 	writeSaneTranscript(t, filepath.Join(dir, "ep.transcript.json"), 10)
 
-	failingProfile := LLMProfile{
+	failingProfile := types.LLMProfile{
 		ID:    2,
 		Name:  "failing",
 		Type:  "openrouter",
@@ -171,9 +173,9 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	}
 
 	hasError, _, _ := processSingleAudioFile(0, 1, 0, mp3,
-		ProcOptions{
+		types.ProcOptions{
 			Quiet: true,
-		}, Config{}, "proc", time.Now(), failingProfile)
+		}, types.Config{}, "proc", time.Now(), failingProfile)
 
 	if !hasError {
 		t.Errorf("expected hasError=true when LLM ad detection fails")
@@ -192,7 +194,7 @@ func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
 	if err != nil || st == nil {
 		t.Fatalf("expected status file to exist: %v", err)
 	}
-	if st.Status != StateFailed {
-		t.Errorf("expected status %s, got %s", StateFailed, st.Status)
+	if st.Status != types.StateFailed {
+		t.Errorf("expected status %s, got %s", types.StateFailed, st.Status)
 	}
 }

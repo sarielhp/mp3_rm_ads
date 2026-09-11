@@ -344,3 +344,17 @@ func TestGeminiDeleteGCSObjectEmptyPrefix(t *testing.T) {
 	DeleteGCSObject(ctx, "test-bucket", "")
 	DeleteGCSObject(ctx, "test-bucket", "short")
 }
+
+func TestProcessGeminiChunksParallelCancelledContext(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	chunks := []types.GeminiChunkInfo{
+		{Index: 0, FilePath: "test.mp3", StartSec: 0, DurSec: 100},
+		{Index: 1, FilePath: "test.mp3", StartSec: 100, DurSec: 100},
+	}
+	_, err := ProcessGeminiChunksParallel(ctx, chunks, types.Config{})
+	if err == nil {
+		t.Fatal("expected error with cancelled context, got nil")
+	}
+}

@@ -1,13 +1,16 @@
 package adremoval
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"abs/pkg/config"
 	"abs/pkg/detect"
+	"abs/pkg/types"
 )
 
 func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {
@@ -34,11 +37,12 @@ func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {
 	}))
 	defer server.Close()
 	enabled := true
-	cfg := Config{ActiveProfileID: 3, Profiles: []LLMProfile{{ID: 3, Name: "OpenRouter Test", Type: "openrouter", URL: server.URL, Model: "test-model"}}}
+	cfg := types.Config{ActiveProfileID: 3, Profiles: []types.LLMProfile{{ID: 3, Name: "OpenRouter Test", Type: "openrouter", URL: server.URL, Model: "test-model"}}}
 	cfg.OpenRouterAPIKeyEnabled = &enabled
 	for _, query := range []string{"", "3", "OpenRouter Test", "test-model"} {
-		profile := selectProfile(cfg, query)
-		if _, err := detectAdsLLM("[0s -> 10s] A short discussion.", profile); err != nil {
+		profile, _ := config.SelectLLMProfile(&cfg, query)
+		detector := detect.NewLLMAdDetector(profile, profile.APIKey, detect.DefaultLLMTimeout)
+		if _, err := detector.DetectAds(context.Background(), "[0s -> 10s] A short discussion."); err != nil {
 			t.Fatalf("query %q: %v", query, err)
 		}
 		if cfg.Profiles[0].APIKey != "" {
@@ -51,7 +55,7 @@ func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {
 		t.Fatalf("requests=%d, want %d", requests, want)
 	}
 	enabled = false
-	if profile := selectProfile(cfg, "3"); profile.APIKey != "" {
+	if profile, _ := config.SelectLLMProfile(&cfg, "3"); profile.APIKey != "" {
 		t.Fatal("disabled credentials were resolved")
 	}
 }

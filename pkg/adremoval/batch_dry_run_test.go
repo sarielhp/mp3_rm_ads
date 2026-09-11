@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sort"
 	"testing"
+
+	"abs/pkg/types"
 )
 
 func snapshotTree(t *testing.T, root string) map[string]string {
@@ -71,12 +73,12 @@ func TestProcDryRunMutatesNothing(t *testing.T) {
 
 	before := snapshotTree(t, dir)
 
-	opts := ProcOptions{
+	opts := types.ProcOptions{
 		Quiet:  true,
 		DryRun: true,
 	}
 	opts.Local = true
-	ProcessFiles([]string{dir}, opts, Config{}, "proc")
+	ProcessFiles([]string{dir}, opts, types.Config{}, "proc")
 
 	if diffs := diffTrees(before, snapshotTree(t, dir)); len(diffs) > 0 {
 		t.Errorf("--dry-run modified the tree:\n  %v", diffs)

@@ -396,15 +396,5 @@ func ResolveManifestDest(localPodcastsDir string, item types.RemoteBatchJobItem)
 }
 
 func SyncAudiobookshelfDuration(cfg *types.Config, filePath string, duration float64) {
-	if cfg == nil {
-		return
-	}
-	if cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" && cfg.PodfetchURL == "" && cfg.PodfetchDBPath == "" {
-		return
-	}
-	b, err := backend.FromAppConfig(cfg, true)
-	if err != nil || b == nil {
-		return
-	}
-	_ = b.SyncDuration(filePath, duration)
+	_ = backend.SyncEpisodeDuration(cfg, filePath, duration)
 }

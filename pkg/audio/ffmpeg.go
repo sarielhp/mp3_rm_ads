@@ -258,5 +258,21 @@ func CutAudioFFmpeg(inputFile string, keepSegments [][2]float64, outputFile stri
 	}
 	absInput, _ := filepath.Abs(inputFile)
 	absOutput, _ := filepath.Abs(outputFile)
-	return CutAudioFilterComplex(absInput, keepSegments, absOutput)
+	if !CutAudioFilterComplex(absInput, keepSegments, absOutput) {
+		return false
+	}
+	taggedOutput := absOutput + ".tagged" + filepath.Ext(absOutput)
+	if !strings.Contains(taggedOutput, "/.work/") {
+		workDir := util.WorkDirFor(absOutput)
+		if err := os.MkdirAll(workDir, 0755); err != nil {
+			return true
+		}
+		taggedOutput = filepath.Join(workDir, filepath.Base(absOutput)+".tagged"+filepath.Ext(absOutput))
+	}
+	if util.VerifyTempFile(taggedOutput) == nil && CopyTagsAndArt(absOutput, absInput, taggedOutput) {
+		if err := util.SafeMove(taggedOutput, absOutput); err != nil {
+			_ = os.Remove(taggedOutput)
+		}
+	}
+	return true
 }

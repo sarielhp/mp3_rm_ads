@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"abs/pkg/pipeline"
+	"abs/pkg/types"
 )
 
 func TestAuditRepairsAndQueuesDownloadedEpisodes(t *testing.T) {
@@ -27,20 +28,20 @@ func TestAuditRepairsAndQueuesDownloadedEpisodes(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			cfg := Config{PodcastsDir: root}
-			if err := RunTranscriptAudit(cfg, nil, ProcOptions{DryRun: true, Quiet: true}); err != nil {
+			cfg := types.Config{PodcastsDir: root}
+			if err := RunTranscriptAudit(cfg, nil, types.ProcOptions{DryRun: true, Quiet: true}); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := os.Stat(pipeline.StatusPathFor(path)); !os.IsNotExist(err) {
 				t.Fatal("dry run wrote status")
 			}
 			for i := 0; i < 2; i++ {
-				if err := RunTranscriptAudit(cfg, []string{root, path}, ProcOptions{Quiet: true}); err != nil {
+				if err := RunTranscriptAudit(cfg, []string{root, path}, types.ProcOptions{Quiet: true}); err != nil {
 					t.Fatal(err)
 				}
 			}
 			st, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(path))
-			if err != nil || st.Status != StateNeedsAdR {
+			if err != nil || st.Status != types.StateNeedsAdR {
 				t.Fatalf("status = %+v, error = %v", st, err)
 			}
 			queue := pipeline.QueuedEpisodes(filepath.Join(root, "show"))
@@ -62,7 +63,7 @@ func TestAuditReportsQueueErrors(t *testing.T) {
 	if err := os.WriteFile(queuePath, before, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := RunTranscriptAudit(Config{PodcastsDir: root}, nil, ProcOptions{Quiet: true}); err == nil {
+	if err := RunTranscriptAudit(types.Config{PodcastsDir: root}, nil, types.ProcOptions{Quiet: true}); err == nil {
 		t.Fatal("expected queue error")
 	}
 	after, err := os.ReadFile(queuePath)
@@ -82,7 +83,7 @@ func TestAuditFailedDetectionQueuesAndPreservesTranscript(t *testing.T) {
 	if err := os.WriteFile(transPath, transcript, 0644); err != nil {
 		t.Fatal(err)
 	}
-	if err := RunTranscriptAudit(Config{PodcastsDir: root}, nil, ProcOptions{Quiet: true}); err != nil {
+	if err := RunTranscriptAudit(types.Config{PodcastsDir: root}, nil, types.ProcOptions{Quiet: true}); err != nil {
 		t.Fatal(err)
 	}
 	if queue := pipeline.QueuedEpisodes(root); len(queue) != 1 {
@@ -95,7 +96,7 @@ func TestAuditFailedDetectionQueuesAndPreservesTranscript(t *testing.T) {
 }
 
 func TestStaleCleanAudioMessage(t *testing.T) {
-	clean := &EpisodeStatusFile{Status: StateDone, Cleaned: EpisodeAudioMeta{DurationSec: 90}}
+	clean := &types.EpisodeStatusFile{Status: types.StateDone, Cleaned: types.EpisodeAudioMeta{DurationSec: 90}}
 	if got := staleCleanAudioMessage(clean, 120); got == "" {
 		t.Fatal("expected original-length audio to be reported as uncut")
 	}
@@ -130,7 +131,7 @@ func TestAuditExcludesPrecutAndWorkFiles(t *testing.T) {
 
 func TestInvalidCleanStateMessageRequiresTranscript(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "episode.transcript.json")
-	clean := &EpisodeStatusFile{Status: StateDone}
+	clean := &types.EpisodeStatusFile{Status: types.StateDone}
 	if got := invalidCleanStateMessage(clean, 0, path); got == "" {
 		t.Fatal("expected missing transcript to invalidate clean status")
 	}
@@ -148,7 +149,7 @@ func TestInspectEpisodeTranscriptReportsCompletedEpisodeWithoutTranscript(t *tes
 		t.Fatal(err)
 	}
 	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
-	st.Status = StateDone
+	st.Status = types.StateDone
 	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st); err != nil {
 		t.Fatal(err)
 	}
@@ -165,7 +166,7 @@ func TestInspectEpisodeTranscriptRejectsShortCompletedTranscript(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
-	st.Status = StateDone
+	st.Status = types.StateDone
 	st.Original.DurationSec = 30
 	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st); err != nil {
 		t.Fatal(err)
@@ -186,20 +187,20 @@ func TestReportAndHealInvalidCleanStateResetsCleanState(t *testing.T) {
 		t.Fatal(err)
 	}
 	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
-	st.Status = StateDone
-	st.Cleaned = EpisodeAudioMeta{DurationSec: 90, AdDurationSec: 30}
+	st.Status = types.StateDone
+	st.Cleaned = types.EpisodeAudioMeta{DurationSec: 90, AdDurationSec: 30}
 	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := repairAuditedEpisode(&transcriptAuditItem{audioPath: audioPath, cleanStateMsg: "duration mismatch"}, Config{PodcastsDir: filepath.Dir(audioPath)}, false, true); err != nil {
+	if err := repairAuditedEpisode(&transcriptAuditItem{audioPath: audioPath, cleanStateMsg: "duration mismatch"}, types.Config{PodcastsDir: filepath.Dir(audioPath)}, false, true); err != nil {
 		t.Fatal(err)
 	}
 	healed, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(audioPath))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if healed.Status != StateNeedsAdR || healed.Cleaned.DurationSec != 0 {
+	if healed.Status != types.StateNeedsAdR || healed.Cleaned.DurationSec != 0 {
 		t.Fatalf("healed status = %+v, want NeedAdR without clean metadata", healed)
 	}
 	queued := pipeline.QueuedEpisodes(filepath.Dir(audioPath))

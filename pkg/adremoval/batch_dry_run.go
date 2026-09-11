@@ -1,15 +1,17 @@
 package adremoval
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/remote"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"abs/pkg/pipeline"
+	"abs/pkg/remote"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 type dryRunFileStatus struct {
@@ -17,18 +19,18 @@ type dryRunFileStatus struct {
 	status string
 }
 
-func auditFileStatus(inputFile string, opts ProcOptions) (category string, statusText string) {
-	mainMP3File, precutFile, _ := resolveAudioFiles(inputFile, opts)
+func auditFileStatus(inputFile string, opts types.ProcOptions) (category string, statusText string) {
+	mainMP3File, precutFile, _ := pipeline.ResolveAudioFiles(inputFile, opts.Verbose)
 	statFile := pipeline.StatusPathFor(mainMP3File)
 	st, _ := pipeline.LoadEpisodeStatus(statFile)
 
 	if st != nil {
 		switch st.Status {
-		case StateDone, StateCopiedBack, StateArchived:
+		case types.StateDone, types.StateCopiedBack, types.StateArchived:
 			return "completed", "Completed (Ad-Free)"
-		case StateReadyForCopyBack:
+		case types.StateReadyForCopyBack:
 			return "remote_pending", "Ready for Pull (Remote Done)"
-		case StateQueuedRemote, StateTranscribingRemotely, StateCuttingRemotely, StateAwaitingTranscription:
+		case types.StateQueuedRemote, types.StateTranscribingRemotely, types.StateCuttingRemotely, types.StateAwaitingTranscription:
 			return "remote_pending", fmt.Sprintf("Remote Processing (%s)", st.Status)
 		}
 	}
@@ -50,22 +52,22 @@ func auditFileStatus(inputFile string, opts ProcOptions) (category string, statu
 		return "completed", "Completed (Ad-Free)"
 	}
 	data, err := os.ReadFile(cutsFile)
-	var cd CutsData
+	var cd types.CutsData
 	if err == nil && json.Unmarshal(data, &cd) == nil && len(cd.CutIntervals) > 0 {
 		return "needs_cut", "Needs Audio Cutting"
 	}
 	return "completed", "Completed (0 ads)"
 }
 
-func fetchRemoteReadyCount(opts ProcOptions, config Config) (int, string) {
+func fetchRemoteReadyCount(opts types.ProcOptions, cfg types.Config) (int, string) {
 	if opts.Local {
 		return 0, ""
 	}
 	reqHost := ""
 	if opts.Remote {
-		reqHost = config.RemoteHost
+		reqHost = cfg.RemoteHost
 	}
-	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
+	h, isRem, err := remote.ResolveProcessingHost(&cfg, reqHost, nil)
 	if err != nil || !isRem || h == "" {
 		return 0, ""
 	}
@@ -74,8 +76,8 @@ func fetchRemoteReadyCount(opts ProcOptions, config Config) (int, string) {
 		return 0, h
 	}
 	remoteWorkDir := "~/abs_remote"
-	if config.RemoteWorkDir != "" {
-		remoteWorkDir = config.RemoteWorkDir
+	if cfg.RemoteWorkDir != "" {
+		remoteWorkDir = cfg.RemoteWorkDir
 	}
 	tempDonePath := filepath.Join(os.TempDir(), fmt.Sprintf("dryrun_done_%d.json", time.Now().UnixNano()))
 	remoteDoneFile := fmt.Sprintf("%s/done.json", remoteWorkDir)
@@ -83,7 +85,7 @@ func fetchRemoteReadyCount(opts ProcOptions, config Config) (int, string) {
 	if err := transport.Download(h, remoteDoneFile, tempDonePath); err == nil {
 		if doneM, err := remote.LoadDoneManifest(tempDonePath); err == nil && doneM != nil {
 			for _, it := range doneM.Episodes {
-				if it.Status == StateReadyForCopyBack {
+				if it.Status == types.StateReadyForCopyBack {
 					remoteReadyOnServer++
 				}
 			}
@@ -93,7 +95,7 @@ func fetchRemoteReadyCount(opts ProcOptions, config Config) (int, string) {
 	return remoteReadyOnServer, h
 }
 
-func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, opts ProcOptions, details []dryRunFileStatus) {
+func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, opts types.ProcOptions, details []dryRunFileStatus) {
 	totalNeedingAction := needsTx + needsLLM + needsCut
 	fmt.Println()
 	fmt.Println(util.Bold("DRY RUN: Audio Processing Pipeline Status"))
@@ -125,7 +127,7 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	}
 }
 
-func handleProcDryRun(files []string, opts ProcOptions, config Config) {
+func handleProcDryRun(files []string, opts types.ProcOptions, cfg types.Config) {
 	var needsTranscribe, needsLLM, needsCut, alreadyComplete, remotePending int
 	var details []dryRunFileStatus
 
@@ -149,6 +151,6 @@ func handleProcDryRun(files []string, opts ProcOptions, config Config) {
 		}
 	}
 
-	remoteReady, targetHost := fetchRemoteReadyCount(opts, config)
+	remoteReady, targetHost := fetchRemoteReadyCount(opts, cfg)
 	printDryRunSummary(len(files), needsTranscribe, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady, targetHost, opts, details)
 }

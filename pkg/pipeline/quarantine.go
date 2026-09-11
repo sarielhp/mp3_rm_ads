@@ -106,19 +106,22 @@ func QuarantineAbandonedDuplicates(podDir string, trackedEpisodes []backend.Epis
 			}
 			base := strings.TrimSuffix(mp3, ".mp3")
 
-			_ = QuarantineFile(mp3)
-			_ = QuarantineFile(base + ".cuts.json")
-			_ = QuarantineFile(base + ".transcript.json")
-			_ = QuarantineFile(mp3 + ".precut")
-			_ = QuarantineFile(base + ".srt")
-			_ = QuarantineFile(base + ".txt")
+			if err := QuarantineFile(mp3); err == nil {
+				_ = QuarantineFile(base + ".cuts.json")
+				_ = QuarantineFile(base + ".transcript.json")
+				_ = QuarantineFile(mp3 + ".precut")
+				_ = QuarantineFile(base + ".srt")
+				_ = QuarantineFile(base + ".txt")
 
-			quarantined = append(quarantined, fn)
+				quarantined = append(quarantined, fn)
+			}
 		}
 	}
 
 	if len(quarantined) > 0 {
-		_ = EnsureABSIgnore(podDir)
+		if err := EnsureABSIgnore(podDir); err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: failed to ensure .absignore in '%s': %v\n", podDir, err)
+		}
 	}
 
 	return quarantined

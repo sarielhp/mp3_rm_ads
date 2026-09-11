@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"abs/pkg/audio"
+	"abs/pkg/backend"
 	"abs/pkg/config"
 	"abs/pkg/detect"
 	"abs/pkg/format"
@@ -101,8 +102,7 @@ func HandleRecut(mainMP3File, sourceAudioFile, precutFile, outputFile, baseName 
 		return err
 	}
 
-	ExecuteRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir, keepSegments, totalDuration, cfg, opts, fileStartTime)
-	return nil
+	return ExecuteRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir, keepSegments, totalDuration, cfg, opts, fileStartTime)
 }
 
 func LoadRecutKeepSegments(cutsFile, mainMP3File string, totalDuration float64, selectedProfile types.LLMProfile, opts types.ProcOptions) ([][2]float64, types.CutsData, bool) {
@@ -148,41 +148,34 @@ func LoadRecutKeepSegments(cutsFile, mainMP3File string, totalDuration float64, 
 	return keepSegments, cutsData, true
 }
 
-func ExecuteRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir string, keepSegments [][2]float64, totalDuration float64, cfg types.Config, opts types.ProcOptions, fileStartTime time.Time) {
+func ExecuteRecutAudio(sourceAudioFile, precutFile, outputFile, tempOutputFile, mainMP3File, workDir string, keepSegments [][2]float64, totalDuration float64, cfg types.Config, opts types.ProcOptions, fileStartTime time.Time) error {
 	t0Recut := time.Now()
 	if !opts.Quiet {
 		fmt.Printf("Cutting ads with ffmpeg (%d non-ad clips)...\n", len(keepSegments))
 	}
 
 	if !audio.KeepFractionIsPlausible(sourceAudioFile, keepSegments) {
-		return
+		return fmt.Errorf("keep fraction not plausible for '%s'", sourceAudioFile)
 	}
 
-	filter := audio.BuildCutFilterComplex(keepSegments)
-	remoteHost := cfg.RemoteFFmpegHost
-	if opts.RemoteFFmpegHost != "" {
-		remoteHost = opts.RemoteFFmpegHost
-	}
-	if opts.Local {
-		remoteHost = ""
-	}
-
-	if remoteHost != "" {
-		remIn := fmt.Sprintf("/tmp/abs_ffmpeg_in_%d.mp3", time.Now().UnixNano())
-		remOut := fmt.Sprintf("/tmp/abs_ffmpeg_out_%d.mp3", time.Now().UnixNano())
-		cleanCmd := audio.BuildRemoteCutCleanupCmd(remIn, remOut)
-		ffmpegCmd := audio.BuildRemoteFFmpegCmd(remIn, filter, remOut)
-		_ = cleanCmd
-		_ = ffmpegCmd
+	if err := audio.DefaultProcessor.Cut(context.Background(), sourceAudioFile, keepSegments, tempOutputFile); err != nil {
+		_ = os.Remove(tempOutputFile)
+		_ = os.RemoveAll(workDir)
+		return fmt.Errorf("failed to cut audio for '%s': %w", mainMP3File, err)
 	}
 
 	if !opts.Quiet && opts.Verbose {
 		fmt.Printf("Audio Recutting finished in %s\n", format.FormatClock(time.Since(t0Recut).Seconds()))
 	}
 
-	_ = util.SafeMove(tempOutputFile, outputFile)
-	os.RemoveAll(workDir)
+	if err := util.SafeMove(tempOutputFile, outputFile); err != nil {
+		_ = os.Remove(tempOutputFile)
+		_ = os.RemoveAll(workDir)
+		return fmt.Errorf("failed to install cut audio '%s': %w", outputFile, err)
+	}
+	_ = os.RemoveAll(workDir)
 	FinishRecutStatusAndSummary(mainMP3File, precutFile, outputFile, totalDuration, cfg, opts, fileStartTime)
+	return nil
 }
 
 func FinishRecutStatusAndSummary(mainMP3File, precutFile, outputFile string, totalDuration float64, cfg types.Config, opts types.ProcOptions, fileStartTime time.Time) {
@@ -193,7 +186,7 @@ func FinishRecutStatusAndSummary(mainMP3File, precutFile, outputFile string, tot
 		pctCut = actualCut / totalDuration * 100
 	}
 
-	_ = UpdateEpisodeStatus(mainMP3File, func(st *types.EpisodeStatusFile) {
+	if err := UpdateEpisodeStatus(mainMP3File, func(st *types.EpisodeStatusFile) {
 		st.Status = types.StateDone
 		if util.FileExists(precutFile) {
 			st.Original.Filename = filepath.Base(precutFile)
@@ -207,7 +200,13 @@ func FinishRecutStatusAndSummary(mainMP3File, precutFile, outputFile string, tot
 		if fi, err := os.Stat(outputFile); err == nil {
 			st.Cleaned.SizeBytes = fi.Size()
 		}
-	})
+	}); err != nil && !opts.Quiet {
+		fmt.Fprintf(os.Stderr, "Warning: failed to update status for '%s': %v\n", mainMP3File, err)
+	}
+
+	if err := backend.SyncEpisodeDuration(&cfg, outputFile, newDuration); err != nil && !opts.Quiet {
+		fmt.Fprintf(os.Stderr, "Warning: failed to sync duration for '%s': %v\n", outputFile, err)
+	}
 
 	if !opts.Quiet {
 		fmt.Println()
@@ -302,22 +301,17 @@ func ExtractMetadataPrompt(sourceAudioFile string, id3TagsOut map[string]string,
 	return extracted
 }
 
-func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *types.TranscriptionData, err error) {
-	wp := config.GetActiveWhisperProfile(&cfg)
-	// wp is reassigned by routing and by the Gemini fallback, so the stamp is
-	// deferred until the backend that actually produced the result is known.
-	defer func() { transcribe.StampBackend(td, wp.Engine, wp.Model) }()
-	isHebrew := detect.IsHebrewAudio(sourceAudioFile, nil, whisperLang)
-	if isHebrew && whisperLang == "" {
-		whisperLang = "he"
+func resolveWhisperRoutingProfile(cfg *types.Config, sourceAudioFile string, opts types.ProcOptions, whisperLang *string) types.WhisperProfile {
+	wp := config.GetActiveWhisperProfile(cfg)
+	isHebrew := transcribe.IsHebrewAudio(sourceAudioFile, nil, *whisperLang)
+	if isHebrew && *whisperLang == "" {
+		*whisperLang = "he"
 	}
 	if opts.WhisperEngine != "" {
 		wp.Engine = types.WhisperEngine(opts.WhisperEngine)
 	} else if wp.Engine != types.WhisperEngineGemini {
-		// Route by language: the backends differ by an order of magnitude in
-		// speed, and the English-only models cannot handle every language.
-		lang := detect.WhisperTargetLanguage(cfg, isHebrew, whisperLang)
-		routed := detect.ResolveWhisperProfileForLanguage(cfg, lang)
+		lang := transcribe.WhisperTargetLanguage(*cfg, isHebrew, *whisperLang)
+		routed := transcribe.ResolveWhisperProfileForLanguage(*cfg, lang)
 		if routed.ID != wp.ID && !opts.Quiet {
 			fmt.Printf("   Language %s: routing to %s (%s)\n", strings.ToUpper(lang), routed.Name, config.WhisperEngineBadge(routed.Engine))
 		}
@@ -329,26 +323,27 @@ func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts type
 	if opts.WhisperModel != "" {
 		wp.Model = opts.WhisperModel
 	}
+	return wp
+}
 
-	if wp.Engine == types.WhisperEngineLocal {
-		return transcribe.RunWhisperCLITranscription(sourceAudioFile, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
+func handleGeminiWhisperFallback(ctx context.Context, sourceAudioFile string, cfg types.Config, opts types.ProcOptions, whisperPrompt, whisperLang string) (*types.TranscriptionData, types.WhisperProfile, types.Config, error) {
+	td, _, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, cfg, gemini.DefaultGeminiChunkSec)
+	if err == nil {
+		return td, types.WhisperProfile{}, cfg, nil
 	}
-	if wp.Engine == types.WhisperEngineGemini {
-		td, _, err := gemini.ProcessWithGeminiConfig(context.Background(), sourceAudioFile, cfg, gemini.DefaultGeminiChunkSec)
-		if err == nil {
-			return td, nil
-		}
-		if !opts.Quiet {
-			fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v). Falling back to Whisper...", err)) + "\n")
-		}
-		fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
-		fallbackWp := config.GetActiveWhisperProfile(&fallbackCfg)
-		if fallbackWp.Engine == types.WhisperEngineLocal {
-			return transcribe.RunWhisperCLITranscription(sourceAudioFile, fallbackWp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
-		}
-		wp, cfg = fallbackWp, fallbackCfg
+	if !opts.Quiet {
+		fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v). Falling back to Whisper...", err)) + "\n")
 	}
+	fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
+	fallbackWp := config.GetActiveWhisperProfile(&fallbackCfg)
+	if fallbackWp.Engine == types.WhisperEngineLocal {
+		res, runErr := transcribe.RunWhisperCLITranscription(sourceAudioFile, fallbackWp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
+		return res, fallbackWp, fallbackCfg, runErr
+	}
+	return nil, fallbackWp, fallbackCfg, err
+}
 
+func transcribeWhisperServerWithChunkFallback(sourceAudioFile string, cfg types.Config, opts types.ProcOptions, wp types.WhisperProfile, totalDuration, speedFactor float64, dockerContainer, whisperPrompt, whisperLang string) (*types.TranscriptionData, error) {
 	transcribe.AnnounceWhisperServer(cfg.WhisperURL, wp.Engine, dockerContainer, opts.Quiet)
 	chunkDuration := cfg.ChunkDurationSec
 	useChunks := opts.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
@@ -389,6 +384,24 @@ func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts type
 		)
 	}
 	return data, err
+}
+
+func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts types.ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string) (td *types.TranscriptionData, err error) {
+	wp := resolveWhisperRoutingProfile(&cfg, sourceAudioFile, opts, &whisperLang)
+	defer func() { transcribe.StampBackend(td, wp.Engine, wp.Model) }()
+
+	if wp.Engine == types.WhisperEngineLocal {
+		return transcribe.RunWhisperCLITranscription(sourceAudioFile, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
+	}
+	if wp.Engine == types.WhisperEngineGemini {
+		res, fallbackWp, fallbackCfg, err := handleGeminiWhisperFallback(context.Background(), sourceAudioFile, cfg, opts, whisperPrompt, whisperLang)
+		if res != nil || err == nil {
+			return res, nil
+		}
+		wp, cfg = fallbackWp, fallbackCfg
+	}
+
+	return transcribeWhisperServerWithChunkFallback(sourceAudioFile, cfg, opts, wp, totalDuration, speedFactor, dockerContainer, whisperPrompt, whisperLang)
 }
 
 func FormatTranscript(data *types.TranscriptionData, totalDuration float64) string {

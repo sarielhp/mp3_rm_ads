@@ -1,11 +1,13 @@
 package adremoval
 
 import (
-	"abs/pkg/util"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"abs/pkg/remote"
+	"abs/pkg/util"
 )
 
 type MockRemoteTransport struct {
@@ -94,7 +96,7 @@ func handleMockAckCmd(m *MockRemoteTransport, cmd string) {
 	if len(rels) > 0 && util.FileExists(filepath.Join(m.RemoteRoot, "remote_root", rels[0])) {
 		dir = filepath.Join(m.RemoteRoot, "remote_root")
 	}
-	_ = runRemoteAck(dir, rels)
+	_ = remote.RunRemoteAck(dir, rels)
 }
 
 func handleMockFilesystemCmd(m *MockRemoteTransport, cmd string) (string, bool) {

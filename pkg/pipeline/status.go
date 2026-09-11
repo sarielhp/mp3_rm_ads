@@ -78,7 +78,9 @@ func GetOrCreateEpisodeStatus(audioPath string) *types.EpisodeStatusFile {
 	PopulatePrecutOrCutsMeta(st, audioPath, fname, dur, sz)
 	PopulateAdsFromCutsFile(st, util.StripExt(audioPath)+".cuts.json")
 
-	_ = SaveEpisodeStatus(statPath, st)
+	if err := SaveEpisodeStatus(statPath, st); err != nil {
+		fmt.Fprintf(os.Stderr, "Warning: failed to initialize episode status file '%s': %v\n", statPath, err)
+	}
 	return st
 }
 
@@ -141,8 +143,19 @@ func PopulateAdsFromCutsFile(st *types.EpisodeStatusFile, cutsFile string) {
 	}
 }
 
+var statusUpdateMu util.SyncMutex
+
 func UpdateEpisodeStatus(audioPath string, mutate func(*types.EpisodeStatusFile)) error {
+	statusUpdateMu.Lock()
+	defer statusUpdateMu.Unlock()
+
 	statPath := StatusPathFor(audioPath)
+	lock, err := util.AcquireFileLockWithTimeout(statPath, 5*time.Second)
+	if err != nil || lock == nil {
+		return fmt.Errorf("status file is locked: %w", err)
+	}
+	defer lock.Release()
+
 	st := GetOrCreateEpisodeStatus(audioPath)
 	mutate(st)
 	if err := SaveEpisodeStatus(statPath, st); err != nil {

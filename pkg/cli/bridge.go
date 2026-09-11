@@ -140,7 +140,6 @@ func displayName(s string) string          { return util.DisplayName(s) }
 func stripExt(path string) string          { return util.StripExt(path) }
 func fileExists(path string) bool          { return util.FileExists(path) }
 func safeMove(src, dst string) error       { return util.SafeMove(src, dst) }
-func verifyTempFile(path string)           { util.VerifyTempFile(path) }
 func copyFile(src, dst string) error       { return util.CopyFileErr(src, dst) }
 func findMP3Files(dir string) []string     { return util.FindMP3Files(dir) }
 func stripHTML(s string) string            { return backend.StripHTML(s) }

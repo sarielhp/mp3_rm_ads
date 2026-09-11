@@ -1,29 +1,31 @@
 package adremoval
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/transcribe"
-	"abs/pkg/util"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 	"time"
+
+	"abs/pkg/config"
+	"abs/pkg/format"
+	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
+	"abs/pkg/remote"
+	"abs/pkg/transcribe"
+	"abs/pkg/types"
+	"abs/pkg/util"
 )
 
 // ProcessFiles removes ads from an already-resolved set of targets: audio
 // files, or directories to be expanded into the episodes their podcast's
 // ad-removal policy admits. Interpreting a command line into that set belongs
 // to the caller.
-func ProcessFiles(targets []string, opts ProcOptions, config Config, action string) {
+func ProcessFiles(targets []string, opts types.ProcOptions, cfg types.Config, action string) {
 	opts.Normalize()
 
-	expandedArgs := expandDirectoryArgs(targets, opts, config)
+	expandedArgs := expandDirectoryArgs(targets, opts, cfg)
 	if len(expandedArgs) == 0 {
 		if !opts.Quiet {
 			fmt.Println("No files or directories with audio found to process.")
@@ -32,24 +34,87 @@ func ProcessFiles(targets []string, opts ProcOptions, config Config, action stri
 	}
 
 	if opts.DryRun {
-		handleProcDryRun(expandedArgs, opts, config)
+		handleProcDryRun(expandedArgs, opts, cfg)
 		return
 	}
 
-	targetHost, err := resolveRemoteProcessingTargetHost(opts, config)
+	targetHost, err := resolveRemoteProcessingTargetHost(opts, cfg)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
 	if targetHost != "" {
-		handleRemoteBatchExecution(expandedArgs, opts, config, targetHost)
+		handleRemoteBatchExecution(expandedArgs, opts, cfg, targetHost)
 		return
 	}
 
-	executeLocalBatchProcessing(expandedArgs, opts, config, action)
+	executeLocalBatchProcessing(expandedArgs, opts, cfg, action)
 }
 
-func expandDirectoryArgs(args []string, opts ProcOptions, appCfg Config) []string {
+func groupAndFilterAudioByPodcast(rawMp3Files []string, opts types.ProcOptions, appCfg types.Config) []string {
+	filesByFolder := make(map[string][]string)
+	for _, f := range rawMp3Files {
+		epFolder := filepath.Dir(f)
+		if strings.HasSuffix(epFolder, "-1") || strings.HasSuffix(epFolder, "-1/") {
+			continue
+		}
+		folder := podcast.DetectPodcastDirForAudio(f)
+		filesByFolder[folder] = append(filesByFolder[folder], f)
+	}
+
+	var podFolders []string
+	for folder := range filesByFolder {
+		podFolders = append(podFolders, folder)
+	}
+	sort.Strings(podFolders)
+
+	var filtered []string
+	for _, podFolder := range podFolders {
+		fList := filesByFolder[podFolder]
+		podCfg := config.LoadPodcastConfig(podFolder, config.DefaultPodcastConfig(&appCfg))
+		if !opts.DryRun {
+			ensurePodcastConfig(podFolder, podCfg, opts.Quiet)
+		}
+		if config.NormalizeAdRemovalMode(podCfg.AdRemoval) == config.AdRemovalNone {
+			if opts.Verbose && !opts.Quiet {
+				fmt.Printf("Podcast config set to 'none' for '%s'. Skipping.\n", filepath.Base(podFolder))
+			}
+			continue
+		}
+		filtered = append(filtered, podcast.FilterByAdRemovalPolicy(fList, podFolder, podCfg)...)
+	}
+	return filtered
+}
+
+func expandSingleDirectoryArg(arg string, opts types.ProcOptions, appCfg types.Config) []string {
+	if !opts.DryRun {
+		removeWorkDirs(arg)
+	}
+	rawMp3Files := util.FindMP3Files(arg)
+	if len(rawMp3Files) == 0 {
+		if !opts.Quiet {
+			fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
+		}
+		return nil
+	}
+	return groupAndFilterAudioByPodcast(rawMp3Files, opts, appCfg)
+}
+
+func sortFilesByPublicationTime(files []string) {
+	if len(files) <= 1 {
+		return
+	}
+	sort.SliceStable(files, func(i, j int) bool {
+		ti := podcast.GetEpisodePublicationTime(files[i])
+		tj := podcast.GetEpisodePublicationTime(files[j])
+		if ti.Equal(tj) {
+			return files[i] < files[j]
+		}
+		return ti.After(tj)
+	})
+}
+
+func expandDirectoryArgs(args []string, opts types.ProcOptions, appCfg types.Config) []string {
 	var expandedArgs []string
 	hasPrintedScanning := false
 	printScanning := func(dir string) {
@@ -67,90 +132,31 @@ func expandDirectoryArgs(args []string, opts ProcOptions, appCfg Config) []strin
 		fi, err := os.Stat(arg)
 		if err == nil && fi.IsDir() {
 			printScanning(arg)
-			if !opts.DryRun {
-				removeWorkDirs(arg)
-			}
-			rawMp3Files := util.FindMP3Files(arg)
-			if len(rawMp3Files) == 0 {
-				if !opts.Quiet {
-					fmt.Printf("No MP3 files found in directory '%s'.\n", arg)
-				}
-				continue
-			}
-
-			filesByFolder := make(map[string][]string)
-			for _, f := range rawMp3Files {
-				// A re-download lands in a sibling folder suffixed "-1".
-				epFolder := filepath.Dir(f)
-				if strings.HasSuffix(epFolder, "-1") || strings.HasSuffix(epFolder, "-1/") {
-					continue
-				}
-				// Group by podcast, not by episode. With the podfetch layout
-				// <podcast>/<episode>/podcast.mp3 the episode folder holds no
-				// podcast.json, so grouping by it reads an empty config whose
-				// ad-removal mode defaults to "none" and silently drops every
-				// episode. The "latest" policy likewise needs a podcast's
-				// episodes in one group to pick the newest among them.
-				folder := podcast.DetectPodcastDirForAudio(f)
-				filesByFolder[folder] = append(filesByFolder[folder], f)
-			}
-
-			var podFolders []string
-			for folder := range filesByFolder {
-				podFolders = append(podFolders, folder)
-			}
-			sort.Strings(podFolders)
-
-			for _, podFolder := range podFolders {
-				fList := filesByFolder[podFolder]
-				podCfg := loadPodcastConfig(podFolder, appCfg)
-				if !opts.DryRun {
-					ensurePodcastConfig(podFolder, podCfg, opts.Quiet)
-				}
-				// Compare the normalized mode: the raw field is empty when a
-				// podcast has no config, which is not literally "none".
-				if config.NormalizeAdRemovalMode(podCfg.AdRemoval) == AdRemovalNone {
-					if opts.Verbose && !opts.Quiet {
-						fmt.Printf("Podcast config set to 'none' for '%s'. Skipping.\n", filepath.Base(podFolder))
-					}
-					continue
-				}
-				filtered := podcast.FilterByAdRemovalPolicy(fList, podFolder, podCfg)
-				expandedArgs = append(expandedArgs, filtered...)
-			}
+			expandedArgs = append(expandedArgs, expandSingleDirectoryArg(arg, opts, appCfg)...)
 		} else {
 			expandedArgs = append(expandedArgs, arg)
 		}
 	}
 
-	if len(expandedArgs) > 1 {
-		sort.SliceStable(expandedArgs, func(i, j int) bool {
-			ti := podcast.GetEpisodePublicationTime(expandedArgs[i])
-			tj := podcast.GetEpisodePublicationTime(expandedArgs[j])
-			if ti.Equal(tj) {
-				return expandedArgs[i] < expandedArgs[j]
-			}
-			return ti.After(tj)
-		})
-	}
+	sortFilesByPublicationTime(expandedArgs)
 	return expandedArgs
 }
 
-func resolveRemoteProcessingTargetHost(opts ProcOptions, config Config) (string, error) {
+func resolveRemoteProcessingTargetHost(opts types.ProcOptions, cfg types.Config) (string, error) {
 	if opts.Local {
 		return "", nil
 	}
 	reqHost := opts.RemoteHost
 	if opts.Remote && reqHost == "" {
-		reqHost = config.RemoteHost
+		reqHost = cfg.RemoteHost
 		if reqHost == "" {
-			reqHost = config.RemoteFFmpegHost
+			reqHost = cfg.RemoteFFmpegHost
 		}
 		if reqHost == "" {
 			return "", fmt.Errorf("remote processing requested without a remote host")
 		}
 	}
-	h, isRem, err := remote.ResolveProcessingHost(&config, reqHost, nil)
+	h, isRem, err := remote.ResolveProcessingHost(&cfg, reqHost, nil)
 	if err != nil {
 		return "", err
 	}
@@ -160,9 +166,9 @@ func resolveRemoteProcessingTargetHost(opts ProcOptions, config Config) (string,
 	return "", nil
 }
 
-func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config Config, targetHost string) {
+func handleRemoteBatchExecution(expandedArgs []string, opts types.ProcOptions, cfg types.Config, targetHost string) {
 	if !opts.NoCollect && !opts.DryRun {
-		if err := remote.RunRemotePull(&config, targetHost, nil, opts.Quiet, opts.Verbose); err != nil {
+		if err := remote.RunRemotePull(&cfg, targetHost, nil, opts.Quiet, opts.Verbose); err != nil {
 			if !opts.Quiet {
 				fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
 			}
@@ -174,7 +180,7 @@ func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config 
 		if strings.HasSuffix(f, ".json") {
 			continue
 		}
-		mainMP3File, _, _ := resolveAudioFiles(f, opts)
+		mainMP3File, _, _ := pipeline.ResolveAudioFiles(f, opts.Verbose)
 		if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && (pipeline.IsEpisodeClean(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
 			continue
 		}
@@ -185,31 +191,32 @@ func handleRemoteBatchExecution(expandedArgs []string, opts ProcOptions, config 
 		filesToPush = filesToPush[:opts.Count]
 	}
 	if len(filesToPush) == 0 {
-		remoteWorkDir := config.RemoteWorkDir
+		remoteWorkDir := cfg.RemoteWorkDir
 		if remoteWorkDir == "" {
 			remoteWorkDir = "~/abs_remote"
 		}
-		_ = remote.EnsureRemoteEnvironmentAndWorker(&config, targetHost, remoteWorkDir, nil, opts.Quiet)
+		_ = remote.EnsureRemoteEnvironmentAndWorker(&cfg, targetHost, remoteWorkDir, nil, opts.Quiet)
 		if !opts.Quiet {
 			fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
 		}
 		return
 	}
-	if err := remote.RunRemotePush(&config, filesToPush, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
-		fatalError("Error pushing batch to remote %s: %v\n", targetHost, err)
+	if err := remote.RunRemotePush(&cfg, filesToPush, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
+		fmt.Fprintf(os.Stderr, "Error pushing batch to remote %s: %v\n", targetHost, err)
+		os.Exit(1)
 	}
 }
 
-func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config Config, action string) error {
-	wp := getActiveWhisperProfile(config)
+func executeLocalBatchProcessing(expandedArgs []string, opts types.ProcOptions, cfg types.Config, action string) error {
+	wp := config.GetActiveWhisperProfile(&cfg)
 	if opts.WhisperEngine != "" {
-		wp.Engine = WhisperEngine(opts.WhisperEngine)
+		wp.Engine = types.WhisperEngine(opts.WhisperEngine)
 	}
-	if wp.Engine != WhisperEngineLocal && wp.Engine != WhisperEngineGemini {
-		transcribe.WakeServer(config.WhisperURL, config.WhisperWakeCommand, opts.Quiet)
+	if wp.Engine != types.WhisperEngineLocal && wp.Engine != types.WhisperEngineGemini {
+		transcribe.WakeServer(cfg.WhisperURL, cfg.WhisperWakeCommand, opts.Quiet)
 	}
 
-	selectedProfile := selectProfile(config, opts.UseLLM)
+	selectedProfile, _ := config.SelectLLMProfile(&cfg, opts.UseLLM)
 	batchStartTime := time.Now()
 
 	totalFiles := len(expandedArgs)
@@ -217,7 +224,7 @@ func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config
 	failures := 0
 
 	for idx, inputFile := range expandedArgs {
-		hasError, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, opts, config, action, batchStartTime, selectedProfile)
+		hasError, processedFlag, stopFlag := processSingleAudioFile(idx, len(expandedArgs), processedCount, inputFile, opts, cfg, action, batchStartTime, selectedProfile)
 		if hasError || (!processedFlag && !stopFlag && (opts.ForceTranscribe || opts.ForceLLM || opts.Recut || !pipeline.IsEpisodeClean(inputFile))) {
 			failures++
 		}
@@ -240,4 +247,39 @@ func executeLocalBatchProcessing(expandedArgs []string, opts ProcOptions, config
 		return fmt.Errorf("%d episode(s) failed or could not be processed", failures)
 	}
 	return nil
+}
+
+func ensurePodcastConfig(dir string, cfg config.PodcastConfig, quiet bool) {
+	if util.FileExists(filepath.Join(dir, config.PodcastConfigFileName)) {
+		return
+	}
+	if cfg.ID == "" {
+		cfg.ID = podcast.GetOrSetPodcastShortID(dir, filepath.Base(dir))
+	}
+	if err := config.SavePodcastConfig(dir, cfg); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Warning: could not write default config for %s: %v\n", filepath.Base(dir), err)
+		}
+		return
+	}
+	if !quiet {
+		fmt.Printf("Created default %s for '%s' (ad removal: %s)\n",
+			config.PodcastConfigFileName, filepath.Base(dir), cfg.AdRemoval)
+	}
+}
+
+func removeWorkDirs(dir string) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return
+	}
+	for _, entry := range entries {
+		if entry.IsDir() {
+			if entry.Name() == ".work" {
+				_ = os.RemoveAll(filepath.Join(dir, entry.Name()))
+			} else {
+				removeWorkDirs(filepath.Join(dir, entry.Name()))
+			}
+		}
+	}
 }

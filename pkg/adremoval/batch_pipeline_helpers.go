@@ -2,6 +2,7 @@ package adremoval
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -17,7 +18,7 @@ import (
 	"abs/pkg/util"
 )
 
-func validateTranscriptSanity(data *TranscriptionData, totalDuration float64, quiet bool) bool {
+func validateTranscriptSanity(data *types.TranscriptionData, totalDuration float64, quiet bool) bool {
 	if totalDuration <= 0 || data == nil {
 		return true
 	}
@@ -139,53 +140,77 @@ func printFullSummary(verbose bool, totalDuration, newDuration, actualCut float6
 	}
 }
 
-func checkPrecutSymlink(precutFile string) {
+func checkPrecutSymlink(precutFile string) error {
 	info, err := os.Lstat(precutFile)
 	if err == nil && info.Mode()&os.ModeSymlink != 0 {
-		fatalError("ERROR: Pre-cut backup file %q is a symlink. Refusing to overwrite.\n", precutFile)
+		return fmt.Errorf("pre-cut backup file %q is a symlink, refusing to overwrite", precutFile)
 	}
+	return nil
 }
 
-func prepareWhisperFallbackConfig(cfg Config) Config {
-	fallback := cfg
-	for _, wp := range cfg.WhisperProfiles {
-		engine := wp.Engine
-		if engine == "" {
-			engine = config.InferWhisperEngine(wp)
-		}
-		if engine == WhisperEngineGemini || engine == types.WhisperEngineRemote {
-			continue
-		}
-		if engine == WhisperEngineLocal || engine == WhisperEngineDocker {
-			fallback.ActiveWhisperID = wp.ID
-			return fallback
-		}
+func isGeminiEngine(cfg types.Config, opts types.ProcOptions) bool {
+	if opts.WhisperEngine == string(types.WhisperEngineGemini) {
+		return true
 	}
-	for _, wp := range cfg.WhisperProfiles {
-		engine := wp.Engine
-		if engine == "" {
-			engine = config.InferWhisperEngine(wp)
-		}
-		if engine != WhisperEngineGemini {
-			fallback.ActiveWhisperID = wp.ID
-			return fallback
-		}
-	}
-	fallback.WhisperEngine = WhisperEngineLocal
-	return fallback
+	wp := config.GetActiveWhisperProfile(&cfg)
+	return wp.Engine == types.WhisperEngineGemini
 }
 
-func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, opts ProcOptions, selectedProfile LLMProfile, fileStartTime time.Time) bool {
+func updateStatusAdDetection(mainMP3File string, successful bool, status, model, errMsg string) error {
+	return pipeline.UpdateEpisodeStatus(mainMP3File, func(st *types.EpisodeStatusFile) {
+		st.AdDetectionSuccessful = &successful
+		st.AdDetectionStatus = status
+		st.AdDetectionModel = model
+		st.AdDetectionError = errMsg
+		if !successful {
+			st.Status = types.StateNeedsAdR
+		}
+	})
+}
+
+func updateTranscriptAdDetectionStatus(jsonFile string, successful bool, status, model, errMsg string, adCount int) error {
+	if !util.FileExists(jsonFile) {
+		return nil
+	}
+	raw, err := os.ReadFile(jsonFile)
+	if err != nil {
+		return err
+	}
+	var data map[string]interface{}
+	if err := json.Unmarshal(raw, &data); err != nil {
+		return err
+	}
+	data["ad_detection_successful"] = successful
+	data["ad_detection_status"] = status
+	if model != "" {
+		data["ad_detection_model"] = model
+	}
+	if errMsg != "" {
+		data["ad_detection_error"] = errMsg
+	} else {
+		delete(data, "ad_detection_error")
+	}
+	if successful {
+		data["ad_segments_count"] = adCount
+	}
+	content, err := json.MarshalIndent(data, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(jsonFile, append(content, '\n'), 0644)
+}
+
+func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, cfg types.Config, opts types.ProcOptions, selectedProfile types.LLMProfile, fileStartTime time.Time) bool {
 	transcribe.AnnounceStart(totalDuration, opts.Quiet)
 	ctx := context.Background()
 	t0Step1 := time.Now()
 
-	chunkDur := defaultGeminiChunkSec
-	if config.ChunkDurationSec > 0 {
-		chunkDur = float64(config.ChunkDurationSec)
+	chunkDur := gemini.DefaultGeminiChunkSec
+	if cfg.ChunkDurationSec > 0 {
+		chunkDur = float64(cfg.ChunkDurationSec)
 	}
-	td, ads, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
-	transcribe.StampBackend(td, WhisperEngineGemini, config.GetGeminiModel())
+	td, ads, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, cfg, chunkDur)
+	transcribe.StampBackend(td, types.WhisperEngineGemini, cfg.GetGeminiModel())
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "\nError processing with Gemini Flash: %v\n\n", err)
 		return false
@@ -204,8 +229,12 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	}
 
 	t0Step2 := time.Now()
-	_ = updateTranscriptAdDetectionStatus(jsonFile, true, "completed", "gemini-flash", "", len(ads))
-	updateStatusAdDetection(mainMP3File, true, "completed", "gemini-flash", "")
+	if err := updateTranscriptAdDetectionStatus(jsonFile, true, "completed", "gemini-flash", "", len(ads)); err != nil && opts.Verbose {
+		fmt.Fprintf(os.Stderr, "Warning: failed to update transcript ad status: %v\n", err)
+	}
+	if err := updateStatusAdDetection(mainMP3File, true, "completed", "gemini-flash", ""); err != nil && opts.Verbose {
+		fmt.Fprintf(os.Stderr, "Warning: failed to update status ad detection: %v\n", err)
+	}
 	if len(ads) == 0 {
 		handleNoAdsDetected(mainMP3File, sourceAudioFile, outputFile, totalDuration, selectedProfile, opts, fileStartTime, t0Step1, t0Step2)
 		return true
@@ -213,5 +242,5 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 
 	cutsResult := format.SaveCutsJSON(mainMP3File, totalDuration, ads, &selectedProfile, opts.Quiet)
 	t0Step3 := time.Now()
-	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, config, opts, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
+	return executeLocalAudioCutting(sourceAudioFile, mainMP3File, precutFile, outputFile, cutsResult.KeepSegments, ads, totalDuration, cfg, opts, selectedProfile, fileStartTime, t0Step1, t0Step2, t0Step3)
 }

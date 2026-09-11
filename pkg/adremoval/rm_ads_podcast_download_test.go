@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"abs/pkg/backend"
+	"abs/pkg/podcast"
 	"abs/pkg/types"
 )
 
@@ -68,7 +69,7 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 		Quiet:       true,
 	})
 
-	resolved := &ResolvedPodcast{
+	resolved := &podcast.ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "My Show",
 		ShortID:    "ms",
@@ -76,7 +77,7 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 		UUID:       "item-1",
 	}
 
-	cfg := Config{
+	cfg := types.Config{
 		PodcastsDir: tmp,
 		BackendConfig: types.BackendConfig{
 			AudiobookshelfURL:   srv.URL,

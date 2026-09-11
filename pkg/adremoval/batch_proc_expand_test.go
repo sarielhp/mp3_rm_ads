@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"abs/pkg/backend"
+	"abs/pkg/types"
 )
 
 // writeEpisode lays out one episode the way podfetch does:
@@ -49,7 +50,7 @@ func TestExpandDirectoryArgsFindsNestedPodfetchEpisodes(t *testing.T) {
 	writePodcastConfig(t, lib, "Muted", "none")
 	writeEpisode(t, lib, "Muted", "Episode C")
 
-	got := expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true, DryRun: true}, Config{})
+	got := expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true, DryRun: true}, types.Config{})
 	sort.Strings(got)
 	want := []string{wantA, wantB}
 	sort.Strings(want)
@@ -73,7 +74,7 @@ func TestExpandDirectoryArgsAppliesLatestPolicyPerPodcast(t *testing.T) {
 	writeEpisode(t, lib, "Show", "Episode B")
 	writeEpisode(t, lib, "Show", "Episode C")
 
-	got := expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true, DryRun: true}, Config{})
+	got := expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true, DryRun: true}, types.Config{})
 	if len(got) != 1 {
 		t.Fatalf("expected the latest episode only, got %d: %v", len(got), got)
 	}
@@ -85,7 +86,7 @@ func TestGetActiveBackendForPodfetchDoesNotTouchAudiobookshelf(t *testing.T) {
 	backend.SetAudiobookshelfDisabled(true)
 	t.Cleanup(func() { backend.SetAudiobookshelfDisabled(false) })
 
-	cfg := Config{}
+	cfg := types.Config{}
 	cfg.BackendType = "podfetch"
 	cfg.PodfetchURL = "http://127.0.0.1:8000"
 
@@ -104,7 +105,7 @@ func TestExpandDirectoryArgsProcessesPodcastWithNoConfig(t *testing.T) {
 	lib := t.TempDir()
 	want := writeEpisode(t, lib, "Unconfigured", "Episode A")
 
-	got := expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true, DryRun: true}, Config{})
+	got := expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true, DryRun: true}, types.Config{})
 	if len(got) != 1 || got[0] != want {
 		t.Fatalf("expected the unconfigured podcast's episode, got %v", got)
 	}
@@ -115,9 +116,9 @@ func TestExpandDirectoryArgsHonoursAppDefaultAdRemoval(t *testing.T) {
 	lib := t.TempDir()
 	writeEpisode(t, lib, "Unconfigured", "Episode A")
 
-	cfg := Config{}
+	cfg := types.Config{}
 	cfg.DefaultAdRemoval = "none"
-	if got := expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true, DryRun: true}, cfg); len(got) != 0 {
+	if got := expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true, DryRun: true}, cfg); len(got) != 0 {
 		t.Fatalf("expected nothing with default_ad_policy=none, got %v", got)
 	}
 }
@@ -128,13 +129,13 @@ func TestExpandDirectoryArgsWritesMissingPodcastConfig(t *testing.T) {
 	cfgPath := filepath.Join(lib, "Unconfigured", "podcast.json")
 
 	// A dry run must not write anything.
-	expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true, DryRun: true}, Config{})
+	expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true, DryRun: true}, types.Config{})
 	if _, err := os.Stat(cfgPath); err == nil {
 		t.Fatal("dry run wrote a config file")
 	}
 
 	// A real run materializes the defaults it just acted on.
-	expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true}, Config{})
+	expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true}, types.Config{})
 	data, err := os.ReadFile(cfgPath)
 	if err != nil {
 		t.Fatalf("expected a default config to be created: %v", err)
@@ -165,7 +166,7 @@ func TestExpandDirectoryArgsKeepsExistingPodcastConfig(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expandDirectoryArgs([]string{lib}, ProcOptions{Quiet: true}, Config{})
+	expandDirectoryArgs([]string{lib}, types.ProcOptions{Quiet: true}, types.Config{})
 
 	after, err := os.ReadFile(cfgPath)
 	if err != nil {

@@ -135,7 +135,9 @@ func SaveJSONTranscript(mainFile string, data *types.TranscriptionData, jsonFile
 	if err != nil {
 		return err
 	}
-	_ = json.Unmarshal(raw, &outputData)
+	if err := json.Unmarshal(raw, &outputData); err != nil {
+		return err
+	}
 
 	for k, v := range id3Tags {
 		outputData["id3_"+k] = v
