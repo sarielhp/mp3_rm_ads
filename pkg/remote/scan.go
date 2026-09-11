@@ -240,6 +240,7 @@ func transcribeAndDetectAdsRemoteScan(audioFile string, origDuration float64, cf
 	_ = pipeline.SaveJSONTranscript(audioFile, transData, transcriptJSON, quiet, map[string]string{})
 
 	formattedTranscript := pipeline.FormatTranscript(transData, origDuration)
+	detect.AnnounceAdDetection(profile, quiet)
 	adSegments, err := detect.DetectAdsLLM(formattedTranscript, profile, profile.APIKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("ad detection failed: %w", err)

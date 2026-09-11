@@ -56,7 +56,7 @@ func TranscribeWhisperContext(ctx context.Context, audioPath, whisperURL string,
 
 		if attempt < maxRetries {
 			if !quiet {
-				fmt.Printf("\nWhisper server error (attempt %d/%d): %v\n", attempt, maxRetries, err)
+				fmt.Printf("\nWhisper server error (attempt %d/%d): %v\n\n", attempt, maxRetries, err)
 				fmt.Printf("   Retrying in %d seconds...\n", retryDelay)
 			}
 			select {

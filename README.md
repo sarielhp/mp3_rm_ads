@@ -263,6 +263,7 @@ abs rm_ads -f all episode.mp3
 ```bash
 # List available profiles
 abs config llm list
+abs config llm test 3       # Test profile 3 with a sample ad-detection request
 
 # Use specific profile
 abs rm_ads --profile 2 episode.mp3

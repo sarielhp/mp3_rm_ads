@@ -111,6 +111,19 @@ func SelectWhisperProfile(cfg *types.Config, query string) (types.WhisperProfile
 }
 
 func SelectLLMProfile(cfg *types.Config, query string) (types.LLMProfile, error) {
+	profile, err := selectLLMProfile(cfg, query)
+	if err != nil {
+		return profile, err
+	}
+	if !cfg.IsOpenRouterAPIKeyEnabled() && (profile.Type == "openrouter" || strings.Contains(profile.URL, "openrouter") || strings.HasPrefix(profile.APIKey, "sk-or-")) {
+		profile.APIKey = ""
+	} else {
+		profile.APIKey = ResolveOpenRouterAPIKey(profile, cfg)
+	}
+	return profile, nil
+}
+
+func selectLLMProfile(cfg *types.Config, query string) (types.LLMProfile, error) {
 	if cfg == nil || len(cfg.Profiles) == 0 {
 		return types.LLMProfile{}, fmt.Errorf("no LLM profiles available")
 	}

@@ -204,7 +204,7 @@ func ExtractKeywordsLLM(transcriptText string, profile types.LLMProfile, apiKey 
 	content, err := CallLLMChat(profile, KeywordExtractionPrompt, userPrompt, 200, 60*time.Second, apiKey)
 	if err != nil {
 		if !quiet {
-			fmt.Fprintf(os.Stderr, "Error during keyword extraction: %v\n", err)
+			fmt.Fprintf(os.Stderr, "\nError during keyword extraction: %v\n\n", err)
 		}
 		return ""
 	}

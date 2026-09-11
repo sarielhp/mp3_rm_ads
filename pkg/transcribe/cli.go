@@ -225,6 +225,9 @@ func RunWhisperCLITranscription(audioPath string, profile types.WhisperProfile, 
 
 func RunWhisperCLITranscriptionContext(ctx context.Context, audioPath string, profile types.WhisperProfile, quiet, verbose bool, prompt, lang string) (*types.TranscriptionData, error) {
 	bin := ResolveWhisperCLIBinary(profile.CliBinary)
+	if !quiet {
+		fmt.Println("\n" + util.BoldCyan(fmt.Sprintf("Transcription: local Whisper COMMAND-LINE TOOL (%s; model: %s)", bin, profile.Model)))
+	}
 	modelPath, err := ResolveWhisperModelPath(profile.Model)
 	if err != nil {
 		return nil, err
@@ -256,9 +259,6 @@ func RunWhisperCLITranscriptionContext(ctx context.Context, audioPath string, pr
 	} else {
 		cmd.Stderr = &errBuf
 		cmd.Stdout = nil
-	}
-	if !quiet {
-		fmt.Printf("   Transcribing with local GPU (whisper-cli %s)...\n", filepath.Base(modelPath))
 	}
 	if err := cmd.Run(); err != nil {
 		if ctx.Err() != nil {

@@ -3,6 +3,7 @@ package adremoval
 import (
 	"abs/pkg/gemini"
 	"abs/pkg/transcribe"
+	"abs/pkg/util"
 	"context"
 	"fmt"
 	"strings"
@@ -90,6 +91,7 @@ func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp Wh
 	if wp.Engine == WhisperEngineLocal {
 		return transcribe.RunWhisperCLITranscriptionContext(ctx, audioPath, wp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
 	}
+	transcribe.AnnounceWhisperServer(wp.URL, wp.Engine, dockerContainer, opts.Quiet)
 	chunkDuration := config.ChunkDurationSec
 	useChunks := opts.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 	if useChunks {
@@ -107,6 +109,7 @@ func runLocalCandidateTranscription(ctx context.Context, audioPath string, wp Wh
 }
 
 func runSpeculativeParallelRace(parentCtx context.Context, audioPath string, config Config, opts ProcOptions, totalDuration, speedFactor float64, whisperPrompt, whisperLang, dockerContainer string, isHebrew bool) (*TranscriptionData, []AdSegment, bool, error) {
+	transcribe.AnnounceStart(totalDuration, opts.Quiet)
 	ctx, cancel := context.WithCancel(parentCtx)
 	defer cancel()
 
@@ -150,12 +153,12 @@ func awaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <
 			if gr.err == nil {
 				cancel()
 				if !quiet {
-					fmt.Println("   [Race] Gemini Flash completed first with cuts!")
+					fmt.Println("\n" + util.BoldGreen("Transcription complete: using Gemini result (including ad detection)."))
 				}
 				return gr.td, gr.ads, true, nil
 			}
 			if !quiet {
-				fmt.Printf("   [Race] Gemini returned (%v); awaiting running local Whisper...\n", gr.err)
+				fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v); continuing with the running Whisper service...", gr.err)) + "\n")
 			}
 			if localRes != nil {
 				if localRes.err == nil {
@@ -168,12 +171,12 @@ func awaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <
 			if lr.err == nil {
 				cancel()
 				if !quiet {
-					fmt.Println("   [Race] Local Whisper completed first!")
+					fmt.Println("\n" + util.BoldGreen("Transcription complete: using Whisper result."))
 				}
 				return lr.td, nil, false, nil
 			}
 			if !quiet {
-				fmt.Printf("   [Race] Local Whisper failed (%v); awaiting Gemini...\n", lr.err)
+				fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Whisper failed (%v); continuing with the running Gemini service...", lr.err)) + "\n")
 			}
 			if geminiRes != nil {
 				if geminiRes.err == nil {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"abs/pkg/detect"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -110,6 +111,7 @@ func processBatchItem(item *RemoteBatchJobItem, batchDir, outDir string, config 
 	saveJSONTranscript(outMP3, transcriptionData, outTranscriptJSON, quiet, id3Tags)
 
 	formattedTranscript := formatTranscript(transcriptionData, origDuration)
+	detect.AnnounceAdDetection(selectedProfile, quiet)
 	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
 	if err != nil {
 		return fmt.Errorf("ad detection failed: %w", err)

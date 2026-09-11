@@ -2,6 +2,7 @@ package adremoval
 
 import (
 	"abs/pkg/audio"
+	"abs/pkg/detect"
 	"abs/pkg/format"
 	"abs/pkg/pipeline"
 	"abs/pkg/remote"
@@ -118,7 +119,7 @@ func handleSpeculativeStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 
 	td, ads, geminiWon, err := runSpeculativeParallelRace(context.Background(), sourceAudioFile, config, opts, totalDuration, speedFactor, whisperPrompt, config.WhisperLanguage, dockerContainer, isHebrew)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Speculative transcription error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nSpeculative transcription error: %v\n\n", err)
 		return false, false
 	}
 
@@ -166,7 +167,7 @@ func handleGeminiStepWithFallback(sourceAudioFile, jsonFile, mainMP3File, precut
 	}
 	if !opts.Quiet {
 		fmt.Println()
-		fmt.Println(util.BoldYellow("Warning: Gemini processing failed. Falling back to local Whisper transcription..."))
+		fmt.Println("\n" + util.BoldYellow("Transcription: Gemini processing failed. Falling back to Whisper...") + "\n")
 	}
 	fallbackCfg := prepareWhisperFallbackConfig(config)
 	fallbackOpts := opts
@@ -190,7 +191,7 @@ func runLocalTranscriptionStep(sourceAudioFile, jsonFile, mainMP3File string, to
 
 	transcriptionData, err := pipeline.LoadOrTranscribe(sourceAudioFile, jsonFile, config, opts, selectedProfile, totalDuration, speedFactor, config.WhisperLanguage, config.WhisperPrompt, id3Tags, &isNewlyTranscribed, &t0Step1)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nError: %v\n\n", err)
 		return nil, t0Step1, false, true
 	}
 
@@ -214,16 +215,17 @@ func runLocalAdDetectionAndCutStep(transcriptionData *TranscriptionData, sourceA
 	t0Step2 := time.Now()
 	if !opts.Quiet {
 		fmt.Println()
-		fmt.Println(util.BoldYellow("Step 2/3: Detecting ad/sponsor segments via LLM (" + selectedProfile.Model + ")..."))
+		fmt.Println(util.BoldYellow("Step 2/3: Detecting ad/sponsor segments..."))
 	}
 	jsonFile := opts.TranscriptPath
 	if jsonFile == "" {
 		jsonFile = util.StripExt(mainMP3File) + ".transcript.json"
 	}
+	detect.AnnounceAdDetection(selectedProfile, opts.Quiet)
 	adSegments, err := detectAdsLLM(formattedTranscript, selectedProfile)
 	if err != nil {
 		if !opts.Quiet {
-			fmt.Fprintf(os.Stderr, "Error during LLM ad detection: %v\n", err)
+			fmt.Fprintf(os.Stderr, "\nError during LLM ad detection: %v\n\n", err)
 		}
 		_ = updateTranscriptAdDetectionStatus(jsonFile, false, "failed", selectedProfile.Model, err.Error(), 0)
 		updateStatusAdDetection(mainMP3File, false, "failed", selectedProfile.Model, err.Error())

@@ -251,6 +251,12 @@ func ProcessWithGeminiFlashChunks(ctx context.Context, audioPath, projectID, buc
 }
 
 func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg types.Config, chunkDurSec float64) (*types.TranscriptionData, []types.AdSegment, error) {
+	backendLabel, model := "Vertex AI", "gemini-1.5-flash"
+	if config.ResolveGeminiAPIKey(&cfg) != "" {
+		backendLabel, model = "Google AI Studio", cfg.GetGeminiModel()
+	}
+	fmt.Println("\n" + util.BoldCyan(fmt.Sprintf("Transcription: Gemini via %s (model: %s)", backendLabel, model)))
+	fmt.Println(util.BoldCyan(fmt.Sprintf("Ad detection: Gemini via %s (model: %s; combined with transcription)", backendLabel, model)))
 	totDur := audio.GetAudioDuration(audioPath)
 	if totDur <= 0 {
 		totDur = DefaultGeminiChunkSec
@@ -261,12 +267,6 @@ func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg types.Co
 		return nil, nil, err
 	}
 	defer cleanup()
-
-	apiKey := config.ResolveGeminiAPIKey(&cfg)
-	backendLabel := "Vertex AI"
-	if apiKey != "" {
-		backendLabel = "Google AI Studio"
-	}
 
 	if len(prepared) > 1 {
 		fmt.Printf("Splitting '%s' (%s) into %d parallel 30-min chunks for Gemini [%s]...\n",

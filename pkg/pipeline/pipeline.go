@@ -240,10 +240,7 @@ func LoadOrTranscribe(sourceAudioFile, jsonFile string, cfg types.Config, opts t
 		return &td, nil
 	}
 
-	if !opts.Quiet {
-		fmt.Println()
-		fmt.Println(util.BoldYellow("Step 1/3: Transcribing audio via AMD GPU Whisper server..."))
-	}
+	transcribe.AnnounceStart(totalDuration, opts.Quiet)
 
 	if whisperPrompt == "" {
 		whisperPrompt = ExtractMetadataPrompt(sourceAudioFile, id3TagsOut, selectedProfile, opts)
@@ -332,17 +329,17 @@ func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts type
 			return td, nil
 		}
 		if !opts.Quiet {
-			fmt.Printf("\nWarning: Gemini transcription failed (%v). Falling back to local Whisper...\n", err)
+			fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v). Falling back to Whisper...", err)) + "\n")
 		}
 		fallbackCfg := config.PrepareWhisperFallbackConfig(cfg)
 		fallbackWp := config.GetActiveWhisperProfile(&fallbackCfg)
 		if fallbackWp.Engine == types.WhisperEngineLocal {
 			return transcribe.RunWhisperCLITranscription(sourceAudioFile, fallbackWp, opts.Quiet, opts.Verbose, whisperPrompt, whisperLang)
 		}
-		wp = fallbackWp
-		cfg = fallbackCfg
+		wp, cfg = fallbackWp, fallbackCfg
 	}
 
+	transcribe.AnnounceWhisperServer(cfg.WhisperURL, wp.Engine, dockerContainer, opts.Quiet)
 	chunkDuration := cfg.ChunkDurationSec
 	useChunks := opts.UseChunks || (chunkDuration > 0 && totalDuration > float64(chunkDuration)*1.5)
 
@@ -369,7 +366,7 @@ func RunWhisperTranscription(sourceAudioFile string, cfg types.Config, opts type
 	)
 	if err != nil && strings.Contains(err.Error(), "failed to") && totalDuration > 300 {
 		if !opts.Quiet {
-			fmt.Println("\nFull-file transcription failed - retrying in chunks...")
+			fmt.Println("\n" + util.BoldYellow("Transcription: full-file Whisper request failed; retrying on the same server in chunks...") + "\n")
 		}
 		chunkDur := cfg.ChunkDurationSec
 		if chunkDur <= 0 {

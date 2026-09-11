@@ -26,7 +26,11 @@ func listProfiles(cfg Config) {
 		costInfo := config.GetProfileCost(p)
 
 		headerStr := fmt.Sprintf("  [%d] %s", p.ID, p.Name)
-		fmt.Printf("%s%s\n", headerStr, defaultBadge)
+		headerStr += defaultBadge
+		if isDefault {
+			headerStr = util.BoldGreen(headerStr)
+		}
+		fmt.Println(headerStr)
 		fmt.Printf("      - Model:     %s\n", p.Model)
 		fmt.Printf("      - Type:      %s%s\n", p.Type, hasKey)
 		fmt.Printf("      - Pricing:   %s\n", costInfo.CostStr)

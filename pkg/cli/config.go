@@ -88,6 +88,7 @@ func buildConfigLLMSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 		Name:        "llm",
 		Description: "Manage LLM profiles for ad detection",
 		Subcommands: []clihelp.Command{
+			buildConfigLLMTestSubcommand(opts, action),
 			{
 				Name:        "list",
 				Description: "List all configured LLM profiles",
@@ -337,6 +338,8 @@ func runConfigCommand(config *Config, cli CLIOptions) error {
 		printConfig(*config)
 	case "llm-list":
 		listProfiles(*config)
+	case "llm-test":
+		return testLLMProfile(*config, cli.ConfigVal)
 	case "llm-default":
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
 			setDefaultProfile(config, id)

@@ -12,6 +12,7 @@ import (
 	"abs/pkg/format"
 	"abs/pkg/gemini"
 	"abs/pkg/pipeline"
+	"abs/pkg/transcribe"
 	"abs/pkg/types"
 	"abs/pkg/util"
 )
@@ -175,6 +176,7 @@ func prepareWhisperFallbackConfig(cfg Config) Config {
 }
 
 func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, outputFile string, totalDuration float64, config Config, opts ProcOptions, selectedProfile LLMProfile, fileStartTime time.Time) bool {
+	transcribe.AnnounceStart(totalDuration, opts.Quiet)
 	ctx := context.Background()
 	t0Step1 := time.Now()
 
@@ -184,7 +186,7 @@ func runGeminiPipelineStep(sourceAudioFile, jsonFile, mainMP3File, precutFile, o
 	}
 	td, ads, err := gemini.ProcessWithGeminiConfig(ctx, sourceAudioFile, config, chunkDur)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "Error processing with Gemini Flash: %v\n", err)
+		fmt.Fprintf(os.Stderr, "\nError processing with Gemini Flash: %v\n\n", err)
 		return false
 	}
 

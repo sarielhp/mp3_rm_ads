@@ -23,7 +23,7 @@ func WakeServer(whisperURL string, wakeCmd string, quiet bool) {
 		cmd.Stdout = os.Stdout
 		cmd.Stderr = os.Stderr
 		if err := cmd.Run(); err != nil && !quiet {
-			fmt.Printf("Warning: Whisper wake command failed: %v\n", err)
+			fmt.Printf("\nWarning: Whisper wake command failed: %v\n\n", err)
 		}
 	}
 	client := &http.Client{Timeout: 5 * time.Second}
