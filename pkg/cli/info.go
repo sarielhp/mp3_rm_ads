@@ -174,6 +174,7 @@ func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
 			clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
 			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
+			clihelp.Bool(&opts.TestGemini, "--test-gemini", false, "Test Gemini API key and quota status"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "info"

@@ -20,7 +20,8 @@ func TestAwaitRaceResultsGeminiWins(t *testing.T) {
 		Ads: []types.AdSegment{{Start: 10, End: 20, Reason: "Sponsor"}},
 	}
 
-	td, ads, geminiWon, err := AwaitRaceResults(ctx, cancel, geminiCh, localCh, true)
+	testWp := types.WhisperProfile{Name: "whisper-gpu", URL: "http://127.0.0.1:8080"}
+	td, ads, geminiWon, err := AwaitRaceResults(ctx, cancel, geminiCh, localCh, testWp, true)
 	if err != nil || !geminiWon {
 		t.Fatalf("expected Gemini to win: err=%v, geminiWon=%v", err, geminiWon)
 	}
@@ -39,7 +40,8 @@ func TestAwaitRaceResultsGemini503FallbackToLocal(t *testing.T) {
 	geminiCh <- GeminiRaceResult{Err: errors.New("503 UNAVAILABLE: High demand")}
 	localCh <- LocalRaceResult{TD: &types.TranscriptionData{Text: "Local text"}}
 
-	td, ads, geminiWon, err := AwaitRaceResults(ctx, cancel, geminiCh, localCh, true)
+	testWp := types.WhisperProfile{Name: "whisper-gpu", URL: "http://127.0.0.1:8080"}
+	td, ads, geminiWon, err := AwaitRaceResults(ctx, cancel, geminiCh, localCh, testWp, true)
 	if err != nil || geminiWon {
 		t.Fatalf("expected local to win after Gemini 503: err=%v, geminiWon=%v", err, geminiWon)
 	}

@@ -37,8 +37,10 @@ func resolveTestCommandArgs(args []string, opts *CLIOptions) error {
 		}
 	case "kitty":
 		opts.TestKitty = true
+	case "gemini":
+		opts.TestGemini = true
 	default:
-		return fmt.Errorf("unknown test target %q (valid targets: whisper, abs, kitty)", args[0])
+		return fmt.Errorf("unknown test target %q (valid targets: whisper, abs, kitty, gemini)", args[0])
 	}
 	return nil
 }

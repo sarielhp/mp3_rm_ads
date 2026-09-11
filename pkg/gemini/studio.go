@@ -158,6 +158,22 @@ func DeleteGeminiStudioFile(ctx context.Context, apiKey, fileName string) {
 	}
 }
 
+type geminiErrorDetail struct {
+	Type     string            `json:"@type"`
+	Reason   string            `json:"reason"`
+	Domain   string            `json:"domain"`
+	Metadata map[string]string `json:"metadata"`
+}
+
+type geminiErrorResponse struct {
+	Error struct {
+		Code    int                 `json:"code"`
+		Message string              `json:"message"`
+		Status  string              `json:"status"`
+		Details []geminiErrorDetail `json:"details"`
+	} `json:"error"`
+}
+
 func CallGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI string) (*types.GeminiResponsePayload, error) {
 	var err error
 	apiKey, err = validateKey(apiKey)
@@ -169,6 +185,55 @@ func CallGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 	}
 	url := fmt.Sprintf("https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent", modelName)
 
+	reqBytes, err := buildStudioGeneratePayload(fileURI)
+	if err != nil {
+		return nil, err
+	}
+
+	client := &http.Client{Timeout: 5 * time.Minute}
+	const maxAttempts = 3
+	var lastErr error
+
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+
+		body, statusCode, err := executeStudioRequest(ctx, client, url, apiKey, reqBytes)
+		if err != nil {
+			lastErr = fmt.Errorf("gemini studio request failed: %w", err)
+		} else if statusCode == http.StatusOK {
+			return ParseGeminiStudioResponse(body)
+		} else {
+			errMsg := FormatGeminiErrorBody(body)
+			lastErr = fmt.Errorf("gemini studio generateContent HTTP %d: %s", statusCode, errMsg)
+			if statusCode == http.StatusTooManyRequests {
+				if IsGeminiDailyQuotaExhausted(body) {
+					TripCircuitBreaker(errMsg, DefaultDailyQuotaCooldown)
+					return nil, lastErr
+				}
+				if attempt == maxAttempts {
+					TripCircuitBreaker(errMsg, DefaultRateLimitCooldown)
+				}
+			} else if statusCode != http.StatusServiceUnavailable && statusCode != http.StatusGatewayTimeout {
+				return nil, lastErr
+			}
+		}
+
+		if attempt < maxAttempts {
+			delay := time.Duration(attempt*2) * time.Second
+			select {
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			case <-time.After(delay):
+			}
+		}
+	}
+
+	return nil, lastErr
+}
+
+func buildStudioGeneratePayload(fileURI string) ([]byte, error) {
 	reqPayload := map[string]any{
 		"contents": []map[string]any{
 			{
@@ -190,49 +255,95 @@ func CallGeminiStudioProcessor(ctx context.Context, apiKey, modelName, fileURI s
 			"temperature":        0.1,
 		},
 	}
-
-	reqBytes, err := json.Marshal(reqPayload)
+	data, err := json.Marshal(reqPayload)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal studio request: %w", err)
 	}
+	return data, nil
+}
 
+func executeStudioRequest(ctx context.Context, client *http.Client, url, apiKey string, reqBytes []byte) ([]byte, int, error) {
 	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(reqBytes))
 	if err != nil {
-		return nil, fmt.Errorf("failed to create studio request: %w", err)
+		return nil, 0, fmt.Errorf("failed to create studio request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("x-goog-api-key", apiKey)
 
-	client := &http.Client{Timeout: 5 * time.Minute}
 	resp, err := client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("gemini studio request failed: %w", err)
+		return nil, 0, err
 	}
 	defer resp.Body.Close()
 
-	body, _ := io.ReadAll(resp.Body)
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("gemini studio generateContent HTTP %d: %s", resp.StatusCode, FormatGeminiErrorBody(body))
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, resp.StatusCode, err
 	}
-
-	return ParseGeminiStudioResponse(body)
+	return body, resp.StatusCode, nil
 }
 
 func FormatGeminiErrorBody(body []byte) string {
-	var errResp struct {
-		Error struct {
-			Message string `json:"message"`
-			Status  string `json:"status"`
-		} `json:"error"`
-	}
+	var errResp geminiErrorResponse
 	if err := json.Unmarshal(body, &errResp); err == nil && errResp.Error.Message != "" {
 		msg := strings.TrimSpace(errResp.Error.Message)
+		if quotaInfo := extractGeminiQuotaDetails(&errResp); quotaInfo != "" {
+			return fmt.Sprintf("%s [%s]", msg, quotaInfo)
+		}
 		if errResp.Error.Status != "" {
 			return fmt.Sprintf("%s (%s)", msg, errResp.Error.Status)
 		}
 		return msg
 	}
 	return strings.TrimSpace(string(body))
+}
+
+func extractGeminiQuotaDetails(errResp *geminiErrorResponse) string {
+	for _, d := range errResp.Error.Details {
+		if len(d.Metadata) == 0 {
+			continue
+		}
+		limit := d.Metadata["quota_limit"]
+		val := d.Metadata["quota_limit_value"]
+		consumer := d.Metadata["consumer"]
+
+		var parts []string
+		if limit != "" {
+			if strings.Contains(limit, "PerDay") || val == "1500" {
+				parts = append(parts, "Free Tier: Daily quota exhausted (1,500 req/day limit)")
+			} else if strings.Contains(limit, "PerMinute") || val == "15" {
+				parts = append(parts, "Free Tier: Rate limit exceeded (15 req/min limit)")
+			} else {
+				parts = append(parts, fmt.Sprintf("Quota: %s", limit))
+			}
+		}
+		if val != "" && !strings.Contains(limit, "PerDay") && !strings.Contains(limit, "PerMinute") {
+			parts = append(parts, fmt.Sprintf("Limit: %s", val))
+		}
+		if consumer != "" {
+			parts = append(parts, fmt.Sprintf("Project: %s", strings.TrimPrefix(consumer, "projects/")))
+		}
+		if len(parts) > 0 {
+			return strings.Join(parts, ", ")
+		}
+	}
+	return ""
+}
+
+func IsGeminiDailyQuotaExhausted(body []byte) bool {
+	var errResp geminiErrorResponse
+	if err := json.Unmarshal(body, &errResp); err != nil {
+		return false
+	}
+	for _, d := range errResp.Error.Details {
+		limit := d.Metadata["quota_limit"]
+		val := d.Metadata["quota_limit_value"]
+		if strings.Contains(limit, "PerDay") || val == "1500" {
+			return true
+		}
+	}
+	msg := strings.ToLower(errResp.Error.Message)
+	return strings.Contains(msg, "exceeded your current quota") && !strings.Contains(msg, "per minute")
 }
 
 func ParseGeminiStudioResponse(body []byte) (*types.GeminiResponsePayload, error) {

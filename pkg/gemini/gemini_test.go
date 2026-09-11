@@ -322,6 +322,50 @@ func TestFormatGeminiErrorBody(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, got)
 	}
 
+	dailyErr := []byte(`{
+		"error": {
+			"code": 429,
+			"message": "You exceeded your current quota, please check your plan and billing details.",
+			"status": "RESOURCE_EXHAUSTED",
+			"details": [{
+				"metadata": {
+					"consumer": "projects/10394829",
+					"quota_limit": "GenerateContentRequestsPerDayPerProjectPerRegion",
+					"quota_limit_value": "1500"
+				}
+			}]
+		}
+	}`)
+	gotDaily := FormatGeminiErrorBody(dailyErr)
+	if !strings.Contains(gotDaily, "Free Tier: Daily quota exhausted") || !strings.Contains(gotDaily, "Project: 10394829") {
+		t.Errorf("expected daily quota details in formatted error, got: %s", gotDaily)
+	}
+	if !IsGeminiDailyQuotaExhausted(dailyErr) {
+		t.Errorf("expected IsGeminiDailyQuotaExhausted to be true")
+	}
+
+	rateLimitErr := []byte(`{
+		"error": {
+			"code": 429,
+			"message": "Rate limit exceeded",
+			"status": "RESOURCE_EXHAUSTED",
+			"details": [{
+				"metadata": {
+					"consumer": "projects/999",
+					"quota_limit": "GenerateContentRequestsPerMinutePerProjectPerRegion",
+					"quota_limit_value": "15"
+				}
+			}]
+		}
+	}`)
+	gotRate := FormatGeminiErrorBody(rateLimitErr)
+	if !strings.Contains(gotRate, "Free Tier: Rate limit exceeded (15 req/min limit)") {
+		t.Errorf("expected rate limit details in formatted error, got: %s", gotRate)
+	}
+	if IsGeminiDailyQuotaExhausted(rateLimitErr) {
+		t.Errorf("expected IsGeminiDailyQuotaExhausted to be false for rate limit error")
+	}
+
 	plainErr := []byte("plain error message")
 	gotPlain := FormatGeminiErrorBody(plainErr)
 	if gotPlain != "plain error message" {

@@ -9,7 +9,7 @@ import (
 
 func preparePublicationSource(action string, cfg Config, cli CLIOptions) error {
 	podcast.SetPublicationSource("", nil)
-	if action == "info" && cli.InfoSubcmd == "transcript" {
+	if action == "info" && (cli.InfoSubcmd == "transcript" || cli.InfoSubcmd == "check" || cli.StatusSubcmd == "check") {
 		return nil
 	}
 	if action == "offload" && cli.RemoteSubcmd != "push" {

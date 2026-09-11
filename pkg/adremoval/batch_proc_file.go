@@ -13,6 +13,7 @@ import (
 	"abs/pkg/config"
 	"abs/pkg/detect"
 	"abs/pkg/format"
+	"abs/pkg/gemini"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/transcribe"
@@ -105,6 +106,12 @@ func canRunSpeculativeRace(cfg types.Config, opts types.ProcOptions) bool {
 		return false
 	}
 	if opts.WhisperEngine != "" && opts.WhisperEngine != string(types.WhisperEngineGemini) {
+		return false
+	}
+	if isOpen, until, reason := gemini.IsCircuitBreakerOpen(); isOpen {
+		if !opts.Quiet {
+			fmt.Printf("   %s\n", util.BoldYellow(fmt.Sprintf("Gemini in cooldown until %s (%s); skipping speculative race and using Whisper directly.", until.Format("15:04:05"), reason)))
+		}
 		return false
 	}
 	return true

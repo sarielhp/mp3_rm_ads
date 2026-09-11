@@ -194,6 +194,7 @@ type CLIOptions struct {
 	TestABSMap        bool
 	TestABSDownload   bool
 	TestKitty         bool
+	TestGemini        bool
 	ResetCache        bool
 	AddWhisper        string
 	RemoveWhisper     int

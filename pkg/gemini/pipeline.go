@@ -196,10 +196,25 @@ func ProcessGeminiChunksParallel(ctx context.Context, chunks []types.GeminiChunk
 	var mu util.Mutex
 	var firstErr error
 
+	const maxConcurrentChunks = 2
+	sem := make(chan struct{}, maxConcurrentChunks)
+
 	for i, ch := range chunks {
 		wg.Add(1)
 		go func(idx int, chunk types.GeminiChunkInfo) {
 			defer wg.Done()
+			select {
+			case <-ctx.Done():
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = ctx.Err()
+				}
+				mu.Unlock()
+				return
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			}
+
 			if ctx.Err() != nil {
 				mu.Lock()
 				if firstErr == nil {
@@ -270,6 +285,10 @@ func ProcessWithGeminiFlashChunks(ctx context.Context, audioPath, projectID, buc
 }
 
 func ProcessWithGeminiConfig(ctx context.Context, audioPath string, cfg types.Config, chunkDurSec float64) (*types.TranscriptionData, []types.AdSegment, error) {
+	if isOpen, until, reason := IsCircuitBreakerOpen(); isOpen {
+		return nil, nil, fmt.Errorf("gemini in cooldown until %s: %s", until.Format("15:04:05"), reason)
+	}
+
 	backendLabel, model := "Vertex AI", "gemini-1.5-flash"
 	if config.ResolveGeminiAPIKey(&cfg) != "" {
 		backendLabel, model = "Google AI Studio", cfg.GetGeminiModel()

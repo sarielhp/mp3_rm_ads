@@ -17,6 +17,8 @@ func runCheckCommand(config Config, cli CLIOptions) error {
 		}
 	} else if cli.TestKitty {
 		testKittyImage(cli.Args)
+	} else if cli.TestGemini {
+		return testGeminiAPI(&config, cli.Quiet)
 	} else if cli.TestABS {
 		b, err := backend.FromAppConfig(&config, cli.Quiet)
 		if err != nil {

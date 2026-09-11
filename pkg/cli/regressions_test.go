@@ -254,3 +254,24 @@ func TestRegressionIssue9_ProcHelpLineLimitAndBrevity(t *testing.T) {
 		t.Errorf("expected at most 8 visible flags in rm_ads command help, got %d", visibleFlags)
 	}
 }
+
+func TestCheckGeminiCommandTargetValidation(t *testing.T) {
+	var action string
+	var opts CLIOptions
+	app := buildCLIApp(&action, &opts)
+
+	if err := app.Execute([]string{"info", "check", "gemini"}); err != nil {
+		t.Fatalf("unexpected error executing info check gemini: %v", err)
+	}
+	if !opts.TestGemini {
+		t.Errorf("expected opts.TestGemini to be true")
+	}
+
+	opts = CLIOptions{}
+	if err := app.Execute([]string{"info", "check", "--test-gemini"}); err != nil {
+		t.Fatalf("unexpected error executing info check --test-gemini: %v", err)
+	}
+	if !opts.TestGemini {
+		t.Errorf("expected opts.TestGemini to be true with flag")
+	}
+}

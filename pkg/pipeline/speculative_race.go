@@ -86,10 +86,10 @@ func RunSpeculativeParallelRace(parentCtx context.Context, audioPath string, cfg
 		localCh <- LocalRaceResult{TD: td, Err: err}
 	}()
 
-	return AwaitRaceResults(ctx, cancel, geminiCh, localCh, opts.Quiet)
+	return AwaitRaceResults(ctx, cancel, geminiCh, localCh, localWp, opts.Quiet)
 }
 
-func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <-chan GeminiRaceResult, localCh <-chan LocalRaceResult, quiet bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
+func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <-chan GeminiRaceResult, localCh <-chan LocalRaceResult, localWp types.WhisperProfile, quiet bool) (*types.TranscriptionData, []types.AdSegment, bool, error) {
 	var geminiRes *GeminiRaceResult
 	var localRes *LocalRaceResult
 
@@ -105,7 +105,15 @@ func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <
 				return gr.TD, gr.Ads, true, nil
 			}
 			if !quiet {
-				fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v); continuing with the running Whisper service...", gr.Err)) + "\n")
+				fmt.Printf("\n%s\n", util.BoldYellow(fmt.Sprintf("Transcription: Gemini failed (%v)", gr.Err)))
+				target := localWp.URL
+				if target == "" {
+					target = localWp.Name
+				}
+				if target == "" {
+					target = "local service"
+				}
+				fmt.Printf("   ➔ %s\n\n", util.Bold(fmt.Sprintf("Continuing with running Whisper service (%s: %s)...", localWp.Name, target)))
 			}
 			if localRes != nil {
 				if localRes.Err == nil {
@@ -123,7 +131,8 @@ func AwaitRaceResults(ctx context.Context, cancel context.CancelFunc, geminiCh <
 				return lr.TD, nil, false, nil
 			}
 			if !quiet {
-				fmt.Println("\n" + util.BoldYellow(fmt.Sprintf("Transcription: Whisper failed (%v); continuing with the running Gemini service...", lr.Err)) + "\n")
+				fmt.Printf("\n%s\n", util.BoldYellow(fmt.Sprintf("Transcription: Whisper failed (%v)", lr.Err)))
+				fmt.Printf("   ➔ %s\n\n", util.Bold("Continuing with running Gemini service..."))
 			}
 			if geminiRes != nil {
 				if geminiRes.Err == nil {
