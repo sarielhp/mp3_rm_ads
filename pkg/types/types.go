@@ -145,12 +145,14 @@ type RemoteOptions struct {
 }
 
 type PolicyOptions struct {
-	AutoDownloadStr string
-	DownloadPolicy  string
-	DownloadK       int
-	AutoCleanupStr  string
-	CleanupDays     int
-	AdRemovalMode   string
+	AutoDownloadStr  string
+	DownloadPolicy   string
+	DownloadK        int
+	AutoCleanupStr   string
+	CleanupDays      int
+	AdRemovalMode    string
+	PolicyAll        bool
+	SetDefaultPolicy bool
 }
 
 type BackendOptions struct {

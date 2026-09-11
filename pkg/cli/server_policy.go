@@ -32,7 +32,7 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		podcastsDir = "."
 	}
 
-	if len(cli.Args) == 0 {
+	if len(cli.Args) == 0 && !cli.PolicyAll {
 		return fmt.Errorf("missing podcast identifier for policy command")
 	}
 
@@ -40,7 +40,162 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		return err
 	}
 
-	target := cli.Args[0]
+	target := ""
+	if len(cli.Args) > 0 {
+		target = cli.Args[0]
+	}
+
+	if strings.EqualFold(target, "default") {
+		return handleDefaultPolicy(cli)
+	}
+
+	if strings.EqualFold(target, "all") || cli.PolicyAll {
+		return handleAllPodcastsPolicy(cfg, podcastsDir, cli)
+	}
+
+	return handleSinglePodcastPolicy(cfg, podcastsDir, target, cli)
+}
+
+func handleDefaultPolicy(cli CLIOptions) error {
+	globalCfg := loadConfig()
+	applyDefaultPolicyChanges(&globalCfg, cli)
+	if err := config.SaveConfig(&globalCfg); err != nil {
+		return fmt.Errorf("failed to save global configuration: %w", err)
+	}
+	if cli.JSON {
+		res := map[string]any{
+			"default_download_policy": globalCfg.DefaultDownloadPolicy,
+			"default_download_k":      globalCfg.DefaultDownloadK,
+			"default_ad_removal":      globalCfg.DefaultAdRemoval,
+		}
+		data, _ := json.MarshalIndent(res, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+	fmt.Printf("Global default policy updated: download_policy=%s, download_k=%d, ad_removal=%s\n",
+		globalCfg.DefaultDownloadPolicy, globalCfg.DefaultDownloadK, globalCfg.DefaultAdRemoval)
+	return nil
+}
+
+func applyDefaultPolicyChanges(cfg *Config, cli CLIOptions) {
+	if cli.AutoDownloadStr != "" {
+		if parseBoolString(cli.AutoDownloadStr) {
+			if cfg.DefaultDownloadPolicy == "" || cfg.DefaultDownloadPolicy == config.DownloadPolicyNone {
+				cfg.DefaultDownloadPolicy = config.DownloadPolicyLatest
+			}
+		} else {
+			cfg.DefaultDownloadPolicy = config.DownloadPolicyNone
+		}
+	}
+	if cli.DownloadPolicy != "" {
+		cfg.DefaultDownloadPolicy = config.NormalizeDownloadPolicy(cli.DownloadPolicy)
+	}
+	if cli.DownloadK > 0 {
+		cfg.DefaultDownloadK = cli.DownloadK
+	}
+	if cli.AdRemovalMode != "" {
+		cfg.DefaultAdRemoval = config.NormalizeAdRemovalMode(cli.AdRemovalMode)
+	}
+}
+
+func handleAllPodcastsPolicy(cfg Config, podcastsDir string, cli CLIOptions) error {
+	entries := podcast.ScanPodcastDirs(podcastsDir)
+	if len(entries) == 0 {
+		return fmt.Errorf("no podcasts found in %s", podcastsDir)
+	}
+
+	hasUpdates := checkHasPolicyUpdates(cli)
+	if !hasUpdates {
+		return displayAllPodcastsPolicy(entries, cli)
+	}
+
+	return updateAllPodcastsPolicy(cfg, entries, cli)
+}
+
+func updateAllPodcastsPolicy(cfg Config, entries []podcast.PodcastDirEntry, cli CLIOptions) error {
+	updated := 0
+	var sampleCfg config.PodcastConfig
+	for _, entry := range entries {
+		pCfg := config.LoadPodcastConfig(entry.Dir, config.DefaultPodcastConfig(&cfg))
+		applyPolicyOptionChanges(&pCfg, cli)
+		if err := config.SavePodcastConfig(entry.Dir, pCfg); err != nil {
+			return fmt.Errorf("failed to save policy for %s: %w", entry.Title, err)
+		}
+		sampleCfg = pCfg
+		updated++
+	}
+
+	defaultMsg := ""
+	if cli.SetDefaultPolicy {
+		globalCfg := loadConfig()
+		applyDefaultPolicyChanges(&globalCfg, cli)
+		if err := config.SaveConfig(&globalCfg); err != nil {
+			return fmt.Errorf("failed to save global default configuration: %w", err)
+		}
+		defaultMsg = fmt.Sprintf(" (global default updated: %s)", globalCfg.DefaultDownloadPolicy)
+	}
+
+	if cli.JSON {
+		res := map[string]any{
+			"updated_count":   updated,
+			"auto_download":   sampleCfg.IsAutoDownloadEnabled(),
+			"download_policy": sampleCfg.DownloadPolicy,
+			"ad_removal":      sampleCfg.AdRemoval,
+			"set_default":     cli.SetDefaultPolicy,
+		}
+		data, _ := json.MarshalIndent(res, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	dlBadge := config.DownloadPolicyBadge(sampleCfg.DownloadPolicy, sampleCfg.DownloadK)
+	adBadge := config.AdRemovalModeBadge(sampleCfg.AdRemoval)
+	fmt.Printf("Policy updated for %d podcast(s): AutoDownload=%v %s, AdRemoval=%s %s%s\n",
+		updated, sampleCfg.IsAutoDownloadEnabled(), dlBadge, sampleCfg.AdRemoval, adBadge, defaultMsg)
+	return nil
+}
+
+func displayAllPodcastsPolicy(entries []podcast.PodcastDirEntry, cli CLIOptions) error {
+	var results []PodcastPolicyResult
+	for _, entry := range entries {
+		pCfg := config.LoadPodcastConfig(entry.Dir, config.PodcastConfig{})
+		results = append(results, PodcastPolicyResult{
+			ID:              entry.ShortID,
+			Title:           entry.Title,
+			AutoDownload:    pCfg.IsAutoDownloadEnabled(),
+			DownloadPolicy:  pCfg.DownloadPolicy,
+			DownloadK:       pCfg.DownloadK,
+			AutoCleanup:     pCfg.IsAutoCleanupEnabled(),
+			AutoCleanupDays: pCfg.AutoCleanupDays,
+			AdRemoval:       pCfg.AdRemoval,
+		})
+	}
+
+	if cli.JSON {
+		data, err := json.MarshalIndent(results, "", "  ")
+		if err != nil {
+			return err
+		}
+		fmt.Println(string(data))
+		return nil
+	}
+
+	fmt.Printf("\nPolicies for all podcasts (%d total):\n", len(results))
+	fmt.Printf("%-8s  %-30s  %-15s  %-12s\n", "ID", "TITLE", "AUTO DOWNLOAD", "AD REMOVAL")
+	fmt.Println(strings.Repeat("-", 72))
+	for _, r := range results {
+		dlBadge := config.DownloadPolicyBadge(r.DownloadPolicy, r.DownloadK)
+		title := r.Title
+		if len(title) > 30 {
+			title = title[:27] + "..."
+		}
+		fmt.Printf("%-8s  %-30s  %-15s  %-12s\n", r.ID, title, dlBadge, r.AdRemoval)
+	}
+	fmt.Println()
+	return nil
+}
+
+func handleSinglePodcastPolicy(cfg Config, podcastsDir, target string, cli CLIOptions) error {
 	resolved, err := podcast.ResolveAnyID(podcastsDir, target)
 	if err != nil {
 		return err
@@ -57,7 +212,20 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		return displayPodcastPolicy(pod, cli)
 	}
 
-	return updatePodcastPolicy(pod, cli)
+	if err := updatePodcastPolicy(pod, cli); err != nil {
+		return err
+	}
+
+	if cli.SetDefaultPolicy {
+		globalCfg := loadConfig()
+		applyDefaultPolicyChanges(&globalCfg, cli)
+		if err := config.SaveConfig(&globalCfg); err != nil {
+			return fmt.Errorf("failed to save global default configuration: %w", err)
+		}
+		fmt.Printf("Global default policy updated: default_download_policy=%s\n", globalCfg.DefaultDownloadPolicy)
+	}
+
+	return nil
 }
 
 func parseShorthandNumberPolicy(cli *CLIOptions) error {
@@ -89,7 +257,8 @@ func checkHasPolicyUpdates(cli CLIOptions) bool {
 		cli.DownloadK > 0 ||
 		cli.AutoCleanupStr != "" ||
 		cli.CleanupDays > 0 ||
-		cli.AdRemovalMode != ""
+		cli.AdRemovalMode != "" ||
+		cli.SetDefaultPolicy
 }
 
 func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
@@ -236,13 +405,15 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "policy",
 		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "abs server policy <podcast-id> [<number>] [options]",
+		UsageLine:   "abs server policy [<podcast-id>|all|default] [<number>] [options]",
 		Parameters: []clihelp.Param{
-			{Name: "<podcast-id>", Description: "Target podcast identifier"},
+			{Name: "[<podcast-id>|all|default]", Description: "Target podcast identifier, 'all' for all podcasts, or 'default' for global config"},
 			{Name: "[<number>]", Description: "Shorthand: auto-download latest K episodes with ad-removal all"},
 		},
-		Args: clihelp.RangeArgs(1, 2),
+		Args: clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
+			clihelp.Bool(&opts.PolicyAll, "--all", false, "Apply policy to all podcasts in library"),
+			clihelp.Bool(&opts.SetDefaultPolicy, "--set-default", false, "Also update global default configuration for new podcasts"),
 			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable automatic downloads (true/false)"),
 			clihelp.String(&opts.DownloadPolicy, "--download-policy <mode>", "", "Policy mode ('none', 'latest', 'latest_k', 'all')"),
 			clihelp.Int(&opts.DownloadK, "--download-k <num>", 0, "Number of latest episodes to download"),
@@ -257,12 +428,16 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 				Description: "Shorthand: auto-download latest 1 episode and remove all ads",
 			},
 			{
-				Line:        "abs server policy 'Huberman Lab' 3",
-				Description: "Shorthand: auto-download latest 3 episodes and remove all ads",
+				Line:        "abs server policy all --auto-download false",
+				Description: "Mark all podcasts as not auto-download",
 			},
 			{
-				Line:        "abs server policy 42 --download-policy all --ad-removal all",
-				Description: "Configure podcast 42 to download all episodes and remove ads",
+				Line:        "abs server policy all --auto-download false --set-default",
+				Description: "Disable auto-download for all podcasts and set global default",
+			},
+			{
+				Line:        "abs server policy default --download-policy none",
+				Description: "Set default download policy for new podcasts to none",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {

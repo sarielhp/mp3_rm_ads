@@ -183,3 +183,133 @@ func TestPolicyShorthandNumber(t *testing.T) {
 		t.Errorf("expected error for non-integer count")
 	}
 }
+
+func TestPolicyAllPodcasts(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "Podcast_One")
+	pod2 := filepath.Join(tempDir, "Podcast_Two")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+	podcast.GetOrSetPodcastShortID(pod1, "Podcast One")
+	podcast.GetOrSetPodcastShortID(pod2, "Podcast Two")
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{
+		Args: []string{"all"},
+		PolicyOptions: PolicyOptions{
+			AutoDownloadStr: "false",
+			DownloadPolicy:  "none",
+			AdRemovalMode:   "latest",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+	err := runPolicyCommand(cfg, cli)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	outBytes, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand all failed: %v", err)
+	}
+	if !strings.Contains(string(outBytes), "Policy updated for 2 podcast(s)") {
+		t.Errorf("expected output to mention 2 podcasts updated, got: %s", string(outBytes))
+	}
+
+	cfg1 := config.LoadPodcastConfig(pod1, config.PodcastConfig{})
+	cfg2 := config.LoadPodcastConfig(pod2, config.PodcastConfig{})
+	if cfg1.IsAutoDownloadEnabled() || cfg2.IsAutoDownloadEnabled() {
+		t.Errorf("expected auto download false for both podcasts")
+	}
+	if cfg1.DownloadPolicy != DownloadPolicyNone || cfg2.DownloadPolicy != DownloadPolicyNone {
+		t.Errorf("expected download policy none for both podcasts")
+	}
+}
+
+func TestPolicyDefaultUpdate(t *testing.T) {
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	_ = os.MkdirAll(configDir, 0755)
+	t.Setenv("HOME", tempDir)
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{
+		Args: []string{"default"},
+		PolicyOptions: PolicyOptions{
+			AutoDownloadStr: "false",
+			DownloadPolicy:  "none",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+	err := runPolicyCommand(cfg, cli)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	outBytes, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand default failed: %v", err)
+	}
+	if !strings.Contains(string(outBytes), "Global default policy updated") {
+		t.Errorf("expected global default policy updated output, got: %s", string(outBytes))
+	}
+
+	savedCfg, err := config.LoadConfig()
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+	if savedCfg.DefaultDownloadPolicy != DownloadPolicyNone {
+		t.Errorf("expected default_download_policy 'none', got %q", savedCfg.DefaultDownloadPolicy)
+	}
+}
+
+func TestPolicyAllWithSetDefault(t *testing.T) {
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, "config")
+	_ = os.MkdirAll(configDir, 0755)
+	t.Setenv("HOME", tempDir)
+
+	pod := filepath.Join(tempDir, "Podcast_Alpha")
+	_ = os.MkdirAll(pod, 0755)
+	podcast.GetOrSetPodcastShortID(pod, "Podcast Alpha")
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{
+		PolicyOptions: PolicyOptions{
+			PolicyAll:        true,
+			AutoDownloadStr:  "false",
+			DownloadPolicy:   "none",
+			SetDefaultPolicy: true,
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+	err := runPolicyCommand(cfg, cli)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	outBytes, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand --all --set-default failed: %v", err)
+	}
+	if !strings.Contains(string(outBytes), "Policy updated for 1 podcast(s)") {
+		t.Errorf("expected policy updated for 1 podcast, got: %s", string(outBytes))
+	}
+	if !strings.Contains(string(outBytes), "global default updated: none") {
+		t.Errorf("expected global default updated output, got: %s", string(outBytes))
+	}
+
+	savedCfg, err := config.LoadConfig()
+	if err != nil {
+		t.Fatalf("failed to load saved config: %v", err)
+	}
+	if savedCfg.DefaultDownloadPolicy != DownloadPolicyNone {
+		t.Errorf("expected default_download_policy 'none', got %q", savedCfg.DefaultDownloadPolicy)
+	}
+}
