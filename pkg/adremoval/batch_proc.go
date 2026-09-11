@@ -1,6 +1,7 @@
 package adremoval
 
 import (
+	"abs/pkg/config"
 	"abs/pkg/format"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
@@ -22,7 +23,7 @@ import (
 func ProcessFiles(targets []string, opts ProcOptions, config Config, action string) {
 	opts.Normalize()
 
-	expandedArgs := expandDirectoryArgs(targets, opts)
+	expandedArgs := expandDirectoryArgs(targets, opts, config)
 	if len(expandedArgs) == 0 {
 		if !opts.Quiet {
 			fmt.Println("No files or directories with audio found to process.")
@@ -48,7 +49,7 @@ func ProcessFiles(targets []string, opts ProcOptions, config Config, action stri
 	executeLocalBatchProcessing(expandedArgs, opts, config, action)
 }
 
-func expandDirectoryArgs(args []string, opts ProcOptions) []string {
+func expandDirectoryArgs(args []string, opts ProcOptions, appCfg Config) []string {
 	var expandedArgs []string
 	hasPrintedScanning := false
 	printScanning := func(dir string) {
@@ -79,7 +80,18 @@ func expandDirectoryArgs(args []string, opts ProcOptions) []string {
 
 			filesByFolder := make(map[string][]string)
 			for _, f := range rawMp3Files {
-				folder := filepath.Dir(f)
+				// A re-download lands in a sibling folder suffixed "-1".
+				epFolder := filepath.Dir(f)
+				if strings.HasSuffix(epFolder, "-1") || strings.HasSuffix(epFolder, "-1/") {
+					continue
+				}
+				// Group by podcast, not by episode. With the podfetch layout
+				// <podcast>/<episode>/podcast.mp3 the episode folder holds no
+				// podcast.json, so grouping by it reads an empty config whose
+				// ad-removal mode defaults to "none" and silently drops every
+				// episode. The "latest" policy likewise needs a podcast's
+				// episodes in one group to pick the newest among them.
+				folder := podcast.DetectPodcastDirForAudio(f)
 				filesByFolder[folder] = append(filesByFolder[folder], f)
 			}
 
@@ -90,12 +102,14 @@ func expandDirectoryArgs(args []string, opts ProcOptions) []string {
 			sort.Strings(podFolders)
 
 			for _, podFolder := range podFolders {
-				if strings.HasSuffix(podFolder, "-1") || strings.HasSuffix(podFolder, "-1/") {
-					continue
-				}
 				fList := filesByFolder[podFolder]
-				podCfg := loadPodcastConfig(podFolder)
-				if podCfg.AdRemoval == AdRemovalNone {
+				podCfg := loadPodcastConfig(podFolder, appCfg)
+				if !opts.DryRun {
+					ensurePodcastConfig(podFolder, podCfg, opts.Quiet)
+				}
+				// Compare the normalized mode: the raw field is empty when a
+				// podcast has no config, which is not literally "none".
+				if config.NormalizeAdRemovalMode(podCfg.AdRemoval) == AdRemovalNone {
 					if opts.Verbose && !opts.Quiet {
 						fmt.Printf("Podcast config set to 'none' for '%s'. Skipping.\n", filepath.Base(podFolder))
 					}

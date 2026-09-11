@@ -8,6 +8,7 @@ import (
 	"abs/pkg/format"
 	"abs/pkg/gemini"
 	"abs/pkg/pipeline"
+	"abs/pkg/podcast"
 	"abs/pkg/types"
 	"abs/pkg/util"
 	"encoding/json"
@@ -109,6 +110,21 @@ func fatalError(formatStr string, args ...interface{}) {
 	os.Exit(1)
 }
 
+// getPodfetchBackend builds the PodFetch client. The Audiobookshelf client is
+// not a substitute: asking for one while Audiobookshelf is disabled trips the
+// backend's runtime guard, which panics rather than returning an error.
+func getPodfetchBackend(cfg Config, quiet bool) (backend.Backend, error) {
+	return backend.New("podfetch", backend.Config{
+		Host:        cfg.PodfetchURL,
+		User:        cfg.PodfetchUser,
+		Pass:        cfg.PodfetchPass,
+		APIKey:      cfg.PodfetchAPIKey,
+		DBPath:      cfg.PodfetchDBPath,
+		PodcastsDir: cfg.PodcastsDir,
+		Quiet:       quiet,
+	})
+}
+
 // getBackend builds the Audiobookshelf client the engine uses to sync episode
 // durations back after a cut.
 func getBackend(cfg Config, quiet bool) (backend.Backend, error) {
@@ -146,8 +162,35 @@ func resolveOutputFile(mainMP3File string, opts ProcOptions, totalFiles int) str
 	return pipeline.ResolveOutputFile(mainMP3File, opts.Output, totalFiles)
 }
 
-func loadPodcastConfig(dir string) PodcastConfig {
-	return config.LoadPodcastConfig(dir, config.PodcastConfig{})
+// loadPodcastConfig reads a podcast's settings, falling back to the app-wide
+// defaults rather than the zero value. The zero value is not a neutral
+// default: its empty ad-removal mode normalizes to "none", which silently
+// excludes any podcast that has no config file, or whose file predates the
+// ad_removal key, from ad removal entirely.
+func loadPodcastConfig(dir string, appCfg Config) PodcastConfig {
+	return config.LoadPodcastConfig(dir, config.DefaultPodcastConfig(&appCfg))
+}
+
+// ensurePodcastConfig writes the defaults out for a podcast that has no
+// config file, so the settings ad removal is about to act on are visible and
+// editable instead of implicit.
+func ensurePodcastConfig(dir string, cfg PodcastConfig, quiet bool) {
+	if util.FileExists(filepath.Join(dir, config.PodcastConfigFileName)) {
+		return
+	}
+	if cfg.ID == "" {
+		cfg.ID = podcast.GetOrSetPodcastShortID(dir, filepath.Base(dir))
+	}
+	if err := config.SavePodcastConfig(dir, cfg); err != nil {
+		if !quiet {
+			fmt.Fprintf(os.Stderr, "Warning: could not write default config for %s: %v\n", filepath.Base(dir), err)
+		}
+		return
+	}
+	if !quiet {
+		fmt.Printf("Created default %s for '%s' (ad removal: %s)\n",
+			config.PodcastConfigFileName, filepath.Base(dir), cfg.AdRemoval)
+	}
 }
 
 func getActiveWhisperProfile(cfg Config) types.WhisperProfile {

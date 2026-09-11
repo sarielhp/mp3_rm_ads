@@ -102,7 +102,7 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 	})
 	pipeline.AddToQueue(otherPodDir, filepath.Base(otherPaths[0]))
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "History Show",
@@ -145,7 +145,7 @@ func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Coding Talk", []string{
 		"Go 1.26",
 	})
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "Coding Talk",
@@ -229,7 +229,7 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 		Quiet:       true,
 	})
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "Show A",
@@ -303,7 +303,7 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 		Quiet:       true,
 	})
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "Show B",
@@ -365,7 +365,7 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 	})
 	markEpisodeClean(t, paths[0])
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "Offline Show",
@@ -406,7 +406,7 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 	})
 	markEpisodeClean(t, paths[0])
 
-	podCfg := loadPodcastConfig(podDir)
+	podCfg := loadPodcastConfig(podDir, Config{})
 	resolved := &ResolvedPodcast{
 		Dir:        podDir,
 		Title:      "Solo Show",

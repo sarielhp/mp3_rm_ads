@@ -99,7 +99,7 @@ func resolveTargetEpisodeForRmAds(pod *ResolvedPodcast, opts ProcOptions, config
 func getActiveBackendForPodcast(config Config, quiet bool) backend.Backend {
 	if isPodfetchActive(config) {
 		if config.PodfetchURL != "" || config.PodfetchDBPath != "" {
-			b, err := getBackend(config, quiet)
+			b, err := getPodfetchBackend(config, quiet)
 			if err == nil {
 				return b
 			}
