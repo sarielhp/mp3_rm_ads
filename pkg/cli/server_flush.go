@@ -55,24 +55,15 @@ func handleServerFlush(cfg Config, cli CLIOptions) error {
 }
 
 func resolveFlushPodcast(root, query string, items []backend.Podcast) (backend.Podcast, string, error) {
-	var matches []backend.Podcast
-	var dirs []string
-	for _, item := range items {
-		dir, err := flushPodcastDir(root, item.RelPath)
-		if err != nil {
-			continue
-		}
-		local := config.LoadPodcastConfig(dir, config.PodcastConfig{})
-		if query == item.ID || strings.EqualFold(query, item.Media.Metadata.Title) ||
-			(local.ID != "" && strings.EqualFold(query, local.ID)) {
-			matches = append(matches, item)
-			dirs = append(dirs, dir)
-		}
+	matched, err := podcast.MatchBackendPodcasts(items, query)
+	if err != nil {
+		return backend.Podcast{}, "", err
 	}
-	if len(matches) != 1 {
-		return backend.Podcast{}, "", fmt.Errorf("flush needs one exact podcast match for %q; found %d", query, len(matches))
+	dir, err := flushPodcastDir(root, matched.RelPath)
+	if err != nil {
+		return backend.Podcast{}, "", err
 	}
-	return matches[0], dirs[0], nil
+	return *matched, dir, nil
 }
 
 func flushPodcastDir(root, rel string) (string, error) {

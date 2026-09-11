@@ -5,7 +5,6 @@ import (
 	"abs/pkg/podcast"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -132,37 +131,8 @@ func showServerUsage() {
 	_ = app.RenderCommand(clihelp.Options{}, "server")
 }
 
-func matchBackendPodcast(podcasts []backend.Podcast, target string) *backend.Podcast {
-	clean := strings.TrimSpace(target)
-	if clean == "" {
-		return nil
-	}
-	if idx, err := strconv.Atoi(clean); err == nil && idx >= 1 && idx <= len(podcasts) {
-		return &podcasts[idx-1]
-	}
-	for i := range podcasts {
-		if podcasts[i].ID == clean || podcasts[i].Media.ID == clean {
-			return &podcasts[i]
-		}
-	}
-	lower := strings.ToLower(clean)
-	for i := range podcasts {
-		if strings.ToLower(podcasts[i].Media.Metadata.Title) == lower {
-			return &podcasts[i]
-		}
-	}
-	for i := range podcasts {
-		if strings.Contains(strings.ToLower(podcasts[i].Media.Metadata.Title), lower) {
-			return &podcasts[i]
-		}
-	}
-	for i := range podcasts {
-		short := podcast.GeneratePodcastShortID(podcasts[i].Media.Metadata.Title)
-		if strings.EqualFold(short, clean) {
-			return &podcasts[i]
-		}
-	}
-	return nil
+func matchBackendPodcast(podcasts []backend.Podcast, target string) (*backend.Podcast, error) {
+	return podcast.MatchBackendPodcasts(podcasts, target)
 }
 
 func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
@@ -187,9 +157,9 @@ func serverTargetName(cli CLIOptions) string {
 
 func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
 	if target := serverTargetName(cli); target != "" {
-		matched := matchBackendPodcast(podcasts, target)
-		if matched == nil {
-			return nil, fmt.Errorf("podcast matching %q not found on server", target)
+		matched, err := matchBackendPodcast(podcasts, target)
+		if err != nil {
+			return nil, err
 		}
 		return []backend.Podcast{*matched}, nil
 	}

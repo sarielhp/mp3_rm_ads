@@ -3,10 +3,10 @@ package podcast
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
 
 	"abs/pkg/config"
@@ -178,20 +178,39 @@ func ResolveAnyID(podcastsDir, query string) (*ResolvedID, error) {
 		return nil, fmt.Errorf("no podcasts found in %s", podcastsDir)
 	}
 
-	resolvers := []func([]PodcastDirEntry, string) (*ResolvedID, bool){
-		resolveByEpisodeShortID,
-		resolveByPodcastShortID,
-		resolveByIndex,
-		resolveByPodcastUUID,
-		resolveByPodcastName,
-		resolveByEpisodeFileOrTitle,
-		resolveBySubstring,
+	if res, ok := resolveByEpisodeShortID(podEntries, search); ok {
+		return res, nil
 	}
 
-	for _, fn := range resolvers {
-		if res, ok := fn(podEntries, search); ok {
-			return res, nil
-		}
+	matchedPod, err := MatchLocalPodcasts(podEntries, search)
+	if err != nil && errors.Is(err, ErrAmbiguousPodcast) {
+		return nil, err
+	}
+	if matchedPod != nil {
+		cfg := config.LoadPodcastConfig(matchedPod.Dir, config.DefaultPodcastConfig(nil))
+		return &ResolvedID{
+			Type: ResolvedTypePodcast,
+			Podcast: &ResolvedPodcast{
+				Dir:        matchedPod.Dir,
+				Title:      matchedPod.Title,
+				ShortID:    matchedPod.ShortID,
+				FolderName: matchedPod.FolderName,
+				UUID:       cfg.ID,
+				Config:     cfg,
+			},
+		}, nil
+	}
+
+	if res, ok := resolveByPodcastUUID(podEntries, search); ok {
+		return res, nil
+	}
+
+	if res, ok := resolveByEpisodeFileOrTitle(podEntries, search); ok {
+		return res, nil
+	}
+
+	if res, ok := resolveBySubstring(podEntries, search); ok {
+		return res, nil
 	}
 
 	return nil, fmt.Errorf("identifier %q not found in %s", query, podcastsDir)
@@ -296,72 +315,12 @@ func buildResolvedEpisodeFromParams(p PodcastDirEntry, mp3Path, epID string) *Re
 	}
 }
 
-func resolveByPodcastShortID(podEntries []PodcastDirEntry, search string) (*ResolvedID, bool) {
-	for _, p := range podEntries {
-		if strings.EqualFold(p.ShortID, search) {
-			cfg := config.LoadPodcastConfig(p.Dir, config.DefaultPodcastConfig(nil))
-			return &ResolvedID{
-				Type: ResolvedTypePodcast,
-				Podcast: &ResolvedPodcast{
-					Dir:        p.Dir,
-					Title:      p.Title,
-					ShortID:    p.ShortID,
-					FolderName: p.FolderName,
-					UUID:       cfg.ID,
-					Config:     cfg,
-				},
-			}, true
-		}
-	}
-	return nil, false
-}
-
-func resolveByIndex(podEntries []PodcastDirEntry, search string) (*ResolvedID, bool) {
-	idx, err := strconv.Atoi(search)
-	if err != nil || idx < 1 || idx > len(podEntries) {
-		return nil, false
-	}
-	p := podEntries[idx-1]
-	cfg := config.LoadPodcastConfig(p.Dir, config.DefaultPodcastConfig(nil))
-	return &ResolvedID{
-		Type: ResolvedTypePodcast,
-		Podcast: &ResolvedPodcast{
-			Dir:        p.Dir,
-			Title:      p.Title,
-			ShortID:    p.ShortID,
-			FolderName: p.FolderName,
-			UUID:       cfg.ID,
-			Config:     cfg,
-		},
-	}, true
-}
-
 func resolveByPodcastUUID(podEntries []PodcastDirEntry, search string) (*ResolvedID, bool) {
 	for _, p := range podEntries {
 		cfg := config.LoadPodcastConfig(p.Dir, config.DefaultPodcastConfig(nil))
 		cached, _ := LoadPodcastCache(p.Dir)
 		matched := strings.EqualFold(cfg.ID, search) || (cached != nil && strings.EqualFold(cached.ABSItemID, search))
 		if matched {
-			return &ResolvedID{
-				Type: ResolvedTypePodcast,
-				Podcast: &ResolvedPodcast{
-					Dir:        p.Dir,
-					Title:      p.Title,
-					ShortID:    p.ShortID,
-					FolderName: p.FolderName,
-					UUID:       cfg.ID,
-					Config:     cfg,
-				},
-			}, true
-		}
-	}
-	return nil, false
-}
-
-func resolveByPodcastName(podEntries []PodcastDirEntry, search string) (*ResolvedID, bool) {
-	for _, p := range podEntries {
-		if strings.EqualFold(p.FolderName, search) || strings.EqualFold(p.Title, search) {
-			cfg := config.LoadPodcastConfig(p.Dir, config.DefaultPodcastConfig(nil))
 			return &ResolvedID{
 				Type: ResolvedTypePodcast,
 				Podcast: &ResolvedPodcast{
@@ -398,23 +357,6 @@ func resolveByEpisodeFileOrTitle(podEntries []PodcastDirEntry, search string) (*
 func resolveBySubstring(podEntries []PodcastDirEntry, search string) (*ResolvedID, bool) {
 	lower := strings.ToLower(search)
 	for _, p := range podEntries {
-		if strings.Contains(strings.ToLower(p.FolderName), lower) || strings.Contains(strings.ToLower(p.Title), lower) {
-			cfg := config.LoadPodcastConfig(p.Dir, config.DefaultPodcastConfig(nil))
-			return &ResolvedID{
-				Type: ResolvedTypePodcast,
-				Podcast: &ResolvedPodcast{
-					Dir:        p.Dir,
-					Title:      p.Title,
-					ShortID:    p.ShortID,
-					FolderName: p.FolderName,
-					UUID:       cfg.ID,
-					Config:     cfg,
-				},
-			}, true
-		}
-	}
-
-	for _, p := range podEntries {
 		mp3s := util.FindMP3Files(p.Dir)
 		for _, mp3 := range mp3s {
 			fn := filepath.Base(mp3)
@@ -425,6 +367,5 @@ func resolveBySubstring(podEntries []PodcastDirEntry, search string) (*ResolvedI
 			}
 		}
 	}
-
 	return nil, false
 }

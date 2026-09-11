@@ -1,11 +1,13 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"abs/pkg/config"
+	"abs/pkg/podcast"
 	"abs/pkg/tui"
 	"abs/pkg/util"
 )
@@ -40,6 +42,15 @@ func Execute(args []string) int {
 	}
 
 	if err := dispatch(action, &appCfg, cli); err != nil {
+		if errors.Is(err, podcast.ErrAmbiguousPodcast) {
+			var ambErr *podcast.AmbiguousPodcastError
+			if errors.As(err, &ambErr) {
+				podcast.PrintAmbiguousMatches(ambErr.Matches)
+			} else {
+				fmt.Println(err.Error())
+			}
+			return 1
+		}
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
 		return 1
 	}

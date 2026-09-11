@@ -6,7 +6,6 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 
 	"abs/pkg/backend"
@@ -261,33 +260,11 @@ func ResolvePodcastDirByIDOrName(podcastsDir, query string) (string, string, boo
 		return "", "", false
 	}
 
-	for _, p := range podcasts {
-		if strings.EqualFold(p.ShortID, search) {
-			return p.Dir, p.Title, true
-		}
+	matched, err := MatchLocalPodcasts(podcasts, search)
+	if err != nil || matched == nil {
+		return "", "", false
 	}
-
-	if idx, err := strconv.Atoi(search); err == nil {
-		if idx >= 1 && idx <= len(podcasts) {
-			p := podcasts[idx-1]
-			return p.Dir, p.Title, true
-		}
-	}
-
-	for _, p := range podcasts {
-		if strings.EqualFold(p.FolderName, search) || strings.EqualFold(p.Title, search) {
-			return p.Dir, p.Title, true
-		}
-	}
-
-	lower := strings.ToLower(search)
-	for _, p := range podcasts {
-		if strings.Contains(strings.ToLower(p.FolderName), lower) || strings.Contains(strings.ToLower(p.Title), lower) {
-			return p.Dir, p.Title, true
-		}
-	}
-
-	return "", "", false
+	return matched.Dir, matched.Title, true
 }
 
 func FindPodcastDirForItem(item backend.Podcast, podcastsDir string) string {

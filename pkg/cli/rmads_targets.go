@@ -5,12 +5,13 @@ package cli
 // and positional arguments; pkg/adremoval receives only the resolved paths.
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/podcast"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"abs/pkg/podcast"
 )
 
 func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
@@ -20,21 +21,27 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 	}
 
 	if cli.Podcast != "" {
-		targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cli.Podcast)
-		if !found {
-			if !cli.Quiet {
+		podcasts := podcast.ScanPodcastDirs(podcastsDir)
+		matched, err := podcast.MatchLocalPodcasts(podcasts, cli.Podcast)
+		if err != nil {
+			if !errors.Is(err, podcast.ErrAmbiguousPodcast) && !cli.Quiet {
 				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
 			}
 			return nil, false
 		}
-		return []string{targetDir}, true
+		return []string{matched.Dir}, true
 	}
 
 	if len(cli.Args) == 1 {
 		arg := cli.Args[0]
 		if !strings.HasSuffix(strings.ToLower(arg), ".mp3") && !strings.HasSuffix(strings.ToLower(arg), ".json") {
-			if targetDir, _, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, arg); found {
-				return []string{targetDir}, true
+			podcasts := podcast.ScanPodcastDirs(podcastsDir)
+			matched, err := podcast.MatchLocalPodcasts(podcasts, arg)
+			if err == nil {
+				return []string{matched.Dir}, true
+			}
+			if errors.Is(err, podcast.ErrAmbiguousPodcast) {
+				return nil, false
 			}
 			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
 				return []string{arg}, true
@@ -57,26 +64,28 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 	return cli.Args, true
 }
 
-func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast, bool) {
+func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast, error) {
 	candidate := ""
+	explicitPodcast := false
 	if cli.Podcast != "" {
 		candidate = cli.Podcast
+		explicitPodcast = true
 	} else if len(cli.Args) == 1 {
 		candidate = cli.Args[0]
 	} else {
-		return nil, false
+		return nil, nil
 	}
 
 	cleanCand := strings.TrimSpace(candidate)
 	if cleanCand == "" {
-		return nil, false
+		return nil, nil
 	}
 
 	lower := strings.ToLower(cleanCand)
 	if strings.HasSuffix(lower, ".mp3") || strings.HasSuffix(lower, ".json") ||
 		strings.HasSuffix(lower, ".wav") || strings.HasSuffix(lower, ".m4a") ||
 		strings.HasSuffix(lower, ".ogg") || strings.HasSuffix(lower, ".aac") {
-		return nil, false
+		return nil, nil
 	}
 
 	if podcastsDir == "" {
@@ -84,31 +93,29 @@ func resolvePodcastTarget(podcastsDir string, cli CLIOptions) (*ResolvedPodcast,
 	}
 
 	if isExcludedRootPodcastsDir(podcastsDir, cleanCand) {
-		return nil, false
+		return nil, nil
 	}
 
-	if res, err := podcast.ResolveAnyID(podcastsDir, cleanCand); err == nil && res.IsPodcast() {
-		if !isExcludedRootPodcastsDir(podcastsDir, res.Podcast.Dir) {
-			return res.Podcast, true
+	res, err := podcast.ResolveAnyID(podcastsDir, cleanCand)
+	if err != nil {
+		if errors.Is(err, podcast.ErrAmbiguousPodcast) {
+			return nil, err
 		}
-	}
-
-	if dir, title, found := podcast.ResolvePodcastDirByIDOrName(podcastsDir, cleanCand); found {
-		if !isExcludedRootPodcastsDir(podcastsDir, dir) {
-			shortID := podcast.GetOrSetPodcastShortID(dir, title)
-			cfg := config.LoadPodcastConfig(dir, config.PodcastConfig{})
-			return &ResolvedPodcast{
-				Dir:        dir,
-				Title:      title,
-				ShortID:    shortID,
-				FolderName: filepath.Base(dir),
-				UUID:       cfg.ID,
-				Config:     cfg,
-			}, true
+		if explicitPodcast {
+			return nil, fmt.Errorf("podcast matching %q not found", cleanCand)
 		}
+		return nil, nil
 	}
 
-	return nil, false
+	if res.IsPodcast() && !isExcludedRootPodcastsDir(podcastsDir, res.Podcast.Dir) {
+		return res.Podcast, nil
+	}
+
+	if explicitPodcast {
+		return nil, fmt.Errorf("identifier %q is not a podcast", cleanCand)
+	}
+
+	return nil, nil
 }
 
 func isExcludedRootPodcastsDir(podcastsDir, cand string) bool {

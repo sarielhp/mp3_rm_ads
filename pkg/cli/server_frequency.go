@@ -1,15 +1,17 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	configPkg "abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"abs/pkg/backend"
+	configPkg "abs/pkg/config"
+	"abs/pkg/podcast"
+	"abs/pkg/util"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -115,37 +117,42 @@ func collectFrequencyTargetPodcasts(config Config, cli CLIOptions) (backend.Back
 	b, err := backend.FromAppConfig(&config, cli.Quiet)
 	if err == nil && b != nil {
 		podcasts, pErr := resolveServerTargetPodcasts(b, cli)
+		if pErr != nil && errors.Is(pErr, podcast.ErrAmbiguousPodcast) {
+			return nil, nil, pErr
+		}
 		if pErr == nil && len(podcasts) > 0 {
 			return b, podcasts, nil
 		}
 	}
 
 	if config.PodcastsDir != "" {
-		entries, rErr := os.ReadDir(config.PodcastsDir)
-		if rErr == nil {
-			var localPodcasts []backend.Podcast
-			for _, e := range entries {
-				if !e.IsDir() {
-					continue
-				}
-				if cli.Podcast != "" && !strings.EqualFold(e.Name(), cli.Podcast) && !strings.Contains(strings.ToLower(e.Name()), strings.ToLower(cli.Podcast)) {
-					continue
-				}
-				podDir := filepath.Join(config.PodcastsDir, e.Name())
-				var feedURL string
-				if cache, _ := podcast.LoadPodcastCache(podDir); cache != nil {
-					feedURL = cache.FeedURL
-				}
-				localPodcasts = append(localPodcasts, backend.Podcast{
-					ID: e.Name(),
-					Media: backend.PodcastMedia{
-						Metadata: backend.PodcastMetadata{Title: e.Name(), FeedURL: feedURL},
-					},
-				})
+		podEntries := podcast.ScanPodcastDirs(config.PodcastsDir)
+		if cli.Podcast != "" {
+			matched, mErr := podcast.MatchLocalPodcasts(podEntries, cli.Podcast)
+			if mErr != nil {
+				return nil, nil, mErr
 			}
-			if len(localPodcasts) > 0 {
-				return b, localPodcasts, nil
+			podEntries = []podcast.PodcastDirEntry{*matched}
+		}
+		var localPodcasts []backend.Podcast
+		for _, e := range podEntries {
+			var feedURL string
+			if cache, _ := podcast.LoadPodcastCache(e.Dir); cache != nil {
+				feedURL = cache.FeedURL
 			}
+			title := e.Title
+			if title == "" {
+				title = e.FolderName
+			}
+			localPodcasts = append(localPodcasts, backend.Podcast{
+				ID: e.ShortID,
+				Media: backend.PodcastMedia{
+					Metadata: backend.PodcastMetadata{Title: title, FeedURL: feedURL},
+				},
+			})
+		}
+		if len(localPodcasts) > 0 {
+			return b, localPodcasts, nil
 		}
 	}
 

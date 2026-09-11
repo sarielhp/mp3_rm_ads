@@ -241,7 +241,11 @@ func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 	if handled, err := runUrgentEpisode(config, cli); handled {
 		return err
 	}
-	if pod, ok := resolvePodcastTarget(config.PodcastsDir, cli); ok {
+	pod, err := resolvePodcastTarget(config.PodcastsDir, cli)
+	if err != nil {
+		return err
+	}
+	if pod != nil {
 		return adremoval.ProcessPodcast(pod, cli.ProcOptions, config, action)
 	}
 	targets, ok := resolveTargetAudioArgs(cli, config)

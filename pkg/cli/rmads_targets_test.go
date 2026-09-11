@@ -2,6 +2,8 @@ package cli
 
 import (
 	"abs/pkg/config"
+	"abs/pkg/podcast"
+	"errors"
 	"testing"
 )
 
@@ -11,41 +13,48 @@ func TestResolvePodcastTarget(t *testing.T) {
 	cfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
 
 	cliShort := CLIOptions{Podcast: cfg.ID}
-	p1, ok1 := resolvePodcastTarget(tmp, cliShort)
-	if !ok1 || p1 == nil || p1.Dir != podDir {
-		t.Fatalf("expected to resolve podcast by short ID %s, got %v", cfg.ID, p1)
+	p1, err1 := resolvePodcastTarget(tmp, cliShort)
+	if err1 != nil || p1 == nil || p1.Dir != podDir {
+		t.Fatalf("expected to resolve podcast by short ID %s, got %v, err %v", cfg.ID, p1, err1)
 	}
 
 	cliArgShort := CLIOptions{Args: []string{cfg.ID}}
-	p2, ok2 := resolvePodcastTarget(tmp, cliArgShort)
-	if !ok2 || p2 == nil || p2.Dir != podDir {
-		t.Fatalf("expected to resolve podcast by arg short ID, got %v", p2)
+	p2, err2 := resolvePodcastTarget(tmp, cliArgShort)
+	if err2 != nil || p2 == nil || p2.Dir != podDir {
+		t.Fatalf("expected to resolve podcast by arg short ID, got %v, err %v", p2, err2)
 	}
 
 	cliArgTitle := CLIOptions{Args: []string{"Daily Tech"}}
-	p3, ok3 := resolvePodcastTarget(tmp, cliArgTitle)
-	if !ok3 || p3 == nil || p3.Dir != podDir {
-		t.Fatalf("expected to resolve podcast by title, got %v", p3)
+	p3, err3 := resolvePodcastTarget(tmp, cliArgTitle)
+	if err3 != nil || p3 == nil || p3.Dir != podDir {
+		t.Fatalf("expected to resolve podcast by title, got %v, err %v", p3, err3)
 	}
 
 	cliArgIndex := CLIOptions{Args: []string{"1"}}
-	p4, ok4 := resolvePodcastTarget(tmp, cliArgIndex)
-	if !ok4 || p4 == nil || p4.Dir != podDir {
-		t.Fatalf("expected to resolve podcast by index 1, got %v", p4)
+	p4, err4 := resolvePodcastTarget(tmp, cliArgIndex)
+	if err4 != nil || p4 == nil || p4.Dir != podDir {
+		t.Fatalf("expected to resolve podcast by index 1, got %v, err %v", p4, err4)
 	}
 
 	cliMP3 := CLIOptions{Args: []string{"ep1.mp3"}}
-	if _, ok := resolvePodcastTarget(tmp, cliMP3); ok {
+	if p, err := resolvePodcastTarget(tmp, cliMP3); p != nil || err != nil {
 		t.Errorf("expected .mp3 arg to NOT resolve as podcast")
 	}
 
 	cliJSON := CLIOptions{Args: []string{"ep1.transcript.json"}}
-	if _, ok := resolvePodcastTarget(tmp, cliJSON); ok {
+	if p, err := resolvePodcastTarget(tmp, cliJSON); p != nil || err != nil {
 		t.Errorf("expected .json arg to NOT resolve as podcast")
 	}
 
 	cliRoot := CLIOptions{Args: []string{tmp}}
-	if _, ok := resolvePodcastTarget(tmp, cliRoot); ok {
+	if p, err := resolvePodcastTarget(tmp, cliRoot); p != nil || err != nil {
 		t.Errorf("expected root podcasts directory to NOT resolve as a single podcast")
+	}
+
+	createTestPodcastWithEpisodes(t, tmp, "Daily News", []string{"Ep 1"})
+	cliAmb := CLIOptions{Podcast: "Daily"}
+	_, errAmb := resolvePodcastTarget(tmp, cliAmb)
+	if errAmb == nil || !errors.Is(errAmb, podcast.ErrAmbiguousPodcast) {
+		t.Fatalf("expected ErrAmbiguousPodcast for 'Daily', got %v", errAmb)
 	}
 }

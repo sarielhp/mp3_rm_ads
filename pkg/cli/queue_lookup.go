@@ -1,13 +1,14 @@
 package cli
 
 import (
+	"errors"
+	"fmt"
+	"path/filepath"
+	"strings"
+
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
-	"fmt"
-	"path/filepath"
-	"strconv"
-	"strings"
 )
 
 func scanQueuePodcasts(root string) []podcast.PodcastDirEntry {
@@ -15,11 +16,26 @@ func scanQueuePodcasts(root string) []podcast.PodcastDirEntry {
 }
 
 func resolveQueueTarget(root, query string) (*podcast.ResolvedID, error) {
-	var matches []*podcast.ResolvedID
-	for i, p := range scanQueuePodcasts(root) {
-		if strings.EqualFold(query, p.ShortID) || strings.EqualFold(query, p.Title) || query == p.FolderName || query == p.Dir || query == strconv.Itoa(i+1) {
-			return &podcast.ResolvedID{Type: podcast.ResolvedTypePodcast, Podcast: &podcast.ResolvedPodcast{Dir: p.Dir, Title: p.Title, ShortID: p.ShortID, FolderName: p.FolderName}}, nil
+	podcasts := scanQueuePodcasts(root)
+	matchedPod, err := podcast.MatchLocalPodcasts(podcasts, query)
+	if err != nil {
+		if errors.Is(err, podcast.ErrAmbiguousPodcast) {
+			return nil, err
 		}
+	} else if matchedPod != nil {
+		return &podcast.ResolvedID{
+			Type: podcast.ResolvedTypePodcast,
+			Podcast: &podcast.ResolvedPodcast{
+				Dir:        matchedPod.Dir,
+				Title:      matchedPod.Title,
+				ShortID:    matchedPod.ShortID,
+				FolderName: matchedPod.FolderName,
+			},
+		}, nil
+	}
+
+	var matches []*podcast.ResolvedID
+	for _, p := range podcasts {
 		for _, path := range util.FindMP3Files(p.Dir) {
 			if !pipeline.IsQueueAudioPath(path) {
 				continue
@@ -27,7 +43,18 @@ func resolveQueueTarget(root, query string) (*podcast.ResolvedID, error) {
 			id := podcast.EpisodeShortIDReadOnly(p.Dir, p.ShortID, path)
 			title := podcast.EpisodeTitleFromPath(path)
 			if strings.EqualFold(query, id) || query == path || query == filepath.Base(path) || query == title || query == queueFilenameForPath(p.Dir, path) {
-				matches = append(matches, &podcast.ResolvedID{Type: podcast.ResolvedTypeEpisode, Episode: &podcast.ResolvedEpisode{Path: path, Filename: filepath.Base(path), ShortID: id, Title: title, PodcastDir: p.Dir, PodcastTitle: p.Title, PodcastShortID: p.ShortID}})
+				matches = append(matches, &podcast.ResolvedID{
+					Type: podcast.ResolvedTypeEpisode,
+					Episode: &podcast.ResolvedEpisode{
+						Path:           path,
+						Filename:       filepath.Base(path),
+						ShortID:        id,
+						Title:          title,
+						PodcastDir:     p.Dir,
+						PodcastTitle:   p.Title,
+						PodcastShortID: p.ShortID,
+					},
+				})
 			}
 		}
 	}

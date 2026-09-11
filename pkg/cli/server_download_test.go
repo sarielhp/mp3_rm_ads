@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"abs/pkg/backend"
+	"abs/pkg/podcast"
 )
 
 func TestServerDownloadArguments(t *testing.T) {
@@ -166,5 +167,23 @@ func TestServerDownloadCountSelectsNewestOrOldest(t *testing.T) {
 		if len(b.selected) != 1 || b.selected[0].Title != want {
 			t.Fatalf("oldest=%v: selected %+v, want %s", oldest, b.selected, want)
 		}
+	}
+}
+
+func TestServerDownloadAmbiguousTarget(t *testing.T) {
+	podcasts := []backend.Podcast{
+		{ID: "101", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Daily News"}}},
+		{ID: "102", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Daily Tech"}}},
+	}
+	opts := CLIOptions{Podcast: "daily", ProcOptions: ProcOptions{Quiet: true}}
+	_, err := filterServerTargets(podcasts, opts)
+	if err == nil || !errors.Is(err, podcast.ErrAmbiguousPodcast) {
+		t.Fatalf("expected ErrAmbiguousPodcast, got %v", err)
+	}
+
+	opts.Podcast = "news"
+	targets, err := filterServerTargets(podcasts, opts)
+	if err != nil || len(targets) != 1 || targets[0].ID != "101" {
+		t.Fatalf("expected 1 unique target for 'news', got targets=%+v err=%v", targets, err)
 	}
 }

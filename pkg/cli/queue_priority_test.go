@@ -1,13 +1,15 @@
 package cli
 
 import (
+	"errors"
+	"path/filepath"
+	"reflect"
+	"testing"
+
 	"abs/pkg/config"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
-	"path/filepath"
-	"reflect"
-	"testing"
 )
 
 func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
@@ -98,5 +100,20 @@ func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
 	}
 	if podcast.EpisodePriority(dir, paths[1]) != 0 {
 		t.Fatal("temporary boost survived removal")
+	}
+}
+
+func TestQueuePriorityStringMatching(t *testing.T) {
+	root := t.TempDir()
+	createTestPodcastWithEpisodes(t, root, "History Show", []string{"episode1"})
+	createTestPodcastWithEpisodes(t, root, "Science Show", []string{"episode2"})
+
+	if err := handleQueuePriority(root, []string{"hist", "7"}); err != nil {
+		t.Fatalf("expected unique substring match: %v", err)
+	}
+
+	err := handleQueuePriority(root, []string{"show", "5"})
+	if err == nil || !errors.Is(err, podcast.ErrAmbiguousPodcast) {
+		t.Fatalf("expected ambiguous error, got %v", err)
 	}
 }
