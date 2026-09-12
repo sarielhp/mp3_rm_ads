@@ -314,8 +314,9 @@ func printCadenceGroup(groupTitle string, list []podcast.PodcastFreqResult, glob
 		}
 
 		epsStr := fmt.Sprintf("%d eps", r.Freq.EpisodesAnalyzed)
-		fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
-			*globalIdx, util.Truncate(util.DisplayName(r.Title), 38), epsStr, epWk, medInt, status)
+		title := util.TruncateDisplayName(r.Title, 38)
+		fmt.Printf("  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
+			*globalIdx, util.PadRight(title, 38), epsStr, epWk, medInt, status)
 		*globalIdx++
 
 		if verbose {
@@ -337,8 +338,9 @@ func printFrequencyErrors(errors []podcast.PodcastFreqResult, globalIdx *int) {
 	}
 	fmt.Println("  " + headerTitle)
 	for _, r := range errors {
-		fmt.Printf("  %2d. │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
-			*globalIdx, util.Truncate(util.DisplayName(r.Title), 38), "-", "-", "-", r.Err.Error())
+		title := util.TruncateDisplayName(r.Title, 38)
+		fmt.Printf("  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
+			*globalIdx, util.PadRight(title, 38), "-", "-", "-", r.Err.Error())
 		*globalIdx++
 	}
 	fmt.Println("  " + strings.Repeat("─", 98))

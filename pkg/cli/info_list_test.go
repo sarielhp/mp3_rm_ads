@@ -306,7 +306,7 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 	out := string(outBytes)
 
 	rawTitle := "פרק ראשון של הפודקאסט"
-	expectedTitle := util.Truncate(util.DisplayName(rawTitle), 35)
+	expectedTitle := util.TruncateDisplayName(rawTitle, 35)
 	if !strings.Contains(out, expectedTitle) {
 		t.Errorf("expected single podcast table to contain displayName reordered %q, got: %s", expectedTitle, out)
 	}

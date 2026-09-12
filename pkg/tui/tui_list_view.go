@@ -244,7 +244,7 @@ func appendPodcastDescriptionAndRecentEpisodes(rightLines []string, selPod tuiPo
 			if ep.hasTranscript {
 				txTag = "[TX] "
 			}
-			epLine := fmt.Sprintf("  %s%s%s%s", chk, txTag, dStr, ep.displayTitle())
+			epLine := fmt.Sprintf("  %s%s%s%s", chk, txTag, dStr, util.DisplayName(ep.displayTitle()))
 			rightLines = append(rightLines, tuiDimStyle.Render(truncate(epLine, rightW-2)))
 		}
 	}

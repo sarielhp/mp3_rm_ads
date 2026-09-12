@@ -154,10 +154,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 
 	for idx, item := range allItems {
 		title := item.Media.Metadata.Title
-		dName := util.DisplayName(title)
-		if len(dName) > 48 {
-			dName = dName[:45] + "..."
-		}
+		dName := util.TruncateDisplayName(title, 48)
 		absEpisodeCount := len(item.Media.Episodes)
 		shortID, needsAdRemoval := calculateItemAdRemovalCount(item, localByName, podIDByDir)
 
@@ -165,7 +162,7 @@ func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quie
 		totalNeedsAdRemoval += needsAdRemoval
 
 		if !quiet {
-			fmt.Printf("  %-3d  %-6s  %-48s │ %-8d │ %-16d\n", idx+1, shortID, dName, absEpisodeCount, needsAdRemoval)
+			fmt.Printf("  %-3d  %-6s  %s │ %-8d │ %-16d\n", idx+1, shortID, util.PadRight(dName, 48), absEpisodeCount, needsAdRemoval)
 		}
 	}
 
@@ -273,13 +270,10 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 	totalNeedsAdRemoval := 0
 
 	for idx, e := range entries {
-		dName := util.DisplayName(e.name)
-		if len(dName) > 48 {
-			dName = dName[:45] + "..."
-		}
+		dName := util.TruncateDisplayName(e.name, 48)
 		totalEpisodes += e.episodes
 		totalNeedsAdRemoval += e.needsAdRemoval
-		fmt.Printf("  %-3d  %-6s  %-48s │ %-8d │ %-16d\n", idx+1, e.id, dName, e.episodes, e.needsAdRemoval)
+		fmt.Printf("  %-3d  %-6s  %s │ %-8d │ %-16d\n", idx+1, e.id, util.PadRight(dName, 48), e.episodes, e.needsAdRemoval)
 	}
 
 	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))

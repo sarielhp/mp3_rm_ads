@@ -211,20 +211,21 @@ func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {
 }
 
 func printFeedCheckLine(r *podcast.FeedCheckResult, verbose bool) {
+	title := util.DisplayName(r.Title)
 	switch {
 	case r.Status == podcast.FeedUnknown:
-		fmt.Printf("! %s: could not read feed: %v\n", r.Title, r.Err)
+		fmt.Printf("! %s: could not read feed: %v\n", title, r.Err)
 	case len(r.New) > 0:
 		fmt.Printf("+ %s: %d new episode(s) (%d in feed, %d undownloaded)\n",
-			r.Title, len(r.New), r.EpisodeCount, r.Undownloaded)
+			title, len(r.New), r.EpisodeCount, r.Undownloaded)
 		if verbose {
 			for _, ep := range r.New {
-				fmt.Printf("    + %s (%s)\n", ep.Title, ep.PubDate)
+				fmt.Printf("    + %s (%s)\n", util.DisplayName(ep.Title), ep.PubDate)
 			}
 		}
 	default:
 		fmt.Printf("  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
-			r.Title, r.Reason, r.EpisodeCount, r.Undownloaded)
+			title, r.Reason, r.EpisodeCount, r.Undownloaded)
 	}
 }
 

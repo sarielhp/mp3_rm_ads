@@ -103,3 +103,18 @@ func TestFileLock(t *testing.T) {
 	lock.Release()
 	_ = os.Remove(target + ".lock")
 }
+
+func TestDisplayNameRTL(t *testing.T) {
+	testCases := []string{
+		"השבוע - פודקאסט הארץ",
+		"המרקרים",
+		"207be",
+		"שיר אחד One Song",
+		"Kan Hourly News כאן רשת ב חדשות - מהדורת השעה",
+		"תרבות יום א' - הפודקאסט של גלריה",
+		"שלום (עולם)",
+	}
+	for _, tc := range testCases {
+		t.Logf("In: %q -> Out: %q", tc, DisplayName(tc))
+	}
+}

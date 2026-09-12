@@ -52,7 +52,7 @@ func (m *tuiModel) openTranscriptViewer() {
 
 	items, lines, err := loadEpisodeTranscriptData(ep.path)
 	if err != nil || len(items) == 0 {
-		m.showPopup("No transcript found for: " + truncate(ep.displayTitle(), 25))
+		m.showPopup("No transcript found for: " + truncate(util.DisplayName(ep.displayTitle()), 25))
 		return
 	}
 

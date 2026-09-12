@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"abs/pkg/player"
+	"abs/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -198,12 +199,12 @@ func (m *tuiModel) playSelectedEpisode() {
 			if m.bk != nil && m.bk.SaveQueue != nil {
 				m.bk.SaveQueue(pod.dir, m.queue[pod.dir])
 			}
-			m.showPopup(fmt.Sprintf("Playing %s (Added to ad queue)", truncate(track.Title, 20)))
+			m.showPopup(fmt.Sprintf("Playing %s (Added to ad queue)", truncate(util.DisplayName(track.Title), 20)))
 		} else {
-			m.showPopup("Playing " + truncate(track.Title, 25))
+			m.showPopup("Playing " + truncate(util.DisplayName(track.Title), 25))
 		}
 	} else {
-		m.showPopup("Playing " + truncate(track.Title, 25))
+		m.showPopup("Playing " + truncate(util.DisplayName(track.Title), 25))
 	}
 
 	globalPlayer.PlayTrack(track)

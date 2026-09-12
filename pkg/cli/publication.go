@@ -23,6 +23,9 @@ func preparePublicationSource(action string, cfg Config, cli CLIOptions) error {
 	default:
 		return nil
 	}
+	if backend.IsStandalone(&cfg) {
+		return nil
+	}
 	if cfg.PodfetchDBPath == "" && cfg.PodfetchURL == "" && cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" {
 		return nil
 	}

@@ -133,13 +133,10 @@ func listFavoritePodcasts(podcastsDir string, cli CLIOptions) error {
 	fmt.Printf("%-8s  %-32s  %-12s  %-12s  %-16s\n", "ID", "TITLE", "DOWNLOAD", "AD REMOVAL", "FAVORITE SINCE")
 	fmt.Println(strings.Repeat("-", 84))
 	for _, f := range favorites {
-		title := f.Title
-		if len(title) > 32 {
-			title = title[:29] + "..."
-		}
+		title := util.TruncateDisplayName(f.Title, 32)
 		dlBadge := config.DownloadPolicyBadge(f.DownloadPolicy, 0)
 		adBadge := config.AdRemovalModeBadge(f.AdRemoval)
-		fmt.Printf("%-8s  %-32s  %-12s  %-12s  %-16s\n", f.ID, title, dlBadge, adBadge, f.FavoriteSince)
+		fmt.Printf("%-8s  %s  %-12s  %-12s  %-16s\n", f.ID, util.PadRight(title, 32), dlBadge, adBadge, f.FavoriteSince)
 	}
 	fmt.Println()
 	return nil
@@ -188,10 +185,10 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 
 	if favorite {
 		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
+			util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), syncMsg)
 	} else {
 		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
+			util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), syncMsg)
 	}
 	return nil
 }
@@ -220,10 +217,10 @@ func setEpisodeFavorite(ep *podcast.ResolvedEpisode, favorite bool, cli CLIOptio
 
 	if favorite {
 		fmt.Printf("⭐ Marked episode as favorite: %s [%s]\n",
-			util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
+			util.Bold(util.DisplayName(ep.Title)), util.BoldCyan(ep.ShortID))
 	} else {
 		fmt.Printf("Removed episode from favorites: %s [%s]\n",
-			util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
+			util.Bold(util.DisplayName(ep.Title)), util.BoldCyan(ep.ShortID))
 	}
 	return nil
 }

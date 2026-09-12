@@ -18,10 +18,7 @@ func printMappedEpisodeSummary(matched Episode, entryName string, hasCut bool) {
 		summary += fmt.Sprintf("    Title:       %s\n", util.DisplayName(matched.Title))
 	}
 	if matched.Description != "" {
-		desc := backend.StripHTML(matched.Description)
-		if len(desc) > 120 {
-			desc = desc[:120] + "..."
-		}
+		desc := util.TruncateDisplayName(backend.StripHTML(matched.Description), 120)
 		summary += fmt.Sprintf("    Description: %s\n", desc)
 	}
 	if matched.PubDate != "" {

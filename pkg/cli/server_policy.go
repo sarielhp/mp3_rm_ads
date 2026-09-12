@@ -186,11 +186,8 @@ func displayAllPodcastsPolicy(entries []podcast.PodcastDirEntry, cli CLIOptions)
 	fmt.Println(strings.Repeat("-", 72))
 	for _, r := range results {
 		dlBadge := config.DownloadPolicyBadge(r.DownloadPolicy, r.DownloadK)
-		title := r.Title
-		if len(title) > 30 {
-			title = title[:27] + "..."
-		}
-		fmt.Printf("%-8s  %-30s  %-15s  %-12s\n", r.ID, title, dlBadge, r.AdRemoval)
+		title := util.TruncateDisplayName(r.Title, 30)
+		fmt.Printf("%-8s  %s  %-15s  %-12s\n", r.ID, util.PadRight(title, 30), dlBadge, r.AdRemoval)
 	}
 	fmt.Println()
 	return nil
@@ -294,7 +291,7 @@ func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 }
 
 func printPodcastPolicyDetails(res PodcastPolicyResult) {
-	fmt.Printf("\nPolicy for %s [%s]:\n", util.Bold(res.Title), util.BoldCyan(res.ID))
+	fmt.Printf("\nPolicy for %s [%s]:\n", util.Bold(util.DisplayName(res.Title)), util.BoldCyan(res.ID))
 	fmt.Printf("%s\n", strings.Repeat("=", 65))
 	favStr := "No"
 	if res.Favorite {
@@ -349,7 +346,7 @@ func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 		favBadge = " ⭐ [Favorite]"
 	}
 	fmt.Printf("Policy updated for %s [%s]%s: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
-		util.Bold(pod.Title), util.BoldCyan(pod.ShortID), favBadge, autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
+		util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), favBadge, autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
 	return nil
 }
 

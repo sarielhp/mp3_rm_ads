@@ -2,6 +2,7 @@ package util
 
 import (
 	"net"
+	"strings"
 )
 
 var netInterfaceAddrs = net.InterfaceAddrs
@@ -145,13 +146,85 @@ func RepeatStr(s string, n int) string {
 }
 
 func Truncate(s string, max int) string {
-	if len(s) <= max {
+	if max <= 0 {
+		return ""
+	}
+	runes := []rune(s)
+	if len(runes) <= max {
 		return s
 	}
 	if max <= 3 {
-		return s[:max]
+		return string(runes[:max])
 	}
-	return s[:max-3] + "..."
+	return string(runes[:max-3]) + "..."
+}
+
+func StripANSI(s string) string {
+	if !strings.Contains(s, "\x1b[") {
+		return s
+	}
+	var sb strings.Builder
+	inEsc := false
+	for i := 0; i < len(s); i++ {
+		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
+			inEsc = true
+			i++
+			continue
+		}
+		if inEsc {
+			if (s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z') {
+				inEsc = false
+			}
+			continue
+		}
+		sb.WriteByte(s[i])
+	}
+	return sb.String()
+}
+
+func isWideRune(r rune) bool {
+	if (r >= 0x1F300 && r <= 0x1FAFF) || (r >= 0x2300 && r <= 0x23FF) {
+		return true
+	}
+	if r == 0x2728 || r == 0x2702 || r == 0x2B07 || r == 0x26A1 {
+		return true
+	}
+	return r >= 0x4E00 && r <= 0x9FFF
+}
+
+func RuneDisplayWidth(r rune) int {
+	if r == 0xFE0F || r == 0xFE0E || (r >= 0x200B && r <= 0x200D) || (r >= 0x0300 && r <= 0x036F) || (r >= 0x0591 && r <= 0x05C7) {
+		return 0
+	}
+	if isWideRune(r) {
+		return 2
+	}
+	return 1
+}
+
+func StringDisplayWidth(s string) int {
+	clean := StripANSI(s)
+	w := 0
+	for _, r := range clean {
+		w += RuneDisplayWidth(r)
+	}
+	return w
+}
+
+func PadRight(s string, width int) string {
+	w := StringDisplayWidth(s)
+	if w >= width {
+		return s
+	}
+	return s + strings.Repeat(" ", width-w)
+}
+
+func PadLeft(s string, width int) string {
+	w := StringDisplayWidth(s)
+	if w >= width {
+		return s
+	}
+	return strings.Repeat(" ", width-w) + s
 }
 
 func StripExt(path string) string {

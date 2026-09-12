@@ -24,59 +24,11 @@ type TableColumn struct {
 }
 
 func stringDisplayWidth(s string) int {
-	clean := stripAnsi(s)
-	w := 0
-	for _, r := range clean {
-		w += runeDisplayWidth(r)
-	}
-	return w
-}
-
-func stripAnsi(s string) string {
-	if !strings.Contains(s, "\x1b[") {
-		return s
-	}
-	var sb strings.Builder
-	inEsc := false
-	for i := 0; i < len(s); i++ {
-		if s[i] == 0x1b && i+1 < len(s) && s[i+1] == '[' {
-			inEsc = true
-			i++
-			continue
-		}
-		if inEsc {
-			if (s[i] >= 'a' && s[i] <= 'z') || (s[i] >= 'A' && s[i] <= 'Z') {
-				inEsc = false
-			}
-			continue
-		}
-		sb.WriteByte(s[i])
-	}
-	return sb.String()
-}
-
-func runeDisplayWidth(r rune) int {
-	if r == 0xFE0F || r == 0xFE0E || (r >= 0x200B && r <= 0x200D) || (r >= 0x0300 && r <= 0x036F) {
-		return 0
-	}
-	if isWideRune(r) {
-		return 2
-	}
-	return 1
-}
-
-func isWideRune(r rune) bool {
-	if (r >= 0x1F300 && r <= 0x1FAFF) || (r >= 0x2300 && r <= 0x23FF) {
-		return true
-	}
-	if r == 0x2728 || r == 0x2702 || r == 0x2B07 || r == 0x26A1 {
-		return true
-	}
-	return r >= 0x4E00 && r <= 0x9FFF
+	return util.StringDisplayWidth(s)
 }
 
 func padCell(val string, width int, align TableAlign) string {
-	w := stringDisplayWidth(val)
+	w := util.StringDisplayWidth(val)
 	if w >= width {
 		return val
 	}

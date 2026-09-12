@@ -244,24 +244,18 @@ func renderSubscriptionList(subs []podcast.Subscription, podcastsDir string, ver
 	fmt.Printf("%-8s %-32s %-6s %-20s %s\n", "ID", "TITLE", "EPS", "FOLDER", "FEED URL")
 	fmt.Println(strings.Repeat("-", 95))
 	for _, s := range subs {
-		title := s.Title
-		if len(title) > 30 {
-			title = title[:29] + "…"
-		}
-		folder := s.Folder
-		if len(folder) > 18 {
-			folder = folder[:17] + "…"
-		}
+		title := util.TruncateDisplayName(s.Title, 30)
+		folder := util.TruncateDisplayName(s.Folder, 18)
 		epCount := 0
 		if podcastsDir != "" {
 			podDir := filepath.Join(podcastsDir, s.Folder)
 			epCount = len(util.FindMP3Files(podDir))
 		}
 		feedURL := s.FeedURL
-		if !verbose && len(feedURL) > 35 {
-			feedURL = feedURL[:34] + "…"
+		if !verbose && len([]rune(feedURL)) > 35 {
+			feedURL = util.Truncate(feedURL, 35)
 		}
-		fmt.Printf("%-8s %-32s %-6d %-20s %s\n", s.ID, title, epCount, folder, feedURL)
+		fmt.Printf("%-8s %s %-6d %s %s\n", s.ID, util.PadRight(title, 32), epCount, util.PadRight(folder, 20), feedURL)
 	}
 	fmt.Printf("\nTotal: %d subscription(s)\n", len(subs))
 	return nil

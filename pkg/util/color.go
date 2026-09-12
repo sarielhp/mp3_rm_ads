@@ -56,6 +56,33 @@ func ReverseRunes(s string) string {
 	return string(runes)
 }
 
+func reverseRTLRun(str string) string {
+	leading := 0
+	for leading < len(str) && (str[leading] == ' ' || str[leading] == '\t') {
+		leading++
+	}
+	trailing := len(str)
+	for trailing > leading && (str[trailing-1] == ' ' || str[trailing-1] == '\t') {
+		trailing--
+	}
+	leadSpaces := str[:leading]
+	trailSpaces := str[trailing:]
+	core := str[leading:trailing]
+	return leadSpaces + ReverseRunes(core) + trailSpaces
+}
+
+func IsBaseRTL(s string) bool {
+	for _, r := range s {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') {
+			return false
+		}
+		if (r >= 0x0590 && r <= 0x05FF) || (r >= 0xFB1D && r <= 0xFB4F) || (r >= 0x0600 && r <= 0x06FF) {
+			return true
+		}
+	}
+	return false
+}
+
 func DisplayName(name string) string {
 	if !HasRTL(name) {
 		return name
@@ -73,7 +100,7 @@ func DisplayName(name string) string {
 		run := ordering.Run(i)
 		str := run.String()
 		if run.Direction() == bidi.RightToLeft {
-			sb.WriteString(ReverseRunes(str))
+			sb.WriteString(reverseRTLRun(str))
 		} else {
 			sb.WriteString(str)
 		}
@@ -82,6 +109,9 @@ func DisplayName(name string) string {
 }
 
 func TruncateDisplayName(s string, maxRunes int) string {
+	if maxRunes <= 0 {
+		return ""
+	}
 	runes := []rune(s)
 	if len(runes) <= maxRunes {
 		return DisplayName(s)
@@ -89,9 +119,9 @@ func TruncateDisplayName(s string, maxRunes int) string {
 	if maxRunes <= 3 {
 		return "..."
 	}
-	if HasRTL(s) {
+	if IsBaseRTL(s) {
 		sub := string(runes[:maxRunes-3])
 		return "..." + DisplayName(sub)
 	}
-	return string(runes[:maxRunes-3]) + "..."
+	return DisplayName(string(runes[:maxRunes-3])) + "..."
 }

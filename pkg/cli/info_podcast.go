@@ -236,8 +236,13 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 	if len(info.RecentEpisodes) > 0 {
 		sb.WriteString("\n  Recent Episodes:\n")
 		for _, ep := range info.RecentEpisodes {
-			sb.WriteString(fmt.Sprintf("    %-6s  %-10s  [%-7s]  %-7s  %s\n",
-				util.BoldCyan(ep.ID), ep.Date, ep.Status, ep.Duration, util.Truncate(util.DisplayName(ep.Title), 35)))
+			statusStr := fmt.Sprintf("[%s]", ep.Status)
+			sb.WriteString(fmt.Sprintf("    %-6s  %s  %s  %s  %s\n",
+				util.BoldCyan(ep.ID),
+				util.PadRight(ep.Date, 16),
+				util.PadRight(statusStr, 12),
+				util.PadRight(ep.Duration, 8),
+				util.TruncateDisplayName(ep.Title, 35)))
 		}
 	}
 	sb.WriteString(fmt.Sprintf("%s\n\n", strings.Repeat("=", 80)))

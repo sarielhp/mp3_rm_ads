@@ -5,6 +5,7 @@ import (
 	"abs/pkg/backend"
 	"abs/pkg/config"
 	"abs/pkg/podcast"
+	"abs/pkg/util"
 	"fmt"
 	"os"
 	"os/exec"
@@ -168,14 +169,15 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 	fmt.Println(".")
 
 	for i := range plans {
+		pTitle := util.DisplayName(plans[i].Title())
 		switch {
 		case plans[i].Err != nil:
-			fmt.Printf("  ! %s: %v\n", plans[i].Title(), plans[i].Err)
+			fmt.Printf("  ! %s: %v\n", pTitle, plans[i].Err)
 		case len(plans[i].Unknown) > 0:
 			fmt.Printf("  ? %s: %d episode(s) the server has not indexed yet\n",
-				plans[i].Title(), len(plans[i].Unknown))
+				pTitle, len(plans[i].Unknown))
 		case cli.Verbose && len(plans[i].Episodes) == 0:
-			fmt.Printf("  - %s: up to date\n", plans[i].Title())
+			fmt.Printf("  - %s: up to date\n", pTitle)
 		}
 	}
 	if unknown > 0 {
