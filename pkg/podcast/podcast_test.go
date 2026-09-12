@@ -264,20 +264,20 @@ func TestSelectNewEpisodes(t *testing.T) {
 	downloaded := func(ep backend.FeedEpisode) bool {
 		return ep.Title == "Old 2"
 	}
-	eps, reasons := selectNewEpisodes(catalog, []int{1}, downloaded, nil)
+	eps, reasons := SelectNewEpisodes(catalog, []int{1}, downloaded, nil)
 	if len(eps) != 1 || eps[0].Title != "New 3" {
 		t.Fatalf("expected only 'New 3' selected, got %d eps: %v (reasons: %v)", len(eps), eps, reasons)
 	}
 
 	// 2. With 0 downloaded episodes and favoriteSince set to t2: only episodes >= t2 should be selected
-	eps2, _ := selectNewEpisodes(catalog, nil, func(ep backend.FeedEpisode) bool { return false }, &t2)
+	eps2, _ := SelectNewEpisodes(catalog, nil, func(ep backend.FeedEpisode) bool { return false }, &t2)
 	if len(eps2) != 1 || eps2[0].Title != "New 3" {
 		t.Fatalf("expected only 'New 3' selected for cutoff t2, got: %v", eps2)
 	}
 
 	// 3. With 0 downloaded episodes and favoriteSince set after all episodes: 0 should be selected
 	tFuture := time.Date(2026, 2, 1, 0, 0, 0, 0, time.UTC)
-	eps3, _ := selectNewEpisodes(catalog, nil, func(ep backend.FeedEpisode) bool { return false }, &tFuture)
+	eps3, _ := SelectNewEpisodes(catalog, nil, func(ep backend.FeedEpisode) bool { return false }, &tFuture)
 	if len(eps3) != 0 {
 		t.Fatalf("expected 0 episodes selected for future cutoff, got: %v", eps3)
 	}

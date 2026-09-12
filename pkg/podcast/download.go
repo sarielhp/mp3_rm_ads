@@ -9,6 +9,7 @@ import (
 
 	"abs/pkg/backend"
 	"abs/pkg/config"
+	"abs/pkg/types"
 )
 
 type DownloadOptions struct {
@@ -32,6 +33,9 @@ type DownloadOptions struct {
 	// download policy nor the audio already on disk can be found, and a run
 	// silently falls back to the default policy.
 	PodcastsDir string
+
+	DefaultDownloadPolicy string
+	DefaultDownloadK      int
 }
 
 func GetPubMS(ep backend.FeedEpisode) int64 {
@@ -120,7 +124,16 @@ func BuildDownloadedChecker(item backend.Podcast, index *PodcastEpisodeIndex, ac
 
 func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, opts DownloadOptions) ([]backend.FeedEpisode, []string) {
 	podDir := FindPodcastDirForItem(item, opts.PodcastsDir)
-	podCfg := config.DefaultPodcastConfig(nil)
+	var appCfg *types.Config
+	if opts.DefaultDownloadPolicy != "" || opts.DefaultDownloadK > 0 {
+		appCfg = &types.Config{
+			PolicyConfig: types.PolicyConfig{
+				DefaultDownloadPolicy: opts.DefaultDownloadPolicy,
+				DefaultDownloadK:      opts.DefaultDownloadK,
+			},
+		}
+	}
+	podCfg := config.DefaultPodcastConfig(appCfg)
 	if podDir != "" {
 		podCfg = config.LoadPodcastConfig(podDir, podCfg)
 	}
@@ -134,7 +147,7 @@ func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.Fee
 	}
 	if !opts.Fill && !opts.CountGiven {
 		if podCfg.Favorite || podCfg.DownloadPolicy == config.DownloadPolicyNew {
-			return selectNewEpisodes(sortedCatalog, downloadedIndices, isDownloaded, podCfg.FavoriteSince)
+			return SelectNewEpisodes(sortedCatalog, downloadedIndices, isDownloaded, podCfg.FavoriteSince)
 		}
 		return SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, podCfg.DownloadPolicy, podCfg.DownloadK, opts.Oldest)
 	}

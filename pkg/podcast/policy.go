@@ -24,13 +24,13 @@ func SelectEpisodesByDownloadPolicy(sortedCatalog []backend.FeedEpisode, isDownl
 	case config.DownloadPolicyAll:
 		return selectAllEpisodes(sortedCatalog, isDownloaded, oldest)
 	case config.DownloadPolicyNew:
-		return selectNewEpisodes(sortedCatalog, nil, isDownloaded, nil)
+		return SelectNewEpisodes(sortedCatalog, nil, isDownloaded, nil)
 	default:
 		return nil, nil
 	}
 }
 
-func selectNewEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, favoriteSince *time.Time) ([]backend.FeedEpisode, []string) {
+func SelectNewEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, favoriteSince *time.Time) ([]backend.FeedEpisode, []string) {
 	if len(sortedCatalog) == 0 {
 		return nil, nil
 	}

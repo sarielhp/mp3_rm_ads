@@ -187,19 +187,21 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 
 func downloadOptions(config Config, cli CLIOptions) podcast.DownloadOptions {
 	return podcast.DownloadOptions{
-		Count:       cli.Count,
-		Oldest:      cli.Oldest,
-		DryRun:      cli.DryRun,
-		NoWait:      true,
-		Fill:        cli.Fill,
-		CountGiven:  cli.CountGiven,
-		CheckNew:    cli.CheckNew,
-		DownloadAll: cli.DownloadAll,
-		Keep:        cli.KeepCount,
-		Verbose:     cli.Verbose,
-		Quiet:       cli.Quiet,
-		Jobs:        cli.FeedJobs,
-		PodcastsDir: config.PodcastsDir,
+		Count:                 cli.Count,
+		Oldest:                cli.Oldest,
+		DryRun:                cli.DryRun,
+		NoWait:                true,
+		Fill:                  cli.Fill,
+		CountGiven:            cli.CountGiven,
+		CheckNew:              cli.CheckNew,
+		DownloadAll:           cli.DownloadAll,
+		Keep:                  cli.KeepCount,
+		Verbose:               cli.Verbose,
+		Quiet:                 cli.Quiet,
+		Jobs:                  cli.FeedJobs,
+		PodcastsDir:           config.PodcastsDir,
+		DefaultDownloadPolicy: config.DefaultDownloadPolicy,
+		DefaultDownloadK:      config.DefaultDownloadK,
 	}
 }
 

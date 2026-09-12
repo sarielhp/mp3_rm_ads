@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"abs/pkg/backend"
@@ -325,7 +326,7 @@ func downloadSubEpisodes(cfg Config, cli CLIOptions, sub podcast.Subscription) e
 	}
 
 	downloader := podcast.NewDownloader()
-	shouldQueue := shouldQueueEpisode(sub, cfg)
+	shouldQueue := shouldQueueEpisode(podDir, sub, cfg)
 	for _, ep := range toDownload {
 		if err := executeSingleEpisodeDownload(downloader, podDir, ep, cli.Quiet, shouldQueue); err != nil {
 			fmt.Fprintf(os.Stderr, "    Download error for %q: %v\n", ep.Title, err)
@@ -343,36 +344,71 @@ func selectSubEpisodesToDownload(podDir string, feedEps []backend.FeedEpisode, s
 		existingFiles[name] = true
 	}
 
-	maxCount := 1
+	podCfg := config.LoadPodcastConfig(podDir, config.DefaultPodcastConfig(&cfg))
+	if sub.DownloadPolicy != "" {
+		podCfg.DownloadPolicy = sub.DownloadPolicy
+		autoDl := config.NormalizeDownloadPolicy(sub.DownloadPolicy) != config.DownloadPolicyNone
+		podCfg.AutoDownload = &autoDl
+	}
 	if sub.DownloadK > 0 {
-		maxCount = sub.DownloadK
-	} else if cfg.DefaultDownloadK > 0 {
-		maxCount = cfg.DefaultDownloadK
-	}
-	if cli.CountGiven && cli.Count > 0 {
-		maxCount = cli.Count
-	}
-	if cli.DownloadAll {
-		maxCount = len(feedEps)
+		podCfg.DownloadK = sub.DownloadK
 	}
 
-	var candidates []backend.FeedEpisode
-	for _, ep := range feedEps {
+	isDownloaded := func(ep backend.FeedEpisode) bool {
 		safeStem := strings.ToLower(podcast.SanitizeTitle(ep.Title))
 		rawStem := strings.ToLower(strings.TrimSpace(ep.Title))
-		if existingFiles[safeStem] || existingFiles[rawStem] {
-			continue
-		}
-		candidates = append(candidates, ep)
-		if len(candidates) >= maxCount {
-			break
-		}
+		return existingFiles[safeStem] || existingFiles[rawStem]
 	}
-	return candidates
+
+	sortedCatalog := make([]backend.FeedEpisode, len(feedEps))
+	copy(sortedCatalog, feedEps)
+	sort.Slice(sortedCatalog, func(i, j int) bool {
+		return podcast.GetPubMS(sortedCatalog[i]) < podcast.GetPubMS(sortedCatalog[j])
+	})
+
+	if cli.DownloadAll {
+		eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, config.DownloadPolicyAll, 0, false)
+		if cli.CountGiven && cli.Count > 0 && len(eps) > cli.Count {
+			eps = eps[:cli.Count]
+		}
+		return eps
+	}
+
+	if cli.CountGiven && cli.Count > 0 {
+		eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, config.DownloadPolicyAll, 0, false)
+		if len(eps) > cli.Count {
+			eps = eps[:cli.Count]
+		}
+		return eps
+	}
+
+	if podCfg.Favorite || config.NormalizeDownloadPolicy(podCfg.DownloadPolicy) == config.DownloadPolicyNew {
+		eps, _ := podcast.SelectNewEpisodes(sortedCatalog, nil, isDownloaded, podCfg.FavoriteSince)
+		return eps
+	}
+
+	if !podCfg.IsAutoDownloadEnabled() {
+		return nil
+	}
+
+	policy := config.NormalizeDownloadPolicy(podCfg.DownloadPolicy)
+	k := podCfg.DownloadK
+	if k <= 0 {
+		k = cfg.DefaultDownloadK
+	}
+	eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, policy, k, false)
+	return eps
 }
 
-func shouldQueueEpisode(sub podcast.Subscription, cfg Config) bool {
+func shouldQueueEpisode(podDir string, sub podcast.Subscription, cfg Config) bool {
+	podCfg := config.LoadPodcastConfig(podDir, config.DefaultPodcastConfig(&cfg))
+	if podCfg.Favorite {
+		return true
+	}
 	adPolicy := sub.AdRemoval
+	if adPolicy == "" {
+		adPolicy = podCfg.AdRemoval
+	}
 	if adPolicy == "" {
 		adPolicy = cfg.DefaultAdRemoval
 	}
@@ -399,6 +435,8 @@ func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backe
 	if err := d.DownloadEpisode(context.Background(), encURL, destPath, quiet); err != nil {
 		return err
 	}
+
+	pipeline.GetOrCreateEpisodeStatus(destPath)
 
 	if shouldQueue {
 		pipeline.AddToQueue(podDir, fn)
