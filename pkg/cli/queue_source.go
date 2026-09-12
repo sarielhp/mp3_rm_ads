@@ -8,6 +8,9 @@ import (
 )
 
 func runQueueToday(cfg Config, root string, cli CLIOptions, now time.Time) error {
+	if backend.IsStandalone(&cfg) {
+		return handleQueueToday(root, cli, now)
+	}
 	if _, ready := podcast.SourcePublicationTime(root); ready {
 		return handleQueueToday(root, cli, now)
 	}

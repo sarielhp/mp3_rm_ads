@@ -105,3 +105,29 @@ func TestQueueCatalogRejectsUnsafeAndConflictingPaths(t *testing.T) {
 		t.Fatalf("dates=%v error=%v", dates, err)
 	}
 }
+
+func TestQueueTodayStandalone(t *testing.T) {
+	root := t.TempDir()
+	dir := filepath.Join(root, "Show")
+	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
+	path := filepath.Join(dir, "today.mp3")
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	cached := []podcast.CachedEpisodeSummary{{Path: path, Filename: "today.mp3", PublishedAt: now.UnixMilli()}}
+	if err := podcast.SavePodcastCache(dir, &podcast.CachedPodcastIndex{Episodes: cached}); err != nil {
+		t.Fatal(err)
+	}
+	cfg := Config{PodcastsDir: root}
+	cfg.AudiobookshelfURL = "http://example.com"
+	cfg.BackendType = "standalone"
+	if err := runQueueToday(cfg, root, CLIOptions{ProcOptions: ProcOptions{Quiet: true}}, now); err != nil {
+		t.Fatalf("unexpected error in standalone: %v", err)
+	}
+	if got := readTodayTestQueue(t, dir); !reflect.DeepEqual(got, []string{"today.mp3"}) {
+		t.Fatalf("queue = %v", got)
+	}
+}
