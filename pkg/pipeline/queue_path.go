@@ -45,8 +45,25 @@ func ResolveQueueAudioPath(dir, entry string) (string, error) {
 	if IsQueueAudioPath(path) {
 		return path, nil
 	}
-	if _, err := os.Lstat(path); err == nil {
-		return "", fmt.Errorf("queue entry is not episode audio: %s", path)
+	if info, err := os.Lstat(path); err == nil {
+		if !info.IsDir() {
+			return "", fmt.Errorf("queue entry is not episode audio: %s", path)
+		}
+		subFiles, err := util.FindMP3FilesErr(path)
+		if err == nil {
+			var subMatch string
+			for _, sf := range subFiles {
+				if IsQueueAudioPath(sf) {
+					if subMatch != "" {
+						return "", fmt.Errorf("ambiguous queue entry %q; use an episode-relative path", entry)
+					}
+					subMatch = sf
+				}
+			}
+			if subMatch != "" {
+				return subMatch, nil
+			}
+		}
 	}
 	if filepath.Base(clean) != clean {
 		return "", fmt.Errorf("queued audio is missing: %s", path)
@@ -57,7 +74,22 @@ func ResolveQueueAudioPath(dir, entry string) (string, error) {
 	}
 	var match string
 	for _, candidate := range files {
-		if IsQueueAudioPath(candidate) && filepath.Base(candidate) == clean {
+		if !IsQueueAudioPath(candidate) {
+			continue
+		}
+		candidateRel, _ := filepath.Rel(dir, candidate)
+		candidateBase := filepath.Base(candidate)
+		candidateDir := filepath.Dir(candidateRel)
+		leafDir := filepath.Base(candidateDir)
+		cleanStem := util.StripExt(clean)
+
+		matches := false
+		if candidateBase == clean {
+			matches = true
+		} else if candidateDir != "." && (candidateDir == clean || candidateDir == cleanStem || leafDir == clean || leafDir == cleanStem) {
+			matches = true
+		}
+		if matches {
 			if match != "" {
 				return "", fmt.Errorf("ambiguous queue entry %q; use an episode-relative path", entry)
 			}

@@ -90,3 +90,25 @@ func TestCleanRejectsInvalidTranscriptAndFailedDetection(t *testing.T) {
 		t.Fatal("failed detection marked clean")
 	}
 }
+
+func TestResolveQueueAudioPathNested(t *testing.T) {
+	dir := t.TempDir()
+	nestedDir := filepath.Join(dir, "Ballot Bots — The Weekly")
+	if err := os.MkdirAll(nestedDir, 0755); err != nil {
+		t.Fatal(err)
+	}
+	audioPath := filepath.Join(nestedDir, "podcast.mp3")
+	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	for _, entry := range []string{"Ballot Bots — The Weekly.mp3", "Ballot Bots — The Weekly", "Ballot Bots — The Weekly/podcast.mp3"} {
+		resolved, err := ResolveQueueAudioPath(dir, entry)
+		if err != nil {
+			t.Fatalf("failed to resolve %q: %v", entry, err)
+		}
+		if resolved != audioPath {
+			t.Fatalf("expected %q, got %q", audioPath, resolved)
+		}
+	}
+}
