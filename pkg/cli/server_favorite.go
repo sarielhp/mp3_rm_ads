@@ -163,7 +163,6 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 		return fmt.Errorf("failed to save podcast config: %w", err)
 	}
 
-	epCount := updatePodcastEpisodesFavorite(pod.Dir, favorite)
 	syncMsg := syncPolicyWithBackend(pod, pod.Config.IsAutoDownloadEnabled(), pod.Config.IsAutoCleanupEnabled(), pod.Config.AutoCleanupDays)
 	sinceStr := ""
 	if pod.Config.FavoriteSince != nil {
@@ -188,27 +187,13 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 	}
 
 	if favorite {
-		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %d episode(s) updated, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), epCount, syncMsg)
+		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %s)\n",
+			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
 	} else {
-		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %d episode(s) updated, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), epCount, syncMsg)
+		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %s)\n",
+			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
 	}
 	return nil
-}
-
-func updatePodcastEpisodesFavorite(podDir string, favorite bool) int {
-	mp3s := util.FindMP3Files(podDir)
-	count := 0
-	for _, mp3 := range mp3s {
-		err := pipeline.UpdateEpisodeStatus(mp3, func(st *types.EpisodeStatusFile) {
-			st.SetFavorite(favorite)
-		})
-		if err == nil {
-			count++
-		}
-	}
-	return count
 }
 
 func setEpisodeFavorite(ep *podcast.ResolvedEpisode, favorite bool, cli CLIOptions) error {
@@ -256,7 +241,6 @@ func setAllFavorites(cfg Config, podcastsDir string, favorite bool, cli CLIOptio
 		if err := config.SavePodcastConfig(entry.Dir, pCfg); err != nil {
 			return fmt.Errorf("failed to save config for %s: %w", entry.Title, err)
 		}
-		updatePodcastEpisodesFavorite(entry.Dir, favorite)
 		count++
 	}
 

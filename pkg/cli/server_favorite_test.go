@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestFavoriteSubcommandMarkAndUnmark(t *testing.T) {
@@ -129,14 +130,17 @@ func TestFavoriteSubcommandList(t *testing.T) {
 	}
 }
 
-func TestFavoritePodcastUpdatesEpisodes(t *testing.T) {
+func TestFavoritePodcastDoesNotMarkExistingEpisodes(t *testing.T) {
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_EpFav")
 	_ = os.MkdirAll(podDir, 0755)
 	podID := podcast.GetOrSetPodcastShortID(podDir, "Show EpFav")
 
-	mp3Path := filepath.Join(podDir, "episode1.mp3")
+	mp3Path := filepath.Join(podDir, "existing_ep.mp3")
 	_ = os.WriteFile(mp3Path, []byte("fake audio content"), 0644)
+	oldTime := time.Now().Add(-10 * time.Minute)
+	_ = os.Chtimes(mp3Path, oldTime, oldTime)
+
 	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
 	if st.IsFavorite() {
 		t.Fatalf("expected initial episode status not favorite")
@@ -148,21 +152,22 @@ func TestFavoritePodcastUpdatesEpisodes(t *testing.T) {
 		t.Fatalf("handleServerFavorite failed: %v", err)
 	}
 
-	updatedSt, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	existingSt, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
 	if err != nil {
 		t.Fatalf("LoadEpisodeStatus failed: %v", err)
 	}
-	if !updatedSt.IsFavorite() {
-		t.Errorf("expected episode status file to have favorite: true after podcast favorited")
+	if existingSt.IsFavorite() {
+		t.Errorf("expected existing episode status file to remain not favorite")
 	}
 
-	cliUnmark := CLIOptions{Args: []string{podID, "off"}}
-	if err := handleServerFavorite(cfg, cliUnmark); err != nil {
-		t.Fatalf("handleServerFavorite unmark failed: %v", err)
-	}
-	unmarkedSt, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
-	if unmarkedSt.IsFavorite() {
-		t.Errorf("expected episode status file to have favorite: false after podcast un-favorited")
+	newMp3Path := filepath.Join(podDir, "new_downloaded.mp3")
+	_ = os.WriteFile(newMp3Path, []byte("new audio"), 0644)
+	newTime := time.Now().Add(5 * time.Minute)
+	_ = os.Chtimes(newMp3Path, newTime, newTime)
+
+	newSt := pipeline.GetOrCreateEpisodeStatus(newMp3Path)
+	if !newSt.IsFavorite() {
+		t.Errorf("expected newly downloaded episode status file to have favorite: true")
 	}
 }
 

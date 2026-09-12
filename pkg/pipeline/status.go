@@ -99,7 +99,14 @@ func applyInitialFavoriteStatus(audioPath string, st *types.EpisodeStatusFile) {
 		return
 	}
 	podCfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
-	if !podCfg.Favorite {
+	if !podCfg.Favorite || podCfg.FavoriteSince == nil {
+		return
+	}
+	fi, err := os.Stat(audioPath)
+	if err != nil {
+		return
+	}
+	if fi.ModTime().UTC().Before(*podCfg.FavoriteSince) {
 		return
 	}
 	st.SetFavorite(true)

@@ -1,9 +1,11 @@
 package pipeline
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
+	"time"
 
 	"abs/pkg/types"
 )
@@ -36,18 +38,33 @@ func TestGetOrCreateEpisodeStatusFavoriteInheritance(t *testing.T) {
 	podDir := filepath.Join(tempDir, "FavPodcast")
 	_ = os.MkdirAll(podDir, 0755)
 
-	podCfgJSON := `{"favorite":true}`
+	cutoff := time.Now().Add(-5 * time.Minute).UTC()
+	podCfgJSON := fmt.Sprintf(`{"favorite":true,"favorite_since":%q}`, cutoff.Format(time.RFC3339))
 	_ = os.WriteFile(filepath.Join(podDir, "podcast.json"), []byte(podCfgJSON), 0644)
 
-	audioPath := filepath.Join(podDir, "new_episode.mp3")
-	_ = os.WriteFile(audioPath, []byte("audio"), 0644)
+	// Pre-existing episode before cutoff
+	oldAudioPath := filepath.Join(podDir, "old_episode.mp3")
+	_ = os.WriteFile(oldAudioPath, []byte("audio"), 0644)
+	oldTime := cutoff.Add(-10 * time.Minute)
+	_ = os.Chtimes(oldAudioPath, oldTime, oldTime)
 
-	st := GetOrCreateEpisodeStatus(audioPath)
-	if !st.IsFavorite() {
-		t.Errorf("expected new episode status to inherit favorite from podcast config")
+	oldSt := GetOrCreateEpisodeStatus(oldAudioPath)
+	if oldSt.IsFavorite() {
+		t.Errorf("expected pre-existing episode status to NOT inherit favorite")
 	}
 
-	loaded, err := LoadEpisodeStatus(StatusPathFor(audioPath))
+	// Newly downloaded episode after cutoff
+	newAudioPath := filepath.Join(podDir, "new_episode.mp3")
+	_ = os.WriteFile(newAudioPath, []byte("audio"), 0644)
+	newTime := cutoff.Add(10 * time.Minute)
+	_ = os.Chtimes(newAudioPath, newTime, newTime)
+
+	newSt := GetOrCreateEpisodeStatus(newAudioPath)
+	if !newSt.IsFavorite() {
+		t.Errorf("expected newly downloaded episode status to inherit favorite")
+	}
+
+	loaded, err := LoadEpisodeStatus(StatusPathFor(newAudioPath))
 	if err != nil {
 		t.Fatalf("LoadEpisodeStatus failed: %v", err)
 	}
