@@ -51,7 +51,7 @@ func TestGetOrCreateEpisodeStatusFavoriteInheritance(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoadEpisodeStatus failed: %v", err)
 	}
-	if !loaded.IsFavorite() || !loaded.Favorite || !loaded.Favourite {
+	if !loaded.IsFavorite() || !loaded.Favorite {
 		t.Errorf("expected loaded episode status to have favorite: true")
 	}
 }
