@@ -2,7 +2,9 @@ package cli
 
 import (
 	"abs/pkg/config"
+	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
+	"abs/pkg/types"
 	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
@@ -25,14 +27,14 @@ type FavoritePodcastResult struct {
 func buildServerFavoriteSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "favorite",
-		Description: "Set or list favorite podcasts (auto-downloads all new episodes and removes ads)",
-		UsageLine:   "abs server favorite [<podcast-id>] [options]",
+		Description: "Set or list favorite podcasts and episodes (auto-downloads all new episodes and removes ads)",
+		UsageLine:   "abs server favorite [<identifier>] [options]",
 		Parameters: []clihelp.Param{
-			{Name: "[<podcast-id>]", Description: "Target podcast identifier to mark/unmark as favorite (leave empty to list)"},
+			{Name: "[<identifier>]", Description: "Target podcast or episode identifier to mark/unmark as favorite (leave empty to list)"},
 		},
 		Args: clihelp.MaximumNArgs(2),
 		Options: []clihelp.Option{
-			clihelp.Bool(&opts.FavoriteOff, "--off", false, "Unmark podcast as favorite"),
+			clihelp.Bool(&opts.FavoriteOff, "--off", false, "Unmark podcast or episode as favorite"),
 			clihelp.Bool(&opts.PolicyAll, "--all", false, "Apply to all podcasts in library"),
 			clihelp.Bool(&opts.JSON, "--json", false, "Output results in JSON format"),
 		},
@@ -40,6 +42,10 @@ func buildServerFavoriteSubcommand(opts *CLIOptions, action *string) clihelp.Com
 			{
 				Line:        "abs server favorite 'Huberman Lab'",
 				Description: "Mark podcast as favorite (auto-downloads new episodes with ad removal)",
+			},
+			{
+				Line:        "abs server favorite e12345",
+				Description: "Mark single episode as favorite",
 			},
 			{
 				Line:        "abs server favorite 42 --off",
@@ -144,8 +150,11 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 	if err != nil {
 		return err
 	}
+	if resolved.IsEpisode() {
+		return setEpisodeFavorite(resolved.Episode, favorite, cli)
+	}
 	if !resolved.IsPodcast() {
-		return fmt.Errorf("identifier %q resolved to an episode, expected a podcast", target)
+		return fmt.Errorf("identifier %q resolved to neither a podcast nor an episode", target)
 	}
 
 	pod := resolved.Podcast
@@ -154,6 +163,7 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 		return fmt.Errorf("failed to save podcast config: %w", err)
 	}
 
+	epCount := updatePodcastEpisodesFavorite(pod.Dir, favorite)
 	syncMsg := syncPolicyWithBackend(pod, pod.Config.IsAutoDownloadEnabled(), pod.Config.IsAutoCleanupEnabled(), pod.Config.AutoCleanupDays)
 	sinceStr := ""
 	if pod.Config.FavoriteSince != nil {
@@ -178,11 +188,57 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 	}
 
 	if favorite {
-		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
+		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %d episode(s) updated, %s)\n",
+			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), epCount, syncMsg)
 	} else {
-		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %s)\n",
-			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), syncMsg)
+		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %d episode(s) updated, %s)\n",
+			util.Bold(pod.Title), util.BoldCyan(pod.ShortID), epCount, syncMsg)
+	}
+	return nil
+}
+
+func updatePodcastEpisodesFavorite(podDir string, favorite bool) int {
+	mp3s := util.FindMP3Files(podDir)
+	count := 0
+	for _, mp3 := range mp3s {
+		err := pipeline.UpdateEpisodeStatus(mp3, func(st *types.EpisodeStatusFile) {
+			st.SetFavorite(favorite)
+		})
+		if err == nil {
+			count++
+		}
+	}
+	return count
+}
+
+func setEpisodeFavorite(ep *podcast.ResolvedEpisode, favorite bool, cli CLIOptions) error {
+	var isFav bool
+	err := pipeline.UpdateEpisodeStatus(ep.Path, func(st *types.EpisodeStatusFile) {
+		st.SetFavorite(favorite)
+		isFav = st.IsFavorite()
+	})
+	if err != nil {
+		return fmt.Errorf("failed to update episode status: %w", err)
+	}
+
+	if cli.JSON {
+		res := map[string]any{
+			"id":         ep.ShortID,
+			"title":      ep.Title,
+			"audio_path": ep.Path,
+			"favorite":   isFav,
+		}
+		data, _ := json.MarshalIndent(res, "", "  ")
+		fmt.Println(string(data))
+		return nil
+	}
+
+	if favorite {
+		fmt.Printf("⭐ Marked episode as favorite: %s [%s]\n",
+			util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
+	} else {
+		fmt.Printf("Removed episode from favorites: %s [%s]\n",
+			util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
 	}
 	return nil
 }
@@ -200,6 +256,7 @@ func setAllFavorites(cfg Config, podcastsDir string, favorite bool, cli CLIOptio
 		if err := config.SavePodcastConfig(entry.Dir, pCfg); err != nil {
 			return fmt.Errorf("failed to save config for %s: %w", entry.Title, err)
 		}
+		updatePodcastEpisodesFavorite(entry.Dir, favorite)
 		count++
 	}
 

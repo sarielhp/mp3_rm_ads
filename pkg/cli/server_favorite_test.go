@@ -2,6 +2,7 @@ package cli
 
 import (
 	"abs/pkg/config"
+	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"encoding/json"
 	"io"
@@ -125,5 +126,84 @@ func TestFavoriteSubcommandList(t *testing.T) {
 	}
 	if len(results) != 1 || results[0].ID != podID {
 		t.Errorf("expected 1 result with ID %s, got: %+v", podID, results)
+	}
+}
+
+func TestFavoritePodcastUpdatesEpisodes(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "Show_EpFav")
+	_ = os.MkdirAll(podDir, 0755)
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Show EpFav")
+
+	mp3Path := filepath.Join(podDir, "episode1.mp3")
+	_ = os.WriteFile(mp3Path, []byte("fake audio content"), 0644)
+	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
+	if st.IsFavorite() {
+		t.Fatalf("expected initial episode status not favorite")
+	}
+
+	cfg := Config{PodcastsDir: tempDir}
+	cliMark := CLIOptions{Args: []string{podID}}
+	if err := handleServerFavorite(cfg, cliMark); err != nil {
+		t.Fatalf("handleServerFavorite failed: %v", err)
+	}
+
+	updatedSt, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	if err != nil {
+		t.Fatalf("LoadEpisodeStatus failed: %v", err)
+	}
+	if !updatedSt.IsFavorite() {
+		t.Errorf("expected episode status file to have favorite: true after podcast favorited")
+	}
+
+	cliUnmark := CLIOptions{Args: []string{podID, "off"}}
+	if err := handleServerFavorite(cfg, cliUnmark); err != nil {
+		t.Fatalf("handleServerFavorite unmark failed: %v", err)
+	}
+	unmarkedSt, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	if unmarkedSt.IsFavorite() {
+		t.Errorf("expected episode status file to have favorite: false after podcast un-favorited")
+	}
+}
+
+func TestFavoriteSingleEpisode(t *testing.T) {
+	tempDir := t.TempDir()
+	podDir := filepath.Join(tempDir, "Show_SingleEp")
+	_ = os.MkdirAll(podDir, 0755)
+	podID := podcast.GetOrSetPodcastShortID(podDir, "Show SingleEp")
+
+	mp3Path := filepath.Join(podDir, "single_ep.mp3")
+	_ = os.WriteFile(mp3Path, []byte("fake audio content"), 0644)
+	_ = pipeline.GetOrCreateEpisodeStatus(mp3Path)
+
+	epID := podcast.GetOrSetEpisodeShortID(podDir, podID, mp3Path)
+	cfg := Config{PodcastsDir: tempDir}
+
+	cliMark := CLIOptions{Args: []string{epID}}
+	if err := handleServerFavorite(cfg, cliMark); err != nil {
+		t.Fatalf("handleServerFavorite single episode failed: %v", err)
+	}
+
+	st, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	if err != nil {
+		t.Fatalf("LoadEpisodeStatus failed: %v", err)
+	}
+	if !st.IsFavorite() {
+		t.Errorf("expected episode status file to have favorite: true")
+	}
+
+	podCfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
+	if podCfg.Favorite {
+		t.Errorf("expected podcast to remain not favorite")
+	}
+
+	cliUnmark := CLIOptions{Args: []string{epID, "off"}}
+	if err := handleServerFavorite(cfg, cliUnmark); err != nil {
+		t.Fatalf("handleServerFavorite single episode unmark failed: %v", err)
+	}
+
+	unmarkedSt, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	if unmarkedSt.IsFavorite() {
+		t.Errorf("expected episode status file to have favorite: false")
 	}
 }

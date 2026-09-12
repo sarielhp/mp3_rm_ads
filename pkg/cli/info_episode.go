@@ -25,6 +25,7 @@ type EpisodeInfoJSON struct {
 	OriginalDurationSec float64         `json:"original_duration_sec"`
 	CleanDurationSec    float64         `json:"clean_duration_sec"`
 	PercentReduction    float64         `json:"percent_reduction"`
+	Favorite            bool            `json:"favorite"`
 	HasTranscript       bool            `json:"has_transcript"`
 	TranscriptPath      string          `json:"transcript_path,omitempty"`
 	TranscriptSegments  int             `json:"transcript_segments,omitempty"`
@@ -188,6 +189,7 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 		OriginalDurationSec: origDur,
 		CleanDurationSec:    cleanDur,
 		PercentReduction:    pctReduction,
+		Favorite:            st.IsFavorite(),
 		HasTranscript:       hasTx,
 		TranscriptPath:      txPath,
 		TranscriptSegments:  txSegments,
@@ -211,6 +213,11 @@ func formatEpisodeInfo(info EpisodeInfoJSON, showCuts ...bool) string {
 	sb.WriteString(fmt.Sprintf("  Audio Path:       %s\n", info.AudioPath))
 	sb.WriteString(fmt.Sprintf("  File Size:        %s\n", info.FileSizeFormatted))
 	sb.WriteString(fmt.Sprintf("  AdR Status:       %s\n", util.Bold(info.Status)))
+	favStr := "No"
+	if info.Favorite {
+		favStr = "⭐ Yes"
+	}
+	sb.WriteString(fmt.Sprintf("  Favorite:         %s\n", favStr))
 
 	sb.WriteString("\n  Audio & Processing Stats:\n")
 	sb.WriteString(fmt.Sprintf("    Original Dur:   %s (%.1fs)\n", format.FormatClock(info.OriginalDurationSec), info.OriginalDurationSec))

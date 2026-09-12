@@ -48,8 +48,19 @@ type EpisodeStatusFile struct {
 	Ads                   []EpisodeAdCut   `json:"ads,omitempty"`
 	LastError             string           `json:"last_error,omitempty"`
 	Priority              int              `json:"priority,omitempty"`
+	Favorite              bool             `json:"favorite,omitempty"`
+	Favourite             bool             `json:"favourite,omitempty"`
 	AdDetectionSuccessful *bool            `json:"ad_detection_successful,omitempty"`
 	AdDetectionStatus     string           `json:"ad_detection_status,omitempty"`
 	AdDetectionError      string           `json:"ad_detection_error,omitempty"`
 	AdDetectionModel      string           `json:"ad_detection_model,omitempty"`
+}
+
+func (s *EpisodeStatusFile) SetFavorite(fav bool) {
+	s.Favorite = fav
+	s.Favourite = fav
+}
+
+func (s *EpisodeStatusFile) IsFavorite() bool {
+	return s.Favorite || s.Favourite
 }

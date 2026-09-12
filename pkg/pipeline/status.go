@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"abs/pkg/audio"
+	"abs/pkg/config"
 	"abs/pkg/types"
 	"abs/pkg/util"
 )
@@ -26,11 +27,17 @@ func LoadEpisodeStatus(path string) (*types.EpisodeStatusFile, error) {
 	if err := json.Unmarshal(data, &st); err != nil {
 		return nil, fmt.Errorf("invalid episode status json in %s: %w", path, err)
 	}
+	if st.IsFavorite() {
+		st.SetFavorite(true)
+	}
 	return &st, nil
 }
 
 func SaveEpisodeStatus(path string, st *types.EpisodeStatusFile) error {
 	applySourcePublication(strings.TrimSuffix(path, ".json"), st)
+	if st.IsFavorite() {
+		st.SetFavorite(true)
+	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
@@ -75,6 +82,7 @@ func GetOrCreateEpisodeStatus(audioPath string) *types.EpisodeStatusFile {
 		},
 	}
 
+	applyInitialFavoriteStatus(audioPath, st)
 	PopulatePrecutOrCutsMeta(st, audioPath, fname, dur, sz)
 	PopulateAdsFromCutsFile(st, util.StripExt(audioPath)+".cuts.json")
 
@@ -82,6 +90,19 @@ func GetOrCreateEpisodeStatus(audioPath string) *types.EpisodeStatusFile {
 		fmt.Fprintf(os.Stderr, "Warning: failed to initialize episode status file '%s': %v\n", statPath, err)
 	}
 	return st
+}
+
+func applyInitialFavoriteStatus(audioPath string, st *types.EpisodeStatusFile) {
+	podDir := filepath.Dir(audioPath)
+	cfgPath := filepath.Join(podDir, config.PodcastConfigFileName)
+	if !util.FileExists(cfgPath) {
+		return
+	}
+	podCfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})
+	if !podCfg.Favorite {
+		return
+	}
+	st.SetFavorite(true)
 }
 
 func PopulatePrecutOrCutsMeta(st *types.EpisodeStatusFile, audioPath, fname string, dur float64, sz int64) {

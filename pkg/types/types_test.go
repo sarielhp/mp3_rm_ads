@@ -68,3 +68,51 @@ func TestConfigFlags(t *testing.T) {
 		t.Error("expected SpeculativeTranscription to be false when explicitly disabled")
 	}
 }
+
+func TestEpisodeStatusFileFavorite(t *testing.T) {
+	st := EpisodeStatusFile{}
+	if st.IsFavorite() {
+		t.Errorf("expected initially not favorite")
+	}
+
+	st.SetFavorite(true)
+	if !st.IsFavorite() || !st.Favorite || !st.Favourite {
+		t.Errorf("expected favorite to be true for both spellings")
+	}
+
+	data, err := json.Marshal(st)
+	if err != nil {
+		t.Fatalf("Marshal failed: %v", err)
+	}
+
+	var parsed EpisodeStatusFile
+	if err := json.Unmarshal(data, &parsed); err != nil {
+		t.Fatalf("Unmarshal failed: %v", err)
+	}
+	if !parsed.IsFavorite() || !parsed.Favorite || !parsed.Favourite {
+		t.Errorf("expected parsed status file to be favorite")
+	}
+
+	jsonUK := []byte(`{"media_file":"test.mp3","favourite":true}`)
+	var parsedUK EpisodeStatusFile
+	if err := json.Unmarshal(jsonUK, &parsedUK); err != nil {
+		t.Fatalf("Unmarshal UK failed: %v", err)
+	}
+	if !parsedUK.IsFavorite() {
+		t.Errorf("expected favourite:true in JSON to set favorite")
+	}
+
+	jsonUS := []byte(`{"media_file":"test.mp3","favorite":true}`)
+	var parsedUS EpisodeStatusFile
+	if err := json.Unmarshal(jsonUS, &parsedUS); err != nil {
+		t.Fatalf("Unmarshal US failed: %v", err)
+	}
+	if !parsedUS.IsFavorite() {
+		t.Errorf("expected favorite:true in JSON to set favorite")
+	}
+
+	st.SetFavorite(false)
+	if st.IsFavorite() {
+		t.Errorf("expected SetFavorite(false) to clear favorite")
+	}
+}

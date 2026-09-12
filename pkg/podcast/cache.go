@@ -26,6 +26,7 @@ type CachedEpisodeSummary struct {
 	Episode       string  `json:"episode,omitempty"`
 	HasAdsRemoved bool    `json:"has_ads_removed"`
 	HasTranscript bool    `json:"has_transcript,omitempty"`
+	Favorite      bool    `json:"favorite,omitempty"`
 }
 
 type CachedPodcastIndex struct {
