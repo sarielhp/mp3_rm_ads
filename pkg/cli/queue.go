@@ -28,43 +28,28 @@ type queueEpisodeItem struct {
 	Priority        int     `json:"priority"`
 }
 
+func resolveQueueSubcmdArgs(subcmd string, args []string) (string, []string) {
+	if subcmd != "" {
+		return subcmd, args
+	}
+	if len(args) == 0 {
+		return "list", args
+	}
+	switch strings.ToLower(args[0]) {
+	case "priority", "list", "ls", "add", "today", "latest", "remove", "clear", "run":
+		return strings.ToLower(args[0]), args[1:]
+	default:
+		return "list", args
+	}
+}
+
 func runQueueCommand(cfg Config, cli CLIOptions) error {
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
 
-	subcmd := cli.QueueSubcmd
-	args := cli.Args
-	if subcmd == "" && len(args) > 0 {
-		switch strings.ToLower(args[0]) {
-		case "priority":
-			subcmd = "priority"
-			args = args[1:]
-		case "list", "ls":
-			subcmd = "list"
-			args = args[1:]
-		case "add":
-			subcmd = "add"
-			args = args[1:]
-		case "today":
-			subcmd = "today"
-			args = args[1:]
-		case "remove":
-			subcmd = "remove"
-			args = args[1:]
-		case "clear":
-			subcmd = "clear"
-			args = args[1:]
-		case "run":
-			subcmd = "run"
-			args = args[1:]
-		default:
-			subcmd = "list"
-		}
-	} else if subcmd == "" {
-		subcmd = "list"
-	}
+	subcmd, args := resolveQueueSubcmdArgs(cli.QueueSubcmd, cli.Args)
 
 	switch subcmd {
 	case "priority":
@@ -85,6 +70,12 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			return fmt.Errorf("queue today accepts no arguments")
 		}
 		return runQueueToday(cfg, podcastsDir, cli, time.Now())
+	case "latest":
+		limit, target, err := parseQueueLatestArgs(args)
+		if err != nil {
+			return err
+		}
+		return runQueueLatest(cfg, podcastsDir, limit, target, cli)
 	case "remove":
 		if len(args) == 0 {
 			return fmt.Errorf("missing target ID(s) to remove from queue")
@@ -103,7 +94,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		}
 		return handleQueueRun(cfg, cli, target)
 	default:
-		return fmt.Errorf("unknown queue action %q (use list, add, today, remove, clear, or run)", subcmd)
+		return fmt.Errorf("unknown queue action %q (use list, add, today, latest, remove, clear, or run)", subcmd)
 	}
 }
 
@@ -528,6 +519,7 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 			buildQueueLsSubcommand(opts, action),
 			buildQueueAddSubcommand(opts, action),
 			buildQueueTodaySubcommand(opts, action),
+			buildQueueLatestSubcommand(opts, action),
 			buildQueuePrioritySubcommand(opts, action),
 			buildQueueRemoveSubcommand(opts, action),
 			buildQueueClearSubcommand(opts, action),
@@ -537,6 +529,10 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 			{
 				Line:        "abs queue list",
 				Description: "List all episodes currently in the ad removal queue",
+			},
+			{
+				Line:        "abs queue latest 5",
+				Description: "Queue the 5 latest published uncleaned episodes",
 			},
 			{
 				Line:        "abs queue run",
