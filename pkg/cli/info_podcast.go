@@ -84,7 +84,7 @@ func collectPodcastStatsAndRecent(pod *ResolvedPodcast, mp3s []string, maxEpisod
 		od, _ := pipeline.EpisodeDurations(mp3, st)
 		totalDur += od
 
-		pt := podcast.GetEpisodePublicationTime(mp3)
+		pt := resolveEpisodePublicationTime(mp3, st, fi)
 		epList = append(epList, epTime{path: mp3, pt: pt, fi: fi})
 	}
 

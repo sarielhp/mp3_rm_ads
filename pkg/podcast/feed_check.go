@@ -112,7 +112,7 @@ func CheckFeedsForUpdates(podcasts []backend.Podcast, index EpisodeIndex, opts F
 	return results
 }
 
-func feedCheckWorkers(requested, total int) int {
+func FeedCheckWorkers(requested, total int) int {
 	if requested <= 0 {
 		requested = DefaultFeedCheckConcurrency
 	}
@@ -120,6 +120,10 @@ func feedCheckWorkers(requested, total int) int {
 		requested = total
 	}
 	return requested
+}
+
+func feedCheckWorkers(requested, total int) int {
+	return FeedCheckWorkers(requested, total)
 }
 
 func checkOneFeed(item backend.Podcast, index EpisodeIndex, cache *FeedCacheManager, client *http.Client, opts FeedCheckOptions) FeedCheckResult {

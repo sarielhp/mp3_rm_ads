@@ -4,6 +4,8 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/xml"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -189,27 +191,169 @@ func CacheStats() (dir string, entries int, bytes int64) {
 	return dir, entries, bytes
 }
 
+var (
+	feedXMLMu    util.SyncMutex
+	feedXMLCache = make(map[string]map[string]time.Time)
+)
+
+func ParseAnyPublicationTime(s string) (time.Time, error) {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return time.Time{}, fmt.Errorf("empty time string")
+	}
+	layouts := []string{
+		time.RFC3339,
+		time.RFC3339Nano,
+		time.RFC1123Z,
+		time.RFC1123,
+		time.RFC822Z,
+		time.RFC822,
+		"2006-01-02 15:04:05 -0700",
+		"2006-01-02 15:04:05",
+		"2006-01-02 15:04",
+		"2006-01-02",
+	}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, s); err == nil && !t.IsZero() {
+			return t, nil
+		}
+	}
+	norm := NormalizeFeedTimezone(s)
+	for _, l := range layouts {
+		if t, err := time.Parse(l, norm); err == nil && !t.IsZero() {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unknown time format: %s", s)
+}
+
+type localFeedItemXML struct {
+	Title     string `xml:"title"`
+	PubDate   string `xml:"pubDate"`
+	Enclosure struct {
+		URL string `xml:"url,attr"`
+	} `xml:"enclosure"`
+}
+
+type localFeedChannelXML struct {
+	Items []localFeedItemXML `xml:"item"`
+}
+
+type localFeedRSSXML struct {
+	Channel localFeedChannelXML `xml:"channel"`
+}
+
+func parseFeedXMLDates(data []byte) map[string]time.Time {
+	var rss localFeedRSSXML
+	if err := xml.Unmarshal(data, &rss); err != nil || len(rss.Channel.Items) == 0 {
+		return nil
+	}
+	m := make(map[string]time.Time, len(rss.Channel.Items)*4)
+	for _, it := range rss.Channel.Items {
+		pubMs, _ := ParseFeedDate(it.PubDate)
+		if pubMs <= 0 {
+			continue
+		}
+		t := time.UnixMilli(pubMs)
+		title := strings.TrimSpace(it.Title)
+		titleKey := strings.ToLower(title)
+		if titleKey != "" {
+			m[titleKey] = t
+			m[strings.ToLower(SanitizeTitle(title))] = t
+		}
+		if it.Enclosure.URL != "" {
+			uBase := strings.ToLower(strings.TrimSpace(filepath.Base(it.Enclosure.URL)))
+			if uBase != "" {
+				m[uBase] = t
+				m[util.StripExt(uBase)] = t
+			}
+		}
+	}
+	return m
+}
+
+func lookupFeedXMLPublicationTime(dir, filePath string) time.Time {
+	if dir == "" {
+		return time.Time{}
+	}
+	feedPath := filepath.Join(dir, "feed.xml")
+	feedXMLMu.Lock()
+	dates, cached := feedXMLCache[feedPath]
+	feedXMLMu.Unlock()
+
+	if !cached {
+		data, err := os.ReadFile(feedPath)
+		if err != nil {
+			feedXMLMu.Lock()
+			feedXMLCache[feedPath] = nil
+			feedXMLMu.Unlock()
+			return time.Time{}
+		}
+		dates = parseFeedXMLDates(data)
+		feedXMLMu.Lock()
+		feedXMLCache[feedPath] = dates
+		feedXMLMu.Unlock()
+	}
+	if dates == nil {
+		return time.Time{}
+	}
+
+	baseName := filepath.Base(filePath)
+	cleanStem := strings.ToLower(strings.TrimSpace(util.StripExt(baseName)))
+	cleanTitle := strings.ToLower(strings.TrimSpace(EpisodeTitleFromPath(filePath)))
+
+	if t, ok := dates[cleanStem]; ok && !t.IsZero() {
+		return t
+	}
+	if t, ok := dates[cleanTitle]; ok && !t.IsZero() {
+		return t
+	}
+	if t, ok := dates[strings.ToLower(SanitizeTitle(cleanTitle))]; ok && !t.IsZero() {
+		return t
+	}
+	return time.Time{}
+}
+
+func matchCachedEpisodeDate(ep CachedEpisodeSummary, dir, filePath, absolute string) time.Time {
+	if ep.PublishedAt <= 0 {
+		return time.Time{}
+	}
+	path := ep.Path
+	if path == "" {
+		path = ep.Filename
+	}
+	baseName := filepath.Base(filePath)
+	cleanBase := strings.ToLower(util.StripExt(baseName))
+	matched := PublicationAudioPath(dir, path) == absolute ||
+		strings.EqualFold(ep.Filename, baseName) ||
+		strings.EqualFold(util.StripExt(ep.Filename), cleanBase) ||
+		strings.EqualFold(ep.Title, cleanBase)
+	if matched {
+		return time.UnixMilli(ep.PublishedAt)
+	}
+	return time.Time{}
+}
+
 func GetEpisodePublicationTime(filePath string) time.Time {
 	if date, ok := SourcePublicationTime(filePath); ok {
 		return date
 	}
 	st, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(filePath))
-	if err == nil && st != nil && st.PublicationSource == "source" {
-		if date, err := time.Parse(time.RFC3339, st.PublishedAt); err == nil {
+	if err == nil && st != nil && (st.PublicationSource == "source" || st.PublicationSource == "feed") {
+		if date, err := ParseAnyPublicationTime(st.PublishedAt); err == nil && !date.IsZero() {
 			return date
 		}
 		return time.Time{}
 	}
 	dir := DetectPodcastDirForAudio(filePath)
+	if feedDate := lookupFeedXMLPublicationTime(dir, filePath); !feedDate.IsZero() {
+		return feedDate
+	}
 	if cached, _ := LoadPodcastCache(dir); cached != nil {
 		absolute, _ := filepath.Abs(filePath)
 		for _, ep := range cached.Episodes {
-			path := ep.Path
-			if path == "" {
-				path = ep.Filename
-			}
-			if PublicationAudioPath(dir, path) == absolute && ep.PublishedAt > 0 {
-				return time.UnixMilli(ep.PublishedAt)
+			if t := matchCachedEpisodeDate(ep, dir, filePath, absolute); !t.IsZero() {
+				return t
 			}
 		}
 	}

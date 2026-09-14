@@ -3,6 +3,7 @@ package cli
 import (
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
+	"abs/pkg/types"
 	"abs/pkg/util"
 	"io"
 	"os"
@@ -371,5 +372,72 @@ func TestFormatShortStatusAdR(t *testing.T) {
 		if got != tc.want {
 			t.Errorf("formatShortStatus(%q) = %q, want %q", tc.input, got, tc.want)
 		}
+	}
+}
+
+func TestGetEpisodeStatusLabelStaleActive(t *testing.T) {
+	tempDir := t.TempDir()
+	mp3Path := filepath.Join(tempDir, "stale_ep.mp3")
+	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
+	st.Status = StateTranscribingLocally
+	if err := pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(mp3Path), st); err != nil {
+		t.Fatal(err)
+	}
+
+	label, color := getEpisodeStatusLabel(mp3Path)
+	if label != "NeedAdR" || color != "yellow" {
+		t.Fatalf("expected NeedAdR/yellow for dead local process, got %s/%s", label, color)
+	}
+
+	reloaded, err := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(mp3Path))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reloaded.Status != types.StateNeedsAdR {
+		t.Fatalf("expected healed status %s, got %s", types.StateNeedsAdR, reloaded.Status)
+	}
+
+	lock, err := util.AcquireFileLock(mp3Path)
+	if err != nil || lock == nil {
+		t.Fatalf("failed to acquire lock: %v", err)
+	}
+	defer lock.Release()
+
+	st.Status = StateTranscribingLocally
+	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(mp3Path), st)
+
+	label, color = getEpisodeStatusLabel(mp3Path)
+	if label != "In Progress" || color != "yellow" {
+		t.Fatalf("expected In Progress/yellow for actively locked process, got %s/%s", label, color)
+	}
+}
+
+func TestResolveEpisodePublicationTimeFallback(t *testing.T) {
+	tempDir := t.TempDir()
+	mp3Path := filepath.Join(tempDir, "fallback_ep.mp3")
+	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	fi, err := os.Stat(mp3Path)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	got := resolveEpisodePublicationTime(mp3Path, nil, fi)
+	if !got.Equal(fi.ModTime()) {
+		t.Fatalf("expected modTime %v, got %v", fi.ModTime(), got)
+	}
+
+	st := &types.EpisodeStatusFile{
+		PublishedAt: "2026-09-05T10:00:00Z",
+	}
+	got = resolveEpisodePublicationTime(mp3Path, st, fi)
+	want := time.Date(2026, 9, 5, 10, 0, 0, 0, time.UTC)
+	if !got.Equal(want) {
+		t.Fatalf("expected published_at %v, got %v", want, got)
 	}
 }

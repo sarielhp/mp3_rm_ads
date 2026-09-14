@@ -13,7 +13,7 @@ import (
 
 func FindMP3Files(dir string) []string {
 	files, err := FindMP3FilesErr(dir)
-	if err != nil {
+	if err != nil && !os.IsNotExist(err) {
 		fmt.Fprintf(os.Stderr, "Warning: failed to read directory %s: %v\n", dir, err)
 	}
 	return files

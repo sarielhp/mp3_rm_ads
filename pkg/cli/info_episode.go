@@ -151,7 +151,7 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 		pctReduction = (origDur - cleanDur) / origDur * 100
 	}
 
-	pubTime := podcast.GetEpisodePublicationTime(ep.Path)
+	pubTime := resolveEpisodePublicationTime(ep.Path, st, fi)
 	pubDateStr := "-"
 	if !pubTime.IsZero() {
 		pubDateStr = publicationDateTime(pubTime)

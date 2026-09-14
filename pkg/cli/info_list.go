@@ -12,6 +12,7 @@ import (
 	"abs/pkg/config"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
+	"abs/pkg/types"
 	"abs/pkg/util"
 )
 
@@ -104,7 +105,9 @@ func collectPodcastListItems(entries []podcast.PodcastDirEntry) []lsPodcastItem 
 			if pipeline.IsEpisodeClean(mp3) {
 				cleanCount++
 			}
-			pt := podcast.GetEpisodePublicationTime(mp3)
+			st := pipeline.GetOrCreateEpisodeStatus(mp3)
+			fi, _ := os.Stat(mp3)
+			pt := resolveEpisodePublicationTime(mp3, st, fi)
 			if pt.After(newestTime) {
 				newestTime = pt
 			}
@@ -253,7 +256,7 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 			podcastShortID: shortID,
 			episodeShortID: epShortID,
 			episodeName:    epName,
-			modTime:        podcast.GetEpisodePublicationTime(mp3),
+			modTime:        resolveEpisodePublicationTime(mp3, st, fi),
 			sizeBytes:      fi.Size(),
 			origDuration:   origDur,
 			cleanDuration:  cleanDur,
@@ -299,6 +302,37 @@ func formatShortStatus(status string) string {
 	}
 }
 
+func resolveEpisodePublicationTime(mp3Path string, st *types.EpisodeStatusFile, fi os.FileInfo) time.Time {
+	pt := podcast.GetEpisodePublicationTime(mp3Path)
+	if pt.IsZero() && st != nil && st.PublishedAt != "" {
+		if t, err := podcast.ParseAnyPublicationTime(st.PublishedAt); err == nil && !t.IsZero() {
+			pt = t
+		}
+	}
+	if pt.IsZero() && fi != nil && !fi.ModTime().IsZero() {
+		pt = fi.ModTime()
+	}
+	return pt
+}
+
+func isStaleRemoteStatus(st *types.EpisodeStatusFile) bool {
+	if st == nil {
+		return true
+	}
+	tStr := st.UpdatedAt
+	if tStr == "" {
+		tStr = st.CreatedAt
+	}
+	if tStr == "" {
+		return true
+	}
+	t, err := time.Parse(time.RFC3339, tStr)
+	if err != nil {
+		return true
+	}
+	return time.Since(t) > 24*time.Hour
+}
+
 func getEpisodeStatusLabel(mp3Path string) (string, string) {
 	st := pipeline.GetOrCreateEpisodeStatus(mp3Path)
 	if st.Status == StateDone || st.Status == StateCopiedBack || pipeline.IsEpisodeCompleted(mp3Path) {
@@ -307,7 +341,21 @@ func getEpisodeStatusLabel(mp3Path string) (string, string) {
 	if st.Status == StateQueuedRemote {
 		return "Queued Remote", "cyan"
 	}
-	if st.Status == StateTranscribingRemotely || st.Status == StateCuttingRemotely || st.Status == StateTranscribingLocally || st.Status == StateCuttingLocally {
+	if st.Status == StateTranscribingLocally || st.Status == StateCuttingLocally {
+		if lock, err := util.AcquireFileLock(mp3Path); err == nil && lock != nil {
+			lock.Release()
+			st.Status = types.StateNeedsAdR
+			_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(mp3Path), st)
+			return "NeedAdR", "yellow"
+		}
+		return "In Progress", "yellow"
+	}
+	if st.Status == StateTranscribingRemotely || st.Status == StateCuttingRemotely {
+		if isStaleRemoteStatus(st) {
+			st.Status = types.StateNeedsAdR
+			_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(mp3Path), st)
+			return "NeedAdR", "yellow"
+		}
 		return "In Progress", "yellow"
 	}
 	return "NeedAdR", "yellow"

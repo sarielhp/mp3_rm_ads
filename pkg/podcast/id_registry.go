@@ -111,8 +111,10 @@ func GetOrSetEpisodeShortID(podDir, podShortID, audioPath string) string {
 	}
 	id := EpisodeShortIDReadOnly(podDir, podShortID, audioPath)
 	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
-	st.ID = id
-	_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st)
+	if st.ID != id {
+		st.ID = id
+		_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st)
+	}
 	return id
 }
 
