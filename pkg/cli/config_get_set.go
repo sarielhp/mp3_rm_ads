@@ -71,6 +71,8 @@ func handleConfigSetBackend(cfg *Config, normKey, val string) bool {
 		cfg.PodfetchAPIKey = val
 	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
 		cfg.PodfetchDBPath = val
+	case "server-base-url", "server.base-url", "server-url", "base-url":
+		cfg.ServerBaseURL = strings.TrimRight(val, "/")
 	default:
 		return false
 	}
@@ -163,6 +165,8 @@ func handleConfigGet(cfg Config, key string) error {
 		fmt.Println(cfg.PodfetchAPIKey)
 	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
 		fmt.Println(cfg.PodfetchDBPath)
+	case "server-base-url", "server.base-url", "server-url", "base-url":
+		fmt.Println(cfg.ServerBaseURL)
 	case "remote-ffmpeg", "remote-ffmpeg-host", "rffmpeg":
 		fmt.Println(cfg.RemoteFFmpegHost)
 	case "remote-host", "remote.host", "rhost":
@@ -218,6 +222,9 @@ func printConfig(cfg Config) {
 		podcastsDir = "(not set)"
 	}
 	fmt.Printf("  podcasts_dir:             %s\n", podcastsDir)
+	if cfg.ServerBaseURL != "" {
+		fmt.Printf("  server_base_url:          %s\n", cfg.ServerBaseURL)
+	}
 	if cfg.DefaultDownloadPolicy != "" {
 		fmt.Printf("  default_download_policy:  %s\n", cfg.DefaultDownloadPolicy)
 	}

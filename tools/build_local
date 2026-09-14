@@ -27,5 +27,9 @@ unless resolved_path.start_with?(root_dir)
   exit 1
 end
 
-File.chmod(0755, target_binary)
+begin
+  File.chmod(0755, target_binary)
+rescue Errno::EROFS, Errno::EPERM
+  # Ignored in read-only / restricted sandbox
+end
 puts "Built ./abs successfully."

@@ -14,6 +14,7 @@ import (
 
 	"abs/pkg/backend"
 	"abs/pkg/format"
+	"abs/pkg/pipeline"
 	"abs/pkg/util"
 )
 
@@ -155,7 +156,20 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 		guid = "abs:ep:" + hex.EncodeToString(h[:8])
 	}
 	if pubMs <= 0 {
-		pubMs = fi.ModTime().UnixMilli()
+		if pubTime := GetEpisodePublicationTime(path); !pubTime.IsZero() {
+			pubMs = pubTime.UnixMilli()
+		} else {
+			pubMs = fi.ModTime().UnixMilli()
+		}
+	}
+	if durSec <= 0 {
+		if st, _ := pipeline.LoadEpisodeStatus(pipeline.StatusPathFor(path)); st != nil {
+			if st.Cleaned.DurationSec > 0 {
+				durSec = st.Cleaned.DurationSec
+			} else if st.Original.DurationSec > 0 {
+				durSec = st.Original.DurationSec
+			}
+		}
 	}
 	pubDateStr = time.UnixMilli(pubMs).UTC().Format(time.RFC1123Z)
 	if desc == "" {
@@ -177,12 +191,18 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 
 func GeneratePodcastFeedXML(sub Subscription, podDir string, episodes []LocalEpisodeMeta, baseURL string) ([]byte, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	if baseURL == "" {
+		baseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("SERVER_BASE_URL")), "/")
+	}
 	folder := sub.Folder
 	if folder == "" {
 		folder = filepath.Base(podDir)
 	}
 
 	channelURL := fmt.Sprintf("%s/%s/", baseURL, url.PathEscape(folder))
+	if baseURL == "" {
+		channelURL = fmt.Sprintf("/%s/", url.PathEscape(folder))
+	}
 	channel := rssChannel{
 		Title:       sub.Title,
 		Link:        channelURL,
@@ -209,7 +229,7 @@ func GeneratePodcastFeedXML(sub Subscription, podDir string, episodes []LocalEpi
 	}
 
 	for _, ep := range episodes {
-		encURL := ""
+		encURL := escapeRelPath(ep.Filename)
 		if baseURL != "" {
 			encURL = fmt.Sprintf("%s/%s/%s", baseURL, url.PathEscape(folder), escapeRelPath(ep.Filename))
 		}

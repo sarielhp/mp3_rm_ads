@@ -64,7 +64,7 @@ To subscribe to a specific show by RSS address:
 If you add new podcast subscriptions using `abs server add <feed-url> [title]`, regenerate the server OPML file:
 
 ```bash
-abs server opml export /media/podcasts/abs/antennapod.opml
+abs server opml export /media/podcasts/clean/antennapod.opml
 ```
 
 This updates the OPML file served by Caddy so you can re-import any new feeds into AntennaPod.
@@ -78,7 +78,7 @@ This updates the OPML file served by Caddy so you can re-import any new feeds in
 - AntennaPod can seek forward/backward within audio files and resume partially streamed episodes instantly without re-downloading.
 
 ### Feed Updates & Cover Art
-- Each podcast folder in `/media/podcasts/abs/<show>/` contains a standard iTunes-compatible `feed.xml` and local cover image (`cover.jpg` / `cover.png`).
+- Each podcast folder in `/media/podcasts/clean/<show>/` contains a standard iTunes-compatible `feed.xml` and local cover image (`cover.jpg` / `cover.png`).
 - When `abs` downloads new episodes, adds subscriptions, or completes ad removal, it updates `feed.xml` with:
   - Exact file size (`length`) and MIME type (`audio/mpeg`).
   - Audio duration (`itunes:duration`).

@@ -290,7 +290,7 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 	}
 
 	plans := planSubDownloads(targets, cfg, cli)
-	return executeSubDownloads(plans, cfg, cli)
+	return executeSubDownloads(plans, store, cfg, cli)
 }
 
 func resolveSubTargets(subs []podcast.Subscription, cli CLIOptions) []podcast.Subscription {
@@ -406,15 +406,7 @@ func reportSubDownloadPlans(plans []subDownloadPlan, elapsed time.Duration, cli 
 	}
 }
 
-func executeSubDownloads(plans []subDownloadPlan, cfg Config, cli CLIOptions) error {
-	totalToDownload := 0
-	for i := range plans {
-		totalToDownload += len(plans[i].toDownload)
-	}
-	if totalToDownload == 0 {
-		return nil
-	}
-
+func executeSubDownloads(plans []subDownloadPlan, store *podcast.SubscriptionStore, cfg Config, cli CLIOptions) error {
 	if cli.DryRun {
 		printDryRunPlans(plans)
 		return nil
@@ -423,22 +415,41 @@ func executeSubDownloads(plans []subDownloadPlan, cfg Config, cli CLIOptions) er
 	downloader := podcast.NewDownloader()
 	totalDownloaded, podcastsDownloaded := 0, 0
 	for _, plan := range plans {
-		if plan.err != nil || len(plan.toDownload) == 0 {
+		if plan.err != nil {
 			continue
 		}
-		n, err := executePodcastSubDownloads(downloader, plan, cfg, cli)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed downloading %s: %v\n", plan.sub.Title, err)
-			continue
+		if len(plan.toDownload) > 0 {
+			n, err := executePodcastSubDownloads(downloader, plan, cfg, cli)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "Warning: failed downloading %s: %v\n", plan.sub.Title, err)
+			} else {
+				totalDownloaded += n
+				podcastsDownloaded++
+			}
+		} else {
+			_ = podcast.WritePodcastFeedXML(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
 		}
-		totalDownloaded += n
-		podcastsDownloaded++
+		updateSubscriptionCover(&plan, store)
+	}
+
+	if cfg.PodcastsDir != "" && store != nil {
+		_ = podcast.WriteCatalogWebpage(cfg.PodcastsDir, store.List(), cfg.ServerBaseURL)
 	}
 
 	if !cli.Quiet && totalDownloaded > 0 {
 		fmt.Printf("Downloaded %d episode(s) across %d podcast(s).\n", totalDownloaded, podcastsDownloaded)
 	}
 	return nil
+}
+
+func updateSubscriptionCover(plan *subDownloadPlan, store *podcast.SubscriptionStore) {
+	if plan.sub.ImageURL == "" && store != nil {
+		if entry := podcast.DefaultFeedCache().Get(plan.sub.FeedURL); entry != nil && entry.ImageURL != "" {
+			plan.sub.ImageURL = entry.ImageURL
+			_ = store.Add(plan.sub)
+			_ = store.Save()
+		}
+	}
 }
 
 func printDryRunPlans(plans []subDownloadPlan) {

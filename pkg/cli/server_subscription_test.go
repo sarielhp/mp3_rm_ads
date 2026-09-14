@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -152,17 +153,22 @@ func TestResolveSubTargetsFiltering(t *testing.T) {
 }
 
 func TestExecuteSubDownloadsNothingToDownload(t *testing.T) {
+	podDir := t.TempDir()
 	plans := []subDownloadPlan{
 		{
-			sub:        podcast.Subscription{ID: "p1", Title: "P1"},
-			podDir:     t.TempDir(),
+			sub:        podcast.Subscription{ID: "p1", Title: "P1", Folder: "P1"},
+			podDir:     podDir,
 			toDownload: nil,
 		},
 	}
-	cfg := Config{}
-	cli := CLIOptions{}
-	if err := executeSubDownloads(plans, cfg, cli); err != nil {
+	cfg := Config{PodcastsDir: t.TempDir()}
+	cli := CLIOptions{ProcOptions: ProcOptions{Quiet: true}}
+	if err := executeSubDownloads(plans, nil, cfg, cli); err != nil {
 		t.Fatalf("executeSubDownloads failed: %v", err)
+	}
+	feedFile := filepath.Join(podDir, "feed.xml")
+	if _, err := os.Stat(feedFile); err != nil {
+		t.Fatalf("expected feed.xml to be created at %s: %v", feedFile, err)
 	}
 }
 
@@ -207,5 +213,72 @@ func TestPlanSubDownloadsParallelIntegration(t *testing.T) {
 	}
 	if len(plans[1].toDownload) != 1 {
 		t.Fatalf("expected 1 download for Show 2, got %d", len(plans[1].toDownload))
+	}
+}
+
+func TestExecuteSubDownloadsUpdatesCatalogAndFeed(t *testing.T) {
+	tmpDir := t.TempDir()
+	podcastsDir := filepath.Join(tmpDir, "podcasts")
+	showDir := filepath.Join(podcastsDir, "Show")
+	_ = os.MkdirAll(showDir, 0755)
+
+	epAudio := filepath.Join(showDir, "Ep1.mp3")
+	_ = os.WriteFile(epAudio, []byte("fake mp3 data"), 0644)
+
+	subsFile := filepath.Join(tmpDir, "podcasts.json")
+	store, err := podcast.NewSubscriptionStore(subsFile)
+	if err != nil {
+		t.Fatalf("NewSubscriptionStore failed: %v", err)
+	}
+	sub := podcast.Subscription{
+		ID:     "sub1",
+		Title:  "Show",
+		Folder: "Show",
+	}
+	_ = store.Add(sub)
+	_ = store.Save()
+
+	plans := []subDownloadPlan{
+		{
+			sub:        sub,
+			podDir:     showDir,
+			toDownload: nil,
+		},
+	}
+	cfg := Config{
+		PodcastsDir:   podcastsDir,
+		ServerBaseURL: "http://example.com/podcasts",
+	}
+	cli := CLIOptions{ProcOptions: ProcOptions{Quiet: true}}
+
+	if err := executeSubDownloads(plans, store, cfg, cli); err != nil {
+		t.Fatalf("executeSubDownloads failed: %v", err)
+	}
+
+	feedFile := filepath.Join(showDir, "feed.xml")
+	data, err := os.ReadFile(feedFile)
+	if err != nil {
+		t.Fatalf("expected feed.xml at %s: %v", feedFile, err)
+	}
+	if !strings.Contains(string(data), "http://example.com/podcasts/Show/Ep1.mp3") {
+		t.Fatalf("feed.xml missing expected enclosure URL, got: %s", string(data))
+	}
+
+	catalogFile := filepath.Join(podcastsDir, "index.html")
+	if _, err := os.Stat(catalogFile); err != nil {
+		t.Fatalf("expected catalog index.html at %s: %v", catalogFile, err)
+	}
+}
+
+func TestConfigSetGetServerBaseURL(t *testing.T) {
+	config.SetTestConfigPath(filepath.Join(t.TempDir(), "config.json"))
+	defer config.SetTestConfigPath("")
+
+	cfg := Config{}
+	if err := handleConfigSet(&cfg, "server-base-url", "http://test.server:8080/podcasts/"); err != nil {
+		t.Fatalf("handleConfigSet server-base-url failed: %v", err)
+	}
+	if cfg.ServerBaseURL != "http://test.server:8080/podcasts" {
+		t.Fatalf("expected trimmed server base url, got %q", cfg.ServerBaseURL)
 	}
 }

@@ -57,6 +57,7 @@ type Config struct {
 	DBPath            string
 	PodcastsDir       string
 	SubscriptionsFile string
+	ServerBaseURL     string
 	Timeout           time.Duration
 	MaxAttempts       int
 	RetryDelay        time.Duration

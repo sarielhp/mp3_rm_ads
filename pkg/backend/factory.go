@@ -24,6 +24,7 @@ func FromAppConfig(cfg *types.Config, quiet bool) (Backend, error) {
 	bCfg := Config{
 		PodcastsDir:       cfg.PodcastsDir,
 		SubscriptionsFile: cfg.SubscriptionsFile,
+		ServerBaseURL:     cfg.ServerBaseURL,
 		Quiet:             quiet,
 	}
 	return New("standalone", bCfg)
