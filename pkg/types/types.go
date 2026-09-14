@@ -316,7 +316,7 @@ func (c *Config) IsOpenRouterAPIKeyEnabled() bool {
 	if c != nil && c.OpenRouterAPIKeyEnabled != nil {
 		return *c.OpenRouterAPIKeyEnabled
 	}
-	return false
+	return true
 }
 
 func (c *Config) IsSpeculativeTranscriptionEnabled() bool {

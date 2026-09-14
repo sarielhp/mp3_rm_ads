@@ -128,8 +128,15 @@ func selectLLMProfile(cfg *types.Config, query string) (types.LLMProfile, error)
 		return types.LLMProfile{}, fmt.Errorf("no LLM profiles available")
 	}
 	if query == "" {
+		if cfg.ActiveProfileID > 0 {
+			for _, p := range cfg.Profiles {
+				if p.ID == cfg.ActiveProfileID {
+					return p, nil
+				}
+			}
+		}
 		for _, p := range cfg.Profiles {
-			if p.ID == cfg.ActiveProfileID {
+			if p.ID == 3 || strings.Contains(strings.ToLower(p.Model), "deepseek-v4-flash") {
 				return p, nil
 			}
 		}

@@ -18,7 +18,7 @@ func DefaultConfig() types.Config {
 	return types.Config{
 		Instructions:     "Configuration file for abs. Select profiles by ID or set active_profile_id.",
 		ChunkDurationSec: 0,
-		ActiveProfileID:  1,
+		ActiveProfileID:  3,
 		Profiles:         DefaultLLMProfiles,
 
 		WhisperConfig: types.WhisperConfig{
@@ -48,7 +48,7 @@ func DefaultConfig() types.Config {
 			GeminiStagingBucket:     "",
 			GeminiLocation:          "us-central1",
 			GeminiAPIKeyEnabled:     &defaultKeyEnabled,
-			OpenRouterAPIKeyEnabled: &defaultKeyDisabled,
+			OpenRouterAPIKeyEnabled: &defaultKeyEnabled,
 		},
 		SpeculativeConfig: types.SpeculativeConfig{
 			SpeculativeTranscription: &defaultKeyDisabled,

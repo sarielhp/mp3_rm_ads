@@ -8,7 +8,8 @@ import (
 )
 
 func listProfiles(cfg Config) {
-	activeID := cfg.ActiveProfileID
+	activeProfile, _ := config.SelectLLMProfile(&cfg, "")
+	activeID := activeProfile.ID
 	fmt.Printf("\n%s\n", util.RepeatStr("=", 70))
 	fmt.Println("AVAILABLE LLM PROFILES & PRICING:")
 	fmt.Printf("%s\n", util.RepeatStr("=", 70))

@@ -31,8 +31,8 @@ func TestConfigFlags(t *testing.T) {
 	if !cfg.IsGeminiAPIKeyEnabled() {
 		t.Error("expected default GeminiAPIKeyEnabled to be true")
 	}
-	if cfg.IsOpenRouterAPIKeyEnabled() {
-		t.Error("expected default OpenRouterAPIKeyEnabled to be false")
+	if !cfg.IsOpenRouterAPIKeyEnabled() {
+		t.Error("expected default OpenRouterAPIKeyEnabled to be true")
 	}
 	if cfg.IsSpeculativeTranscriptionEnabled() {
 		t.Error("expected default SpeculativeTranscription to be false")

@@ -8,7 +8,7 @@
   "whisper_wake_command": "",
   "chunk_duration_sec": 0,
   "parallel_chunks": 1,
-  "active_profile_id": 1,
+  "active_profile_id": 3,
   "active_whisper_id": 1,
   "whisper_profiles": [
     {
@@ -51,7 +51,7 @@
   "gemini_api_key_file": "",
   "gemini_model": "gemini-flash-latest",
   "gemini_api_key_enabled": true,
-  "openrouter_api_key_enabled": false,
+  "openrouter_api_key_enabled": true,
   "speculative_transcription": false,
   "competing_services": [
     "gemini",
