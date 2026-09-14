@@ -53,10 +53,12 @@ func probeLLMProfile(cfg Config, profile LLMProfile) error {
 	if strings.TrimSpace(profile.URL) == "" || strings.TrimSpace(profile.Model) == "" {
 		return fmt.Errorf("profile requires both an API URL and model")
 	}
-	key := config.ResolveOpenRouterAPIKey(profile, &cfg)
-	key, err := config.ValidateOpenRouterKey(profile, key, cfg.IsOpenRouterAPIKeyEnabled())
-	if err != nil {
-		return err
+	key := config.ResolveLLMAPIKey(profile, &cfg)
+	if (profile.Type == "openrouter" || strings.Contains(profile.URL, "openrouter")) && key == "" {
+		return fmt.Errorf("openrouter API key is missing or disabled in configuration")
+	}
+	if (profile.Type == "gemini" || strings.Contains(profile.URL, "googleapis.com")) && key == "" {
+		return fmt.Errorf("gemini API key is missing or disabled in configuration")
 	}
 	const sample = "[0.0s -> 10.0s] Welcome to our discussion of astronomy.\n[10.0s -> 20.0s] This episode is sponsored by Example Coffee. Visit example.com and use code PODCAST for ten percent off.\n[20.0s -> 30.0s] Back to our discussion of distant stars."
 	// A probe only needs one answer; an empty one here means the endpoint

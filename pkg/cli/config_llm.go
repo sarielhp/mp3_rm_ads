@@ -21,7 +21,7 @@ func listProfiles(cfg Config) {
 			defaultBadge = " [DEFAULT]"
 		}
 		hasKey := ""
-		if p.APIKey != "" {
+		if config.ResolveLLMAPIKey(p, &cfg) != "" {
 			hasKey = " (Key set)"
 		}
 		costInfo := config.GetProfileCost(p)

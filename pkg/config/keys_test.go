@@ -119,3 +119,29 @@ func TestResolveGeminiAPIKeyNoSearch(t *testing.T) {
 		t.Errorf("expected empty string when no key or key file configured, got %q", got)
 	}
 }
+
+func TestResolveLLMAPIKey(t *testing.T) {
+	enabled := true
+	disabled := false
+	cfg := &types.Config{
+		GeminiConfig: types.GeminiConfig{
+			GeminiAPIKey:        "gemini-key-123",
+			GeminiAPIKeyEnabled: &enabled,
+		},
+	}
+
+	geminiProfile := types.LLMProfile{
+		Type:  "gemini",
+		URL:   "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+		Model: "gemini-flash-latest",
+	}
+
+	if got := ResolveLLMAPIKey(geminiProfile, cfg); got != "gemini-key-123" {
+		t.Errorf("expected gemini-key-123, got %q", got)
+	}
+
+	cfg.GeminiAPIKeyEnabled = &disabled
+	if got := ResolveLLMAPIKey(geminiProfile, cfg); got != "" {
+		t.Errorf("expected empty when gemini disabled, got %q", got)
+	}
+}

@@ -45,6 +45,7 @@ var DefaultLLMProfiles = []types.LLMProfile{
 	{ID: 2, Name: "OpenRouter - Claude 3.5 Sonnet", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "anthropic/claude-3.5-sonnet"},
 	{ID: 3, Name: "OpenRouter - DeepSeek V4 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "deepseek/deepseek-v4-flash"},
 	{ID: 4, Name: "OpenRouter - Gemini 2.5 Flash", Type: "openrouter", URL: "https://openrouter.ai/api/v1/chat/completions", Model: "google/gemini-2.5-flash"},
+	{ID: 5, Name: "Google AI Studio - Gemini Flash (Free)", Type: "gemini", URL: "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions", Model: "gemini-flash-latest"},
 }
 
 func WhisperEngineBadge(engine types.WhisperEngine) string {
@@ -115,11 +116,7 @@ func SelectLLMProfile(cfg *types.Config, query string) (types.LLMProfile, error)
 	if err != nil {
 		return profile, err
 	}
-	if !cfg.IsOpenRouterAPIKeyEnabled() && (profile.Type == "openrouter" || strings.Contains(profile.URL, "openrouter") || strings.HasPrefix(profile.APIKey, "sk-or-")) {
-		profile.APIKey = ""
-	} else {
-		profile.APIKey = ResolveOpenRouterAPIKey(profile, cfg)
-	}
+	profile.APIKey = ResolveLLMAPIKey(profile, cfg)
 	return profile, nil
 }
 
@@ -166,6 +163,13 @@ func GetProfileCost(profile types.LLMProfile) types.CostInfo {
 	t := profile.Type
 	u := profile.URL
 
+	if t == "gemini" || strings.Contains(u, "googleapis.com") {
+		return types.CostInfo{
+			Type:     "Free Cloud",
+			CostStr:  "Free ($0.00 / Google AI Studio)",
+			Est1HStr: "$0.00",
+		}
+	}
 	if t == "ollama" || strings.Contains(u, "11434") || strings.Contains(u, "localhost") || strings.Contains(u, "127.0.0.1") {
 		return types.CostInfo{
 			Type:     "Local",

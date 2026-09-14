@@ -186,6 +186,30 @@ func ResolveOpenRouterAPIKey(profile types.LLMProfile, cfg *types.Config) string
 	return ReadAuthSecret("openrouter_api_key")
 }
 
+func ResolveLLMAPIKey(profile types.LLMProfile, cfg *types.Config) string {
+	if profile.Type == "gemini" || strings.Contains(profile.URL, "googleapis.com") {
+		key := profile.APIKey
+		if key == "" || util.IsZeroedKey(key) {
+			key = ResolveGeminiAPIKey(cfg)
+		}
+		if cfg != nil {
+			if valKey, err := ValidateGeminiKey(key, cfg.IsGeminiAPIKeyEnabled()); err == nil {
+				return valKey
+			}
+			return ""
+		}
+		return key
+	}
+	key := ResolveOpenRouterAPIKey(profile, cfg)
+	if cfg != nil {
+		if valKey, err := ValidateOpenRouterKey(profile, key, cfg.IsOpenRouterAPIKeyEnabled()); err == nil {
+			return valKey
+		}
+		return ""
+	}
+	return key
+}
+
 func ResolveAuthFolderCredentials(cfg *types.Config) {
 	if cfg == nil {
 		return
