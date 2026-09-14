@@ -9,9 +9,9 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/format"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/format"
+	"pod/pkg/util"
 )
 
 const commonWebpageCSS = `

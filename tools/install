@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-BINARY="abs"
+BINARY="pod"
 INSTALL_DIR="${HOME}/bin"
 
 if ! git diff --quiet HEAD; then
@@ -27,11 +27,12 @@ if [ -n "$remote" ]; then
   fi
 fi
 
-go build -o "$BINARY" .
+./tools/build_local > /dev/null
 
 mkdir -p "$INSTALL_DIR"
 cp "$BINARY" "$INSTALL_DIR/$BINARY"
+ln -sf "$BINARY" "$INSTALL_DIR/abs"
 
 "$INSTALL_DIR/$BINARY" config completion install bash >/dev/null 2>&1 || true
 
-echo "Success: installed to $INSTALL_DIR/$BINARY"
+echo "Success: installed to $INSTALL_DIR/$BINARY (with $INSTALL_DIR/abs symlink)"

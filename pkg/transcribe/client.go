@@ -14,8 +14,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/format"
-	"abs/pkg/types"
+	"pod/pkg/format"
+	"pod/pkg/types"
 )
 
 const WavBytesPerSec = WavSampleRate * 2

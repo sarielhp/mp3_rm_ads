@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 var DefaultWhisperProfiles = []types.WhisperProfile{

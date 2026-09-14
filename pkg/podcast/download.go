@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/types"
 )
 
 type DownloadOptions struct {

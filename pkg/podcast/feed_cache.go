@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/util"
 )
 
 var (
@@ -131,9 +131,16 @@ func feedCachePath() string {
 		}
 		cacheHome = filepath.Join(home, ".cache")
 	}
-	dir := filepath.Join(cacheHome, "abs")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "feed_cache.json")
+	podDir := filepath.Join(cacheHome, "pod")
+	if _, err := os.Stat(filepath.Join(podDir, "feed_cache.json")); err == nil {
+		return filepath.Join(podDir, "feed_cache.json")
+	}
+	legacyDir := filepath.Join(cacheHome, "abs")
+	if _, err := os.Stat(filepath.Join(legacyDir, "feed_cache.json")); err == nil {
+		return filepath.Join(legacyDir, "feed_cache.json")
+	}
+	_ = os.MkdirAll(podDir, 0755)
+	return filepath.Join(podDir, "feed_cache.json")
 }
 
 func NewFeedCacheManager(cachePath string) *FeedCacheManager {

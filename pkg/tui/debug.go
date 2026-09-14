@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/kitty"
-	"abs/pkg/util"
+	"pod/pkg/kitty"
+	"pod/pkg/util"
 )
 
 var (
@@ -30,7 +30,7 @@ func debugBaseDir() string {
 			cacheHome = filepath.Join(home, ".cache")
 		}
 	}
-	dir := filepath.Join(cacheHome, "abs", "debug")
+	dir := filepath.Join(cacheHome, "pod", "debug")
 	_ = os.MkdirAll(dir, 0755)
 	_ = os.MkdirAll(filepath.Join(dir, "snapshots"), 0755)
 	return dir
@@ -40,17 +40,17 @@ func initDebugLogger(enabled bool) {
 	debugLoggerMu.Lock()
 	defer debugLoggerMu.Unlock()
 
-	debugEnabled = enabled || os.Getenv("ABS_DEBUG") == "1" || os.Getenv("ABS_DEBUG") == "true"
+	debugEnabled = enabled || os.Getenv("POD_DEBUG") == "1" || os.Getenv("POD_DEBUG") == "true" || os.Getenv("ABS_DEBUG") == "1" || os.Getenv("ABS_DEBUG") == "true"
 	if !debugEnabled || debugFile != nil {
 		return
 	}
 
-	logPath := filepath.Join(debugBaseDir(), "abs_debug.log")
+	logPath := filepath.Join(debugBaseDir(), "pod_debug.log")
 	f, err := os.OpenFile(logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err == nil {
 		debugFile = f
 		now := time.Now().Format("2006-01-02 15:04:05.000")
-		_, _ = fmt.Fprintf(debugFile, "\n=== ABS TUI Debug Session Started at %s ===\n", now)
+		_, _ = fmt.Fprintf(debugFile, "\n=== POD TUI Debug Session Started at %s ===\n", now)
 		_, _ = fmt.Fprintf(debugFile, "PID: %d | TERM: %s | KittyTerminal: %v\n", os.Getpid(), os.Getenv("TERM"), kitty.IsKittyTerminal())
 	}
 }

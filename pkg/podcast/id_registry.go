@@ -9,10 +9,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type ResolvedType int

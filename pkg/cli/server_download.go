@@ -1,14 +1,14 @@
 package cli
 
 import (
-	"abs/pkg/adremoval"
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"fmt"
 	"os"
 	"os/exec"
+	"pod/pkg/adremoval"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 	"time"
 
@@ -19,7 +19,7 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 	return clihelp.Command{
 		Name:        "download",
 		Description: "Download undownloaded episodes for podcasts",
-		UsageLine:   "abs server download [podcast-id] [options]",
+		UsageLine:   "pod server download [podcast-id] [options]",
 		Parameters:  []clihelp.Param{{Name: "[podcast-id]", Description: "Specify podcast by name, index, or ID"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -181,7 +181,7 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 		}
 	}
 	if unknown > 0 {
-		fmt.Printf("%d episode(s) cannot be requested until the server indexes them; run 'abs server feeds update'.\n", unknown)
+		fmt.Printf("%d episode(s) cannot be requested until the server indexes them; run 'pod server feeds update'.\n", unknown)
 	}
 }
 

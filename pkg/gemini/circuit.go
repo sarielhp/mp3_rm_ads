@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 const (

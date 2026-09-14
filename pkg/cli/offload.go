@@ -13,7 +13,7 @@ func buildOffloadCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "offload",
 		Description: "Manage remote batch transcription offload",
-		UsageLine:   "abs offload [command]",
+		UsageLine:   "pod offload [command]",
 		Subcommands: subcmds,
 	}
 }
@@ -31,7 +31,7 @@ func buildRemoteDeploySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "deploy",
 		Description: "Deploy current abs binary and configuration to a remote host",
-		UsageLine:   "abs offload deploy [host] [options]",
+		UsageLine:   "pod offload deploy [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -53,7 +53,7 @@ func buildRemotePushSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "push",
 		Description: "Package and push audio files to remote staging for background processing",
-		UsageLine:   "abs offload push <path1> [path2 ...] [options]",
+		UsageLine:   "pod offload push <path1> [path2 ...] [options]",
 		Parameters:  []clihelp.Param{{Name: "<path1> [path2 ...]", Description: "Audio files or directories to push for remote processing"}},
 		Options: []clihelp.Option{
 			clihelp.String(&opts.RemoteHost, "--host <host>", "", "Target remote SSH host"),
@@ -74,7 +74,7 @@ func buildRemotePullSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "pull",
 		Description: "Collect completed batch results from remote host and update local library",
-		UsageLine:   "abs offload pull [host] [options]",
+		UsageLine:   "pod offload pull [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -96,8 +96,8 @@ func buildRemoteScanSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "scan",
 		Description: "Scan remote mirror directory for pending episodes and process them",
-		UsageLine:   "abs offload scan [path] [options]",
-		Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/abs_remote)"}},
+		UsageLine:   "pod offload scan [path] [options]",
+		Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory to scan (defaults to ~/abs_remote or ~/pod_remote)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.IfDirty, "--if-dirty", false, "Only scan if .scan_trigger file exists"),
@@ -118,7 +118,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "start",
 			Description: "Start and verify remote worker processing on a remote host",
-			UsageLine:   "abs offload start [host] [options]",
+			UsageLine:   "pod offload start [host] [options]",
 			Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 			Args:        clihelp.MaximumNArgs(1),
 			Options: []clihelp.Option{
@@ -135,8 +135,8 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "worker",
 			Description: "Run remote worker scanner loop on mirror directory",
-			UsageLine:   "abs offload worker [path] [options]",
-			Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory (defaults to ~/abs_remote)"}},
+			UsageLine:   "pod offload worker [path] [options]",
+			Parameters:  []clihelp.Param{{Name: "[path]", Description: "Target mirror directory (defaults to ~/abs_remote or ~/pod_remote)"}},
 			Args:        clihelp.MaximumNArgs(1),
 			Options: []clihelp.Option{
 				clihelp.String(&opts.BatchWorkerDir, "--batch-dir <path>", "", "Path to the staged batch directory"),
@@ -154,7 +154,7 @@ func buildRemoteWorkerSubcommands(opts *CLIOptions, action *string) []clihelp.Co
 		{
 			Name:        "ack",
 			Description: "Acknowledge pulled episodes on remote: delete audio files and archive",
-			UsageLine:   "abs offload ack <path1> [path2 ...] [options]",
+			UsageLine:   "pod offload ack <path1> [path2 ...] [options]",
 			Parameters:  []clihelp.Param{{Name: "<path1> [path2 ...]", Description: "Relative paths of episodes within remote work directory"}},
 			Args:        clihelp.MinimumNArgs(1),
 			Options: []clihelp.Option{
@@ -183,7 +183,7 @@ func buildRemoteStatusSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "status",
 		Description: "Check remote server status, background workers, and active batches",
-		UsageLine:   "abs offload status [host] [options]",
+		UsageLine:   "pod offload status [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -205,7 +205,7 @@ func buildRemoteClearSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "clear",
 		Description: "Stop remote workers and empty all scheduled/pending jobs from remote queue",
-		UsageLine:   "abs offload clear [host] [options]",
+		UsageLine:   "pod offload clear [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -226,7 +226,7 @@ func buildRemoteStopSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "stop",
 		Description: "Stop remote worker process and Whisper server on remote host",
-		UsageLine:   "abs offload stop [host] [options]",
+		UsageLine:   "pod offload stop [host] [options]",
 		Parameters:  []clihelp.Param{{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
@@ -248,7 +248,7 @@ func buildRemoteCancelSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "cancel",
 		Description: "Cancel a remote batch job or all active workers",
-		UsageLine:   "abs offload cancel [host] [batch_id] [options]",
+		UsageLine:   "pod offload cancel [host] [batch_id] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host"},
 			{Name: "[batch_id]", Description: "Optional batch ID to cancel"},

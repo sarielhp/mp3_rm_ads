@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"abs/pkg/podcast"
+	"pod/pkg/podcast"
 	"time"
 )
 

@@ -3,8 +3,8 @@ package tui
 import (
 	"fmt"
 
-	"abs/pkg/player"
-	"abs/pkg/util"
+	"pod/pkg/player"
+	"pod/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

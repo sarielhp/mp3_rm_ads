@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func TestFormatClock(t *testing.T) {

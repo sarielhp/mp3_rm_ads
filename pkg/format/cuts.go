@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"os"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func BuildCutEntries(combined []types.AdSegment) []types.CutEntry {
@@ -113,7 +113,7 @@ func SaveCutsJSON(mainFile string, totalDuration float64, adSegments []types.AdS
 
 	cutsData := types.CutsData{
 		Version:             1,
-		Generator:           "abs",
+		Generator:           "pod",
 		LLMUsed:             llmInfo,
 		TargetFile:          util.FilepathBase(mainFile),
 		OriginalDurationSec: util.RoundFloat(totalDuration, 2),

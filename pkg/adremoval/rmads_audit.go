@@ -10,11 +10,11 @@ import (
 	"strconv"
 	"strings"
 
-	"abs/pkg/audio"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type transcriptAuditItem struct {

@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
 	"errors"
 	"os"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 	"testing"
 )
 

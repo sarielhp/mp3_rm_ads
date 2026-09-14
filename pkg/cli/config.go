@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"abs/pkg/podcast"
 	"fmt"
+	"pod/pkg/podcast"
 	"strconv"
 	"strings"
 
@@ -23,7 +23,7 @@ func buildConfigCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "config",
 		Description: "View and manage application configuration",
-		UsageLine:   "abs config [command]",
+		UsageLine:   "pod config [command]",
 		Subcommands: subcmds,
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"
@@ -41,7 +41,7 @@ func buildConfigBasicSubcommands(opts *CLIOptions, action *string) []clihelp.Com
 		{
 			Name:        "get",
 			Description: "Get the value of a configuration key",
-			UsageLine:   "abs config get <key>",
+			UsageLine:   "pod config get <key>",
 			Parameters: []clihelp.Param{
 				{Name: "<key>", Description: "Configuration key name (e.g., 'podcasts-dir', 'rffmpeg', 'abs-url')"},
 			},
@@ -56,7 +56,7 @@ func buildConfigBasicSubcommands(opts *CLIOptions, action *string) []clihelp.Com
 		{
 			Name:        "set",
 			Description: "Set the value of a configuration key",
-			UsageLine:   "abs config set <key> <value>",
+			UsageLine:   "pod config set <key> <value>",
 			Parameters: []clihelp.Param{
 				{Name: "<key>", Description: "Configuration key name"},
 				{Name: "<value>", Description: "New configuration value"},
@@ -73,7 +73,7 @@ func buildConfigBasicSubcommands(opts *CLIOptions, action *string) []clihelp.Com
 		{
 			Name:        "show",
 			Description: "Display current configuration summary table",
-			UsageLine:   "abs config show",
+			UsageLine:   "pod config show",
 			Args:        clihelp.NoArgs,
 			Run: func(ctx *clihelp.Context) error {
 				*action = "config"
@@ -93,7 +93,7 @@ func buildConfigLLMSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			{
 				Name:        "list",
 				Description: "List all configured LLM profiles",
-				UsageLine:   "abs config llm list",
+				UsageLine:   "pod config llm list",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
@@ -104,7 +104,7 @@ func buildConfigLLMSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			{
 				Name:        "default",
 				Description: "Set default LLM profile ID",
-				UsageLine:   "abs config llm default <id>",
+				UsageLine:   "pod config llm default <id>",
 				Parameters: []clihelp.Param{
 					{Name: "<id>", Description: "Profile ID to set as default"},
 				},
@@ -119,7 +119,7 @@ func buildConfigLLMSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 			{
 				Name:        "import",
 				Description: "Import LLM settings from OpenCode",
-				UsageLine:   "abs config llm import",
+				UsageLine:   "pod config llm import",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
@@ -144,7 +144,7 @@ func buildConfigWhisperSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 			{
 				Name:        "list",
 				Description: "List all configured Whisper profiles",
-				UsageLine:   "abs config whisper list",
+				UsageLine:   "pod config whisper list",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
@@ -155,7 +155,7 @@ func buildConfigWhisperSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 			{
 				Name:        "default",
 				Description: "Set default Whisper profile ID",
-				UsageLine:   "abs config whisper default <id>",
+				UsageLine:   "pod config whisper default <id>",
 				Parameters: []clihelp.Param{
 					{Name: "<id>", Description: "Whisper profile ID to set as default"},
 				},
@@ -170,7 +170,7 @@ func buildConfigWhisperSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 			{
 				Name:        "add",
 				Description: "Add a new Whisper profile (name:url:speed[:container[:lang[:prompt]]])",
-				UsageLine:   "abs config whisper add <spec>",
+				UsageLine:   "pod config whisper add <spec>",
 				Parameters: []clihelp.Param{
 					{Name: "<spec>", Description: "Profile specification formatted string"},
 				},
@@ -185,7 +185,7 @@ func buildConfigWhisperSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 			{
 				Name:        "del",
 				Description: "Remove a Whisper profile by ID",
-				UsageLine:   "abs config whisper del <id>",
+				UsageLine:   "pod config whisper del <id>",
 				Parameters: []clihelp.Param{
 					{Name: "<id>", Description: "Whisper profile ID to delete"},
 				},
@@ -210,7 +210,7 @@ func buildConfigCacheSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "cache",
 		Description: "Manage and clear local cache",
-		UsageLine:   "abs config cache [clear]",
+		UsageLine:   "pod config cache [clear]",
 		Parameters: []clihelp.Param{
 			{Name: "[clear]", Description: "Clear local cache"},
 		},
@@ -242,7 +242,7 @@ func buildConfigProcessorSubcommand(opts *CLIOptions, action *string) clihelp.Co
 			{
 				Name:        "set",
 				Description: "Add or replace a post-processor program",
-				UsageLine:   "abs config processor set <program>",
+				UsageLine:   "pod config processor set <program>",
 				Parameters: []clihelp.Param{
 					{Name: "<program>", Description: "The command line or path of the program to run"},
 				},
@@ -257,7 +257,7 @@ func buildConfigProcessorSubcommand(opts *CLIOptions, action *string) clihelp.Co
 			{
 				Name:        "list",
 				Description: "List configured post-processor programs",
-				UsageLine:   "abs config processor list",
+				UsageLine:   "pod config processor list",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "config"
@@ -268,7 +268,7 @@ func buildConfigProcessorSubcommand(opts *CLIOptions, action *string) clihelp.Co
 			{
 				Name:        "del",
 				Description: "Remove a post-processor program by number",
-				UsageLine:   "abs config processor del <number>",
+				UsageLine:   "pod config processor del <number>",
 				Parameters: []clihelp.Param{
 					{Name: "<number>", Description: "The index or number of the post-processor to delete"},
 				},
@@ -293,7 +293,7 @@ func buildConfigMigrateSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	return clihelp.Command{
 		Name:        "migrate",
 		Description: "Migrate configuration from legacy podcasts_manager",
-		UsageLine:   "abs config migrate [source]",
+		UsageLine:   "pod config migrate [source]",
 		Parameters: []clihelp.Param{
 			{Name: "[source]", Description: "Optional migration source ('pm', 'podcasts_manager', or 'all')"},
 		},
@@ -356,7 +356,7 @@ func runConfigCommand(config *Config, cli CLIOptions) error {
 		fmt.Printf("Cache directory: %q\n", dir)
 		fmt.Printf("  entries: %d\n", entries)
 		fmt.Printf("  size:    %.1f MB\n", float64(size)/(1024*1024))
-		fmt.Println("Run 'abs config cache clear' to delete it.")
+		fmt.Println("Run 'pod config cache clear' to delete it.")
 	case "cache-reset":
 		if err := podcast.ResetCache(); err != nil {
 			return fmt.Errorf("error resetting cache: %w", err)

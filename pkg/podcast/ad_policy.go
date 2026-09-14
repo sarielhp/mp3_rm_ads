@@ -1,8 +1,8 @@
 package podcast
 
 import (
-	"abs/pkg/config"
 	"os"
+	"pod/pkg/config"
 	"sort"
 	"strings"
 	"time"

@@ -9,9 +9,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/format"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/format"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func RunRemoteStatus(cfg *types.Config, host string, transport RemoteTransport, quiet, verbose bool) error {
@@ -54,11 +54,13 @@ func RunRemoteStatus(cfg *types.Config, host string, transport RemoteTransport, 
 }
 
 func FetchRemoteVersionAndWorkerStatus(targetHost, remoteWorkDir string, transport RemoteTransport, status *types.RemoteServerStatus) {
-	verOut, _ := transport.Exec(targetHost, "~/.local/bin/abs --version 2>/dev/null || ~/abs_remote/bin/abs --version 2>/dev/null || abs --version 2>/dev/null || cat ~/abs_remote/VERSION 2>/dev/null || cat ~/.config/abs/VERSION 2>/dev/null || ~/.local/bin/abs help 2>/dev/null || ~/abs_remote/bin/abs help 2>/dev/null || abs help 2>/dev/null")
+	verOut, _ := transport.Exec(targetHost, "~/.local/bin/pod --version 2>/dev/null || ~/pod_remote/bin/pod --version 2>/dev/null || pod --version 2>/dev/null || ~/.local/bin/abs --version 2>/dev/null || ~/abs_remote/bin/abs --version 2>/dev/null || abs --version 2>/dev/null || cat ~/pod_remote/VERSION 2>/dev/null || cat ~/.config/pod/VERSION 2>/dev/null || cat ~/abs_remote/VERSION 2>/dev/null || cat ~/.config/abs/VERSION 2>/dev/null || ~/.local/bin/pod help 2>/dev/null || ~/.local/bin/abs help 2>/dev/null || pod help 2>/dev/null || abs help 2>/dev/null")
 	if verOut != "" {
 		lines := util.SplitLines(verOut)
 		if len(lines) > 0 {
 			v := strings.TrimSpace(lines[0])
+			v = strings.TrimPrefix(v, "pod version ")
+			v = strings.TrimPrefix(v, "pod ")
 			v = strings.TrimPrefix(v, "abs version ")
 			v = strings.TrimPrefix(v, "abs ")
 			status.BinaryVersion = strings.TrimSpace(v)
@@ -80,7 +82,7 @@ func FetchRemoteVersionAndWorkerStatus(targetHost, remoteWorkDir string, transpo
 			status.WorkerRunning = true
 		}
 	} else {
-		psOut, _ := transport.Exec(targetHost, "pgrep -x abs 2>/dev/null")
+		psOut, _ := transport.Exec(targetHost, "pgrep -x pod 2>/dev/null || pgrep -x abs 2>/dev/null")
 		status.WorkerRunning = strings.TrimSpace(psOut) != ""
 	}
 }
@@ -230,17 +232,17 @@ func CheckAndRecoverRemoteWorker(targetHost, remoteWorkDir string, transport Rem
 	}
 
 	if workerFailed {
-		abortCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker)' 2>/dev/null || true; rm -f %s/.worker.lock; docker restart $(docker ps -q --filter 'ancestor=fedirz/faster-whisper-server' 2>/dev/null || docker ps -q 2>/dev/null) 2>/dev/null || true", remoteWorkDir)
+		abortCmd := fmt.Sprintf("pkill -f '(pod|abs).*(scan|worker)' 2>/dev/null || true; rm -f %s/.worker.lock; docker restart $(docker ps -q --filter 'ancestor=fedirz/faster-whisper-server' 2>/dev/null || docker ps -q 2>/dev/null) 2>/dev/null || true", remoteWorkDir)
 		_, _ = transport.Exec(targetHost, abortCmd)
 
-		relaunchCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		relaunchCmd := fmt.Sprintf("touch %s/.scan_trigger && (nohup ~/.local/bin/pod offload scan %s < /dev/null > %s/worker.log 2>&1 || nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1) &", remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, relaunchCmd)
 		status.WorkerRunning = true
 		status.Message = fmt.Sprintf("Auto-recovered: detected '%s' in worker.log, restarted worker with updated binary", failureReason)
 	} else if !status.WorkerRunning && len(status.QueuedTasks) > 0 {
-		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+		wakeWorkerCmd := fmt.Sprintf("touch %s/.scan_trigger && (nohup ~/.local/bin/pod offload scan %s < /dev/null > %s/worker.log 2>&1 || nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1) &", remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		if _, err := transport.Exec(targetHost, wakeWorkerCmd); err != nil {
-			altCmd := fmt.Sprintf("touch %s/.scan_trigger && nohup abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir, remoteWorkDir)
+			altCmd := fmt.Sprintf("touch %s/.scan_trigger && (nohup pod offload scan %s < /dev/null > %s/worker.log 2>&1 || nohup abs offload scan %s < /dev/null > %s/worker.log 2>&1) &", remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir)
 			_, _ = transport.Exec(targetHost, altCmd)
 		}
 		status.WorkerRunning = true

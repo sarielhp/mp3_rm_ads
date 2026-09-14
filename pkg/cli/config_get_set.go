@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	"abs/pkg/config"
+	"pod/pkg/config"
 )
 
 func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {
@@ -204,7 +204,7 @@ func handleConfigGet(cfg Config, key string) error {
 	case "competing-services", "speculative-services":
 		fmt.Println(strings.Join(cfg.GetCompetingServices(), ", "))
 	default:
-		return fmt.Errorf("unknown configuration key %q; run 'abs config show' to list keys", key)
+		return fmt.Errorf("unknown configuration key %q; run 'pod config show' to list keys", key)
 	}
 	return nil
 }

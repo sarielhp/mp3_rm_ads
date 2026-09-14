@@ -189,9 +189,9 @@ func cliExampleTheme() clihelp.Theme {
 func printCommandExamples(w io.Writer, app *clihelp.App, cmd *clihelp.Command, path []string) {
 	examples := collectExamples(app, cmd)
 	if len(examples) == 0 {
-		name := "abs"
+		name := "pod"
 		if len(path) > 0 {
-			name = "abs " + strings.Join(path, " ")
+			name = "pod " + strings.Join(path, " ")
 		}
 		fmt.Fprintf(w, "No examples available for %s.\nRun '%s --help' for usage.\n", name, name)
 		return

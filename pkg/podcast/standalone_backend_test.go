@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/backend"
+	"pod/pkg/backend"
 )
 
 func TestStandaloneBackend(t *testing.T) {

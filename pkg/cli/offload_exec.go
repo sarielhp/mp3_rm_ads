@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"abs/pkg/remote"
 	"os"
+	"pod/pkg/remote"
 )
 
 func handleRemoteCommand(config Config, cli CLIOptions) {

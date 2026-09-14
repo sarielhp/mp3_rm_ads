@@ -69,8 +69,9 @@ push: bump
 
 install: build
 	@install -d "$$HOME/bin"
-	@install -m 755 abs "$$HOME/bin/abs"
-	@echo "Installed to $$HOME/bin/abs"
+	@install -m 755 pod "$$HOME/bin/pod"
+	@ln -sf pod "$$HOME/bin/abs"
+	@echo "Installed to $$HOME/bin/pod (with $$HOME/bin/abs symlink)"
 
 ci: check
 snapshot:
@@ -84,5 +85,5 @@ review-loop:
 	@./tools/review_loop $(ARGS)
 
 clean:
-	@rm -f abs
+	@rm -f pod abs
 	@echo "Cleaned."

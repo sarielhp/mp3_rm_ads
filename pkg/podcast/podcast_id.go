@@ -8,9 +8,9 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 type PodcastDirEntry struct {

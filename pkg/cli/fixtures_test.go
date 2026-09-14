@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
 	"os"
 	"path/filepath"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
 	"strings"
 	"testing"
 	"time"

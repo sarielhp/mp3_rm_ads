@@ -3,7 +3,7 @@ package format
 import (
 	"math"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 const maxAdSegments = 500

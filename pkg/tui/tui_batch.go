@@ -3,10 +3,10 @@ package tui
 import (
 	"fmt"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
 )
 
 func (m *tuiModel) toggleEpisodeSelection(path string) {

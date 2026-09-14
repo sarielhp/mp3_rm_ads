@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/kitty"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/kitty"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func (m *tuiModel) drawPodcastDetail() string {

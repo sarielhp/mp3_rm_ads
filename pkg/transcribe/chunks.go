@@ -6,10 +6,10 @@ import (
 	"os"
 	"path/filepath"
 
-	"abs/pkg/audio"
-	"abs/pkg/format"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/format"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type ChunkInfo struct {

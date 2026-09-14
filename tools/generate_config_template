@@ -5,7 +5,7 @@ require 'json'
 require 'fileutils'
 
 template = {
-  "_instructions" => "Configuration template for abs. Place in ~/.config/abs/config.json",
+  "_instructions" => "Configuration template for pod. Place in ~/.config/pod/config.json",
   "whisper_url" => "http://127.0.0.1:8088/inference",
   "whisper_speed_factor" => 7.0,
   "whisper_docker_container" => "",

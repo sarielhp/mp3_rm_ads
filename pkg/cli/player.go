@@ -6,11 +6,11 @@ import (
 	"os"
 	"strings"
 
-	"abs/pkg/format"
-	"abs/pkg/player"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/format"
+	"pod/pkg/player"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -197,12 +197,12 @@ func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "player",
 		Description: "Control background audio playback",
-		UsageLine:   "abs player [command]",
+		UsageLine:   "pod player [command]",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "play",
 				Description: "Play an episode or resume playback",
-				UsageLine:   "abs player play [id]",
+				UsageLine:   "pod player play [id]",
 				Args:        clihelp.RangeArgs(0, 1),
 				Run: func(ctx *clihelp.Context) error {
 					*action = "player"
@@ -214,7 +214,7 @@ func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 			{
 				Name:        "stop",
 				Description: "Stop background audio playback",
-				UsageLine:   "abs player stop",
+				UsageLine:   "pod player stop",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "player"
@@ -225,7 +225,7 @@ func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 			{
 				Name:        "pause",
 				Description: "Toggle playback pause state",
-				UsageLine:   "abs player pause",
+				UsageLine:   "pod player pause",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "player"
@@ -236,7 +236,7 @@ func buildPlayerCommand(opts *CLIOptions, action *string) clihelp.Command {
 			{
 				Name:        "status",
 				Description: "Display player status and progress",
-				UsageLine:   "abs player status",
+				UsageLine:   "pod player status",
 				Args:        clihelp.NoArgs,
 				Run: func(ctx *clihelp.Context) error {
 					*action = "player"

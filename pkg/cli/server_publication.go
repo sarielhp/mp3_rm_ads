@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
 	"fmt"
 	"github.com/sarielhp/clihelp"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 )
 
 func buildServerPublicationSubcommand(opts *CLIOptions, action *string) clihelp.Command {

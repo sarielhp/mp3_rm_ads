@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/types"
 )
 
 func TestEnsureABSIgnore(t *testing.T) {

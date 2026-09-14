@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"abs/pkg/cli"
+	"pod/pkg/cli"
 )
 
 //go:embed VERSION

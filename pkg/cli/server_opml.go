@@ -5,9 +5,9 @@ import (
 	"os"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -16,18 +16,18 @@ func buildServerOPMLSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "opml",
 		Description: "Import or export podcast subscriptions using OPML files",
-		UsageLine:   "abs server opml <command> [args]",
+		UsageLine:   "pod server opml <command> [args]",
 		Subcommands: []clihelp.Command{
 			buildServerOPMLImportSubcommand(opts, action),
 			buildServerOPMLExportSubcommand(opts, action),
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server opml export podcasts.opml",
+				Line:        "pod server opml export podcasts.opml",
 				Description: "Export all server podcast feeds into an OPML file",
 			},
 			{
-				Line:        "abs server opml import subscriptions.opml",
+				Line:        "pod server opml import subscriptions.opml",
 				Description: "Import podcasts from an OPML file into the server",
 			},
 		},
@@ -60,7 +60,7 @@ func buildServerOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.C
 	return clihelp.Command{
 		Name:        "import",
 		Description: "Import podcast subscriptions from an OPML file into the server",
-		UsageLine:   "abs server opml import <file> [options]",
+		UsageLine:   "pod server opml import <file> [options]",
 		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to the OPML file to import"}},
 		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
@@ -69,7 +69,7 @@ func buildServerOPMLImportSubcommand(opts *CLIOptions, action *string) clihelp.C
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server opml import subscriptions.opml",
+				Line:        "pod server opml import subscriptions.opml",
 				Description: "Import podcasts from subscriptions.opml into the server",
 			},
 		},
@@ -90,7 +90,7 @@ func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.C
 	return clihelp.Command{
 		Name:        "export",
 		Description: "Export podcast RSS feeds provided by the server into an OPML file",
-		UsageLine:   "abs server opml export <file> [options]",
+		UsageLine:   "pod server opml export <file> [options]",
 		Parameters:  []clihelp.Param{{Name: "<file>", Description: "Path to write the exported OPML file"}},
 		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{
@@ -99,11 +99,11 @@ func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.C
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server opml export podcasts.opml",
+				Line:        "pod server opml export podcasts.opml",
 				Description: "Export all server podcast feeds into podcasts.opml",
 			},
 			{
-				Line:        "abs server opml export ~/Downloads/podcasts.opml --verbose",
+				Line:        "pod server opml export ~/Downloads/podcasts.opml --verbose",
 				Description: "Export feeds with detailed progress and show each feed URL",
 			},
 		},
@@ -114,7 +114,7 @@ func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.C
 			},
 			{
 				Heading: "Importing Into AntennaPod",
-				Text:    "To import all server podcasts into AntennaPod at once:\n1. Run 'abs server opml export podcasts.opml' and transfer the file to your mobile device (via Nextcloud, Syncthing, email, or USB).\n2. Open AntennaPod on your device.\n3. Navigate to Subscriptions -> tap the top-right menu (⋮) -> 'Import/Export'.\n4. Select 'OPML import' and choose the exported 'podcasts.opml' file.\n5. AntennaPod will subscribe to all server-provided podcast feeds in one single step.",
+				Text:    "To import all server podcasts into AntennaPod at once:\n1. Run 'pod server opml export podcasts.opml' and transfer the file to your mobile device (via Nextcloud, Syncthing, email, or USB).\n2. Open AntennaPod on your device.\n3. Navigate to Subscriptions -> tap the top-right menu (⋮) -> 'Import/Export'.\n4. Select 'OPML import' and choose the exported 'podcasts.opml' file.\n5. AntennaPod will subscribe to all server-provided podcast feeds in one single step.",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
@@ -145,7 +145,7 @@ func handleServerOPML(cfg Config, cli CLIOptions) error {
 	switch cli.OPMLSubcmd {
 	case "export":
 		if targetFile == "" {
-			return fmt.Errorf("missing required <file> argument for 'abs server opml export <file>'")
+			return fmt.Errorf("missing required <file> argument for 'pod server opml export <file>'")
 		}
 		data, err := b.ExportOPML(backend.OPMLExportOptions{Quiet: cli.Quiet, Verbose: cli.Verbose})
 		if err != nil {
@@ -160,7 +160,7 @@ func handleServerOPML(cfg Config, cli CLIOptions) error {
 		return nil
 	case "import":
 		if targetFile == "" {
-			return fmt.Errorf("missing required <file> argument for 'abs server opml import <file>'")
+			return fmt.Errorf("missing required <file> argument for 'pod server opml import <file>'")
 		}
 		data, err := os.ReadFile(targetFile)
 		if err != nil {
@@ -191,7 +191,7 @@ func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
 	switch cli.OPMLSubcmd {
 	case "export":
 		if targetFile == "" {
-			return fmt.Errorf("missing required <file> argument for 'abs server opml export <file>'")
+			return fmt.Errorf("missing required <file> argument for 'pod server opml export <file>'")
 		}
 		data, err := store.ExportToOPML(cfg.ServerBaseURL)
 		if err != nil {
@@ -206,7 +206,7 @@ func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
 		return nil
 	case "import":
 		if targetFile == "" {
-			return fmt.Errorf("missing required <file> argument for 'abs server opml import <file>'")
+			return fmt.Errorf("missing required <file> argument for 'pod server opml import <file>'")
 		}
 		data, err := os.ReadFile(targetFile)
 		if err != nil {

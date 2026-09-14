@@ -1,16 +1,16 @@
 package cli
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"pod/pkg/pipeline"
+	"pod/pkg/util"
 	"reflect"
 	"testing"
 	"time"
 
-	"abs/pkg/podcast"
+	"pod/pkg/podcast"
 )
 
 func TestQueueTodaySelection(t *testing.T) {

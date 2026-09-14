@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/detect"
-	"abs/pkg/format"
-	"abs/pkg/gemini"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/detect"
+	"pod/pkg/format"
+	"pod/pkg/gemini"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func processSingleAudioFile(idx, totalFiles, processedCount int, inputFile string, opts types.ProcOptions, config types.Config, action string, batchStartTime time.Time, selectedProfile types.LLMProfile) (hasError bool, processed bool, stop bool) {

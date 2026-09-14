@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/format"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/format"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func PrintRemoteStatus(targetHost string, status types.RemoteServerStatus, readyEpisodes []RemoteDoneItem, archiveCount int, cfg *types.Config, quiet, verbose bool) error {

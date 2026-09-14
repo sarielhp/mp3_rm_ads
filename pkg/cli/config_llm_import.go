@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 func copyLLMFromOpenCode(cfg *Config) {

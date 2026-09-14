@@ -6,7 +6,7 @@ func buildTUICommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "tui",
 		Description: "Interactive TUI browser for podcasts and episodes",
-		UsageLine:   "abs tui [options] [directory]",
+		UsageLine:   "pod tui [options] [directory]",
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.String(&opts.PodcastsDir, "--podcasts-dir <dir>", "", "Podcasts directory"),

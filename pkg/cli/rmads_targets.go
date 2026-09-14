@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/podcast"
+	"pod/pkg/podcast"
 )
 
 func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {

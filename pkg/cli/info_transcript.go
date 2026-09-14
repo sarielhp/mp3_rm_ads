@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"abs/pkg/podcast"
-	"abs/pkg/tui"
 	"fmt"
 	"github.com/sarielhp/clihelp"
 	"os"
 	"path/filepath"
+	"pod/pkg/podcast"
+	"pod/pkg/tui"
 	"strings"
 )
 
@@ -14,7 +14,7 @@ func buildInfoTranscriptSubcommand(opts *CLIOptions, action *string) clihelp.Com
 	return clihelp.Command{
 		Name:        "transcript",
 		Description: "Read an episode transcript in the system pager",
-		UsageLine:   "abs info transcript <episode-id>",
+		UsageLine:   "pod info transcript <episode-id>",
 		Args:        clihelp.ExactArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "info"

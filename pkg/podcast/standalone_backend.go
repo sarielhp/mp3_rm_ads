@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/util"
 )
 
 type StandaloneBackend struct {
@@ -22,6 +22,9 @@ type StandaloneBackend struct {
 
 func init() {
 	backend.Register("standalone", func(cfg backend.Config) (backend.Backend, error) {
+		return NewStandaloneBackend(cfg), nil
+	})
+	backend.Register("pod", func(cfg backend.Config) (backend.Backend, error) {
 		return NewStandaloneBackend(cfg), nil
 	})
 	backend.Register("abs", func(cfg backend.Config) (backend.Backend, error) {

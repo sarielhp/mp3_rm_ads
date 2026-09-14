@@ -9,19 +9,19 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"github.com/sarielhp/clihelp"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func buildServerAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "add",
 		Description: "Add a podcast subscription by RSS feed URL",
-		UsageLine:   "abs server add <feed-url> [title]",
+		UsageLine:   "pod server add <feed-url> [title]",
 		Parameters: []clihelp.Param{
 			{Name: "<feed-url>", Description: "Upstream podcast RSS feed URL"},
 			{Name: "[title]", Description: "Optional title for podcast"},
@@ -41,7 +41,7 @@ func buildServerRemoveSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "remove",
 		Description: "Remove a podcast subscription by ID or title",
-		UsageLine:   "abs server remove <id-or-title>",
+		UsageLine:   "pod server remove <id-or-title>",
 		Parameters: []clihelp.Param{
 			{Name: "<id-or-title>", Description: "Podcast ID, folder, or title"},
 		},
@@ -60,7 +60,7 @@ func buildServerFeedSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "feed",
 		Description: "Regenerate feed.xml for local podcast(s)",
-		UsageLine:   "abs server feed [id-or-title]",
+		UsageLine:   "pod server feed [id-or-title]",
 		Parameters: []clihelp.Param{
 			{Name: "[id-or-title]", Description: "Optional podcast ID or title to regenerate"},
 		},
@@ -79,7 +79,7 @@ func buildServerImportSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "import",
 		Description: "Import subscriptions from OPML file or backend into local store",
-		UsageLine:   "abs server import [file]",
+		UsageLine:   "pod server import [file]",
 		Parameters: []clihelp.Param{
 			{Name: "[file]", Description: "Optional OPML file to import (defaults to importing from backend)"},
 		},

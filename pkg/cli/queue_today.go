@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"fmt"
 	"path/filepath"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 	"time"
 
@@ -16,7 +16,7 @@ func buildQueueTodaySubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "today",
 		Description: "Queue downloaded, uncleaned episodes whose source publication date is today (local calendar date; unknown dates skipped)",
-		UsageLine:   "abs queue today [options]",
+		UsageLine:   "pod queue today [options]",
 		Args:        clihelp.MaximumNArgs(0),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress output"),

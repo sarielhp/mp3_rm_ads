@@ -13,7 +13,7 @@ import (
 
 func TestDownloaderSuccess(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !strings.Contains(r.Header.Get("User-Agent"), "abs") {
+		if !strings.Contains(r.Header.Get("User-Agent"), "pod") {
 			http.Error(w, "invalid user agent", http.StatusBadRequest)
 			return
 		}

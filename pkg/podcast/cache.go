@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/pipeline"
+	"pod/pkg/util"
 )
 
 type CachedEpisodeSummary struct {
@@ -65,9 +65,16 @@ func CacheBaseDir() string {
 		}
 		cacheHome = filepath.Join(home, ".cache")
 	}
-	dir := filepath.Join(cacheHome, "abs", "podcasts")
-	_ = os.MkdirAll(dir, 0755)
-	return dir
+	podCacheDir := filepath.Join(cacheHome, "pod", "podcasts")
+	legacyDir := filepath.Join(cacheHome, "abs", "podcasts")
+	if _, err := os.Stat(podCacheDir); err == nil {
+		return podCacheDir
+	}
+	if _, err := os.Stat(legacyDir); err == nil {
+		return legacyDir
+	}
+	_ = os.MkdirAll(podCacheDir, 0755)
+	return podCacheDir
 }
 
 func SanitizeDirName(dirPath string) string {
@@ -168,8 +175,8 @@ func ResetCache() error {
 			cacheHome = filepath.Join(home, ".cache")
 		}
 	}
-	absCacheDir := filepath.Join(cacheHome, "abs")
-	return os.RemoveAll(absCacheDir)
+	_ = os.RemoveAll(filepath.Join(cacheHome, "abs"))
+	return os.RemoveAll(filepath.Join(cacheHome, "pod"))
 }
 
 func CacheStats() (dir string, entries int, bytes int64) {

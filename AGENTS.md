@@ -12,7 +12,7 @@
 
 | Script | Purpose |
 |--------|---------|
-| `tools/build_local` | Build local `./abs` binary strictly within repo directory |
+| `tools/build_local` | Build local `./pod` binary (with `./abs` symlink) strictly within repo directory |
 | `tools/check` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
 | `tools/lint` | Static analysis: `go vet` + `staticcheck` (respecting baseline) + `tools/audit_lines` |
@@ -182,7 +182,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/detect` | AI-driven ad detection via LLMs (Ollama, OpenRouter), prompt generation, speculative racing |
 | `pkg/gemini` | Direct audio transcription and processing with Gemini Flash 2.5 API |
 | `pkg/pipeline` | Core processing pipeline: transcription → detection → cutting, episode status tracking |
-| `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/abs_player.sock`), MPRIS |
+| `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/pod_player.sock`), MPRIS |
 | `pkg/podcast` | Standalone podcast manager, subscription store, native downloader, feed & web generator |
 | `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
@@ -209,12 +209,12 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
  - Ad detection: LLM API (Ollama, OpenRouter, etc.)
  - Audio cutting: ffmpeg filter_complex with concat
  - Backend Architecture (`architecture.md`):
-   - **Standalone (Native)**: `abs` is its own native podcast backend (`backend_type: "standalone"`). It manages subscriptions in `~/.config/abs/podcasts.json`, directly fetches upstream feeds, downloads episodes, and generates local `feed.xml` RSS and `index.html` static web players.
-   - **Legacy Importers**: External podcast servers (e.g., PodFetch) have a minimal presence strictly as optional read-only migration sources for one-time subscription import via `abs server import`. All operational features (downloads, feeds, pipeline) run natively in standalone mode.
- - Playback Architecture: Headless background playback daemon spawned via `abs player <play|stop|pause|status> [id]`, controlled through IPC socket `/tmp/abs_player.sock` with MPRIS D-Bus integration (supports mpv and cvlc fallback).
+   - **Standalone (Native)**: `pod` is its own native podcast backend (`backend_type: "standalone"`). It manages subscriptions in `~/.config/pod/podcasts.json`, directly fetches upstream feeds, downloads episodes, and generates local `feed.xml` RSS and `index.html` static web players.
+   - **Legacy Importers**: External podcast servers (e.g., PodFetch) have a minimal presence strictly as optional read-only migration sources for one-time subscription import via `pod server import`. All operational features (downloads, feeds, pipeline) run natively in standalone mode.
+ - Playback Architecture: Headless background playback daemon spawned via `pod player <play|stop|pause|status> [id]`, controlled through IPC socket `/tmp/pod_player.sock` with MPRIS D-Bus integration (supports mpv and cvlc fallback).
  - Terminology: Standardized on "AdR" (Ad Removal) and "NeedAdR" across CLI, tables, status badges, and TUI.
- - Config: `~/.config/abs/config.json`
- - Migration: Run `abs config migrate` to import settings from legacy `podcasts_manager` configs.
+ - Config: `~/.config/pod/config.json`
+ - Migration: Run `pod config migrate` to import settings from legacy `podcasts_manager` configs.
  - Environment Overrides: Supported env vars override config values:
    - `WHISPER_URL`
    - `PODFETCH_URL`
@@ -224,7 +224,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
    - `PODCASTS_DIR`
    - `WHISPER_LANGUAGE`
    - `WHISPER_DOCKER_CONTAINER`
- - Security & Wake Command: `whisper_wake_command` executes via `/bin/sh -c` under the executing user's privileges. Ensure `~/.config/abs/config.json` permissions remain restricted to the local user.
+ - Security & Wake Command: `whisper_wake_command` executes via `/bin/sh -c` under the executing user's privileges. Ensure `~/.config/pod/config.json` permissions remain restricted to the local user.
 
 ## Agent Development Rules
 

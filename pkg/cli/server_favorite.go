@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -28,7 +28,7 @@ func buildServerFavoriteSubcommand(opts *CLIOptions, action *string) clihelp.Com
 	return clihelp.Command{
 		Name:        "favorite",
 		Description: "Set or list favorite podcasts and episodes (auto-downloads all new episodes and removes ads)",
-		UsageLine:   "abs server favorite [<identifier>] [options]",
+		UsageLine:   "pod server favorite [<identifier>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<identifier>]", Description: "Target podcast or episode identifier to mark/unmark as favorite (leave empty to list)"},
 		},
@@ -40,19 +40,19 @@ func buildServerFavoriteSubcommand(opts *CLIOptions, action *string) clihelp.Com
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server favorite 'Huberman Lab'",
+				Line:        "pod server favorite 'Huberman Lab'",
 				Description: "Mark podcast as favorite (auto-downloads new episodes with ad removal)",
 			},
 			{
-				Line:        "abs server favorite e12345",
+				Line:        "pod server favorite e12345",
 				Description: "Mark single episode as favorite",
 			},
 			{
-				Line:        "abs server favorite 42 --off",
+				Line:        "pod server favorite 42 --off",
 				Description: "Remove podcast from favorites",
 			},
 			{
-				Line:        "abs server favorite",
+				Line:        "pod server favorite",
 				Description: "List all currently favorited podcasts",
 			},
 		},
@@ -125,7 +125,7 @@ func listFavoritePodcasts(podcastsDir string, cli CLIOptions) error {
 	}
 
 	if len(favorites) == 0 {
-		fmt.Println("No favorite podcasts set. Use 'abs server favorite <podcast>' to favorite one.")
+		fmt.Println("No favorite podcasts set. Use 'pod server favorite <podcast>' to favorite one.")
 		return nil
 	}
 

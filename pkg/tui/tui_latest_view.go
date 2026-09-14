@@ -5,12 +5,12 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/player"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/player"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

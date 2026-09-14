@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/types"
+	"pod/pkg/config"
+	"pod/pkg/types"
 )
 
 type GeminiProbeResult struct {

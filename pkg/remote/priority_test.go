@@ -1,12 +1,12 @@
 package remote
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
 	"testing"
 	"time"
 )

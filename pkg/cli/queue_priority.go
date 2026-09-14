@@ -1,14 +1,14 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
 	"encoding/json"
 	"fmt"
 	"github.com/sarielhp/clihelp"
 	"os"
 	"path/filepath"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
 	"sort"
 	"strconv"
 )
@@ -17,7 +17,7 @@ func buildQueuePrioritySubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	return clihelp.Command{
 		Name:        "priority",
 		Description: "Show or set a podcast's persistent queue priority (0–10)",
-		UsageLine:   "abs queue priority <podcast-id> [0–10]",
+		UsageLine:   "pod queue priority <podcast-id> [0–10]",
 		Args:        clihelp.RangeArgs(1, 2),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"

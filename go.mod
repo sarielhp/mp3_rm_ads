@@ -1,4 +1,4 @@
-module abs
+module pod
 
 go 1.26.5
 

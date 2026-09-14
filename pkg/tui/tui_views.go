@@ -3,7 +3,7 @@ package tui
 import (
 	"strings"
 
-	"abs/pkg/kitty"
+	"pod/pkg/kitty"
 )
 
 func (m *tuiModel) drawPopup() string {
@@ -36,11 +36,11 @@ func (m *tuiModel) View() string {
 	}
 
 	if m.screen == screenPodcastDetail && m.podIdx < len(m.podcasts) {
-		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].name)
+		m.setTerminalTitle("pod - " + m.podcasts[m.podIdx].name)
 	} else if m.screen == screenEpisodeDetail && m.podIdx < len(m.podcasts) && m.epIdx < len(m.podcasts[m.podIdx].episodes) {
-		m.setTerminalTitle("abs - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
+		m.setTerminalTitle("pod - " + m.podcasts[m.podIdx].episodes[m.epIdx].filename)
 	} else {
-		m.setTerminalTitle("abs")
+		m.setTerminalTitle("pod")
 	}
 
 	if m.showHelpModal {

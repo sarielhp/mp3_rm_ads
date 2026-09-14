@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/types"
 	"cloud.google.com/go/vertexai/genai"
+	"pod/pkg/types"
 )
 
 func TestGeminiPromptContent(t *testing.T) {

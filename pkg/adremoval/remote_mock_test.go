@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/remote"
-	"abs/pkg/util"
+	"pod/pkg/remote"
+	"pod/pkg/util"
 )
 
 type MockRemoteTransport struct {

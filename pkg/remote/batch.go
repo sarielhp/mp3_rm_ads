@@ -12,13 +12,13 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/backend"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/backend"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func FindAudioFilesForRemote(paths []string, defaultDir string) []string {
@@ -401,9 +401,9 @@ func startRemoteWorkerProcess(targetHost, remoteWorkDir string, transport Remote
 		fmt.Printf("[+] Starting remote worker on %s...\n", targetHost)
 	}
 
-	workerCmd := fmt.Sprintf("nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+	workerCmd := fmt.Sprintf("(nohup ~/.local/bin/pod offload scan %s < /dev/null > %s/worker.log 2>&1 || nohup ~/.local/bin/abs offload scan %s < /dev/null > %s/worker.log 2>&1) &", remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir)
 	if _, err := transport.Exec(targetHost, workerCmd); err != nil {
-		altCmd := fmt.Sprintf("nohup abs offload scan %s < /dev/null > %s/worker.log 2>&1 &", remoteWorkDir, remoteWorkDir)
+		altCmd := fmt.Sprintf("(nohup pod offload scan %s < /dev/null > %s/worker.log 2>&1 || nohup abs offload scan %s < /dev/null > %s/worker.log 2>&1) &", remoteWorkDir, remoteWorkDir, remoteWorkDir, remoteWorkDir)
 		_, _ = transport.Exec(targetHost, altCmd)
 	}
 }
@@ -435,7 +435,7 @@ func verifyRemoteWorkerStartup(targetHost, remoteWorkDir string, transport Remot
 			break
 		}
 
-		lockCheck, _ := transport.Exec(targetHost, fmt.Sprintf("test -f %s/.worker.lock && pgrep -f 'abs.*(scan|worker)' && echo RUNNING", remoteWorkDir))
+		lockCheck, _ := transport.Exec(targetHost, fmt.Sprintf("test -f %s/.worker.lock && pgrep -f '(pod|abs).*(scan|worker)' && echo RUNNING", remoteWorkDir))
 		if strings.Contains(lockCheck, "RUNNING") {
 			workerStarted = true
 			if i >= 3 {

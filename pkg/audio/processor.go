@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/util"
+	"pod/pkg/util"
 )
 
 // AudioProcessor defines the operations required for audio inspection, cutting,

@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
 	"fmt"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 	"time"
 )
 

@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type RemoteTransport interface {

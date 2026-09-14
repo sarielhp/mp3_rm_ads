@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func TestQueueListEmpty(t *testing.T) {

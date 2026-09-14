@@ -12,12 +12,15 @@ import (
 	"syscall"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
-const PlayerSocketPath = "/tmp/abs_player.sock"
+const (
+	PlayerSocketPath       = "/tmp/pod_player.sock"
+	LegacyPlayerSocketPath = "/tmp/abs_player.sock"
+)
 
 type mpvCommand struct {
 	Command []any `json:"command"`
@@ -42,7 +45,11 @@ type daemonState struct {
 }
 
 func DialPlayerSocket() (net.Conn, error) {
-	return net.DialTimeout("unix", PlayerSocketPath, 250*time.Millisecond)
+	conn, err := net.DialTimeout("unix", PlayerSocketPath, 250*time.Millisecond)
+	if err == nil {
+		return conn, nil
+	}
+	return net.DialTimeout("unix", LegacyPlayerSocketPath, 250*time.Millisecond)
 }
 
 func IsPlayerSocketAlive() bool {
@@ -94,11 +101,13 @@ func SendMpvRawCommand(conn net.Conn, cmd []any) (any, error) {
 func StopPlayerSocket() error {
 	if !IsPlayerSocketAlive() {
 		_ = os.Remove(PlayerSocketPath)
+		_ = os.Remove(LegacyPlayerSocketPath)
 		return nil
 	}
 	_, err := SendPlayerIpcCommand([]any{"quit"})
 	time.Sleep(100 * time.Millisecond)
 	_ = os.Remove(PlayerSocketPath)
+	_ = os.Remove(LegacyPlayerSocketPath)
 	return err
 }
 

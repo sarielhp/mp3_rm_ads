@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 type mockTranscriber struct {

@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/util"
 	"fmt"
+	"pod/pkg/backend"
+	"pod/pkg/util"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -12,7 +12,7 @@ func buildServerTimelineSubcommand(opts *CLIOptions, action *string) clihelp.Com
 	return clihelp.Command{
 		Name:        "timeline",
 		Description: "Display exact online availability timestamps table for recent podcast episodes",
-		UsageLine:   "abs server timeline [directory]",
+		UsageLine:   "pod server timeline [directory]",
 		Parameters: []clihelp.Param{
 			{Name: "[directory]", Description: "Optional path to podcasts directory"},
 		},

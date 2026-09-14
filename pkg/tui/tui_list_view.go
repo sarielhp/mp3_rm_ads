@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/kitty"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/kitty"
+	"pod/pkg/util"
 )
 
 func (m *tuiModel) drawPodcastsList() string {

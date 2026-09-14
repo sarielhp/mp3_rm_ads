@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
+	"pod/pkg/pipeline"
+	"pod/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

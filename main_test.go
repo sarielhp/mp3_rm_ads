@@ -3,7 +3,7 @@ package main
 import (
 	"testing"
 
-	"abs/pkg/cli"
+	"pod/pkg/cli"
 )
 
 func TestMainExecuteHelp(t *testing.T) {

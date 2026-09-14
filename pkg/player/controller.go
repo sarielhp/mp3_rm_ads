@@ -8,9 +8,9 @@ import (
 	"syscall"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type AudioPlayer struct {

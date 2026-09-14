@@ -1,9 +1,9 @@
 package tui
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

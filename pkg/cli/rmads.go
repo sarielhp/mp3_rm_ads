@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"abs/pkg/adremoval"
-	"abs/pkg/remote"
 	"fmt"
+	"pod/pkg/adremoval"
+	"pod/pkg/remote"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -12,7 +12,7 @@ func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "rm_ads",
 		Description: "Process audio files for ad removal",
-		UsageLine:   "abs rm_ads [command]",
+		UsageLine:   "pod rm_ads [command]",
 		Subcommands: []clihelp.Command{
 			buildRmAdsRecutSubcommand(opts, action),
 			buildRmAdsExportSubcommand(opts, action),
@@ -62,7 +62,7 @@ func buildRmAdsCollectSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "collect",
 		Description: "Pull completed batches from remote host",
-		UsageLine:   "abs rm_ads collect [host] [options]",
+		UsageLine:   "pod rm_ads collect [host] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
 		},
@@ -86,7 +86,7 @@ func buildRmAdsClearSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "clear",
 		Description: "Stop remote workers and clear remote queue",
-		UsageLine:   "abs rm_ads clear [host] [options]",
+		UsageLine:   "pod rm_ads clear [host] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
 		},
@@ -109,7 +109,7 @@ func buildRmAdsRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "recut",
 		Description: "Recut audio files using existing cuts metadata",
-		UsageLine:   "abs rm_ads recut [options] [path...]",
+		UsageLine:   "pod rm_ads recut [options] [path...]",
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
@@ -131,12 +131,12 @@ func buildRmAdsExportSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "export",
 		Description: "Export transcript JSON to SRT subtitles or text",
-		UsageLine:   "abs rm_ads export [command] [options] <path...>",
+		UsageLine:   "pod rm_ads export [command] [options] <path...>",
 		Subcommands: []clihelp.Command{
 			{
 				Name:        "srt",
 				Description: "Export transcript to SubRip (.srt) subtitle format",
-				UsageLine:   "abs rm_ads export srt <path1> [path2 ...] [options]",
+				UsageLine:   "pod rm_ads export srt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
 				},
@@ -157,7 +157,7 @@ func buildRmAdsExportSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 			{
 				Name:        "txt",
 				Description: "Export transcript to plain text (.txt) format",
-				UsageLine:   "abs rm_ads export txt <path1> [path2 ...] [options]",
+				UsageLine:   "pod rm_ads export txt <path1> [path2 ...] [options]",
 				Parameters: []clihelp.Param{
 					{Name: "<path1> [path2 ...]", Description: "Transcript JSON files or directories to export"},
 				},
@@ -195,7 +195,7 @@ func buildRmAdsAuditSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "audit",
 		Description: "Scan and heal invalid clean states plus suspicious episode transcripts",
-		UsageLine:   "abs rm_ads audit [paths...] [options]",
+		UsageLine:   "pod rm_ads audit [paths...] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[paths...]", Description: "Podcast directories or audio files to audit (defaults to configured podcasts_dir)"},
 		},

@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/config"
+	"pod/pkg/config"
 )
 
 func TestHandleConfigSetAndGetGeminiAPIKeyFile(t *testing.T) {

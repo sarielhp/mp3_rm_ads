@@ -14,7 +14,7 @@ func testKittyImage(args []string) {
 		args = args[1:]
 	}
 	if len(args) == 0 {
-		fmt.Println("Usage: abs test kitty <image-file>")
+		fmt.Println("Usage: pod test kitty <image-file>")
 		fmt.Println()
 		fmt.Println("Displays an image using ANSI true-color half-block rendering.")
 		fatalError("%s\n", "Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")

@@ -1,9 +1,9 @@
 package podcast
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/pipeline"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/pipeline"
 	"strings"
 	"time"
 )

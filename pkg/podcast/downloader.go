@@ -10,10 +10,10 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/util"
+	"pod/pkg/util"
 )
 
-const PodcastUserAgent = "abs/1.0 (+https://github.com/sarielhp/abs; Podcast Downloader)"
+const PodcastUserAgent = "pod/1.0 (+https://github.com/sarielhp/pod; Podcast Downloader)"
 
 type Downloader struct {
 	Client *http.Client

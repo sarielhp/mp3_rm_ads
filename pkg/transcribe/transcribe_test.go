@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func TestBuildWavHeader(t *testing.T) {

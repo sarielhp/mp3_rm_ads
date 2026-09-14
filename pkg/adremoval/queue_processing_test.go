@@ -5,9 +5,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func TestQueueRemoteHostSelection(t *testing.T) {

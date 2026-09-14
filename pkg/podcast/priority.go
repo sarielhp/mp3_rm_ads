@@ -1,10 +1,10 @@
 package podcast
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
 	"os"
 	"path/filepath"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
 )
 
 func EpisodePriority(podDir, audioPath string) int {

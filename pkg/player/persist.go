@@ -5,8 +5,8 @@ import (
 	"os"
 	"path/filepath"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func GetPlayQueueFilePath() string {
@@ -14,9 +14,16 @@ func GetPlayQueueFilePath() string {
 	if err != nil {
 		configDir = filepath.Join(os.Getenv("HOME"), ".config")
 	}
-	dir := filepath.Join(configDir, "abs")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "play_queue.json")
+	podDir := filepath.Join(configDir, "pod")
+	if _, err := os.Stat(filepath.Join(podDir, "play_queue.json")); err == nil {
+		return filepath.Join(podDir, "play_queue.json")
+	}
+	legacyDir := filepath.Join(configDir, "abs")
+	if _, err := os.Stat(filepath.Join(legacyDir, "play_queue.json")); err == nil {
+		return filepath.Join(legacyDir, "play_queue.json")
+	}
+	_ = os.MkdirAll(podDir, 0755)
+	return filepath.Join(podDir, "play_queue.json")
 }
 
 func (p *AudioPlayer) SaveQueueToFile() {

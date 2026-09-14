@@ -3,8 +3,8 @@ package cli
 import (
 	"fmt"
 
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 func listProfiles(cfg Config) {

@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 )
 

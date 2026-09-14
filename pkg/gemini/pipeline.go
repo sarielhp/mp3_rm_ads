@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/config"
+	"pod/pkg/format"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 const DefaultGeminiChunkSec = 1800.0

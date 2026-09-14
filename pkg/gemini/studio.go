@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 const defaultGeminiModel = "gemini-flash-latest"

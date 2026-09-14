@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func loadTUIPodcasts(podcastsDir string) ([]tuiPodcast, error) {

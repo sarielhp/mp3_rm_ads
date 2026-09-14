@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
+	"pod/pkg/backend"
+	"pod/pkg/config"
 )
 
 func TestFeedCache(t *testing.T) {

@@ -8,17 +8,17 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"github.com/sarielhp/clihelp"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func buildQueueLatestSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "latest",
 		Description: "Queue latest published episodes that do not have their ads removed yet",
-		UsageLine:   "abs queue latest [N] [podcast-id] [options]",
+		UsageLine:   "pod queue latest [N] [podcast-id] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[N]", Description: "Number of episodes to queue (default: 10)"},
 			{Name: "[podcast-id]", Description: "Optional podcast ID or query to restrict to"},
@@ -31,15 +31,15 @@ func buildQueueLatestSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs queue latest",
+				Line:        "pod queue latest",
 				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue latest 10",
+				Line:        "pod queue latest 10",
 				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue latest 5 <podcast-id>",
+				Line:        "pod queue latest 5 <podcast-id>",
 				Description: "Queue the 5 latest published uncleaned episodes for a specific podcast",
 			},
 		},

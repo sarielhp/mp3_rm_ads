@@ -3,7 +3,7 @@ package backend
 import (
 	"fmt"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func IsStandalone(cfg *types.Config) bool {

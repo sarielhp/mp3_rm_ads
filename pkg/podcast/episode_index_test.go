@@ -3,7 +3,7 @@ package podcast
 import (
 	"testing"
 
-	"abs/pkg/backend"
+	"pod/pkg/backend"
 )
 
 func TestParseRSSFeedCapturesChannelMarkers(t *testing.T) {

@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strconv"
 	"strings"
 
@@ -418,7 +418,7 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "policy",
 		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "abs server policy [<podcast-id>|all|default] [<number>] [options]",
+		UsageLine:   "pod server policy [<podcast-id>|all|default] [<number>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast-id>|all|default]", Description: "Target podcast identifier, 'all' for all podcasts, or 'default' for global config"},
 			{Name: "[<number>]", Description: "Shorthand: auto-download latest K episodes with ad-removal all"},
@@ -438,19 +438,19 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server policy 42 1",
+				Line:        "pod server policy 42 1",
 				Description: "Shorthand: auto-download latest 1 episode and remove all ads",
 			},
 			{
-				Line:        "abs server policy all --auto-download false",
+				Line:        "pod server policy all --auto-download false",
 				Description: "Mark all podcasts as not auto-download",
 			},
 			{
-				Line:        "abs server policy all --auto-download false --set-default",
+				Line:        "pod server policy all --auto-download false --set-default",
 				Description: "Disable auto-download for all podcasts and set global default",
 			},
 			{
-				Line:        "abs server policy default --download-policy none",
+				Line:        "pod server policy default --download-policy none",
 				Description: "Set default download policy for new podcasts to none",
 			},
 		},

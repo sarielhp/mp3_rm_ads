@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 type mockTransport struct {

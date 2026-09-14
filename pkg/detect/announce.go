@@ -1,10 +1,10 @@
 package detect
 
 import (
-	"abs/pkg/types"
-	"abs/pkg/util"
 	"fmt"
 	"net/url"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func AnnounceAdDetection(profile types.LLMProfile, quiet bool) {

@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func RunRemoteStop(cfg *types.Config, host string, transport RemoteTransport, quiet, verbose bool) error {
@@ -43,7 +43,7 @@ func RunRemoteStop(cfg *types.Config, host string, transport RemoteTransport, qu
 		_, _ = transport.Exec(targetHost, killPidCmd)
 	}
 
-	killWorkerCmd := "pkill -9 -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true; pkill -9 -f 'ffmpeg.*abs' 2>/dev/null || pkill -f 'ffmpeg.*abs' 2>/dev/null || true"
+	killWorkerCmd := "pkill -9 -f '(pod|abs).*(scan|worker|batch-worker)' 2>/dev/null || pkill -f '(pod|abs).*(scan|worker|batch-worker)' 2>/dev/null || true; pkill -9 -f 'ffmpeg.*(pod|abs)' 2>/dev/null || pkill -f 'ffmpeg.*(pod|abs)' 2>/dev/null || true"
 	_, _ = transport.Exec(targetHost, killWorkerCmd)
 
 	cleanLockCmd := fmt.Sprintf("rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
@@ -125,7 +125,7 @@ func RunRemoteCancel(cfg *types.Config, host, batchID string, transport RemoteTr
 		return nil
 	}
 
-	killAllCmd := "pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true"
+	killAllCmd := "pkill -f '(pod|abs).*(scan|worker|batch-worker)' 2>/dev/null || true"
 	_, _ = transport.Exec(targetHost, killAllCmd)
 
 	if !quiet {
@@ -152,7 +152,7 @@ func RunRemoteClear(cfg *types.Config, host string, transport RemoteTransport, q
 		remoteWorkDir = cfg.RemoteWorkDir
 	}
 
-	killCmd := fmt.Sprintf("pkill -f 'abs.*(scan|worker|batch-worker)' 2>/dev/null || true; pkill -f 'ffmpeg.*abs' 2>/dev/null || true; pkill -f 'whisper-server' 2>/dev/null || true; pkill -f 'whisper_server' 2>/dev/null || true; rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
+	killCmd := fmt.Sprintf("pkill -f '(pod|abs).*(scan|worker|batch-worker)' 2>/dev/null || true; pkill -f 'ffmpeg.*(pod|abs)' 2>/dev/null || true; pkill -f 'whisper-server' 2>/dev/null || true; pkill -f 'whisper_server' 2>/dev/null || true; rm -f %s/.worker.lock %s/.scan_trigger", remoteWorkDir, remoteWorkDir)
 	_, _ = transport.Exec(targetHost, killCmd)
 
 	_, _ = transport.Exec(targetHost, whisperDockerRestartCommand())

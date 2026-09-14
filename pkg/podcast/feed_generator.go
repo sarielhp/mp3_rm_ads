@@ -12,10 +12,10 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/util"
 )
 
 type rssDocument struct {
@@ -153,7 +153,7 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 	}
 	if guid == "" {
 		h := sha256.Sum256([]byte(relPath))
-		guid = "abs:ep:" + hex.EncodeToString(h[:8])
+		guid = "pod:ep:" + hex.EncodeToString(h[:8])
 	}
 	if pubMs <= 0 {
 		if pubTime := GetEpisodePublicationTime(path); !pubTime.IsZero() {
@@ -208,7 +208,7 @@ func GeneratePodcastFeedXML(sub Subscription, podDir string, episodes []LocalEpi
 		Link:        channelURL,
 		Description: fmt.Sprintf("Ad-free podcast feed for %s", sub.Title),
 		Language:    "en",
-		Author:      "abs",
+		Author:      "pod",
 	}
 
 	coverPath := findLocalCover(podDir)

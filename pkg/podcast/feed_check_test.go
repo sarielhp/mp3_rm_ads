@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
+	"pod/pkg/backend"
 )
 
 func feedXML(lastBuild string, items ...string) string {

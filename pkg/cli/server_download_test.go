@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 )
 
 func TestServerDownloadArguments(t *testing.T) {

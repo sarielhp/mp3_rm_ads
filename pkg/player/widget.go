@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func (p *AudioPlayer) RenderProgressBar(width int) string {

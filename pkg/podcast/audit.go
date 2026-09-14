@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/audio"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type TranscriptAuditItem struct {

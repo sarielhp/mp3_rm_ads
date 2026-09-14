@@ -5,7 +5,7 @@ import (
 	"reflect"
 	"testing"
 
-	"abs/pkg/pipeline"
+	"pod/pkg/pipeline"
 )
 
 func TestQueueLatestDefaultCount(t *testing.T) {

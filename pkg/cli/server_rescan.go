@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"abs/pkg/backend"
 	"fmt"
+	"pod/pkg/backend"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -11,7 +11,7 @@ func buildServerRescanSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "rescan",
 		Description: "Scan MP3 file lengths on disk against DB duration and update DB if shorter",
-		UsageLine:   "abs server rescan [options]",
+		UsageLine:   "pod server rescan [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.String(&opts.Podcast, "-p, --podcast <podcast>", "", "Specify podcast by index or title"),

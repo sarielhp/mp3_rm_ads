@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func RunRemoteAck(remoteDir string, relPaths []string) error {
@@ -240,7 +240,7 @@ func ackRemoteVerifiedEpisodes(targetHost, remoteWorkDir string, verifiedRelPath
 		quotedArgs = append(quotedArgs, ShellQuote(p))
 	}
 	ackArgs := strings.Join(quotedArgs, " ")
-	ackCmd := fmt.Sprintf("abs offload ack %s || ~/.local/bin/abs offload ack %s || abs remote ack %s || ~/.local/bin/abs remote ack %s", ackArgs, ackArgs, ackArgs, ackArgs)
+	ackCmd := fmt.Sprintf("pod offload ack %s || ~/.local/bin/pod offload ack %s || abs offload ack %s || ~/.local/bin/abs offload ack %s", ackArgs, ackArgs, ackArgs, ackArgs)
 	if _, errAck := transport.Exec(targetHost, ackCmd); errAck != nil {
 		for _, p := range verifiedRelPaths {
 			_, _ = transport.Exec(targetHost, remoteCleanupCommand(remoteWorkDir, p))

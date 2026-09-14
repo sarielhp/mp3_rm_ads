@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/podcast"
 	"encoding/json"
 	"io"
 	"os"
 	"path/filepath"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 	"strings"
 	"testing"
 )

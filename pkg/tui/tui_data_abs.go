@@ -5,10 +5,10 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
 )
 
 func loadTUIPodcastsABS(podcastsDir string, cfg types.Config) ([]tuiPodcast, error) {

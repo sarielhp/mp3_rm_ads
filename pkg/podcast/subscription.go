@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 type Subscription struct {
@@ -220,7 +220,7 @@ func (s *SubscriptionStore) ExportToOPML(serverBaseURL string) ([]byte, error) {
 			ImageURL: it.ImageURL,
 		})
 	}
-	return backend.BuildOPMLXMLWithTitle(feeds, "ABS Podcast Subscriptions", "ABS Podcasts")
+	return backend.BuildOPMLXMLWithTitle(feeds, "Pod Podcast Subscriptions", "Pod Podcasts")
 }
 
 func (s *SubscriptionStore) ImportFromBackend(reader backend.PodcastReader) (int, error) {

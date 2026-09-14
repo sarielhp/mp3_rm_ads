@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/gemini"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/gemini"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type SpeculativeRacer struct {

@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
 	"fmt"
 	"os"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -14,19 +14,19 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 	return clihelp.Command{
 		Name:        "server",
 		Description: "Manage podcast server feeds, downloads, and policies",
-		UsageLine:   "abs server [command] [options] [podcast-id]",
+		UsageLine:   "pod server [command] [options] [podcast-id]",
 		Subcommands: buildServerSubcommands(opts, action, countVal, keepVal),
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server feeds",
+				Line:        "pod server feeds",
 				Description: "Check podcast feeds directly for newly published episodes",
 			},
 			{
-				Line:        "abs server download -p 'Huberman Lab' -k 3",
+				Line:        "pod server download -p 'Huberman Lab' -k 3",
 				Description: "Download the 3 latest episodes for a specific podcast",
 			},
 			{
-				Line:        "abs server opml export podcasts.opml",
+				Line:        "pod server opml export podcasts.opml",
 				Description: "Export server podcast RSS feeds to an OPML file",
 			},
 		},

@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"os"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/remote"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type (

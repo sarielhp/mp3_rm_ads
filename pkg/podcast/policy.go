@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
+	"pod/pkg/backend"
+	"pod/pkg/config"
 )
 
 func SelectEpisodesByDownloadPolicy(sortedCatalog []backend.FeedEpisode, isDownloaded func(ep backend.FeedEpisode) bool, policy string, k int, oldest bool) ([]backend.FeedEpisode, []string) {

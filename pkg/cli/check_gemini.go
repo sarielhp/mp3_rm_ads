@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"abs/pkg/gemini"
-	"abs/pkg/util"
+	"pod/pkg/gemini"
+	"pod/pkg/util"
 )
 
 func testGeminiAPI(cfg *Config, quiet bool) error {

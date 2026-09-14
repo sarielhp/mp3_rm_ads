@@ -8,10 +8,10 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
-	configPkg "abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	configPkg "pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -20,7 +20,7 @@ func buildServerFrequencySubcommand(opts *CLIOptions, action *string) clihelp.Co
 	return clihelp.Command{
 		Name:        "frequency",
 		Description: "Analyze podcast release cadence and save frequency metadata",
-		UsageLine:   "abs server frequency [<podcast>] [options]",
+		UsageLine:   "pod server frequency [<podcast>] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Optional podcast by name, index, or ID to analyze"},
 		},
@@ -49,7 +49,7 @@ func buildServerDisableHourlySubcommand(opts *CLIOptions, action *string) clihel
 	return clihelp.Command{
 		Name:        "disable-hourly",
 		Description: "Disable policy for hourly podcasts",
-		UsageLine:   "abs server disable-hourly [options]",
+		UsageLine:   "pod server disable-hourly [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[<podcast>]", Description: "Podcast name, index, or ID"},
 		},

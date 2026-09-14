@@ -12,12 +12,12 @@ import (
 	"path/filepath"
 	"strings"
 
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"golang.org/x/image/draw"
 	"golang.org/x/image/font"
 	"golang.org/x/image/font/basicfont"
 	"golang.org/x/image/math/fixed"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 )
 
 func GenerateGenericCover(title string) image.Image {

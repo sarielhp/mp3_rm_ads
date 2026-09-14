@@ -6,10 +6,10 @@ import (
 	"os"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/tui"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/tui"
+	"pod/pkg/util"
 )
 
 func Execute(args []string) int {

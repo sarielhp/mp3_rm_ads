@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/config"
+	"pod/pkg/config"
 )
 
 func TestCircuitBreakerLifeCycle(t *testing.T) {

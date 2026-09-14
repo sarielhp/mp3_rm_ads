@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"abs/pkg/podcast"
 	"bytes"
 	"os"
 	"path/filepath"
+	"pod/pkg/podcast"
 	"reflect"
 	"strings"
 	"testing"

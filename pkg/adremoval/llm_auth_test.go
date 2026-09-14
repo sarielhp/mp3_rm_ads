@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/config"
-	"abs/pkg/detect"
-	"abs/pkg/types"
+	"pod/pkg/config"
+	"pod/pkg/detect"
+	"pod/pkg/types"
 )
 
 func TestAdDetectionUsesAuthFolderCredentials(t *testing.T) {

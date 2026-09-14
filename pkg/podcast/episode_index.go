@@ -3,7 +3,7 @@ package podcast
 import (
 	"strings"
 
-	"abs/pkg/backend"
+	"pod/pkg/backend"
 )
 
 // PodcastEpisodeIndex records the episode identities a server already holds for

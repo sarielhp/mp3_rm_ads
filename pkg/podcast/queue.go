@@ -11,9 +11,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/pipeline"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/pipeline"
+	"pod/pkg/util"
 )
 
 type DownloadQueueItem struct {
@@ -69,9 +69,16 @@ func defaultDownloadQueuePath() string {
 		}
 		configHome = filepath.Join(home, ".config")
 	}
-	dir := filepath.Join(configHome, "abs")
-	_ = os.MkdirAll(dir, 0755)
-	return filepath.Join(dir, "download_queue.json")
+	podDir := filepath.Join(configHome, "pod")
+	if _, err := os.Stat(filepath.Join(podDir, "download_queue.json")); err == nil {
+		return filepath.Join(podDir, "download_queue.json")
+	}
+	legacyDir := filepath.Join(configHome, "abs")
+	if _, err := os.Stat(filepath.Join(legacyDir, "download_queue.json")); err == nil {
+		return filepath.Join(legacyDir, "download_queue.json")
+	}
+	_ = os.MkdirAll(podDir, 0755)
+	return filepath.Join(podDir, "download_queue.json")
 }
 
 var globalDownloadQueueOnce util.Once

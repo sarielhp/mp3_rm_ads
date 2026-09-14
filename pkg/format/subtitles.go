@@ -6,8 +6,8 @@ import (
 	"os"
 	"strings"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func FormatSRT(data *types.TranscriptionData) string {

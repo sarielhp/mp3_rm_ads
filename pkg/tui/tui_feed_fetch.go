@@ -7,10 +7,10 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
 )
 
 func (m *tuiModel) fetchPodcastFullFeed() {

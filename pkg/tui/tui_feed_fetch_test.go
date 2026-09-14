@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/podcast"
+	"pod/pkg/podcast"
 )
 
 func TestTUIFeedFetchAndDownloadAll(t *testing.T) {

@@ -1,14 +1,14 @@
 package cli
 
 import (
-	"abs/pkg/adremoval"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"pod/pkg/adremoval"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 	"time"
 
@@ -520,7 +520,7 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "queue",
 		Description: "Manage the ad removal (AdR) processing queue",
-		UsageLine:   "abs queue [command]",
+		UsageLine:   "pod queue [command]",
 		Subcommands: []clihelp.Command{
 			buildQueueListSubcommand(opts, action),
 			buildQueueLsSubcommand(opts, action),
@@ -534,23 +534,23 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs queue list",
+				Line:        "pod queue list",
 				Description: "List all episodes currently in the ad removal queue",
 			},
 			{
-				Line:        "abs queue latest",
+				Line:        "pod queue latest",
 				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue latest 10",
+				Line:        "pod queue latest 10",
 				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue add",
+				Line:        "pod queue add",
 				Description: "Queue all episodes needing ad removal across all podcasts",
 			},
 			{
-				Line:        "abs queue run",
+				Line:        "pod queue run",
 				Description: "Process ad removal on all queued episodes",
 			},
 		},
@@ -574,7 +574,7 @@ func buildQueueListSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 	return clihelp.Command{
 		Name:        "list",
 		Description: "List queued episodes across library or podcast",
-		UsageLine:   "abs queue list [podcast-id] [options]",
+		UsageLine:   "pod queue list [podcast-id] [options]",
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Print episode details without table borders"),
@@ -592,7 +592,7 @@ func buildQueueListSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 func buildQueueLsSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	cmd := buildQueueListSubcommand(opts, action)
 	cmd.Name = "ls"
-	cmd.UsageLine = "abs queue ls [podcast-id] [options]"
+	cmd.UsageLine = "pod queue ls [podcast-id] [options]"
 	return cmd
 }
 
@@ -600,7 +600,7 @@ func buildQueueAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "add",
 		Description: "Add uncleaned episodes to the ad removal queue (defaults to all)",
-		UsageLine:   "abs queue add [id... | all | latest [N]]",
+		UsageLine:   "pod queue add [id... | all | latest [N]]",
 		Parameters: []clihelp.Param{
 			{Name: "[id... | all | latest [N]]", Description: "Episode ID(s), podcast ID(s), 'all', or 'latest [N]' to queue uncleaned episodes"},
 		},
@@ -610,23 +610,23 @@ func buildQueueAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs queue add",
+				Line:        "pod queue add",
 				Description: "Queue all episodes needing ad removal across all podcasts",
 			},
 			{
-				Line:        "abs queue add latest 10",
+				Line:        "pod queue add latest 10",
 				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue add all",
+				Line:        "pod queue add all",
 				Description: "Queue all episodes needing ad removal across all podcasts",
 			},
 			{
-				Line:        "abs queue add <podcast-id>",
+				Line:        "pod queue add <podcast-id>",
 				Description: "Queue all uncleaned episodes for a specific podcast",
 			},
 			{
-				Line:        "abs queue add <episode-id>",
+				Line:        "pod queue add <episode-id>",
 				Description: "Queue a specific episode for ad removal",
 			},
 		},
@@ -643,7 +643,7 @@ func buildQueueRemoveSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "remove",
 		Description: "Remove one or more episodes from the queue",
-		UsageLine:   "abs queue remove <id...>",
+		UsageLine:   "pod queue remove <id...>",
 		Args:        clihelp.MinimumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
@@ -658,7 +658,7 @@ func buildQueueClearSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "clear",
 		Description: "Clear queue for a specific podcast or all podcasts",
-		UsageLine:   "abs queue clear [podcast-id]",
+		UsageLine:   "pod queue clear [podcast-id]",
 		Args:        clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
@@ -673,7 +673,7 @@ func buildQueueRunSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "run",
 		Description: "Process ad removal for queued episodes",
-		UsageLine:   "abs queue run [podcast-id] [options]",
+		UsageLine:   "pod queue run [podcast-id] [options]",
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Quiet mode"),
@@ -687,11 +687,11 @@ func buildQueueRunSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs queue run",
+				Line:        "pod queue run",
 				Description: "Process ad removal on all queued episodes",
 			},
 			{
-				Line:        "abs queue run <podcast-id>",
+				Line:        "pod queue run <podcast-id>",
 				Description: "Process ad removal for queued episodes of a specific podcast",
 			},
 		},

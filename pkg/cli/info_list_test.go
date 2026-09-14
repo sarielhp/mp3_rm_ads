@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
 	"io"
 	"os"
 	"path/filepath"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 	"strings"
 	"testing"
 	"time"

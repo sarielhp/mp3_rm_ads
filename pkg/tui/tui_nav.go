@@ -5,9 +5,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/player"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
+	"pod/pkg/player"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"

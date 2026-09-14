@@ -9,14 +9,14 @@ import (
 	"time"
 	"unicode"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/remote"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 // ProcessPodcast removes ads from one podcast the caller has already resolved,

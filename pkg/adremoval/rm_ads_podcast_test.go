@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/remote"
+	"pod/pkg/types"
 )
 
 func testLoadPodcastConfig(podDir string) config.PodcastConfig {

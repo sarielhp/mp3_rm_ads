@@ -1,15 +1,15 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"fmt"
 	"io/fs"
 	"os"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 
 	"github.com/sarielhp/clihelp"
@@ -19,7 +19,7 @@ func buildServerFlushSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	return clihelp.Command{
 		Name:        "flush",
 		Description: "Remove a podcast's audio and precut copies, keep transcripts, and disable automatic downloads",
-		UsageLine:   "abs server flush <podcast-id> [--dry-run]",
+		UsageLine:   "pod server flush <podcast-id> [--dry-run]",
 		Parameters:  []clihelp.Param{{Name: "<podcast-id>", Description: "Exact podcast ID, local short ID, or title"}},
 		Args:        clihelp.ExactArgs(1),
 		Options: []clihelp.Option{

@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/detect"
-	"abs/pkg/util"
 	"fmt"
 	"math"
+	"pod/pkg/config"
+	"pod/pkg/detect"
+	"pod/pkg/util"
 	"strconv"
 	"strings"
 	"time"
@@ -17,7 +17,7 @@ func buildConfigLLMTestSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	return clihelp.Command{
 		Name:        "test",
 		Description: "Test an LLM profile with a sample ad-detection request",
-		UsageLine:   "abs config llm test <id>",
+		UsageLine:   "pod config llm test <id>",
 		Args:        clihelp.ExactArgs(1),
 		Run: func(ctx *clihelp.Context) error {
 			*action = "config"

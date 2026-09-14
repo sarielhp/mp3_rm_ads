@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/config"
+	"pod/pkg/config"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

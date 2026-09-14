@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/player"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/player"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func (m *tuiModel) drawPlayerScreen() string {

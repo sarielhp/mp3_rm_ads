@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/config"
-	"abs/pkg/detect"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/remote"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/config"
+	"pod/pkg/detect"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/remote"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func runBatchWorker(batchDir string, quiet, verbose bool) error {

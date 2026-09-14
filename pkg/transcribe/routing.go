@@ -4,8 +4,8 @@ import (
 	"os/exec"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/types"
+	"pod/pkg/config"
+	"pod/pkg/types"
 )
 
 func ContainsHebrew(s string) bool {

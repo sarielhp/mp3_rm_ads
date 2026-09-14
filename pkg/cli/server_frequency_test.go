@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/backend"
-	configPkg "abs/pkg/config"
-	"abs/pkg/podcast"
+	"pod/pkg/backend"
+	configPkg "pod/pkg/config"
+	"pod/pkg/podcast"
 )
 
 func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
@@ -156,7 +156,7 @@ func TestExecuteBlockUnknownCommand(t *testing.T) {
 	if code != 1 {
 		t.Errorf("expected exit code 1, got %d", code)
 	}
-	if !strings.Contains(out, `unknown command "block" for "abs"`) {
+	if !strings.Contains(out, `unknown command "block" for "pod"`) {
 		t.Errorf("expected stderr to report unknown command, got: %q", out)
 	}
 }

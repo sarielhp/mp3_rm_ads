@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"abs/pkg/podcast"
 	"fmt"
+	"pod/pkg/podcast"
 	"strconv"
 
 	"github.com/sarielhp/clihelp"
@@ -70,7 +70,7 @@ func buildInfoCommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "info",
 		Description: "Library query, inspection, cuts and transcripts",
-		UsageLine:   "abs info [options] [id|latest [N]|status|check]",
+		UsageLine:   "pod info [options] [id|latest [N]|status|check]",
 		Subcommands: []clihelp.Command{
 			buildInfoLatestSubcommand(opts, action),
 			buildInfoStatusSubcommand(opts, action),
@@ -123,7 +123,7 @@ func buildInfoLatestSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "latest",
 		Description: "List latest added episodes across all podcasts",
-		UsageLine:   "abs info latest [N] [options]",
+		UsageLine:   "pod info latest [N] [options]",
 		Parameters: []clihelp.Param{
 			{Name: "[N]", Description: "Number of episodes to show (default: 10)"},
 		},
@@ -147,7 +147,7 @@ func buildInfoStatusSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "status",
 		Description: "Show status overview of library and worker",
-		UsageLine:   "abs info status [options] [podcasts]",
+		UsageLine:   "pod info status [options] [podcasts]",
 		Args:        clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
@@ -166,7 +166,7 @@ func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command 
 	return clihelp.Command{
 		Name:        "check",
 		Description: "Test external services (Whisper, Gemini, Kitty)",
-		UsageLine:   "abs info check [options] [target]",
+		UsageLine:   "pod info check [options] [target]",
 		Args:        clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),

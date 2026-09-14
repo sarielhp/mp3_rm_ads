@@ -7,11 +7,11 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/remote"
+	"pod/pkg/util"
 )
 
 type podcastStatusEntry struct {

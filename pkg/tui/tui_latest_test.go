@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/podcast"
+	"pod/pkg/podcast"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

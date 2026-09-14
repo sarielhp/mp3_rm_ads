@@ -9,13 +9,13 @@ import (
 	"time"
 	"unicode"
 
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/gemini"
-	"abs/pkg/pipeline"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/format"
+	"pod/pkg/gemini"
+	"pod/pkg/pipeline"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func validateTranscriptSanity(data *types.TranscriptionData, totalDuration float64, quiet bool) bool {

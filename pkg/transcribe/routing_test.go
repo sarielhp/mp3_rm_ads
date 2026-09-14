@@ -3,7 +3,7 @@ package transcribe
 import (
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func TestContainsHebrew(t *testing.T) {

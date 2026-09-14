@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
 	"fmt"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -12,7 +12,7 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 	return clihelp.Command{
 		Name:        "clean-orphans",
 		Description: "Delete orphaned ABS podcast entries",
-		UsageLine:   "abs server clean-orphans [options]",
+		UsageLine:   "pod server clean-orphans [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Preview items without deleting"),

@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type lsPodcastItem struct {

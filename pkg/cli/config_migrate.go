@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/util"
 )
 
 func migratePodcastsManagerConfig(cfg *Config) bool {

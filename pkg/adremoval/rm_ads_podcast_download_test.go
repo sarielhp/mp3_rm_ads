@@ -6,9 +6,9 @@ import (
 	"path/filepath"
 	"testing"
 
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
 )
 
 func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {

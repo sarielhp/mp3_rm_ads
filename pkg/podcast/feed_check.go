@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/util"
 )
 
 // DefaultFeedCheckConcurrency is how many feeds are checked at once. Each feed

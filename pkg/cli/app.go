@@ -35,11 +35,11 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 	countVal := -1
 
 	return &clihelp.App{
-		Name:                "abs",
+		Name:                "pod",
 		Description:         "Automatic Ad Segment Remover & Podcast Manager",
-		UsageLine:           "abs [OPTIONS] <COMMAND>",
+		UsageLine:           "pod [OPTIONS] <COMMAND>",
 		Version:             getVersion(),
-		GlobalNote:          "Run 'abs <command> --help' or 'abs help <command>' for command-specific options.",
+		GlobalNote:          "Run 'pod <command> --help' or 'abs help <command>' for command-specific options.",
 		AbbrevCommands:      true,
 		Pager:               true,
 		InteractiveFallback: true,
@@ -48,27 +48,27 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs server feeds",
+				Line:        "pod server feeds",
 				Description: "Check podcast feeds directly for newly published episodes",
 			},
 			{
-				Line:        "abs server download",
+				Line:        "pod server download",
 				Description: "Download new episodes from server",
 			},
 			{
-				Line:        "abs server opml export podcasts.opml",
+				Line:        "pod server opml export podcasts.opml",
 				Description: "Export server podcast RSS feeds into an OPML file",
 			},
 			{
-				Line:        "abs queue latest 10",
+				Line:        "pod queue latest 10",
 				Description: "Queue the 10 latest uncleaned episodes for ad removal",
 			},
 			{
-				Line:        "abs queue run",
+				Line:        "pod queue run",
 				Description: "Process ad removal on queued episodes",
 			},
 			{
-				Line:        "abs tui",
+				Line:        "pod tui",
 				Description: "Launch interactive terminal UI browser",
 			},
 		},

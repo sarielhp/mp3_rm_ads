@@ -1,9 +1,9 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/podcast"
 	"errors"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 	"testing"
 )
 

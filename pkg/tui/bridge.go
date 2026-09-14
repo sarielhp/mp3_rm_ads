@@ -1,10 +1,10 @@
 package tui
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/player"
-	"abs/pkg/podcast"
-	"abs/pkg/types"
+	"pod/pkg/config"
+	"pod/pkg/player"
+	"pod/pkg/podcast"
+	"pod/pkg/types"
 )
 
 type (

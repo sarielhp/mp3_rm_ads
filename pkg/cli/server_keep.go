@@ -1,8 +1,8 @@
 package cli
 
 import (
-	"abs/pkg/backend"
 	"fmt"
+	"pod/pkg/backend"
 	"strconv"
 
 	"github.com/sarielhp/clihelp"
@@ -12,7 +12,7 @@ func buildServerPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) 
 	return clihelp.Command{
 		Name:        "prune",
 		Description: "Delete older episodes per retention limit",
-		UsageLine:   "abs server prune [number] [options]",
+		UsageLine:   "pod server prune [number] [options]",
 		Parameters:  []clihelp.Param{{Name: "[number]", Description: "Number of latest episodes to keep per podcast"}},
 		Args:        clihelp.RangeArgs(0, 1),
 		Options: []clihelp.Option{

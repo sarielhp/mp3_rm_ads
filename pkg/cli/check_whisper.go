@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"abs/pkg/transcribe"
 	"bytes"
 	"fmt"
 	"io"
 	"mime/multipart"
 	"net/http"
+	"pod/pkg/transcribe"
 	"time"
 )
 

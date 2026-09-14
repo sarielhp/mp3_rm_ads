@@ -1,6 +1,6 @@
-# AntennaPod Setup Guide for ABS Feeds
+# AntennaPod Setup Guide for Pod Feeds
 
-This guide covers how to subscribe to and stream podcasts managed by `abs` using the **AntennaPod** mobile app.
+This guide covers how to subscribe to and stream podcasts managed by `pod` using the **AntennaPod** mobile app.
 
 ---
 

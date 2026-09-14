@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func TestIsEpisodeCleanRequiresNonEmptyTranscript(t *testing.T) {

@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/config"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/config"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func StatusPathFor(audioPath string) string {

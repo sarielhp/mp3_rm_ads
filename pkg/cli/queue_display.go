@@ -1,12 +1,12 @@
 package cli
 
 import (
-	"abs/pkg/audio"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"fmt"
 	"path/filepath"
+	"pod/pkg/audio"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strings"
 	"time"
 )

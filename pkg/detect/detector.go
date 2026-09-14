@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 const SystemPrompt = `You are an expert podcast editor assistant.

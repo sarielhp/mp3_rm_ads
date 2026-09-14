@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func writeRealMP3(t *testing.T, path string, seconds int) {

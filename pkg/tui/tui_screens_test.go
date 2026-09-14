@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/kitty"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/kitty"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
 
 	tea "github.com/charmbracelet/bubbletea"
 )

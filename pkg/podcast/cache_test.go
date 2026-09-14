@@ -1,10 +1,10 @@
 package podcast
 
 import (
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
 	"os"
 	"path/filepath"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
 	"testing"
 	"time"
 )

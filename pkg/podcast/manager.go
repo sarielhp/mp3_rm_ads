@@ -1,9 +1,9 @@
 package podcast
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/types"
 )
 
 type PodcastManager struct {

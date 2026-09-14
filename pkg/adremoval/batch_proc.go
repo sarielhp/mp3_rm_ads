@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/remote"
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/remote"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 // ProcessFiles removes ads from an already-resolved set of targets: audio

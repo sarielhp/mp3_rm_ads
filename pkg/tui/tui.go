@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/audio"
-	"abs/pkg/kitty"
-	"abs/pkg/types"
+	"pod/pkg/audio"
+	"pod/pkg/kitty"
+	"pod/pkg/types"
 
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"

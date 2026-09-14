@@ -8,20 +8,22 @@ require "fileutils"
 def run_master_visual_tour
   puts "=== Starting Master Visual Tour (All TUI Screens & Modes) ==="
 
-  snap_dir = File.expand_path("~/.cache/abs/debug/snapshots")
+  snap_dir = File.expand_path("~/.cache/pod/debug/snapshots")
   FileUtils.rm_rf(snap_dir)
   FileUtils.mkdir_p(snap_dir)
 
   env = {
     "TERM" => "xterm-kitty",
     "KITTY_WINDOW_ID" => "1",
+    "POD_DEBUG" => "1",
     "ABS_DEBUG" => "1",
+    "POD_NO_AUDIO" => "1",
     "ABS_NO_AUDIO" => "1"
   }
 
-  abs_bin = File.expand_path("abs", Dir.pwd)
+  pod_bin = [File.expand_path("pod", Dir.pwd), File.expand_path("abs", Dir.pwd)].find { |b| File.exist?(b) }
 
-  PTY.spawn(env, abs_bin, "tui", "--debug") do |stdout, stdin, pid|
+  PTY.spawn(env, pod_bin, "tui", "--debug") do |stdout, stdin, pid|
     stdout.winsize = [32, 110] rescue nil
 
     running = true

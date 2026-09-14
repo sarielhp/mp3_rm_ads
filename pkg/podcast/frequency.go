@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"time"
 
-	"abs/pkg/backend"
-	"abs/pkg/types"
+	"pod/pkg/backend"
+	"pod/pkg/types"
 )
 
 type PodcastFreqResult struct {

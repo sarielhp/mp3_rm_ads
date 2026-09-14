@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func TestDefaultConfigNoUsername(t *testing.T) {

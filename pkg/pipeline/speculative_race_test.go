@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"abs/pkg/transcribe"
-	"abs/pkg/types"
+	"pod/pkg/transcribe"
+	"pod/pkg/types"
 )
 
 func TestAwaitRaceResultsGeminiWins(t *testing.T) {

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/config"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/types"
+	"pod/pkg/util"
 
 	"github.com/charmbracelet/lipgloss"
 )

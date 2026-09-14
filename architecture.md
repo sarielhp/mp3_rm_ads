@@ -1,25 +1,25 @@
-# Architecture of `abs`
+# Architecture of `pod`
 
 ## Overview
 
-`abs` is a standalone, self-contained podcast management and automatic ad removal system.
+`pod` is a standalone, self-contained podcast management and automatic ad removal system.
 
-Historically, `abs` started as an ad-removal companion for external podcast servers. **Today, `abs` has been completely decoupled from external servers and operates as its own native backend.**
+Historically, `pod` started as an ad-removal companion for external podcast servers. **Today, `pod` has been completely decoupled from external servers and operates as its own native backend.**
 
-PodFetch plays only an optional, legacy role (one-time subscription import via `abs server import`). During normal operations, external servers are deactivated and blocked by runtime policy guards.
+PodFetch plays only an optional, legacy role (one-time subscription import via `pod server import`). During normal operations, external servers are deactivated and blocked by runtime policy guards.
 
 ---
 
 ## Core Principles
 
 1. **Self-Contained Backend**:
-   - `abs` manages its own podcast subscriptions, upstream feed updates, episode downloads, ad detection, and audio cutting without requiring any running podcast server daemon.
+   - `pod` manages its own podcast subscriptions, upstream feed updates, episode downloads, ad detection, and audio cutting without requiring any running podcast server daemon.
 2. **Deterministic Configuration**:
-   - Subscriptions live in `~/.config/abs/podcasts.json`.
-   - Global configuration lives in `~/.config/abs/config.json` with `backend_type: "standalone"`.
+   - Subscriptions live in `~/.config/pod/podcasts.json`.
+   - Global configuration lives in `~/.config/pod/config.json` with `backend_type: "standalone"`.
    - Per-podcast configurations (`podcast.json`) reside directly inside each podcast folder in `podcasts_dir`.
 3. **Static Serving & Mobile Integration**:
-   - For every podcast, `abs` produces:
+   - For every podcast, `pod` produces:
      - A standard, iTunes-compatible RSS feed (`feed.xml`).
      - A responsive, self-contained HTML5 web player (`index.html`).
    - A root catalog (`index.html`) and OPML export (`antennapod.opml`) allow standard web browsers and mobile podcast clients (e.g., AntennaPod over Tailscale via Caddy) to stream and sync episodes without proprietary APIs.
@@ -39,7 +39,7 @@ PodFetch plays only an optional, legacy role (one-time subscription import via `
                                          |
                                          v HTTP(S) GET
                        +-----------------+-----------------+
-                       |       abs native downloader       |
+                       |       pod native downloader       |
                        |      (pkg/podcast/downloader)     |
                        +-----------------+-----------------+
                                          |
@@ -80,7 +80,7 @@ PodFetch plays only an optional, legacy role (one-time subscription import via `
 ## Component Breakdown
 
 ### 1. Subscription Management (`pkg/podcast/subscription.go`)
-- **Storage**: `~/.config/abs/podcasts.json`
+- **Storage**: `~/.config/pod/podcasts.json`
 - Stores subscribed podcasts with:
   - `id`: Short deterministic identifier
   - `title`: Podcast display title
@@ -92,7 +92,7 @@ PodFetch plays only an optional, legacy role (one-time subscription import via `
   - `abs server add <feed-url> [title]`: Subscribe to a new podcast.
   - `abs server remove <id-or-title>`: Remove a subscription.
   - `abs server list`: List all active subscriptions with local episode counts.
-  - `abs server import [file.opml]`: Import feeds from OPML or PodFetch database.
+  - `pod server import [file.opml]`: Import feeds from OPML or PodFetch database.
 
 ### 2. Native Feed Checker & Downloader (`pkg/podcast/`)
 - **Feed Checking (`pkg/podcast/feed_check.go`)**:
@@ -133,6 +133,6 @@ PodFetch plays only an optional, legacy role (one-time subscription import via `
 ## Optional Legacy Importer
 
 - **PodFetch**:
-  - `abs` contains a minimal read-only import adapter in `pkg/backend/podfetch*.go`.
+  - `pod` contains a minimal read-only import adapter in `pkg/backend/podfetch*.go`.
   - It is not an operational backend (`backend_type: "standalone"` is the sole primary runtime backend).
-  - PodFetch integration exists solely for optional initial subscription migration via `abs server import`.
+  - PodFetch integration exists solely for optional initial subscription migration via `pod server import`.

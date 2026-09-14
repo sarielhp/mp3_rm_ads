@@ -1,10 +1,10 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/podcast"
 	"os"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/podcast"
 	"reflect"
 	"testing"
 	"time"

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sort"
 
-	"abs/pkg/backend"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/util"
 )
 
 // Planning a download run means asking every podcast's feed what it currently

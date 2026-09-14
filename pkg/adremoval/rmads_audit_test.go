@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/types"
+	"pod/pkg/pipeline"
+	"pod/pkg/types"
 )
 
 func TestAuditRepairsAndQueuesDownloadedEpisodes(t *testing.T) {

@@ -14,11 +14,11 @@ func TestConfigCacheRequiresAnExplicitDestructiveAction(t *testing.T) {
 		wantCmd string
 		wantErr bool
 	}{
-		{[]string{"abs", "config", "cache"}, "cache-show", false},
-		{[]string{"abs", "config", "cache", "show"}, "cache-show", false},
-		{[]string{"abs", "config", "cache", "clear"}, "cache-reset", false},
-		{[]string{"abs", "config", "cache", "reset"}, "", true},
-		{[]string{"abs", "config", "cache", "bogus"}, "", true},
+		{[]string{"pod", "config", "cache"}, "cache-show", false},
+		{[]string{"pod", "config", "cache", "show"}, "cache-show", false},
+		{[]string{"pod", "config", "cache", "clear"}, "cache-reset", false},
+		{[]string{"pod", "config", "cache", "reset"}, "", true},
+		{[]string{"pod", "config", "cache", "bogus"}, "", true},
 	}
 
 	for _, tc := range cases {

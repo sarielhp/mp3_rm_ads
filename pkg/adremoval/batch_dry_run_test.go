@@ -8,7 +8,7 @@ import (
 	"sort"
 	"testing"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 func snapshotTree(t *testing.T, root string) map[string]string {

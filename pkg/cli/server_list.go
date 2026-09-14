@@ -1,11 +1,11 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"fmt"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"strconv"
 
 	"github.com/sarielhp/clihelp"
@@ -15,7 +15,7 @@ func buildServerListSubcommand(opts *CLIOptions, action *string) clihelp.Command
 	return clihelp.Command{
 		Name:        "list",
 		Description: "List all available podcasts in server with episode counts",
-		UsageLine:   "abs server list [options]",
+		UsageLine:   "pod server list [options]",
 		Args:        clihelp.NoArgs,
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed output (Feed URLs and IDs)"),
@@ -35,7 +35,7 @@ func buildServerGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	return clihelp.Command{
 		Name:        "get-info",
 		Description: "Cache metadata for latest K episodes",
-		UsageLine:   "abs server get-info [<k>] [options]",
+		UsageLine:   "pod server get-info [<k>] [options]",
 		Parameters:  []clihelp.Param{{Name: "[<k>]", Description: "Episodes count per podcast (default 100)"}},
 		Args:        clihelp.MaximumNArgs(1),
 		Options: []clihelp.Option{

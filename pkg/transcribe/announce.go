@@ -1,11 +1,11 @@
 package transcribe
 
 import (
-	"abs/pkg/format"
-	"abs/pkg/types"
-	"abs/pkg/util"
 	"fmt"
 	"net/url"
+	"pod/pkg/format"
+	"pod/pkg/types"
+	"pod/pkg/util"
 	"strings"
 )
 

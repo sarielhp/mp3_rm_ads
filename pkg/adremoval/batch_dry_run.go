@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"abs/pkg/pipeline"
-	"abs/pkg/remote"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/pipeline"
+	"pod/pkg/remote"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 type dryRunFileStatus struct {

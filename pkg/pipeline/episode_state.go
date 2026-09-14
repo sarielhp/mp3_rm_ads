@@ -6,9 +6,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"abs/pkg/audio"
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/audio"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 // IsEpisodeClean reports whether an episode has finished ad removal.

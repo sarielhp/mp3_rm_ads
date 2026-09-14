@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/config"
+	"pod/pkg/util"
 
 	"github.com/sarielhp/clihelp"
 )

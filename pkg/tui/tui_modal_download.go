@@ -7,9 +7,9 @@ import (
 	"runtime/debug"
 	"strings"
 
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/util"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/util"
 
 	"github.com/charmbracelet/lipgloss"
 )

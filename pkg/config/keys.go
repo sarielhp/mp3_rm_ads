@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 func ResolveGeminiAPIKey(cfg *types.Config) string {

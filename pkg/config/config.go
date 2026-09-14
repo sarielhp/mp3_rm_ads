@@ -7,8 +7,8 @@ import (
 	"path/filepath"
 	"strconv"
 
-	"abs/pkg/types"
-	"abs/pkg/util"
+	"pod/pkg/types"
+	"pod/pkg/util"
 )
 
 var defaultKeyEnabled = true
@@ -16,7 +16,7 @@ var defaultKeyDisabled = false
 
 func DefaultConfig() types.Config {
 	return types.Config{
-		Instructions:     "Configuration file for abs. Select profiles by ID or set active_profile_id.",
+		Instructions:     "Configuration file for pod. Select profiles by ID or set active_profile_id.",
 		ChunkDurationSec: 0,
 		ActiveProfileID:  3,
 		Profiles:         DefaultLLMProfiles,

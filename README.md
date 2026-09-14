@@ -1,4 +1,4 @@
-# abs
+# pod
 
 Automatically detects and removes advertisement, sponsor, and promotional segments from podcast MP3 files using local Whisper transcription and configurable LLM detection.
 
@@ -34,7 +34,7 @@ git clone https://github.com/yourusername/abs.git
 cd abs
 
 # Build the Go binary
-go build -o abs .
+go build -o pod . # (or ./tools/build_local to build ./pod and ./abs symlink)
 
 # Or use the Makefile
 make build
@@ -42,7 +42,7 @@ make build
 
 ## Configuration
 
-The program creates a config file at `~/.config/abs/config.json` on first run, using the local machine's IP address automatically.
+The program creates a config file at `~/.config/pod/config.json` (with fallback to `~/.config/abs/config.json`) on first run, using the local machine's IP address automatically.
 
 ```json
 {
@@ -87,18 +87,18 @@ The program creates a config file at `~/.config/abs/config.json` on first run, u
 
 ## Standalone Backend Architecture
 
-`abs` is a self-contained, native podcast management system:
-- **Subscriptions**: Stored locally in `~/.config/abs/podcasts.json`.
-- **Feed Checking**: `abs server feeds` checks upstream feeds directly with conditional HTTP GET (`ETag` / `If-Modified-Since`).
-- **Downloads**: `abs server download` downloads episodes directly over HTTP with resume support.
-- **Feeds & Web Players**: `abs server feed` generates standard Apple Podcasts `feed.xml` RSS and HTML5 `index.html` static web players for every show and the full catalog.
+`pod` is a self-contained, native podcast management system:
+- **Subscriptions**: Stored locally in `~/.config/pod/podcasts.json` (or `~/.config/abs/podcasts.json`).
+- **Feed Checking**: `pod server feeds` checks upstream feeds directly with conditional HTTP GET (`ETag` / `If-Modified-Since`).
+- **Downloads**: `pod server download` downloads episodes directly over HTTP with resume support.
+- **Feeds & Web Players**: `pod server feed` generates standard Apple Podcasts `feed.xml` RSS and HTML5 `index.html` static web players for every show and the full catalog.
 - **Mobile Sync**: Works with standard podcast clients (e.g. AntennaPod) over Tailscale/Caddy without proprietary server apps.
 
 ### Legacy Server Import (Optional)
 
 External servers are deactivated from normal operations and only serve as optional migration sources for one-time subscription import:
-- Import from OPML: `abs server import subscriptions.opml`
-- Import from PodFetch: `abs server import` (reads configured `podfetch_db_path` or API)
+- Import from OPML: `pod server import subscriptions.opml`
+- Import from PodFetch: `pod server import` (reads configured `podfetch_db_path` or API)
 
 ## Ad Removal Terminology (AdR)
 
@@ -108,16 +108,16 @@ The codebase and CLI standardize on concise **AdR** (Ad Removal) terminology:
 - **`AdR Policy`**: Per-podcast ad removal setting (`none`, `latest`, `all`).
 - **`AdR Queue`**: Priority queue of episodes pending commercial excision.
 
-## Background Audio Player (`abs player`)
+## Background Audio Player (`pod player`)
 
 Headless audio playback daemon with MPRIS D-Bus integration:
 ```bash
-abs player play [id]     # Play episode by ID (eXXXXX) or resume playback
-abs player pause         # Toggle playback pause state
-abs player stop          # Stop playback and shutdown daemon
-abs player status        # Display current track, position, duration, and status
+pod player play [id]     # Play episode by ID (eXXXXX) or resume playback
+pod player pause         # Toggle playback pause state
+pod player stop          # Stop playback and shutdown daemon
+pod player status        # Display current track, position, duration, and status
 ```
-Spawns a detached background player (prefers headless `mpv` with `--input-ipc-server=/tmp/abs_player.sock`, with graceful fallback to `cvlc --control dbus` or built-in players). Player state reflects in real time inside the interactive TUI.
+Spawns a detached background player (prefers headless `mpv` with `--input-ipc-server=/tmp/pod_player.sock`, with graceful fallback to `cvlc --control dbus` or built-in players). Player state reflects in real time inside the interactive TUI.
 
 ## Usage
 
@@ -125,65 +125,65 @@ Spawns a detached background player (prefers headless `mpv` with `--input-ipc-se
 
 ```bash
 # Process audio files or directories for ad removal
-abs rm_ads episode.mp3
-abs rm_ads /path/to/podcasts/
-abs rm_ads recut episode.mp3
-abs rm_ads export srt episode.transcript.json
+pod rm_ads episode.mp3
+pod rm_ads /path/to/podcasts/
+pod rm_ads recut episode.mp3
+pod rm_ads export srt episode.transcript.json
 
 # Library query and inspection (absorbs ls, transcript, and status diagnostics)
-abs info                    # List all podcasts in library
-abs info latest 10          # List latest 10 episodes across library
-abs info p0001              # Display podcast metadata and episode list
-abs info e12345             # Display episode cuts and metadata
-abs info e12345 --cuts      # Show detailed cuts breakdown
-abs info e12345 --transcript # Display transcript text
-abs info transcript e12345  # Read transcript in $PAGER or the system pager
-abs info e12345 --export srt # Export transcript to SRT
-abs info status             # Show library summary and worker status
-abs info check              # Test external services (Whisper, ABS, Kitty)
+pod info                    # List all podcasts in library
+pod info latest 10          # List latest 10 episodes across library
+pod info p0001              # Display podcast metadata and episode list
+pod info e12345             # Display episode cuts and metadata
+pod info e12345 --cuts      # Show detailed cuts breakdown
+pod info e12345 --transcript # Display transcript text
+pod info transcript e12345  # Read transcript in $PAGER or the system pager
+pod info e12345 --export srt # Export transcript to SRT
+pod info status             # Show library summary and worker status
+pod info check              # Test external services (Whisper, ABS, Kitty)
 
 # Podcast sync & server operations (absorbs fetch, server, policy)
-abs sync                    # Scan library for podcasts and new episodes
-abs sync feeds              # Fetch latest RSS feeds
-abs server download         # Download pending episodes according to podcast policy
-abs server download p0001 -k 3 # Download up to 3 missing episodes for a podcast
-abs server flush p0001 --dry-run # Preview removing this podcast's audio, keeping transcripts
-abs server flush p0001       # Remove MP3/precut audio and disable automatic downloads
-abs server publication-sync --dry-run # Preview correcting local publication metadata from the source catalog
-abs server publication-sync # Correct cached/status dates; unknown source dates stay unknown
-abs sync prune              # Prune old episodes per retention policy
-abs sync policy p0001       # View or update download/AdR policy
-abs sync timeline           # Display online availability timestamps table
+pod sync                    # Scan library for podcasts and new episodes
+pod sync feeds              # Fetch latest RSS feeds
+pod server download         # Download pending episodes according to podcast policy
+pod server download p0001 -k 3 # Download up to 3 missing episodes for a podcast
+pod server flush p0001 --dry-run # Preview removing this podcast's audio, keeping transcripts
+pod server flush p0001       # Remove MP3/precut audio and disable automatic downloads
+pod server publication-sync --dry-run # Preview correcting local publication metadata from the source catalog
+pod server publication-sync # Correct cached/status dates; unknown source dates stay unknown
+pod sync prune              # Prune old episodes per retention policy
+pod sync policy p0001       # View or update download/AdR policy
+pod sync timeline           # Display online availability timestamps table
 
 # Manage AdR queue
-abs queue list
-abs queue add e12345
-abs queue today             # Queue downloaded, uncleaned episodes published today (local date)
-abs queue priority tdbwg 8   # Persist podcast priority (0–10; default 0)
-abs queue priority tdbwg     # Show the podcast's priority
-abs rm_ads e79636            # Queue this episode at priority 10 and process it immediately
-abs queue remove e12345
-abs queue clear
+pod queue list
+pod queue add e12345
+pod queue today             # Queue downloaded, uncleaned episodes published today (local date)
+pod queue priority tdbwg 8   # Persist podcast priority (0–10; default 0)
+pod queue priority tdbwg     # Show the podcast's priority
+pod rm_ads e79636            # Queue this episode at priority 10 and process it immediately
+pod queue remove e12345
+pod queue clear
 
 # Background playback
-abs player play e12345
-abs player pause
-abs player status
-abs player stop
+pod player play e12345
+pod player pause
+pod player status
+pod player stop
 
 # Remote processing cluster offload
-abs offload status
-abs offload push
-abs offload pull
-abs offload worker
+pod offload status
+pod offload push
+pod offload pull
+pod offload worker
 
 # Configuration
-abs config show
-abs config get <key>
-abs config set <key> <value>
+pod config show
+pod config get <key>
+pod config set <key> <value>
 
 # Interactive TUI browser
-abs tui
+pod tui
 ```
 
 ### Commands Overview
@@ -192,14 +192,14 @@ Every canonical command begins with a distinct letter (`c`, `i`, `o`, `p`, `q`, 
 
 | Command | Prefix | Usage | Description |
 |---------|--------|-------|-------------|
-| `config` | `c` | `abs config [command]` | View and manage application configuration, profiles, and cache |
-| `info` | `i` | `abs info [options] [id\|latest [N]\|status\|check]` | Library query, inspection, cuts breakdown, transcripts, and status diagnostics |
-| `offload` | `o` | `abs offload [command]` | Manage remote cluster batch processing and worker orchestration |
-| `player` | `p` | `abs player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
-| `queue` | `q` | `abs queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
-| `rm_ads` | `r` | `abs rm_ads [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |
-| `sync` | `s` | `abs sync [command] [options]` | Podcast RSS feed sync, episode downloads, and retention policies |
-| `tui` | `t` | `abs tui [directory]` | Interactive TUI browser for podcasts and episodes |
+| `config` | `c` | `pod config [command]` | View and manage application configuration, profiles, and cache |
+| `info` | `i` | `pod info [options] [id\|latest [N]\|status\|check]` | Library query, inspection, cuts breakdown, transcripts, and status diagnostics |
+| `offload` | `o` | `pod offload [command]` | Manage remote cluster batch processing and worker orchestration |
+| `player` | `p` | `pod player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
+| `queue` | `q` | `pod queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
+| `rm_ads` | `r` | `pod rm_ads [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |
+| `sync` | `s` | `pod sync [command] [options]` | Podcast RSS feed sync, episode downloads, and retention policies |
+| `tui` | `t` | `pod tui [directory]` | Interactive TUI browser for podcasts and episodes |
 
 ### Chunked Transcription
 
@@ -207,7 +207,7 @@ For long files that whisper fails to decode, use chunked transcription:
 
 ```bash
 # Enable chunking (10-minute chunks with 30s overlap)
-abs rm_ads --use-chunks episode.mp3
+pod rm_ads --use-chunks episode.mp3
 
 # Or enable permanently in config:
 # "chunk_duration_sec": 600
@@ -219,53 +219,53 @@ The script also auto-detects whisper decode failures and falls back to chunking 
 
 ```bash
 # Export transcript to SRT or plain text format
-abs rm_ads export srt episode.transcript.json
-abs rm_ads export txt episode.transcript.json
+pod rm_ads export srt episode.transcript.json
+pod rm_ads export txt episode.transcript.json
 
 # Or export via info command
-abs info e12345 --export srt
-abs info e12345 --export txt
+pod info e12345 --export srt
+pod info e12345 --export txt
 ```
 
 ### Recut Mode
 
 ```bash
 # Re-cut using existing .cuts.json metadata
-abs rm_ads recut episode.mp3
+pod rm_ads recut episode.mp3
 ```
 
 ### Force Options
 
 ```bash
 # Force re-transcribe
-abs rm_ads -f whisper episode.mp3
+pod rm_ads -f whisper episode.mp3
 
 # Force re-run LLM detection
-abs rm_ads -f llm episode.mp3
+pod rm_ads -f llm episode.mp3
 
 # Force all pipeline stages
-abs rm_ads -f all episode.mp3
+pod rm_ads -f all episode.mp3
 ```
 
 ### LLM Profiles
 
 ```bash
 # List available profiles
-abs config llm list
-abs config llm test 3       # Test profile 3 with a sample ad-detection request
+pod config llm list
+pod config llm test 3       # Test profile 3 with a sample ad-detection request
 
 # Use specific profile
-abs rm_ads --profile 2 episode.mp3
+pod rm_ads --profile 2 episode.mp3
 
 # Set default profile
-abs config llm default 2
+pod config llm default 2
 ```
 
 ### External Service Diagnostics
 
 ```bash
 # Test connection to Whisper server
-abs info check whisper
+pod info check whisper
 ```
 
 ## Output Files

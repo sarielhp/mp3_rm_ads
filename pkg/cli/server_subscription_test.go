@@ -1,13 +1,13 @@
 package cli
 
 import (
-	"abs/pkg/backend"
-	"abs/pkg/config"
-	"abs/pkg/podcast"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
+	"pod/pkg/backend"
+	"pod/pkg/config"
+	"pod/pkg/podcast"
 	"strings"
 	"testing"
 	"time"

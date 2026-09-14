@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"abs/pkg/audio"
-	"abs/pkg/types"
+	"pod/pkg/audio"
+	"pod/pkg/types"
 )
 
 // Options holds tuning and metadata options for speech transcription.

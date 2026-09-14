@@ -1,11 +1,11 @@
 package podcast
 
 import (
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"pod/pkg/util"
 )
 
 func (q *DownloadQueue) FlushPodcast(id, dir string) error {

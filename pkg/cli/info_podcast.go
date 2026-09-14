@@ -1,14 +1,14 @@
 package cli
 
 import (
-	"abs/pkg/config"
-	"abs/pkg/format"
-	"abs/pkg/pipeline"
-	"abs/pkg/podcast"
-	"abs/pkg/util"
 	"encoding/json"
 	"fmt"
 	"os"
+	"pod/pkg/config"
+	"pod/pkg/format"
+	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
+	"pod/pkg/util"
 	"sort"
 	"strings"
 	"time"

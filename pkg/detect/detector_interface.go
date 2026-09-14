@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"abs/pkg/types"
+	"pod/pkg/types"
 )
 
 // AdDetector defines the interface for detecting advertisements in a transcript.

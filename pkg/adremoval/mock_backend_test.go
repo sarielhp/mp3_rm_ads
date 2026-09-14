@@ -3,7 +3,7 @@ package adremoval
 import (
 	"time"
 
-	"abs/pkg/backend"
+	"pod/pkg/backend"
 )
 
 type mockTestBackend struct {

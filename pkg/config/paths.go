@@ -8,9 +8,10 @@ import (
 )
 
 const (
-	ConfigDirName      = ".config/abs"
-	ConfigFileName     = "config.json"
-	OpencodeConfigFile = ".config/opencode/opencode.json"
+	ConfigDirName       = ".config/pod"
+	LegacyConfigDirName = ".config/abs"
+	ConfigFileName      = "config.json"
+	OpencodeConfigFile  = ".config/opencode/opencode.json"
 )
 
 var testConfigPath string
@@ -27,7 +28,7 @@ func UserTmpDir() string {
 	if username == "" {
 		username = "user"
 	}
-	dir := filepath.Join(os.TempDir(), username, "abs")
+	dir := filepath.Join(os.TempDir(), username, "pod")
 	_ = os.MkdirAll(dir, 0755)
 	return dir
 }
@@ -40,7 +41,15 @@ func ConfigDir() string {
 	if err != nil {
 		return UserTmpDir()
 	}
-	return filepath.Join(home, ConfigDirName)
+	podDir := filepath.Join(home, ConfigDirName)
+	if _, err := os.Stat(podDir); err == nil {
+		return podDir
+	}
+	legacyDir := filepath.Join(home, LegacyConfigDirName)
+	if _, err := os.Stat(legacyDir); err == nil {
+		return legacyDir
+	}
+	return podDir
 }
 
 func ConfigPath() string {

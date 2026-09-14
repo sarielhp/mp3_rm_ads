@@ -15,17 +15,17 @@ func TestParseFlagsDownloadAll(t *testing.T) {
 		downloadAll bool
 	}{
 		{
-			args:        []string{"abs", "server", "download", "--all"},
+			args:        []string{"pod", "server", "download", "--all"},
 			expectedCmd: "server",
 			downloadAll: true,
 		},
 		{
-			args:        []string{"abs", "server", "scan", "--all"},
+			args:        []string{"pod", "server", "scan", "--all"},
 			expectedCmd: "server",
 			downloadAll: true,
 		},
 		{
-			args:        []string{"abs", "server", "new", "--all"},
+			args:        []string{"pod", "server", "new", "--all"},
 			expectedCmd: "server",
 			downloadAll: true,
 		},
