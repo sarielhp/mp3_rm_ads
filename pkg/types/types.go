@@ -193,9 +193,6 @@ type CLIOptions struct {
 	CopyOpenCode      bool
 	Debug             bool
 	TestWhisper       bool
-	TestABS           bool
-	TestABSMap        bool
-	TestABSDownload   bool
 	TestKitty         bool
 	TestGemini        bool
 	ResetCache        bool
@@ -250,17 +247,12 @@ type WhisperConfig struct {
 }
 
 type BackendConfig struct {
-	AudiobookshelfURL    string `json:"audiobookshelf_url,omitempty"`
-	AudiobookshelfUser   string `json:"audiobookshelf_user,omitempty"`
-	AudiobookshelfPass   string `json:"audiobookshelf_pass,omitempty"`
-	AudiobookshelfToken  string `json:"audiobookshelf_token,omitempty"`
-	AudiobookshelfDBPath string `json:"audiobookshelf_sqlite_db_path,omitempty"`
-	BackendType          string `json:"backend_type,omitempty"`
-	PodfetchURL          string `json:"podfetch_url,omitempty"`
-	PodfetchUser         string `json:"podfetch_user,omitempty"`
-	PodfetchPass         string `json:"podfetch_pass,omitempty"`
-	PodfetchAPIKey       string `json:"podfetch_api_key,omitempty"`
-	PodfetchDBPath       string `json:"podfetch_db_path,omitempty"`
+	BackendType    string `json:"backend_type,omitempty"`
+	PodfetchURL    string `json:"podfetch_url,omitempty"`
+	PodfetchUser   string `json:"podfetch_user,omitempty"`
+	PodfetchPass   string `json:"podfetch_pass,omitempty"`
+	PodfetchAPIKey string `json:"podfetch_api_key,omitempty"`
+	PodfetchDBPath string `json:"podfetch_db_path,omitempty"`
 }
 
 type RemoteConfig struct {
@@ -281,6 +273,7 @@ type GeminiConfig struct {
 	GeminiStagingBucket     string `json:"gemini_staging_bucket,omitempty"`
 	GeminiLocation          string `json:"gemini_location,omitempty"`
 	GeminiAPIKey            string `json:"gemini_api_key,omitempty"`
+	GeminiAPIKeyFile        string `json:"gemini_api_key_file,omitempty"`
 	GeminiModel             string `json:"gemini_model,omitempty"`
 	GeminiAPIKeyEnabled     *bool  `json:"gemini_api_key_enabled,omitempty"`
 	OpenRouterAPIKeyEnabled *bool  `json:"openrouter_api_key_enabled,omitempty"`

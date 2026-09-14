@@ -203,19 +203,24 @@ func resolveBackendPodcastAndFeed(b backend.Backend, pod *podcast.ResolvedPodcas
 }
 
 func isMatchingBackendPodcast(p *backend.Podcast, itemID string, pod *podcast.ResolvedPodcast, podcastsDir string) bool {
-	if itemID != "" && p.ID == itemID {
+	if pod.Dir != "" && p.Path != "" && filepath.Clean(p.Path) == filepath.Clean(pod.Dir) {
 		return true
 	}
-	if pod.UUID != "" && p.ID == pod.UUID {
-		return true
-	}
-	if podcast.FindPodcastDirForItem(*p, podcastsDir) == pod.Dir {
-		return true
+	if podcastsDir != "" && p.Path != "" {
+		if !strings.HasPrefix(filepath.Clean(p.Path), filepath.Clean(podcastsDir)) {
+			return false
+		}
 	}
 	if strings.EqualFold(p.Media.Metadata.Title, pod.Title) {
 		return true
 	}
-	return strings.EqualFold(filepath.Base(p.Path), filepath.Base(pod.Dir))
+	if itemID != "" && p.ID == itemID && strings.EqualFold(filepath.Base(p.Path), filepath.Base(pod.Dir)) {
+		return true
+	}
+	if pod.UUID != "" && p.ID == pod.UUID && strings.EqualFold(filepath.Base(p.Path), filepath.Base(pod.Dir)) {
+		return true
+	}
+	return false
 }
 
 func normalizeForFuzzyMatch(s string) string {

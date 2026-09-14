@@ -32,20 +32,8 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 		def := config.DefaultConfig()
 		cfg = &def
 	}
-	var client *backend.AudiobookshelfBackend
-	if backend.IsAudiobookshelfActive(cfg) {
-		client = backend.NewAudiobookshelf(backend.Config{
-			Host:        cfg.AudiobookshelfURL,
-			User:        cfg.AudiobookshelfUser,
-			Pass:        cfg.AudiobookshelfPass,
-			Token:       cfg.AudiobookshelfToken,
-			DBPath:      cfg.AudiobookshelfDBPath,
-			PodcastsDir: cfg.PodcastsDir,
-			Quiet:       true,
-		})
-	}
-
-	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, *cfg, client, feedURL)
+	bCli, _ := backend.FromAppConfig(cfg, true)
+	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, *cfg, bCli, feedURL)
 	if err != nil && len(feedEpisodes) == 0 {
 		m.showPopup(fmt.Sprintf("Failed to fetch feed: %v", err))
 		return
@@ -81,19 +69,7 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 	}
 }
 
-func fetchFeedEpisodesForPodcast(pod *tuiPodcast, cfg types.Config, client *backend.AudiobookshelfBackend, feedURL string) ([]backend.FeedEpisode, error) {
-	itemID := ""
-	if pod.absData != nil {
-		itemID = pod.absData.ID
-	}
-	if backend.IsAudiobookshelfActive(&cfg) {
-		if client != nil {
-			_ = client.ResetPodcastDateCheck(itemID, pod.name)
-		} else {
-			_ = backend.ResetPodcastDateCheckInDB(cfg.AudiobookshelfDBPath, itemID, pod.name)
-		}
-	}
-
+func fetchFeedEpisodesForPodcast(pod *tuiPodcast, cfg types.Config, client backend.Backend, feedURL string) ([]backend.FeedEpisode, error) {
 	var feedEpisodes []backend.FeedEpisode
 	var err error
 	if client != nil {
@@ -221,16 +197,8 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 	}
 
 	cfg, _ := config.LoadConfig()
-	if cfg != nil && backend.IsAudiobookshelfActive(cfg) {
-		client := backend.NewAudiobookshelf(backend.Config{
-			Host:        cfg.AudiobookshelfURL,
-			User:        cfg.AudiobookshelfUser,
-			Pass:        cfg.AudiobookshelfPass,
-			Token:       cfg.AudiobookshelfToken,
-			DBPath:      cfg.AudiobookshelfDBPath,
-			PodcastsDir: cfg.PodcastsDir,
-			Quiet:       true,
-		})
+	if cfg != nil {
+		client, _ := backend.FromAppConfig(cfg, true)
 		if client != nil && len(toDownload) > 0 && pod.absData != nil {
 			_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
 		}

@@ -7,7 +7,6 @@ import (
 	"sort"
 	"testing"
 
-	"abs/pkg/backend"
 	"abs/pkg/types"
 )
 
@@ -80,23 +79,14 @@ func TestExpandDirectoryArgsAppliesLatestPolicyPerPodcast(t *testing.T) {
 	}
 }
 
-func TestGetActiveBackendForPodfetchDoesNotTouchAudiobookshelf(t *testing.T) {
-	// Building an Audiobookshelf client while Audiobookshelf is disabled trips
-	// a runtime guard that panics, so the PodFetch branch must not ask for one.
-	backend.SetAudiobookshelfDisabled(true)
-	t.Cleanup(func() { backend.SetAudiobookshelfDisabled(false) })
-
+func TestGetActiveBackendAlwaysStandalone(t *testing.T) {
 	cfg := types.Config{}
 	cfg.BackendType = "podfetch"
 	cfg.PodfetchURL = "http://127.0.0.1:8000"
 
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("panicked resolving the PodFetch backend: %v", r)
-		}
-	}()
-	if b := getActiveBackendForPodcast(cfg, true); b == nil {
-		t.Error("expected a PodFetch backend")
+	b := getActiveBackendForPodcast(cfg, true)
+	if b == nil || b.Name() != "standalone" {
+		t.Error("expected standalone backend")
 	}
 }
 

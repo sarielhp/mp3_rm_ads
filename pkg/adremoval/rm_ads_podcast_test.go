@@ -187,52 +187,23 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 	})
 	markEpisodeClean(t, paths[0])
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/api/podcasts/feed":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"podcast": map[string]interface{}{
-					"episodes": []map[string]interface{}{
-						{"title": "Episode 2", "pubDate": "Mon, 01 Sep 2026 12:00:00 GMT", "guid": "guid-2", "enclosureUrl": "https://example.com/ep2.mp3"},
-						{"title": "Episode 1", "pubDate": "Sun, 31 Aug 2026 12:00:00 GMT", "guid": "guid-1", "enclosureUrl": "https://example.com/ep1.mp3"},
-					},
-				},
-			})
-		case strings.HasSuffix(r.URL.Path, "/download-episodes"):
-			_ = json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
-			_ = os.WriteFile(filepath.Join(podDir, "Episode_2.mp3"), []byte("new ep 2"), 0644)
-		case strings.HasSuffix(r.URL.Path, "/downloads"):
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"downloads": []interface{}{}})
-		case r.URL.Path == "/api/libraries":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"libraries": []interface{}{map[string]interface{}{"id": "lib-1", "mediaType": "podcast"}}})
-		case r.URL.Path == "/api/libraries/lib-1/items", strings.HasPrefix(r.URL.Path, "/api/items/"):
-			itemMap := map[string]interface{}{
-				"id": "item-1",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{"title": "Show A", "feedUrl": "https://example.com/feed.xml"},
-					"episodes": []interface{}{
-						map[string]interface{}{"title": "Episode 1", "guid": "guid-1", "enclosureURL": "https://example.com/ep1.mp3"},
-					},
-				},
-			}
-			if strings.HasPrefix(r.URL.Path, "/api/items/") {
-				_ = json.NewEncoder(w).Encode(itemMap)
-			} else {
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"results": []interface{}{itemMap}})
-			}
-		default:
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer srv.Close()
-
-	b := backend.NewAudiobookshelf(backend.Config{
-		Host:        srv.URL,
-		Token:       "test-tok",
-		PodcastsDir: tmp,
-		Quiet:       true,
-	})
+	b := newMockTestBackend()
+	b.podcastMap["item-1"] = &backend.Podcast{
+		ID: "item-1",
+		Media: backend.PodcastMedia{
+			Metadata: backend.PodcastMetadata{Title: "Show A", FeedURL: "https://example.com/feed.xml"},
+			Episodes: []backend.Episode{
+				{Title: "Episode 1", GUID: "guid-1", EnclosureURL: "https://example.com/ep1.mp3"},
+			},
+		},
+	}
+	b.feedEpisodes = []backend.FeedEpisode{
+		{Title: "Episode 2", PublishedAt: 1725278400000, GUID: "guid-2", EnclosureURL: "https://example.com/ep2.mp3"},
+		{Title: "Episode 1", PublishedAt: 1725192000000, GUID: "guid-1", EnclosureURL: "https://example.com/ep1.mp3"},
+	}
+	b.downloadFn = func(podcastID string, episodes []backend.FeedEpisode) error {
+		return os.WriteFile(filepath.Join(podDir, "Episode_2.mp3"), []byte("new ep 2"), 0644)
+	}
 
 	podCfg := testLoadPodcastConfig(podDir)
 	resolved := &podcast.ResolvedPodcast{
@@ -246,10 +217,6 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 
 	cfg := types.Config{
 		PodcastsDir: tmp,
-		BackendConfig: types.BackendConfig{
-			AudiobookshelfURL:   srv.URL,
-			AudiobookshelfToken: "test-tok",
-		},
 	}
 	targetPath, ok := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !ok || targetPath == "" {
@@ -267,46 +234,19 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 	})
 	markEpisodeClean(t, paths[0])
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/api/podcasts/feed":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"podcast": map[string]interface{}{
-					"episodes": []map[string]interface{}{
-						{"title": "Episode 1", "pubDate": "Sun, 31 Aug 2026 12:00:00 GMT", "guid": "guid-1", "enclosureUrl": "https://example.com/ep1.mp3"},
-					},
-				},
-			})
-		case r.URL.Path == "/api/libraries":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"libraries": []interface{}{map[string]interface{}{"id": "lib-1", "mediaType": "podcast"}}})
-		case r.URL.Path == "/api/libraries/lib-1/items", strings.HasPrefix(r.URL.Path, "/api/items/"):
-			itemMap := map[string]interface{}{
-				"id": "item-b",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{"title": "Show B", "feedUrl": "https://example.com/feed.xml"},
-					"episodes": []interface{}{
-						map[string]interface{}{"title": "Episode 1", "guid": "guid-1", "enclosureURL": "https://example.com/ep1.mp3"},
-					},
-				},
-			}
-			if strings.HasPrefix(r.URL.Path, "/api/items/") {
-				_ = json.NewEncoder(w).Encode(itemMap)
-			} else {
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"results": []interface{}{itemMap}})
-			}
-		default:
-			w.WriteHeader(http.StatusOK)
-		}
-	}))
-	defer srv.Close()
-
-	b := backend.NewAudiobookshelf(backend.Config{
-		Host:        srv.URL,
-		Token:       "test-tok",
-		PodcastsDir: tmp,
-		Quiet:       true,
-	})
+	b := newMockTestBackend()
+	b.podcastMap["item-b"] = &backend.Podcast{
+		ID: "item-b",
+		Media: backend.PodcastMedia{
+			Metadata: backend.PodcastMetadata{Title: "Show B", FeedURL: "https://example.com/feed.xml"},
+			Episodes: []backend.Episode{
+				{Title: "Episode 1", GUID: "guid-1", EnclosureURL: "https://example.com/ep1.mp3"},
+			},
+		},
+	}
+	b.feedEpisodes = []backend.FeedEpisode{
+		{Title: "Episode 1", PublishedAt: 1725192000000, GUID: "guid-1", EnclosureURL: "https://example.com/ep1.mp3"},
+	}
 
 	podCfg := testLoadPodcastConfig(podDir)
 	resolved := &podcast.ResolvedPodcast{
@@ -320,10 +260,6 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 
 	cfg := types.Config{
 		PodcastsDir: tmp,
-		BackendConfig: types.BackendConfig{
-			AudiobookshelfURL:   srv.URL,
-			AudiobookshelfToken: "test-tok",
-		},
 	}
 	targetPath, handled := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !handled || targetPath != "" {
@@ -388,8 +324,8 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 	cfg := types.Config{
 		PodcastsDir: tmp,
 		BackendConfig: types.BackendConfig{
-			AudiobookshelfURL:   srv.URL,
-			AudiobookshelfToken: "invalid",
+			BackendType: "podfetch",
+			PodfetchURL: srv.URL,
 		},
 	}
 
@@ -616,62 +552,34 @@ func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
 		Original:  types.EpisodeAudioMeta{DurationSec: 100},
 	})
 
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		switch {
-		case r.URL.Path == "/api/podcasts/feed":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"podcast": map[string]interface{}{
-					"episodes": []map[string]interface{}{
-						{
-							"title":        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
-							"pubDate":      "Tue, 08 Sep 2026 11:17:17 GMT",
-							"guid":         "guid-670",
-							"enclosureUrl": "https://example.com/audio.mp3",
+	b := newMockTestBackend()
+	b.podcastMap["item-h"] = &backend.Podcast{
+		ID: "item-h",
+		Media: backend.PodcastMedia{
+			Metadata: backend.PodcastMetadata{Title: "Haaretz Show", FeedURL: "https://example.com/feed.xml"},
+			Episodes: []backend.Episode{
+				{
+					Title:        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
+					GUID:         "guid-670",
+					EnclosureURL: "https://example.com/audio.mp3",
+					AudioFile: &backend.PodcastAudioFile{
+						Metadata: &backend.AudioFileMetadata{
+							Path:     "Haaretz Show/-קיבלתי את המידע מיד אחרי הטבח- - פרק 670/podcast.mp3",
+							Filename: "podcast.mp3",
 						},
 					},
 				},
-			})
-		case r.URL.Path == "/api/libraries":
-			_ = json.NewEncoder(w).Encode(map[string]interface{}{"libraries": []interface{}{map[string]interface{}{"id": "lib-1", "mediaType": "podcast"}}})
-		case r.URL.Path == "/api/libraries/lib-1/items", strings.HasPrefix(r.URL.Path, "/api/items/"):
-			itemMap := map[string]interface{}{
-				"id": "item-h",
-				"media": map[string]interface{}{
-					"metadata": map[string]interface{}{"title": "Haaretz Show", "feedUrl": "https://example.com/feed.xml"},
-					"episodes": []interface{}{
-						map[string]interface{}{
-							"title":        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
-							"guid":         "guid-670",
-							"enclosureURL": "https://example.com/audio.mp3",
-							"audioFile": map[string]interface{}{
-								"metadata": map[string]interface{}{
-									"path":     "Haaretz Show/-קיבלתי את המידע מיד אחרי הטבח- - פרק 670/podcast.mp3",
-									"filename": "podcast.mp3",
-								},
-							},
-						},
-					},
-				},
-			}
-			if strings.HasPrefix(r.URL.Path, "/api/items/") {
-				_ = json.NewEncoder(w).Encode(itemMap)
-			} else {
-				_ = json.NewEncoder(w).Encode(map[string]interface{}{"results": []interface{}{itemMap}})
-			}
-		default:
-			t.Errorf("unexpected backend request: %s", r.URL.Path)
-			w.WriteHeader(http.StatusBadRequest)
-		}
-	}))
-	defer srv.Close()
-
-	b := backend.NewAudiobookshelf(backend.Config{
-		Host:        srv.URL,
-		Token:       "test-tok",
-		PodcastsDir: tmp,
-		Quiet:       true,
-	})
+			},
+		},
+	}
+	b.feedEpisodes = []backend.FeedEpisode{
+		{
+			Title:        "\"קיבלתי את המידע מיד אחרי הטבח\" | פרק 670",
+			GUID:         "guid-670",
+			EnclosureURL: "https://example.com/audio.mp3",
+			PublishedAt:  1725364800000,
+		},
+	}
 
 	resolved := &podcast.ResolvedPodcast{
 		Dir:        podDir,
@@ -683,10 +591,6 @@ func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
 
 	cfg := types.Config{
 		PodcastsDir: tmp,
-		BackendConfig: types.BackendConfig{
-			AudiobookshelfURL:   srv.URL,
-			AudiobookshelfToken: "test-tok",
-		},
 	}
 	targetPath, ok := findTargetEpisodeFromBackend(b, resolved, cfg, true)
 	if !ok || targetPath != mp3Path {

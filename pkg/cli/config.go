@@ -292,10 +292,10 @@ func buildConfigProcessorSubcommand(opts *CLIOptions, action *string) clihelp.Co
 func buildConfigMigrateSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "migrate",
-		Description: "Migrate configuration from legacy podcasts_manager or mp3_rm_ads",
+		Description: "Migrate configuration from legacy podcasts_manager",
 		UsageLine:   "abs config migrate [source]",
 		Parameters: []clihelp.Param{
-			{Name: "[source]", Description: "Optional migration source ('pm', 'podcasts_manager', 'legacy', 'mp3_rm_ads', or 'all')"},
+			{Name: "[source]", Description: "Optional migration source ('pm', 'podcasts_manager', or 'all')"},
 		},
 		Args: clihelp.MaximumNArgs(1),
 		Run: func(ctx *clihelp.Context) error {

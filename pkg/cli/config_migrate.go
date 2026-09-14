@@ -48,18 +48,6 @@ func migratePodcastsManagerConfig(cfg *Config) bool {
 	}
 
 	modified := false
-	if cfg.AudiobookshelfURL == "" && pmCfg.Host != "" {
-		cfg.AudiobookshelfURL = pmCfg.Host
-		modified = true
-	}
-	if cfg.AudiobookshelfToken == "" && pmCfg.Token != "" {
-		cfg.AudiobookshelfToken = pmCfg.Token
-		modified = true
-	}
-	if cfg.AudiobookshelfDBPath == "" && pmCfg.SQLiteDBPath != "" {
-		cfg.AudiobookshelfDBPath = pmCfg.SQLiteDBPath
-		modified = true
-	}
 	if cfg.PodcastsDir == "" && pmCfg.PodcastsDir != "" {
 		cfg.PodcastsDir = pmCfg.PodcastsDir
 		modified = true
@@ -79,45 +67,7 @@ func handleConfigMigrate(cfg *Config, source string) {
 	migrated := false
 	source = strings.ToLower(strings.TrimSpace(source))
 
-	checkLegacy := source == "" || source == "all" || source == "legacy" || source == "mp3_rm_ads"
 	checkPM := source == "" || source == "all" || source == "pm" || source == "podcasts_manager" || source == "podcast_manager"
-
-	if checkLegacy {
-		legacy := config.LegacyConfigPath()
-		if legacy != "" && util.FileExists(legacy) {
-			legacyData, err := os.ReadFile(legacy)
-			if err == nil && len(legacyData) > 0 {
-				var legCfg Config
-				if err := json.Unmarshal(legacyData, &legCfg); err == nil {
-					if cfg.PodcastsDir == "" && legCfg.PodcastsDir != "" {
-						cfg.PodcastsDir = legCfg.PodcastsDir
-						migrated = true
-					}
-					if cfg.WhisperURL == "" && legCfg.WhisperURL != "" {
-						cfg.WhisperURL = legCfg.WhisperURL
-						migrated = true
-					}
-					if cfg.AudiobookshelfURL == "" && legCfg.AudiobookshelfURL != "" {
-						cfg.AudiobookshelfURL = legCfg.AudiobookshelfURL
-						migrated = true
-					}
-					if cfg.AudiobookshelfToken == "" && legCfg.AudiobookshelfToken != "" {
-						cfg.AudiobookshelfToken = legCfg.AudiobookshelfToken
-						migrated = true
-					}
-					if len(cfg.Profiles) == 0 && len(legCfg.Profiles) > 0 {
-						cfg.Profiles = legCfg.Profiles
-						migrated = true
-					}
-					if len(cfg.WhisperProfiles) == 0 && len(legCfg.WhisperProfiles) > 0 {
-						cfg.WhisperProfiles = legCfg.WhisperProfiles
-						migrated = true
-					}
-					fmt.Printf("Migrated settings from legacy config '%s'\n", legacy)
-				}
-			}
-		}
-	}
 
 	if checkPM {
 		if migratePodcastsManagerConfig(cfg) {

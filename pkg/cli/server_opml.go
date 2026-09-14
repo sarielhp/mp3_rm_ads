@@ -110,7 +110,7 @@ func buildServerOPMLExportSubcommand(opts *CLIOptions, action *string) clihelp.C
 		Notes: []clihelp.Note{
 			{
 				Heading: "What This Command Does",
-				Text:    "Queries the active podcast server (Audiobookshelf or PodFetch) for all hosted podcast RSS feeds and compiles them into a standard OPML 2.0 XML file. This allows subscribing to your entire library on the server in any podcast player app in one swoop without adding feeds one by one.",
+				Text:    "Queries the active podcast server for all hosted podcast RSS feeds and compiles them into a standard OPML 2.0 XML file. This allows subscribing to your entire library on the server in any podcast player app in one swoop without adding feeds one by one.",
 			},
 			{
 				Heading: "Importing Into AntennaPod",

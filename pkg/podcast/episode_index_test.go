@@ -82,17 +82,9 @@ func TestEpisodeIndexPendingCountsMissingAudio(t *testing.T) {
 		backend.Episode{GUID: "g2", Title: "Catalogued Only"},
 	)}
 
-	// PodFetch catalogues an episode as soon as the feed lists it, so a record
-	// without an audio file is genuinely undownloaded.
-	pending := BuildEpisodeIndexFromPodcasts(podfetchNamed{}, pods)["p1"]
+	pending := BuildEpisodeIndexFromPodcasts(nil, pods)["p1"]
 	if pending.Total() != 2 || pending.Pending() != 1 {
-		t.Errorf("podfetch: total=%d pending=%d, want 2 and 1", pending.Total(), pending.Pending())
-	}
-
-	// Audiobookshelf only records episodes it has already downloaded.
-	absIdx := BuildEpisodeIndexFromPodcasts(nil, pods)["p1"]
-	if absIdx.Pending() != 0 {
-		t.Errorf("audiobookshelf: pending=%d, want 0", absIdx.Pending())
+		t.Errorf("total=%d pending=%d, want 2 and 1", pending.Total(), pending.Pending())
 	}
 }
 
@@ -122,10 +114,6 @@ func TestBuildEpisodeIndexPrefersBackendCatalog(t *testing.T) {
 type stubBackend struct{ backend.Backend }
 
 func (stubBackend) Name() string { return "stub" }
-
-type podfetchNamed struct{ stubBackend }
-
-func (podfetchNamed) Name() string { return "podfetch" }
 
 type catalogBackend struct{ stubBackend }
 

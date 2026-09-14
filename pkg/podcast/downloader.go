@@ -13,7 +13,7 @@ import (
 	"abs/pkg/util"
 )
 
-const PodcastUserAgent = "abs/1.0 (+https://github.com/sarielhp/mp3_rm_ads; Podcast Downloader)"
+const PodcastUserAgent = "abs/1.0 (+https://github.com/sarielhp/abs; Podcast Downloader)"
 
 type Downloader struct {
 	Client *http.Client

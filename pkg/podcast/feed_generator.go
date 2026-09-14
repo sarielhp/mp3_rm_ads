@@ -347,7 +347,11 @@ func WritePodcastFeedXML(podDir string, sub Subscription, baseURL string, feedEp
 	}
 
 	feedFile := filepath.Join(podDir, "feed.xml")
-	return util.WriteFileAtomic(feedFile, data, 0644)
+	if err := util.WriteFileAtomic(feedFile, data, 0644); err != nil {
+		return err
+	}
+	_ = WritePodcastWebpage(podDir, sub, baseURL, feedEpisodes)
+	return nil
 }
 
 func escapeRelPath(p string) string {

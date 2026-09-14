@@ -27,6 +27,9 @@ func handleConfigSetAPIKey(cfg *Config, key, val string) (bool, error) {
 	case "gemini-api-key":
 		cfg.GeminiAPIKey = val
 		return true, nil
+	case "gemini-api-key-file", "gemini-key-file", "api-key-file":
+		cfg.GeminiAPIKeyFile = val
+		return true, nil
 	case "gemini-model":
 		cfg.GeminiModel = val
 		return true, nil
@@ -68,16 +71,6 @@ func handleConfigSetBackend(cfg *Config, normKey, val string) bool {
 		cfg.PodfetchAPIKey = val
 	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
 		cfg.PodfetchDBPath = val
-	case "abs-url", "abs.url", "audiobookshelf-url", "url":
-		cfg.AudiobookshelfURL = val
-	case "abs-user", "abs.user", "audiobookshelf-user", "user":
-		cfg.AudiobookshelfUser = val
-	case "abs-pass", "abs.pass", "audiobookshelf-pass", "pass":
-		cfg.AudiobookshelfPass = val
-	case "abs-token", "abs.token", "audiobookshelf-token", "token":
-		cfg.AudiobookshelfToken = val
-	case "db-path", "abs.db", "db", "sqlite-db-path":
-		cfg.AudiobookshelfDBPath = val
 	default:
 		return false
 	}
@@ -170,14 +163,6 @@ func handleConfigGet(cfg Config, key string) error {
 		fmt.Println(cfg.PodfetchAPIKey)
 	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
 		fmt.Println(cfg.PodfetchDBPath)
-	case "abs-url", "abs.url", "audiobookshelf-url", "url":
-		fmt.Println(cfg.AudiobookshelfURL)
-	case "abs-user", "abs.user", "audiobookshelf-user", "user":
-		fmt.Println(cfg.AudiobookshelfUser)
-	case "abs-token", "abs.token", "token":
-		fmt.Println(cfg.AudiobookshelfToken)
-	case "db-path", "abs.db", "db":
-		fmt.Println(cfg.AudiobookshelfDBPath)
 	case "remote-ffmpeg", "remote-ffmpeg-host", "rffmpeg":
 		fmt.Println(cfg.RemoteFFmpegHost)
 	case "remote-host", "remote.host", "rhost":
@@ -206,6 +191,8 @@ func handleConfigGet(cfg Config, key string) error {
 		fmt.Println(cfg.IsOpenRouterAPIKeyEnabled())
 	case "gemini-api-key":
 		fmt.Println(config.ResolveGeminiAPIKey(&cfg))
+	case "gemini-api-key-file", "gemini-key-file", "api-key-file":
+		fmt.Println(cfg.GeminiAPIKeyFile)
 	case "gemini-model":
 		fmt.Println(cfg.GetGeminiModel())
 	case "speculative-transcription", "speculative-competition":
@@ -264,12 +251,6 @@ func printConfig(cfg Config) {
 	if cfg.ActiveWhisperID > 0 {
 		fmt.Printf("  active_whisper_id:        %d\n", cfg.ActiveWhisperID)
 	}
-	if cfg.AudiobookshelfURL != "" {
-		fmt.Printf("  audiobookshelf_url:       %s\n", cfg.AudiobookshelfURL)
-	}
-	if cfg.AudiobookshelfUser != "" {
-		fmt.Printf("  audiobookshelf_user:      %s\n", cfg.AudiobookshelfUser)
-	}
 	if cfg.BackendType != "" {
 		fmt.Printf("  backend_type:             %s\n", cfg.BackendType)
 	}
@@ -284,6 +265,9 @@ func printConfig(cfg Config) {
 	}
 	if cfg.RemoteFFmpegHost != "" {
 		fmt.Printf("  remote_ffmpeg_host:       %s\n", cfg.RemoteFFmpegHost)
+	}
+	if cfg.GeminiAPIKeyFile != "" {
+		fmt.Printf("  gemini_api_key_file:      %s\n", cfg.GeminiAPIKeyFile)
 	}
 	fmt.Printf("  gemini_api_key_enabled:   %v\n", cfg.IsGeminiAPIKeyEnabled())
 	fmt.Printf("  openrouter_api_key_enabled: %v\n", cfg.IsOpenRouterAPIKeyEnabled())

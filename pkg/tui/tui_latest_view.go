@@ -243,11 +243,8 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 		var bCli backend.Backend
 		if m.podcastsDir != "" {
 			cfg, err := config.LoadConfig()
-			if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-				bCli = backend.NewAudiobookshelf(backend.Config{
-					Host:  cfg.AudiobookshelfURL,
-					Token: cfg.AudiobookshelfToken,
-				})
+			if err == nil {
+				bCli, _ = backend.FromAppConfig(cfg, true)
 			}
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)

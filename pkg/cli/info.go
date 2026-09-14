@@ -165,14 +165,11 @@ func buildInfoStatusSubcommand(opts *CLIOptions, action *string) clihelp.Command
 func buildInfoCheckSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "check",
-		Description: "Test external services (Whisper, ABS, Kitty)",
+		Description: "Test external services (Whisper, Gemini, Kitty)",
 		UsageLine:   "abs info check [options] [target]",
 		Args:        clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.TestWhisper, "--test-whisper", false, "Test whisper server connection"),
-			clihelp.Bool(&opts.TestABS, "--test-abs", false, "Test Audiobookshelf connection"),
-			clihelp.Bool(&opts.TestABSMap, "--test-abs-map", false, "Map local files to ABS metadata"),
-			clihelp.Bool(&opts.TestABSDownload, "--test-abs-download", false, "Download all ABS data"),
 			clihelp.Bool(&opts.TestKitty, "--test-kitty", false, "Test Kitty cover image display"),
 			clihelp.Bool(&opts.TestGemini, "--test-gemini", false, "Test Gemini API key and quota status"),
 		},

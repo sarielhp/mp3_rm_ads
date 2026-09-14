@@ -134,16 +134,8 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
 		cfg, err := config.LoadConfig()
 		var bCli backend.Backend
-		if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-			bCli = backend.NewAudiobookshelf(backend.Config{
-				Host:        cfg.AudiobookshelfURL,
-				User:        cfg.AudiobookshelfUser,
-				Pass:        cfg.AudiobookshelfPass,
-				Token:       cfg.AudiobookshelfToken,
-				DBPath:      cfg.AudiobookshelfDBPath,
-				PodcastsDir: cfg.PodcastsDir,
-				Quiet:       true,
-			})
+		if err == nil {
+			bCli, _ = backend.FromAppConfig(cfg, true)
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
@@ -206,16 +198,8 @@ func (m *tuiModel) batchQueueDownload() {
 		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
 		cfg, err := config.LoadConfig()
 		var bCli backend.Backend
-		if err == nil && backend.IsAudiobookshelfActive(cfg) && cfg.AudiobookshelfURL != "" {
-			bCli = backend.NewAudiobookshelf(backend.Config{
-				Host:        cfg.AudiobookshelfURL,
-				User:        cfg.AudiobookshelfUser,
-				Pass:        cfg.AudiobookshelfPass,
-				Token:       cfg.AudiobookshelfToken,
-				DBPath:      cfg.AudiobookshelfDBPath,
-				PodcastsDir: cfg.PodcastsDir,
-				Quiet:       true,
-			})
+		if err == nil {
+			bCli, _ = backend.FromAppConfig(cfg, true)
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else {

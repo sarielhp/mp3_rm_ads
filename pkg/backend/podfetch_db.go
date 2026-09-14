@@ -5,9 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	_ "github.com/mattn/go-sqlite3"
 )
@@ -89,7 +87,6 @@ func podfetchColOrEmpty(db *sql.DB, table, col string) string {
 }
 
 func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
-	verifyPodfetchNotDisabled("fetchPodFetchPodcastsDB")
 	if dbPath == "" {
 		return nil, fmt.Errorf("dbPath is empty")
 	}
@@ -118,7 +115,6 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 		var idVal interface{}
 		var name, directory, rssfeed, imageURL, summary, author sql.NullString
 		if err := rows.Scan(&idVal, &name, &directory, &rssfeed, &imageURL, &summary, &author); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to scan podcast row: %v\n", err)
 			continue
 		}
 
@@ -157,7 +153,6 @@ func fetchPodFetchPodcastsDB(dbPath string) ([]Podcast, error) {
 }
 
 func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode, error) {
-	verifyPodfetchNotDisabled("fetchPodFetchEpisodesForPodcastDB")
 	fileCol := podfetchEpisodeFileCol(db)
 	hasStatus := podfetchHasColumn(db, "podcast_episodes", "status")
 	hasDesc := podfetchHasColumn(db, "podcast_episodes", "description")
@@ -185,7 +180,6 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode,
 		var totalTime sql.NullFloat64
 
 		if err := rows.Scan(&idVal, &epID, &name, &url, &dateOfRec, &totalTime, &localURL, &description, &status); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to scan episode row: %v\n", err)
 			continue
 		}
 
@@ -232,7 +226,6 @@ func fetchPodFetchEpisodesForPodcastDB(db *sql.DB, podcastID string) ([]Episode,
 }
 
 func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
-	verifyPodfetchNotDisabled("fetchPodFetchPodcastDB")
 	if dbPath == "" {
 		return nil, fmt.Errorf("dbPath is empty")
 	}
@@ -279,216 +272,4 @@ func fetchPodFetchPodcastDB(dbPath, id string) (*Podcast, error) {
 		},
 	}
 	return pod, nil
-}
-
-func createPodFetchPodcastDB(dbPath, title, directory, feedURL string) (*Podcast, error) {
-	verifyPodfetchNotDisabled("createPodFetchPodcastDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return nil, err
-	}
-
-	dirCol := podfetchPodcastsDirCol(db)
-	nowStr := time.Now().UTC().Format("2006-01-02 15:04:05")
-	query := fmt.Sprintf("INSERT INTO podcasts (name, %s, rssfeed, created_at) VALUES (?, ?, ?, ?)", dirCol)
-	res, err := db.Exec(query, title, directory, feedURL, nowStr)
-	if err != nil {
-		return nil, err
-	}
-
-	lastID, _ := res.LastInsertId()
-	idStr := strconv.FormatInt(lastID, 10)
-
-	return &Podcast{
-		ID:      idStr,
-		RelPath: directory,
-		Media: PodcastMedia{
-			ID: idStr,
-			Metadata: PodcastMetadata{
-				Title:   title,
-				FeedURL: feedURL,
-			},
-		},
-	}, nil
-}
-
-func deletePodFetchEpisodeDB(dbPath, podcastID, episodeID string) error {
-	verifyPodfetchNotDisabled("deletePodFetchEpisodeDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.Exec("DELETE FROM podcast_episodes WHERE (podcast_id = ? OR ? = '') AND (id = ? OR episode_id = ?)", podcastID, podcastID, episodeID, episodeID)
-	return err
-}
-
-func deletePodFetchPodcastDB(dbPath, podcastID string) error {
-	verifyPodfetchNotDisabled("deletePodFetchPodcastDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	tx, err := db.Begin()
-	if err != nil {
-		return err
-	}
-	defer tx.Rollback()
-
-	if _, err := tx.Exec("DELETE FROM podcast_episodes WHERE podcast_id = ?", podcastID); err != nil {
-		return err
-	}
-	dirCol := podfetchPodcastsDirCol(db)
-	query := fmt.Sprintf("DELETE FROM podcasts WHERE id = ? OR name = ? OR %s = ?", dirCol)
-	if _, err := tx.Exec(query, podcastID, podcastID, podcastID); err != nil {
-		return err
-	}
-	return tx.Commit()
-}
-
-func fetchActiveDownloadsDB(dbPath, podcastID string) ([]ActiveDownload, error) {
-	verifyPodfetchNotDisabled("fetchActiveDownloadsDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return nil, err
-	}
-
-	if !podfetchHasColumn(db, "podcast_episodes", "status") {
-		return nil, nil
-	}
-
-	query := "SELECT id, name, episode_id, url FROM podcast_episodes WHERE (status = 'P' OR status = 'DOWNLOADING') AND (podcast_id = ? OR ? = '')"
-	rows, err := db.Query(query, podcastID, podcastID)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var dls []ActiveDownload
-	for rows.Next() {
-		var idVal interface{}
-		var name, epID, url sql.NullString
-		if err := rows.Scan(&idVal, &name, &epID, &url); err == nil {
-			dls = append(dls, ActiveDownload{
-				ID:                  fmt.Sprintf("%v", idVal),
-				EpisodeDisplayTitle: name.String,
-				Title:               name.String,
-				EpisodeID:           epID.String,
-				URL:                 url.String,
-			})
-		}
-	}
-	return dls, nil
-}
-
-func updatePodFetchDurationDB(dbPath, filePath string, duration float64) error {
-	verifyPodfetchNotDisabled("updatePodFetchDurationDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	base := filepath.Base(filePath)
-	likePattern := "%" + base
-	fileCol := podfetchEpisodeFileCol(db)
-
-	query := fmt.Sprintf("UPDATE podcast_episodes SET total_time = ? WHERE %s = ? OR %s LIKE ?", fileCol, fileCol)
-	_, err = db.Exec(query, int(duration), filePath, likePattern)
-	return err
-}
-
-func resetPodFetchDateCheckDB(dbPath, itemID, title string) error {
-	verifyPodfetchNotDisabled("resetPodFetchDateCheckDB")
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	dateCol := "last_build_date"
-	if !podfetchHasColumn(db, "podcasts", dateCol) {
-		if podfetchHasColumn(db, "podcasts", "created_at") {
-			dateCol = "created_at"
-		} else {
-			return nil
-		}
-	}
-
-	if itemID != "" {
-		_, err = db.Exec(fmt.Sprintf("UPDATE podcasts SET %s = '1970-01-01 00:00:00' WHERE id = ?", dateCol), itemID)
-		if err == nil {
-			return nil
-		}
-	}
-	if title != "" {
-		_, err = db.Exec(fmt.Sprintf("UPDATE podcasts SET %s = '1970-01-01 00:00:00' WHERE name = ?", dateCol), title)
-		return err
-	}
-	return nil
-}
-
-func updatePodFetchSettingsDB(dbPath, identifier string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
-	verifyPodfetchNotDisabled("updatePodFetchSettingsDB")
-	if dbPath == "" {
-		return fmt.Errorf("dbPath is empty")
-	}
-	db, err := getPodfetchDB(dbPath)
-	if err != nil {
-		return err
-	}
-
-	var realID string
-	query := "SELECT id FROM podcasts WHERE id = ? OR lower(name) = lower(?) OR lower(directory_name) = lower(?) OR lower(directory_name) = lower('podcasts/' || ?) OR lower(directory_name) = lower(?) LIMIT 1"
-	cleanIdent := strings.TrimPrefix(identifier, "podcasts/")
-	err = db.QueryRow(query, identifier, identifier, identifier, identifier, cleanIdent).Scan(&realID)
-	if err != nil {
-		return fmt.Errorf("resolve PodFetch podcast %q: %w", identifier, err)
-	}
-
-	activeVal := 1
-	if !autoDownload {
-		activeVal = 0
-	}
-	if _, err := db.Exec("UPDATE podcasts SET active = ? WHERE id = ?", activeVal, realID); err != nil {
-		return err
-	}
-
-	autoDlVal := 0
-	if autoDownload {
-		autoDlVal = 1
-	}
-	autoClVal := 0
-	if autoCleanup {
-		autoClVal = 1
-	}
-
-	upsert := `INSERT INTO podcast_settings (
-		podcast_id,
-		episode_numbering,
-		auto_download,
-		auto_update,
-		auto_cleanup,
-		auto_cleanup_days,
-		replace_invalid_characters,
-		use_existing_filename,
-		replacement_strategy,
-		episode_format,
-		podcast_format,
-		direct_paths,
-		activated,
-		podcast_prefill,
-		use_one_cover_for_all_episodes,
-		nfo_format,
-		cover_filename,
-		auto_transcribe
-	) VALUES (
-		?, 0, ?, 1, ?, ?, 1, 0, 'replace-with-dash-and-underscore', '{}', '{}', 0, 1, 0, 0, 'off', 'image', 0
-	) ON CONFLICT(podcast_id) DO UPDATE SET
-		auto_download = excluded.auto_download,
-		auto_cleanup = excluded.auto_cleanup,
-		auto_cleanup_days = excluded.auto_cleanup_days,
-		activated = 1`
-
-	_, err = db.Exec(upsert, realID, autoDlVal, autoClVal, autoCleanupDays)
-	return err
 }

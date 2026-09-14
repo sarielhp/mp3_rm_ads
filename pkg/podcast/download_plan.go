@@ -79,13 +79,8 @@ func PlanPodcastDownloads(client backend.Backend, item backend.Podcast, index *P
 	return plan
 }
 
-// catalogBound reports whether a backend can only download episodes that are
-// already in its own catalog. PodFetch is: it answers a download request for an
-// episode it has never ingested with HTTP 200 and does nothing, so a run that
-// hands it a brand new feed episode reports success and downloads nothing.
-// Getting the episode into its catalog is a feed refresh, not a download.
 func catalogBound(client backend.Backend) bool {
-	return client != nil && client.Name() == "podfetch"
+	return false
 }
 
 // splitByCatalog separates the selected episodes the server already knows from

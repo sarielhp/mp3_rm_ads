@@ -2,8 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
-	"strings"
 	"time"
 
 	"abs/pkg/backend"
@@ -22,10 +20,6 @@ const (
 	// reported as unreadable and handed to the server rather than retried at
 	// length here.
 	feedCheckAttempts = 2
-	// maxServerRefreshes caps concurrent server refreshes. Each one makes the
-	// server fetch and parse a feed, so this is a limit on the server's work,
-	// not on ours.
-	maxServerRefreshes = 4
 )
 
 type feedCheckSummary struct {
@@ -77,114 +71,9 @@ func checkServerFeeds(b backend.Backend, podcasts []backend.Podcast, cli CLIOpti
 		summary.Undownloaded += r.Undownloaded
 	}
 
-	summary.Refreshed = wakeServerForFeeds(b, results, cli.DryRun)
-	if summary.Refreshed > 0 {
-		waitForServerIndexing(b, results, cli.Quiet || cli.DryRun)
-	}
+	summary.Refreshed = 0
 	summary.Elapsed = time.Since(start)
 	return summary
-}
-
-// wakeServerForFeeds resets the server's episode check date for the podcasts
-// whose feeds actually changed, so the server picks up the new episodes. Feeds
-// the origin confirmed unchanged are skipped entirely, which is what keeps the
-// command from making the server refetch every feed on every run.
-func wakeServerForFeeds(b backend.Backend, results []podcast.FeedCheckResult, dryRun bool) int {
-	var targets []*podcast.FeedCheckResult
-	for i := range results {
-		if results[i].NeedsServer() {
-			targets = append(targets, &results[i])
-		}
-	}
-	if len(targets) == 0 || dryRun {
-		return 0
-	}
-
-	workers := min(maxServerRefreshes, len(targets))
-	jobs := make(chan *podcast.FeedCheckResult)
-	var wg util.WaitGroup
-	var mu util.Mutex
-	refreshed := 0
-
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for target := range jobs {
-				if err := b.ResetPodcastDateCheck(target.Podcast.ID, target.Title); err != nil {
-					continue
-				}
-				mu.Lock()
-				refreshed++
-				mu.Unlock()
-			}
-		}()
-	}
-	for _, target := range targets {
-		jobs <- target
-	}
-	close(jobs)
-	wg.Wait()
-
-	return refreshed
-}
-
-func waitForServerIndexing(b backend.Backend, results []podcast.FeedCheckResult, quiet bool) {
-	if b == nil || b.Name() != "podfetch" {
-		return
-	}
-	pending := make(map[string]map[string]bool)
-	for _, r := range results {
-		if !r.NeedsServer() || len(r.New) == 0 {
-			continue
-		}
-		guids := make(map[string]bool, len(r.New))
-		for _, ep := range r.New {
-			if g := strings.TrimSpace(ep.GUID); g != "" {
-				guids[g] = true
-			}
-		}
-		if len(guids) > 0 {
-			pending[r.Podcast.ID] = guids
-		}
-	}
-	if len(pending) == 0 {
-		return
-	}
-	pollCatalogUntilIndexed(b, pending, quiet)
-}
-
-func pollCatalogUntilIndexed(b backend.Backend, pending map[string]map[string]bool, quiet bool) {
-	deadline := time.Now().Add(25 * time.Second)
-	indexer, ok := b.(backend.CatalogIndexer)
-	if !ok {
-		return
-	}
-	for time.Now().Before(deadline) {
-		time.Sleep(1 * time.Second)
-		eps, err := indexer.CatalogEpisodes()
-		if err != nil {
-			return
-		}
-		for _, ep := range eps {
-			if guids, exists := pending[ep.PodcastID]; exists {
-				delete(guids, ep.GUID)
-				if len(guids) == 0 {
-					delete(pending, ep.PodcastID)
-				}
-			}
-		}
-		if len(pending) == 0 {
-			break
-		}
-		if !quiet {
-			fmt.Printf("\rWaiting for server to index %d podcast(s)...\x1b[K", len(pending))
-			os.Stdout.Sync()
-		}
-	}
-	if !quiet {
-		fmt.Print("\r\x1b[K")
-	}
 }
 
 func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {

@@ -64,7 +64,7 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 }
 
 func handleServerDownload(cfg Config, cli CLIOptions) error {
-	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
+	if backend.IsStandalone(&cfg) {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil {
 			return runSubscriptionDirectDownloads(store, cfg, cli)

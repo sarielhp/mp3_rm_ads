@@ -63,7 +63,7 @@ func buildServerGetInfoSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 }
 
 func handleServerList(cfg Config, cli CLIOptions) error {
-	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
+	if backend.IsStandalone(&cfg) {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil {
 			return renderSubscriptionList(store.List(), cfg.PodcastsDir, cli.Verbose)

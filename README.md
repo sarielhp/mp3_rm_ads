@@ -14,7 +14,7 @@ Automatically detects and removes advertisement, sponsor, and promotional segmen
 - **Docker Progress Monitoring**: Auto-detects local whisper Docker container and shows real progress/ETA
 - **Auto-fallback**: Detects whisper decode failures and automatically retries with chunked transcription
 - **Interactive TUI**: Browse podcasts, queue episodes, and track processing status
-- **Audiobookshelf Integration**: Map podcast directories and check ABS server status
+- **Feed & Web Generation**: Generate RSS feeds and static HTML5 web players natively
 
 ## Workflow
 
@@ -65,14 +65,9 @@ The program creates a config file at `~/.config/abs/config.json` on first run, u
       "api_key": ""
     }
   ],
-  "audiobookshelf_url": "",
-  "audiobookshelf_user": "",
-  "audiobookshelf_pass": "",
-  "backend_type": "audiobookshelf",
-  "podfetch_url": "",
-  "podfetch_user": "",
-  "podfetch_pass": "",
-  "podfetch_db_path": ""
+  "backend_type": "standalone",
+  "podcasts_dir": "/media/podcasts/clean/",
+  "server_base_url": "http://100.123.184.3:8080/podcasts"
 }
 ```
 
@@ -85,31 +80,25 @@ The program creates a config file at `~/.config/abs/config.json` on first run, u
 | `whisper_docker_container` | Auto-detected | Docker container name for progress polling |
 | `chunk_duration_sec` | 0 (disabled) | Split audio into chunks of this duration (seconds) |
 | `parallel_chunks` | 1 | Number of chunks to transcribe in parallel |
-| `podcasts_dir` | "" | Default directory for podcast processing |
-| `whisper_language` | "" | Language override for Whisper transcription |
-| `whisper_prompt` | "" | Prompt to prepend to Whisper transcription |
-| `backend_type` | "audiobookshelf" | Backend provider: `"audiobookshelf"` or `"podfetch"` |
-| `audiobookshelf_url` | "" | Audiobookshelf server URL |
-| `audiobookshelf_user` | "" | Audiobookshelf username |
-| `audiobookshelf_pass` | "" | Audiobookshelf password |
-| `podfetch_url` | "" | PodFetch server URL |
-| `podfetch_user` | "" | PodFetch username |
-| `podfetch_pass` | "" | PodFetch password |
-| `podfetch_db_path` | "" | Path to PodFetch SQLite database file |
+| `podcasts_dir` | "" | Default directory for podcast storage and processing |
+| `server_base_url` | "" | Base URL for static HTTP serving of feeds and web pages |
+| `gemini_api_key_file` | "" | Path to file containing Gemini API key |
+| `backend_type` | "standalone" | Backend provider: `"standalone"` (native, default) |
 
-## Podcast Server Backends
+## Standalone Backend Architecture
 
-`abs` supports two podcast server backends for metadata sync, episode downloads, and feed management:
+`abs` is a self-contained, native podcast management system:
+- **Subscriptions**: Stored locally in `~/.config/abs/podcasts.json`.
+- **Feed Checking**: `abs server feeds` checks upstream feeds directly with conditional HTTP GET (`ETag` / `If-Modified-Since`).
+- **Downloads**: `abs server download` downloads episodes directly over HTTP with resume support.
+- **Feeds & Web Players**: `abs server feed` generates standard Apple Podcasts `feed.xml` RSS and HTML5 `index.html` static web players for every show and the full catalog.
+- **Mobile Sync**: Works with standard podcast clients (e.g. AntennaPod) over Tailscale/Caddy without proprietary server apps.
 
-### 1. Audiobookshelf (Default)
-Integrates with Audiobookshelf podcast libraries via REST API and direct SQLite database access.
-- Config keys: `audiobookshelf_url`, `audiobookshelf_user`, `audiobookshelf_pass`, `audiobookshelf_sqlite_db_path`
-- Env overrides: `ABS_URL`, `ABS_USER`, `ABS_PASS`
+### Legacy Server Import (Optional)
 
-### 2. PodFetch
-Full-featured alternative backend (`pkg/backend/podfetch*.go`) communicating via PodFetch REST API and GORM/SQLite database.
-- Config keys: `backend_type: "podfetch"`, `podfetch_url`, `podfetch_user`, `podfetch_pass`, `podfetch_db_path`
-- Env overrides: `PODFETCH_URL`, `PODFETCH_USER`, `PODFETCH_PASS`, `PODFETCH_DB_PATH`
+External servers are deactivated from normal operations and only serve as optional migration sources for one-time subscription import:
+- Import from OPML: `abs server import subscriptions.opml`
+- Import from PodFetch: `abs server import` (reads configured `podfetch_db_path` or API)
 
 ## Ad Removal Terminology (AdR)
 
@@ -277,12 +266,6 @@ abs config llm default 2
 ```bash
 # Test connection to Whisper server
 abs info check whisper
-
-# Test connection to Audiobookshelf
-abs info check abs
-
-# Map podcast directories with Audiobookshelf metadata
-abs info check abs map
 ```
 
 ## Output Files

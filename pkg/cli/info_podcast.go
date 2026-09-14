@@ -6,11 +6,9 @@ import (
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 	"time"
@@ -31,7 +29,6 @@ type PodcastInfoJSON struct {
 	AutoCleanup        bool               `json:"auto_cleanup"`
 	AutoCleanupDays    int                `json:"auto_cleanup_days"`
 	AdRemoval          string             `json:"ad_removal"`
-	SQLiteSync         string             `json:"sqlite_sync"`
 	TotalEpisodes      int                `json:"total_episodes"`
 	CleanEpisodes      int                `json:"clean_episodes"`
 	TotalDurationSec   float64            `json:"total_duration_sec"`
@@ -135,29 +132,13 @@ func getPodcastMetadataFields(pod *ResolvedPodcast) (string, string, string, str
 			coverPath = cached.CoverPath
 		}
 	}
-	if desc == "" {
-		desc = queryPodfetchPodcastSummary(pod.Dir, pod.Title)
-	}
 	return author, feedURL, coverPath, desc, uuid
-}
-
-func checkSQLiteSyncStatus() string {
-	cfgGlobal := loadConfig()
-	dbPath := cfgGlobal.PodfetchDBPath
-	if dbPath == "" {
-		dbPath = "/media/dockers/podfetch/db/podcast.db"
-	}
-	if fi, err := os.Stat(dbPath); err == nil && !fi.IsDir() {
-		return fmt.Sprintf("Synced (%s)", dbPath)
-	}
-	return "Not connected"
 }
 
 func buildPodcastInfoDTO(pod *ResolvedPodcast, maxEpisodes int) PodcastInfoJSON {
 	mp3s := util.FindMP3Files(pod.Dir)
 	cleanCount, totalDur, totalSize, recent := collectPodcastStatsAndRecent(pod, mp3s, maxEpisodes)
 	author, feedURL, coverPath, desc, uuid := getPodcastMetadataFields(pod)
-	sqliteSync := checkSQLiteSyncStatus()
 
 	autoDl := pod.Config.IsAutoDownloadEnabled()
 	autoCl := pod.Config.IsAutoCleanupEnabled()
@@ -177,7 +158,6 @@ func buildPodcastInfoDTO(pod *ResolvedPodcast, maxEpisodes int) PodcastInfoJSON 
 		AutoCleanup:        autoCl,
 		AutoCleanupDays:    pod.Config.AutoCleanupDays,
 		AdRemoval:          pod.Config.AdRemoval,
-		SQLiteSync:         sqliteSync,
 		TotalEpisodes:      len(mp3s),
 		CleanEpisodes:      cleanCount,
 		TotalDurationSec:   totalDur,
@@ -207,7 +187,6 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 	}
 
 	sb.WriteString("\n  Policy & Sync:\n")
-	sb.WriteString(fmt.Sprintf("    SQLite Sync:    %s\n", info.SQLiteSync))
 	dlBadge := config.DownloadPolicyBadge(info.DownloadPolicy, info.DownloadK)
 	sb.WriteString(fmt.Sprintf("    Auto Download:  %v %s\n", info.AutoDownload, dlBadge))
 	retStr := "Disabled"
@@ -251,28 +230,4 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 
 func printPodcastInfoCard(info PodcastInfoJSON) {
 	fmt.Print(formatPodcastInfo(info))
-}
-
-func queryPodfetchPodcastSummary(podDir, title string) string {
-	cfgGlobal := loadConfig()
-	dbPath := cfgGlobal.PodfetchDBPath
-	if dbPath == "" {
-		dbPath = "/media/dockers/podfetch/db/podcast.db"
-	}
-	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
-		return ""
-	}
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=3000")
-	if err != nil {
-		return ""
-	}
-	defer db.Close()
-
-	folderName := filepath.Base(podDir)
-	row := db.QueryRow("SELECT summary FROM podcasts WHERE directory_name = ? OR name = ? LIMIT 1", folderName, title)
-	var summary sql.NullString
-	if err := row.Scan(&summary); err == nil && summary.Valid {
-		return strings.TrimSpace(summary.String)
-	}
-	return ""
 }

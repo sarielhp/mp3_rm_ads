@@ -6,7 +6,6 @@ import (
 	"io"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -76,36 +75,4 @@ func GetMP3DiskDuration(path string) float64 {
 	}
 
 	return 0
-}
-
-func resolveHostPathLocal(path string, podcastsDir string) string {
-	if path == "" {
-		return ""
-	}
-	if fi, err := os.Stat(path); err == nil && !fi.IsDir() {
-		return path
-	}
-
-	if podcastsDir != "" {
-		relPath := path
-		if strings.HasPrefix(relPath, "/podcasts/") {
-			relPath = strings.TrimPrefix(relPath, "/podcasts/")
-		} else if strings.HasPrefix(relPath, "/") {
-			relPath = strings.TrimPrefix(relPath, "/")
-		}
-
-		mapped := filepath.Join(podcastsDir, relPath)
-		if fi, err := os.Stat(mapped); err == nil && !fi.IsDir() {
-			return mapped
-		}
-
-		baseDir := filepath.Base(filepath.Dir(path))
-		baseFile := filepath.Base(path)
-		mappedSub := filepath.Join(podcastsDir, baseDir, baseFile)
-		if fi, err := os.Stat(mappedSub); err == nil && !fi.IsDir() {
-			return mappedSub
-		}
-	}
-
-	return ""
 }

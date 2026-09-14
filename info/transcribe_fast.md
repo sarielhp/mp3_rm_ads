@@ -11,7 +11,7 @@ The setup utilizes a **dual-tier architecture**:
 1. **Docker Background Daemon (High-Accuracy Hebrew & English):**
    * **Endpoint:** `http://localhost:8088` (managed via Traefik + Sablier auto-suspend).
    * **Model:** `ivrit-large-v3-turbo` (specialized on thousands of hours of Hebrew speech, with native English accuracy).
-   * **Role:** Background service for automated podcast downloaders and ad removal pipelines (`mp3_rm_ads`).
+   * **Role:** Background service for automated podcast downloaders and ad removal pipelines (`abs`).
 2. **Host CLI (`transcribe`):**
    * **Location:** `~/.local/bin/transcribe` (native Ruby executable).
    * **Backend:** Native `whisper.cpp` compiled with **Vulkan (`-DGGML_VULKAN=ON`)** and **Flash Attention (`-fa`)**.

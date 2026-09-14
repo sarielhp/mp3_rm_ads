@@ -20,27 +20,12 @@ func resolveTestCommandArgs(args []string, opts *CLIOptions) error {
 	switch args[0] {
 	case "whisper", "whisper-server":
 		opts.TestWhisper = true
-	case "abs":
-		if len(args) > 1 {
-			switch args[1] {
-			case "map":
-				opts.TestABSMap = true
-			case "download":
-				opts.TestABSDownload = true
-			case "connect":
-				opts.TestABS = true
-			default:
-				return fmt.Errorf("unknown abs test target %q (expected: connect, map, download)", args[1])
-			}
-		} else {
-			opts.TestABS = true
-		}
 	case "kitty":
 		opts.TestKitty = true
 	case "gemini":
 		opts.TestGemini = true
 	default:
-		return fmt.Errorf("unknown test target %q (valid targets: whisper, abs, kitty, gemini)", args[0])
+		return fmt.Errorf("unknown test target %q (valid targets: whisper, kitty, gemini)", args[0])
 	}
 	return nil
 }

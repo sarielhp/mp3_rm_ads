@@ -24,8 +24,6 @@ type PodFetchBackend struct {
 	Quiet       bool
 	Verbose     bool
 	httpClient  *http.Client
-	pendingMu   syncRWMutex
-	pendingEps  map[string]map[string]bool
 }
 
 func init() {
@@ -38,7 +36,6 @@ func init() {
 }
 
 func NewPodFetch(cfg Config) *PodFetchBackend {
-	verifyPodfetchNotDisabled("NewPodFetch")
 	host := strings.TrimRight(cfg.Host, "/")
 	timeout := cfg.Timeout
 	if timeout <= 0 {
@@ -69,7 +66,6 @@ func NewPodFetch(cfg Config) *PodFetchBackend {
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
-		pendingEps: make(map[string]map[string]bool),
 	}
 }
 
@@ -88,7 +84,6 @@ func (c *PodFetchBackend) getRetryDelay(attempt int) time.Duration {
 }
 
 func (c *PodFetchBackend) Login() (string, error) {
-	verifyPodfetchNotDisabled("Login")
 	if c.APIKey != "" {
 		return c.APIKey, nil
 	}
@@ -157,7 +152,6 @@ func (c *PodFetchBackend) TestConnection(quiet bool) (bool, error) {
 }
 
 func (c *PodFetchBackend) Request(endpoint, method string, data interface{}) ([]byte, error) {
-	verifyPodfetchNotDisabled("Request " + endpoint)
 	if c.Host == "" {
 		return nil, fmt.Errorf("host is not configured")
 	}
@@ -288,4 +282,84 @@ func (c *PodFetchBackend) Libraries() ([]Library, error) {
 
 func (c *PodFetchBackend) PodcastLibraries() ([]Library, error) {
 	return c.Libraries()
+}
+
+func (c *PodFetchBackend) CreatePodcast(libraryID, folderID, path, title, feedURL string) (*Podcast, error) {
+	return nil, fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) DeletePodcast(id string) error {
+	return fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) DeleteItem(id string) error {
+	return fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) DownloadEpisodes(podcastID string, episodes []FeedEpisode) error {
+	return fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) DeletePodcastEpisode(podcastID, episodeID string) error {
+	return fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) ResetPodcastDateCheck(itemID, title string) error {
+	return nil
+}
+
+func (c *PodFetchBackend) ResetPodcastDateCheckAPI(itemID string) error {
+	return nil
+}
+
+func (c *PodFetchBackend) SyncDuration(filePath string, duration float64) error {
+	return nil
+}
+
+func (c *PodFetchBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error) {
+	return 0, fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error {
+	return fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) Scan(opts ScanOptions) (ScanResult, error) {
+	return ScanResult{}, nil
+}
+
+func (c *PodFetchBackend) Rescan(opts RescanOptions) (RescanResult, error) {
+	return RescanResult{}, nil
+}
+
+func (c *PodFetchBackend) ExportOPML(opts OPMLExportOptions) ([]byte, error) {
+	return nil, fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) ImportOPML(data []byte, opts OPMLImportOptions) (OPMLImportResult, error) {
+	return OPMLImportResult{}, fmt.Errorf("podfetch is an import-only backend")
+}
+
+func (c *PodFetchBackend) FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, error) {
+	return nil, nil
+}
+
+func (c *PodFetchBackend) WaitForActiveDownloads(podcasts []Podcast, quiet bool, timeout time.Duration) error {
+	return nil
+}
+
+func (c *PodFetchBackend) ActiveDownloads(podcastID string) ([]ActiveDownload, error) {
+	return nil, nil
+}
+
+func (c *PodFetchBackend) OpenRSSFeed(podcastID, baseURL string) (string, error) {
+	return "", nil
+}
+
+func (c *PodFetchBackend) DownloadCover(podcastID, destPath string) error {
+	return nil
+}
+
+func (c *PodFetchBackend) PodcastFeedEpisodes(feedURL string) ([]FeedEpisode, error) {
+	return nil, nil
 }

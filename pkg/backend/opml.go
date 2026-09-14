@@ -3,7 +3,6 @@ package backend
 import (
 	"bytes"
 	"encoding/xml"
-	"fmt"
 	"strings"
 	"time"
 )
@@ -31,7 +30,7 @@ type opmlRoot struct {
 }
 
 func BuildOPMLXML(feeds []OPMLFeed) ([]byte, error) {
-	return BuildOPMLXMLWithTitle(feeds, "Audiobookshelf Podcast Feeds", "Audiobookshelf Podcasts")
+	return BuildOPMLXMLWithTitle(feeds, "Podcast Feeds", "Podcasts")
 }
 
 func BuildOPMLXMLWithTitle(feeds []OPMLFeed, headTitle, groupText string) ([]byte, error) {
@@ -115,51 +114,4 @@ func ParseOPMLXML(data []byte) ([]OPMLFeed, error) {
 
 	collect(root.Body.Outlines)
 	return feeds, nil
-}
-
-func (c *AudiobookshelfBackend) FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, error) {
-	podcasts, err := c.Podcasts()
-	if err != nil {
-		return nil, fmt.Errorf("failed to retrieve podcasts: %w", err)
-	}
-
-	var feeds []OPMLFeed
-	for _, item := range podcasts {
-		title := item.Media.Metadata.Title
-		if title == "" {
-			title = item.ID
-		}
-
-		slug, err := c.OpenRSSFeed(item.ID, c.Host)
-		if err != nil || slug == "" {
-			if !silent {
-				fmt.Printf("  [SKIP] Could not open RSS feed for: %s\n", title)
-			}
-			continue
-		}
-
-		feedURL := slug
-		if !strings.HasPrefix(feedURL, "http://") && !strings.HasPrefix(feedURL, "https://") {
-			feedURL = fmt.Sprintf("%s/feed/%s", strings.TrimRight(c.Host, "/"), strings.TrimPrefix(slug, "/"))
-		}
-
-		feeds = append(feeds, OPMLFeed{
-			Title: title,
-			URL:   feedURL,
-		})
-
-		if !silent && verbose {
-			fmt.Printf("  [OK] %s -> %s\n", title, feedURL)
-		}
-	}
-
-	return feeds, nil
-}
-
-func (c *AudiobookshelfBackend) ExportOPML(opts OPMLExportOptions) ([]byte, error) {
-	feeds, err := c.FetchPodcastFeeds(opts.Quiet, opts.Verbose)
-	if err != nil {
-		return nil, err
-	}
-	return BuildOPMLXML(feeds)
 }

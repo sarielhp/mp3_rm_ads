@@ -8,7 +8,16 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
+var embeddedVersion string
+
+func SetEmbeddedVersion(v string) {
+	embeddedVersion = v
+}
+
 func getVersion() string {
+	if embeddedVersion != "" {
+		return embeddedVersion
+	}
 	if data, err := os.ReadFile("VERSION"); err == nil {
 		return strings.TrimSpace(string(data))
 	}
@@ -18,7 +27,7 @@ func getVersion() string {
 			return strings.TrimSpace(string(data))
 		}
 	}
-	return "0.2.11"
+	return "0.2.72"
 }
 
 func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {

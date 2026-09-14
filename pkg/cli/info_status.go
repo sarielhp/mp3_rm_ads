@@ -7,7 +7,6 @@ import (
 	"sort"
 	"strings"
 
-	"abs/pkg/backend"
 	"abs/pkg/config"
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
@@ -107,122 +106,7 @@ func renderLocalLibraryStatus(cfg Config, quiet bool) {
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
-
-	renderedABS := false
-	if backend.IsAudiobookshelfActive(&cfg) && cfg.AudiobookshelfURL != "" {
-		if err := renderABSPodcastStatus(cfg, cfg.AudiobookshelfURL, "", podcastsDir, quiet); err == nil {
-			renderedABS = true
-		}
-	}
-
-	if !renderedABS {
-		renderLocalDiskPodcastStatus(podcastsDir, quiet)
-	}
-}
-
-func renderABSPodcastStatus(cfg Config, baseURL, token, podcastsDir string, quiet bool) error {
-	b, err := backend.FromAppConfig(&cfg, quiet)
-	if err != nil {
-		return err
-	}
-	libs, err := b.PodcastLibraries()
-	if err != nil {
-		return err
-	}
-	if len(libs) == 0 {
-		return fmt.Errorf("no podcast libraries found in ABS")
-	}
-	allItems, err := b.Podcasts()
-	if err != nil {
-		return err
-	}
-	if len(allItems) == 0 {
-		return fmt.Errorf("no podcasts found in ABS")
-	}
-
-	localByName, podIDByDir := buildPodcastMapsForStatus(podcastsDir)
-	if !quiet {
-		fmt.Printf("\n%s\n", strings.Repeat("=", 90))
-		fmt.Println("AUDIOBOOKSHELF DATABASE STATUS REPORT (DRY RUN)")
-		fmt.Printf("%s\n", strings.Repeat("=", 90))
-		fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-10s\n", "#", "ID", "Title", "Episodes", "NeedAdR")
-		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-10s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 10))
-	}
-
-	totalEpisodes := 0
-	totalNeedsAdRemoval := 0
-
-	for idx, item := range allItems {
-		title := item.Media.Metadata.Title
-		dName := util.TruncateDisplayName(title, 48)
-		absEpisodeCount := len(item.Media.Episodes)
-		shortID, needsAdRemoval := calculateItemAdRemovalCount(item, localByName, podIDByDir)
-
-		totalEpisodes += absEpisodeCount
-		totalNeedsAdRemoval += needsAdRemoval
-
-		if !quiet {
-			fmt.Printf("  %-3d  %-6s  %s │ %-8d │ %-16d\n", idx+1, shortID, util.PadRight(dName, 48), absEpisodeCount, needsAdRemoval)
-		}
-	}
-
-	if !quiet {
-		fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
-		fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
-		fmt.Printf("%s\n\n", strings.Repeat("=", 90))
-	}
-	return nil
-}
-
-func buildPodcastMapsForStatus(podcastsDir string) (map[string]podcast.PodcastDirEntry, map[string]string) {
-	podEntries := podcast.ScanPodcastDirs(podcastsDir)
-	localByName := make(map[string]podcast.PodcastDirEntry)
-	podIDByDir := make(map[string]string)
-	for _, p := range podEntries {
-		localByName[strings.ToLower(p.Title)] = p
-		localByName[strings.ToLower(p.FolderName)] = p
-		localByName[strings.ToLower(filepath.Base(p.Dir))] = p
-
-		podIDByDir[p.Dir] = p.ShortID
-		podIDByDir[strings.ToLower(p.Title)] = p.ShortID
-		podIDByDir[strings.ToLower(p.FolderName)] = p.ShortID
-	}
-	return localByName, podIDByDir
-}
-
-func calculateItemAdRemovalCount(item Podcast, localByName map[string]podcast.PodcastDirEntry, podIDByDir map[string]string) (string, int) {
-	title := item.Media.Metadata.Title
-	relBase := filepath.Base(item.RelPath)
-	lp, ok := localByName[strings.ToLower(title)]
-	if !ok {
-		lp, ok = localByName[strings.ToLower(relBase)]
-	}
-
-	needsAdRemoval := 0
-	shortID := ""
-	if ok {
-		shortID = podIDByDir[lp.Dir]
-		if shortID == "" {
-			shortID = podcast.GetOrSetPodcastShortID(lp.Dir, title)
-		}
-		mp3Files, _ := filepath.Glob(filepath.Join(lp.Dir, "*.mp3"))
-		podCfg := config.LoadPodcastConfig(lp.Dir, config.PodcastConfig{})
-		if podCfg.AdRemoval != config.AdRemovalNone {
-			filtered := podcast.FilterByAdRemovalPolicy(mp3Files, lp.Dir, podCfg)
-			for _, mp3 := range filtered {
-				_ = pipeline.GetOrCreateEpisodeStatus(mp3)
-				if !pipeline.IsEpisodeCompleted(mp3) {
-					needsAdRemoval++
-				}
-			}
-		}
-	} else {
-		shortID = podIDByDir[strings.ToLower(title)]
-		if shortID == "" {
-			shortID = podcast.GeneratePodcastShortID(title)
-		}
-	}
-	return shortID, needsAdRemoval
+	renderLocalDiskPodcastStatus(podcastsDir, quiet)
 }
 
 func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {

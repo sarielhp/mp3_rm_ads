@@ -204,6 +204,11 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 		eps := podcast.CollectLocalEpisodes(podDir, nil)
 		fmt.Printf("Updated feed: %s (%d episodes)\n", filepath.Join(podDir, "feed.xml"), len(eps))
 	}
+	if target == "" && cfg.PodcastsDir != "" {
+		if err := podcast.WriteCatalogWebpage(cfg.PodcastsDir, subs, cfg.ServerBaseURL); err == nil {
+			fmt.Printf("Updated catalog webpage: %s\n", filepath.Join(cfg.PodcastsDir, "index.html"))
+		}
+	}
 	return nil
 }
 

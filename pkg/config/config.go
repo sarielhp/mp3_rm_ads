@@ -54,6 +54,9 @@ func DefaultConfig() types.Config {
 			SpeculativeTranscription: &defaultKeyDisabled,
 			CompetingServices:        []string{"gemini", "whisper"},
 		},
+		BackendConfig: types.BackendConfig{
+			BackendType: "standalone",
+		},
 	}
 }
 
@@ -131,23 +134,6 @@ func ApplyEnvOverrides(cfg *types.Config) {
 func applyBackendEnv(cfg *types.Config) {
 	if v := os.Getenv("WHISPER_URL"); v != "" {
 		cfg.WhisperURL = v
-	}
-	if v := os.Getenv("ABS_URL"); v != "" {
-		cfg.AudiobookshelfURL = v
-	} else if v := os.Getenv("AUDIOBOOKSHELF_URL"); v != "" {
-		cfg.AudiobookshelfURL = v
-	}
-	if v := os.Getenv("ABS_USER"); v != "" {
-		cfg.AudiobookshelfUser = v
-	}
-	if v := os.Getenv("ABS_PASS"); v != "" {
-		cfg.AudiobookshelfPass = v
-	}
-	if v := os.Getenv("ABS_TOKEN"); v != "" {
-		cfg.AudiobookshelfToken = v
-	}
-	if v := os.Getenv("ABS_SQLITE_DB_PATH"); v != "" {
-		cfg.AudiobookshelfDBPath = v
 	}
 	if v := os.Getenv("BACKEND_TYPE"); v != "" {
 		cfg.BackendType = v

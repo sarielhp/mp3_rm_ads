@@ -145,7 +145,7 @@ func RunCleanOrphans(client backend.Backend, opts CleanOrphansOptions) (CleanOrp
 	}
 
 	if !opts.Quiet {
-		fmt.Fprintln(opts.Out, "Scanning Audiobookshelf library for orphaned podcasts...")
+		fmt.Fprintln(opts.Out, "Scanning library for orphaned podcasts...")
 	}
 
 	podcasts, err := client.Podcasts()
@@ -207,7 +207,7 @@ func printOrphansList(out io.Writer, orphans []OrphanPodcast, verbose bool, scan
 }
 
 func confirmOrphanDeletion(in io.Reader, out io.Writer, count int, quiet bool) (bool, error) {
-	fmt.Fprintf(out, "Are you sure you want to delete these %d orphaned podcast(s) from Audiobookshelf? [y/N]: ", count)
+	fmt.Fprintf(out, "Are you sure you want to delete these %d orphaned podcast(s)? [y/N]: ", count)
 	reader := bufio.NewReader(in)
 	input, err := reader.ReadString('\n')
 	if err != nil && err != io.EOF {
@@ -225,7 +225,7 @@ func confirmOrphanDeletion(in io.Reader, out io.Writer, count int, quiet bool) (
 
 func executeOrphanDeletions(client backend.Backend, orphans []OrphanPodcast, opts CleanOrphansOptions, res *CleanOrphansResult) {
 	if !opts.Quiet {
-		fmt.Fprintln(opts.Out, "Deleting orphaned podcasts from Audiobookshelf...")
+		fmt.Fprintln(opts.Out, "Deleting orphaned podcasts...")
 	}
 
 	for _, o := range orphans {
@@ -250,7 +250,7 @@ func executeOrphanDeletions(client backend.Backend, orphans []OrphanPodcast, opt
 
 	if !opts.Quiet {
 		if res.FailedCount == 0 {
-			fmt.Fprintf(opts.Out, "\nSuccessfully deleted %d orphaned podcast(s) from Audiobookshelf.\n", res.DeletedCount)
+			fmt.Fprintf(opts.Out, "\nSuccessfully deleted %d orphaned podcast(s).\n", res.DeletedCount)
 		} else {
 			fmt.Fprintf(opts.Out, "\nDeleted %d orphaned podcast(s), %d failed.\n", res.DeletedCount, res.FailedCount)
 		}

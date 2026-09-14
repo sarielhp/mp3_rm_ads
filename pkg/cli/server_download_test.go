@@ -48,7 +48,7 @@ type serverDownloadTestBackend struct {
 	waitErr  error
 }
 
-func (b *serverDownloadTestBackend) Name() string { return "audiobookshelf" }
+func (b *serverDownloadTestBackend) Name() string { return "standalone" }
 func (b *serverDownloadTestBackend) Podcasts() ([]backend.Podcast, error) {
 	return []backend.Podcast{b.item}, nil
 }
@@ -147,7 +147,7 @@ func TestServerDownloadFailureStopsPostprocessing(t *testing.T) {
 func TestServerDownloadCountSelectsNewestOrOldest(t *testing.T) {
 	for _, oldest := range []bool{false, true} {
 		b := newServerDownloadTestBackend(t)
-		b.item.Media.Episodes = []backend.Episode{{Title: "Old", GUID: "Old"}}
+		b.item.Media.Episodes = []backend.Episode{{Title: "Old", GUID: "Old", AudioFile: &backend.PodcastAudioFile{Duration: 1}}}
 		var action string
 		var opts CLIOptions
 		args := []string{"server", "download", "123", "-k", "1", "--no-wait", "--quiet"}

@@ -190,17 +190,12 @@ func buildIndexFromCatalog(catalog []backend.CatalogEpisode, podcasts []backend.
 // BuildEpisodeIndexFromPodcasts indexes the episode lists both backends return
 // inline with each podcast record.
 func BuildEpisodeIndexFromPodcasts(b backend.Backend, podcasts []backend.Podcast) EpisodeIndex {
-	// PodFetch lists an episode in its catalog as soon as it appears in the
-	// feed, whether or not the audio was fetched; Audiobookshelf only records
-	// episodes it has actually downloaded.
-	audioImplied := b == nil || b.Name() != "podfetch"
-
 	index := make(EpisodeIndex, len(podcasts))
 	global := newPodcastEpisodeIndex(len(podcasts) * 50)
 	for _, p := range podcasts {
 		idx := newPodcastEpisodeIndex(len(p.Media.Episodes))
 		for _, ep := range p.Media.Episodes {
-			dl := audioImplied || ep.AudioFile != nil
+			dl := ep.AudioFile != nil
 			idx.add(ep.GUID, ep.EnclosureURL, ep.Title, dl)
 			global.add(ep.GUID, ep.EnclosureURL, ep.Title, dl)
 		}

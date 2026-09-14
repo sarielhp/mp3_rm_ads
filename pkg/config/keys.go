@@ -20,7 +20,6 @@ func ResolveGeminiAPIKey(cfg *types.Config) string {
 			_ = util.ZeroWipeKey(envKey)
 			os.Unsetenv("GEMINI_API_KEY")
 		}
-		WipeGeminiKeyFiles()
 		return ""
 	}
 
@@ -30,57 +29,42 @@ func ResolveGeminiAPIKey(cfg *types.Config) string {
 	if envKey := os.Getenv("GEMINI_API_KEY"); envKey != "" && !util.IsZeroedKey(envKey) {
 		return envKey
 	}
-	return ReadGeminiKeyFiles()
-}
-
-func ReadGeminiKeyFiles() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
+	keyFile := ""
+	if cfg != nil {
+		keyFile = cfg.GeminiAPIKeyFile
 	}
-	for _, rel := range []string{
-		filepath.Join(".config", "auth", "gemini_ai_studio_key_free"),
-		filepath.Join(".config", "auth", "gemini_api_key_free"),
-		filepath.Join(".config", "auth", "gemini_ai_studio_key"),
-		filepath.Join(".config", "auth", "gemini_api_key"),
-		filepath.Join(".config", "auth", "gemini_ai_studio_key_paid"),
-		filepath.Join(".config", "auth", "gemini_api_key_paid"),
-		filepath.Join(".config", "gemini", "api_key"),
-		filepath.Join(".config", "gemini", "gemini_api_key"),
-	} {
-		path := filepath.Join(home, rel)
-		if data, err := os.ReadFile(path); err == nil {
-			if k := strings.TrimSpace(string(data)); k != "" && !util.IsZeroedKey(k) {
-				return k
-			}
-		}
+	if envFile := os.Getenv("GEMINI_API_KEY_FILE"); envFile != "" {
+		keyFile = envFile
+	}
+	if keyFile != "" {
+		return ReadKeyFile(keyFile)
 	}
 	return ""
 }
 
-func WipeGeminiKeyFiles() {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return
+func ReadKeyFile(path string) string {
+	if path == "" {
+		return ""
 	}
-	for _, rel := range []string{
-		filepath.Join(".config", "auth", "gemini_ai_studio_key_free"),
-		filepath.Join(".config", "auth", "gemini_api_key_free"),
-		filepath.Join(".config", "auth", "gemini_ai_studio_key"),
-		filepath.Join(".config", "auth", "gemini_api_key"),
-		filepath.Join(".config", "auth", "gemini_ai_studio_key_paid"),
-		filepath.Join(".config", "auth", "gemini_api_key_paid"),
-		filepath.Join(".config", "gemini", "api_key"),
-		filepath.Join(".config", "gemini", "gemini_api_key"),
-	} {
-		path := filepath.Join(home, rel)
-		if data, err := os.ReadFile(path); err == nil {
-			k := strings.TrimSpace(string(data))
-			if k != "" {
-				_ = util.ZeroWipeKey(k)
+	resolved := path
+	if strings.HasPrefix(path, "~/") || path == "~" {
+		if home, err := os.UserHomeDir(); err == nil {
+			if path == "~" {
+				resolved = home
+			} else {
+				resolved = filepath.Join(home, path[2:])
 			}
 		}
 	}
+	data, err := os.ReadFile(resolved)
+	if err != nil {
+		return ""
+	}
+	k := strings.TrimSpace(string(data))
+	if util.IsZeroedKey(k) {
+		return ""
+	}
+	return k
 }
 
 func SanitizeDisabledAPIKeys(cfg *types.Config) {
@@ -140,6 +124,12 @@ func ValidateGeminiKey(apiKey string, enabled bool) (string, error) {
 }
 
 func ApplyAPIKeyEnvOverrides(cfg *types.Config) {
+	if cfg == nil {
+		return
+	}
+	if v := os.Getenv("GEMINI_API_KEY_FILE"); v != "" {
+		cfg.GeminiAPIKeyFile = v
+	}
 	if v := os.Getenv("GEMINI_API_KEY_ENABLED"); v != "" {
 		if b, err := strconv.ParseBool(v); err == nil {
 			cfg.GeminiAPIKeyEnabled = &b
@@ -208,22 +198,6 @@ func ResolveAuthFolderCredentials(cfg *types.Config) {
 			cfg.PodfetchPass = pass
 		} else {
 			cfg.PodfetchPass = ReadAuthSecret("podfetch_pass")
-		}
-	}
-	if cfg.AudiobookshelfToken == "" {
-		if tok := ReadAuthSecret("audiobookshelf_token"); tok != "" {
-			cfg.AudiobookshelfToken = tok
-		} else if tok := ReadAuthSecret("audiobookshelf_api_key"); tok != "" {
-			cfg.AudiobookshelfToken = tok
-		} else {
-			cfg.AudiobookshelfToken = ReadAuthSecret("abs_token")
-		}
-	}
-	if cfg.AudiobookshelfPass == "" {
-		if pass := ReadAuthSecret("audiobookshelf_password"); pass != "" {
-			cfg.AudiobookshelfPass = pass
-		} else {
-			cfg.AudiobookshelfPass = ReadAuthSecret("audiobookshelf_pass")
 		}
 	}
 }

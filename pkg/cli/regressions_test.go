@@ -41,10 +41,6 @@ func TestRegressionIssue2_TestCommandTargetValidation(t *testing.T) {
 	validCases := [][]string{
 		{"info", "check"},
 		{"info", "check", "whisper"},
-		{"info", "check", "abs"},
-		{"info", "check", "abs", "connect"},
-		{"info", "check", "abs", "map"},
-		{"info", "check", "abs", "download"},
 		{"info", "check", "kitty"},
 	}
 	for _, tc := range validCases {
@@ -215,16 +211,6 @@ func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
 	}
 	if opts.ServerSubcmd != "disable-hourly" {
 		t.Errorf("expected ServerSubcmd 'disable-hourly', got %q", opts.ServerSubcmd)
-	}
-}
-
-func TestRegressionIssue8_TestABSUnconfiguredExitCode(t *testing.T) {
-	cfg := Config{}
-	if ok := absMapPodcasts(cfg, true); ok {
-		t.Errorf("expected absMapPodcasts to return false when unconfigured, got true")
-	}
-	if ok := absDownloadAllData(cfg, true); ok {
-		t.Errorf("expected absDownloadAllData to return false when unconfigured, got true")
 	}
 }
 

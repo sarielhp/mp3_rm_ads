@@ -5,7 +5,6 @@ import (
 	"abs/pkg/pipeline"
 	"abs/pkg/podcast"
 	"abs/pkg/util"
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -170,9 +169,6 @@ func buildEpisodeInfoDTO(ep *ResolvedEpisode) EpisodeInfoJSON {
 	} else if det, _ := podcast.LoadEpisodeDetails(ep.PodcastDir, ep.Filename); det != nil && det.Description != "" {
 		desc = det.Description
 	}
-	if desc == "" {
-		desc = queryPodfetchEpisodeDescription(ep.Title, ep.Path)
-	}
 
 	cuts := collectEpisodeCuts(ep.Path, st)
 
@@ -272,27 +268,4 @@ func formatEpisodeCutsAndTranscript(info EpisodeInfoJSON, showCuts bool) string 
 
 func printEpisodeInfoCard(info EpisodeInfoJSON, showCuts bool) {
 	fmt.Print(formatEpisodeInfo(info, showCuts))
-}
-
-func queryPodfetchEpisodeDescription(title, audioPath string) string {
-	cfgGlobal := loadConfig()
-	dbPath := cfgGlobal.PodfetchDBPath
-	if dbPath == "" {
-		dbPath = "/media/dockers/podfetch/db/podcast.db"
-	}
-	if fi, err := os.Stat(dbPath); err != nil || fi.IsDir() {
-		return ""
-	}
-	db, err := sql.Open("sqlite3", dbPath+"?_busy_timeout=3000")
-	if err != nil {
-		return ""
-	}
-	defer db.Close()
-
-	row := db.QueryRow("SELECT description FROM podcast_episodes WHERE name = ? OR file_episode_path = ? OR download_location = ? LIMIT 1", title, audioPath, audioPath)
-	var desc sql.NullString
-	if err := row.Scan(&desc); err == nil && desc.Valid {
-		return strings.TrimSpace(desc.String)
-	}
-	return ""
 }

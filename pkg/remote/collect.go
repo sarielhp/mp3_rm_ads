@@ -209,7 +209,7 @@ func pullSingleDoneEpisode(cfg *types.Config, relPath string, item RemoteDoneIte
 
 	savePulledEpisodeStatus(localDestAudio, tempStat)
 
-	SyncAudiobookshelfDuration(cfg, localDestAudio, item.CleanedDurationSec)
+	SyncBackendDuration(cfg, localDestAudio, item.CleanedDurationSec)
 
 	if !quiet {
 		fmt.Printf("✓ Pulled %s -> %s (saved %.1fs)\n", relPath, localDestAudio, item.CutDurationSec)
@@ -329,7 +329,7 @@ func pullSingleStagedBatchItem(cfg *types.Config, item types.RemoteBatchJobItem,
 		_ = util.SafeMove(srcTranscript, destTranscript)
 	}
 	_ = pipeline.UpdateEpisodeStatus(destMP3, func(st *types.EpisodeStatusFile) { st.Status = types.StateDone })
-	SyncAudiobookshelfDuration(cfg, destMP3, item.CleanedDurationSec)
+	SyncBackendDuration(cfg, destMP3, item.CleanedDurationSec)
 	return true
 }
 
@@ -395,6 +395,6 @@ func ResolveManifestDest(localPodcastsDir string, item types.RemoteBatchJobItem)
 	return absSrc, true
 }
 
-func SyncAudiobookshelfDuration(cfg *types.Config, filePath string, duration float64) {
+func SyncBackendDuration(cfg *types.Config, filePath string, duration float64) {
 	_ = backend.SyncEpisodeDuration(cfg, filePath, duration)
 }

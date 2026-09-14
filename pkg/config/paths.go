@@ -8,10 +8,9 @@ import (
 )
 
 const (
-	ConfigDirName       = ".config/abs"
-	LegacyConfigDirName = ".config/mp3_rm_ads"
-	ConfigFileName      = "config.json"
-	OpencodeConfigFile  = ".config/opencode/opencode.json"
+	ConfigDirName      = ".config/abs"
+	ConfigFileName     = "config.json"
+	OpencodeConfigFile = ".config/opencode/opencode.json"
 )
 
 var testConfigPath string
@@ -49,14 +48,6 @@ func ConfigPath() string {
 		return testConfigPath
 	}
 	return filepath.Join(ConfigDir(), ConfigFileName)
-}
-
-func LegacyConfigPath() string {
-	home, err := os.UserHomeDir()
-	if err != nil {
-		return ""
-	}
-	return filepath.Join(home, LegacyConfigDirName, ConfigFileName)
 }
 
 func OpencodeConfigPath() string {

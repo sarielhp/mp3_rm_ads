@@ -49,7 +49,7 @@ func buildProbeRequest(ctx context.Context, modelName, apiKey string) (*http.Req
 func ProbeGeminiAPI(ctx context.Context, cfg *types.Config) (*GeminiProbeResult, error) {
 	apiKey := config.ResolveGeminiAPIKey(cfg)
 	if apiKey == "" {
-		return nil, fmt.Errorf("no Gemini API key found (checked config.json, GEMINI_API_KEY, and ~/.config/auth/)")
+		return nil, fmt.Errorf("no Gemini API key found (set gemini_api_key or gemini_api_key_file in config.json, or GEMINI_API_KEY)")
 	}
 
 	modelName := cfg.GetGeminiModel()

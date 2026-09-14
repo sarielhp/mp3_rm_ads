@@ -14,7 +14,7 @@ func runQueueToday(cfg Config, root string, cli CLIOptions, now time.Time) error
 	if _, ready := podcast.SourcePublicationTime(root); ready {
 		return handleQueueToday(root, cli, now)
 	}
-	if cfg.PodfetchDBPath == "" && cfg.PodfetchURL == "" && cfg.AudiobookshelfURL == "" && cfg.AudiobookshelfDBPath == "" {
+	if cfg.PodfetchDBPath == "" && cfg.PodfetchURL == "" {
 		return handleQueueToday(root, cli, now)
 	}
 	b, err := backend.FromAppConfig(&cfg, true)

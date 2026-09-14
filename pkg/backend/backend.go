@@ -3,7 +3,6 @@ package backend
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 )
 
@@ -50,18 +49,19 @@ type Backend interface {
 }
 
 type Config struct {
-	Host        string
-	User        string
-	Pass        string
-	Token       string
-	APIKey      string
-	DBPath      string
-	PodcastsDir string
-	Timeout     time.Duration
-	MaxAttempts int
-	RetryDelay  time.Duration
-	Quiet       bool
-	Verbose     bool
+	Host              string
+	User              string
+	Pass              string
+	Token             string
+	APIKey            string
+	DBPath            string
+	PodcastsDir       string
+	SubscriptionsFile string
+	Timeout           time.Duration
+	MaxAttempts       int
+	RetryDelay        time.Duration
+	Quiet             bool
+	Verbose           bool
 }
 
 type FactoryFunc func(cfg Config) (Backend, error)
@@ -74,13 +74,7 @@ func Register(name string, factory FactoryFunc) {
 
 func New(name string, cfg Config) (Backend, error) {
 	if name == "" {
-		name = "podfetch"
-	}
-	switch strings.ToLower(name) {
-	case "audiobookshelf", "abs":
-		verifyAudiobookshelfNotDisabled("New")
-	case "podfetch", "pod_fetch":
-		verifyPodfetchNotDisabled("New")
+		name = "standalone"
 	}
 	factory, ok := backends[name]
 	if !ok {

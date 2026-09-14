@@ -175,7 +175,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/types` | Core domain types, state enums, configuration data structures, manifests |
 | `pkg/util` | Cross-cutting utilities: safe atomic file operations, locks, shell quoting, ANSI colors |
 | `pkg/config` | Configuration loading/saving, profile cost estimation, environment overrides, podcast configs |
-| `pkg/backend` | Podcast server backend implementations: Audiobookshelf (ABS) and PodFetch REST/SQLite |
+| `pkg/backend` | Standalone backend interface and legacy import adapters |
 | `pkg/audio` | Audio processing via ffmpeg/ffprobe: duration probing, cutting, filtering, ID3 tags |
 | `pkg/format` | Formatting routines: time formatters, cut intervals merging, SRT/TXT export |
 | `pkg/transcribe` | Whisper API client, audio WAV preparation, chunking, Docker container log progress |
@@ -183,7 +183,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/gemini` | Direct audio transcription and processing with Gemini Flash 2.5 API |
 | `pkg/pipeline` | Core processing pipeline: transcription → detection → cutting, episode status tracking |
 | `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/abs_player.sock`), MPRIS |
-| `pkg/podcast` | Podcast feed cache, episode download management, retention/download policies, ID registry |
+| `pkg/podcast` | Standalone podcast manager, subscription store, native downloader, feed & web generator |
 | `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
 | `pkg/tui` | Full-featured interactive terminal UI (Bubbletea/Lipgloss) spanning 19 screens and modes |
@@ -208,18 +208,15 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
  - Progress: Docker log polling via `docker logs --tail N`
  - Ad detection: LLM API (Ollama, OpenRouter, etc.)
  - Audio cutting: ffmpeg filter_complex with concat
- - Backends (`pkg/backend/`):
-   - **Audiobookshelf (ABS)**: Primary podcast server backend via REST API (`audiobookshelf_url`, `audiobookshelf_user`, `audiobookshelf_pass`, `audiobookshelf_token`, `audiobookshelf_sqlite_db_path`).
-   - **PodFetch**: Full-featured alternative podcast backend (`pkg/backend/podfetch*.go`) via REST API and SQLite database (`podfetch_url`, `podfetch_user`, `podfetch_pass`, `podfetch_api_key`, `podfetch_db_path`). Selected via `backend_type: "podfetch"`.
+ - Backend Architecture (`architecture.md`):
+   - **Standalone (Native)**: `abs` is its own native podcast backend (`backend_type: "standalone"`). It manages subscriptions in `~/.config/abs/podcasts.json`, directly fetches upstream feeds, downloads episodes, and generates local `feed.xml` RSS and `index.html` static web players.
+   - **Legacy Importers**: External podcast servers (e.g., PodFetch) have a minimal presence strictly as optional read-only migration sources for one-time subscription import via `abs server import`. All operational features (downloads, feeds, pipeline) run natively in standalone mode.
  - Playback Architecture: Headless background playback daemon spawned via `abs player <play|stop|pause|status> [id]`, controlled through IPC socket `/tmp/abs_player.sock` with MPRIS D-Bus integration (supports mpv and cvlc fallback).
  - Terminology: Standardized on "AdR" (Ad Removal) and "NeedAdR" across CLI, tables, status badges, and TUI.
  - Config: `~/.config/abs/config.json`
- - Migration: Run `abs config migrate` to import settings from legacy `podcasts_manager` or `mp3_rm_ads` configs.
+ - Migration: Run `abs config migrate` to import settings from legacy `podcasts_manager` configs.
  - Environment Overrides: Supported env vars override config values:
    - `WHISPER_URL`
-   - `ABS_URL` / `AUDIOBOOKSHELF_URL`
-   - `ABS_USER` / `AUDIOBOOKSHELF_USER`
-   - `ABS_PASS` / `AUDIOBOOKSHELF_PASS`
    - `PODFETCH_URL`
    - `PODFETCH_USER`
    - `PODFETCH_PASS`
