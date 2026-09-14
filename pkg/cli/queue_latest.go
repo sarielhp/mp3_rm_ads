@@ -5,6 +5,7 @@ import (
 	"os"
 	"sort"
 	"strconv"
+	"strings"
 	"time"
 
 	"abs/pkg/pipeline"
@@ -18,19 +19,28 @@ func buildQueueLatestSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 		Name:        "latest",
 		Description: "Queue latest published episodes that do not have their ads removed yet",
 		UsageLine:   "abs queue latest [N] [podcast-id] [options]",
-		Args:        clihelp.MaximumNArgs(2),
+		Parameters: []clihelp.Param{
+			{Name: "[N]", Description: "Number of episodes to queue (default: 10)"},
+			{Name: "[podcast-id]", Description: "Optional podcast ID or query to restrict to"},
+		},
+		Args: clihelp.MaximumNArgs(2),
 		Options: []clihelp.Option{
+			clihelp.Int(&opts.Count, "-n, --limit <number>", 10, "Number of latest episodes to queue"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress output"),
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show eligible episodes without changing the queue"),
 		},
 		Examples: []clihelp.Example{
 			{
-				Line:        "abs queue latest 5",
-				Description: "Queue the 5 latest published uncleaned episodes",
+				Line:        "abs queue latest",
+				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
-				Line:        "abs queue latest 3 <podcast-id>",
-				Description: "Queue the 3 latest published uncleaned episodes for a specific podcast",
+				Line:        "abs queue latest 10",
+				Description: "Queue the 10 latest published uncleaned episodes",
+			},
+			{
+				Line:        "abs queue latest 5 <podcast-id>",
+				Description: "Queue the 5 latest published uncleaned episodes for a specific podcast",
 			},
 		},
 		Run: func(ctx *clihelp.Context) error {
@@ -42,8 +52,11 @@ func buildQueueLatestSubcommand(opts *CLIOptions, action *string) clihelp.Comman
 	}
 }
 
-func parseQueueLatestArgs(args []string) (int, string, error) {
-	limit := 5
+func parseQueueLatestArgs(args []string, defaultLimits ...int) (int, string, error) {
+	limit := 10
+	if len(defaultLimits) > 0 && defaultLimits[0] > 0 {
+		limit = defaultLimits[0]
+	}
 	target := ""
 	for _, arg := range args {
 		if n, err := strconv.Atoi(arg); err == nil {
@@ -98,12 +111,12 @@ func collectLatestUncleanedEpisodes(podcastsDir, target string) ([]latestQueueCa
 			if !pipeline.IsQueueAudioPath(path) || pipeline.IsEpisodeClean(path) {
 				continue
 			}
-			pubTime := podcast.GetEpisodePublicationTime(path)
-			if pubTime.IsZero() {
-				if fi, err := os.Stat(path); err == nil {
-					pubTime = fi.ModTime()
-				}
+			st := pipeline.GetOrCreateEpisodeStatus(path)
+			var fi os.FileInfo
+			if stat, err := os.Stat(path); err == nil {
+				fi = stat
 			}
+			pubTime := resolveEpisodePublicationTime(path, st, fi)
 			epShortID := podcast.EpisodeShortIDReadOnly(p.Dir, p.ShortID, path)
 			title := podcast.EpisodeTitleFromPath(path)
 			candidates = append(candidates, latestQueueCandidate{
@@ -148,8 +161,22 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 
 	if cli.DryRun {
 		for _, it := range selected {
-			fmt.Printf("[dry-run] Would queue for AdR: [%s] %s (%s)\n",
-				it.episodeShortID, util.DisplayName(it.title), util.DisplayName(it.podTitle))
+			qFile := queueFilenameForPath(it.podDir, it.path)
+			qEntries, _ := pipeline.ReadQueue(it.podDir)
+			isQueued := false
+			for _, q := range qEntries {
+				if strings.EqualFold(q, qFile) {
+					isQueued = true
+					break
+				}
+			}
+			if isQueued {
+				fmt.Printf("[dry-run] Already in queue: [%s] %s (%s)\n",
+					it.episodeShortID, util.DisplayName(it.title), util.DisplayName(it.podTitle))
+			} else {
+				fmt.Printf("[dry-run] Would queue for AdR: [%s] %s (%s)\n",
+					it.episodeShortID, util.DisplayName(it.title), util.DisplayName(it.podTitle))
+			}
 		}
 		return nil
 	}

@@ -60,6 +60,10 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 				Description: "Export server podcast RSS feeds into an OPML file",
 			},
 			{
+				Line:        "abs queue latest 10",
+				Description: "Queue the 10 latest uncleaned episodes for ad removal",
+			},
+			{
 				Line:        "abs queue run",
 				Description: "Process ad removal on queued episodes",
 			},

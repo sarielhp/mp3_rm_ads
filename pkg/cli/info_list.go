@@ -59,7 +59,7 @@ type lsEpisodeJSON struct {
 
 func podcastExistsByIndexOrID(podcastsDir, query string) bool {
 	res, err := podcast.ResolveAnyID(podcastsDir, query)
-	return err == nil && res != nil
+	return err == nil && res != nil && res.IsPodcast()
 }
 
 func listAllPodcasts(podcastsDir string, cli CLIOptions) error {

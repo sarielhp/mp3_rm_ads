@@ -10,7 +10,7 @@ import (
 
 func TestQueueLatestDefaultCount(t *testing.T) {
 	root := t.TempDir()
-	titles := []string{"Ep1", "Ep2", "Ep3", "Ep4", "Ep5", "Ep6", "Ep7"}
+	titles := []string{"Ep1", "Ep2", "Ep3", "Ep4", "Ep5", "Ep6", "Ep7", "Ep8", "Ep9", "Ep10", "Ep11", "Ep12"}
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", titles)
 
 	cfg := Config{PodcastsDir: root}
@@ -20,7 +20,7 @@ func TestQueueLatestDefaultCount(t *testing.T) {
 		},
 	}
 
-	if err := runQueueLatest(cfg, root, 5, "", opts); err != nil {
+	if err := runQueueLatest(cfg, root, 10, "", opts); err != nil {
 		t.Fatal(err)
 	}
 
@@ -29,11 +29,16 @@ func TestQueueLatestDefaultCount(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if len(queue) != 5 {
-		t.Fatalf("expected 5 queued episodes, got %d: %v", len(queue), queue)
+	if len(queue) != 10 {
+		t.Fatalf("expected 10 queued episodes, got %d: %v", len(queue), queue)
 	}
 
 	expected := []string{
+		filepath.Base(paths[11]),
+		filepath.Base(paths[10]),
+		filepath.Base(paths[9]),
+		filepath.Base(paths[8]),
+		filepath.Base(paths[7]),
 		filepath.Base(paths[6]),
 		filepath.Base(paths[5]),
 		filepath.Base(paths[4]),
@@ -161,8 +166,13 @@ func TestQueueLatestParsing(t *testing.T) {
 	}
 
 	limit, target, err = parseQueueLatestArgs([]string{})
-	if err != nil || limit != 5 || target != "" {
+	if err != nil || limit != 10 || target != "" {
 		t.Fatalf("parseQueueLatestArgs empty mismatch: limit=%d, target=%q, err=%v", limit, target, err)
+	}
+
+	limit, target, err = parseQueueLatestArgs([]string{}, 20)
+	if err != nil || limit != 20 || target != "" {
+		t.Fatalf("parseQueueLatestArgs default mismatch: limit=%d, target=%q, err=%v", limit, target, err)
 	}
 
 	if _, _, err := parseQueueLatestArgs([]string{"0"}); err == nil {
@@ -175,5 +185,54 @@ func TestQueueLatestParsing(t *testing.T) {
 
 	if _, _, err := parseQueueLatestArgs([]string{"pod1", "pod2"}); err == nil {
 		t.Fatal("expected error for multiple target names")
+	}
+}
+
+func TestQueueRoutingLatest(t *testing.T) {
+	root := t.TempDir()
+	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"E1", "E2", "E3"})
+
+	cfg := Config{PodcastsDir: root}
+
+	// Test abs queue latest 2
+	err := runQueueCommand(cfg, CLIOptions{
+		QueueSubcmd: "latest",
+		Args:        []string{"2"},
+		ProcOptions: ProcOptions{Quiet: true},
+	})
+	if err != nil {
+		t.Fatalf("runQueueCommand latest 2 failed: %v", err)
+	}
+	q, _ := pipeline.ReadQueue(dir)
+	if len(q) != 2 {
+		t.Fatalf("expected 2 queued items, got %d", len(q))
+	}
+
+	// Test abs queue latest without count (defaults to 10, queues remaining available)
+	err = runQueueCommand(cfg, CLIOptions{
+		QueueSubcmd: "latest",
+		ProcOptions: ProcOptions{Quiet: true},
+	})
+	if err != nil {
+		t.Fatalf("runQueueCommand latest default failed: %v", err)
+	}
+	q, _ = pipeline.ReadQueue(dir)
+	if len(q) != 3 {
+		t.Fatalf("expected 3 queued items, got %d", len(q))
+	}
+
+	// Test abs queue add latest 1
+	_ = clearPodcastQueue(dir)
+	err = runQueueCommand(cfg, CLIOptions{
+		QueueSubcmd: "add",
+		Args:        []string{"latest", "1"},
+		ProcOptions: ProcOptions{Quiet: true},
+	})
+	if err != nil {
+		t.Fatalf("runQueueCommand add latest 1 failed: %v", err)
+	}
+	q, _ = pipeline.ReadQueue(dir)
+	if len(q) != 1 || q[0] != filepath.Base(paths[2]) {
+		t.Fatalf("expected 1 item (newest), got %v", q)
 	}
 }

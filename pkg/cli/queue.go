@@ -64,6 +64,13 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		if len(args) == 0 {
 			args = []string{"all"}
 		}
+		if len(args) > 0 && strings.EqualFold(args[0], "latest") {
+			limit, target, err := parseQueueLatestArgs(args[1:], cli.Count)
+			if err != nil {
+				return err
+			}
+			return runQueueLatest(cfg, podcastsDir, limit, target, cli)
+		}
 		return handleQueueAdd(podcastsDir, args)
 	case "today":
 		if len(args) != 0 {
@@ -71,7 +78,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		}
 		return runQueueToday(cfg, podcastsDir, cli, time.Now())
 	case "latest":
-		limit, target, err := parseQueueLatestArgs(args)
+		limit, target, err := parseQueueLatestArgs(args, cli.Count)
 		if err != nil {
 			return err
 		}
@@ -517,9 +524,9 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Subcommands: []clihelp.Command{
 			buildQueueListSubcommand(opts, action),
 			buildQueueLsSubcommand(opts, action),
+			buildQueueLatestSubcommand(opts, action),
 			buildQueueAddSubcommand(opts, action),
 			buildQueueTodaySubcommand(opts, action),
-			buildQueueLatestSubcommand(opts, action),
 			buildQueuePrioritySubcommand(opts, action),
 			buildQueueRemoveSubcommand(opts, action),
 			buildQueueClearSubcommand(opts, action),
@@ -531,8 +538,16 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 				Description: "List all episodes currently in the ad removal queue",
 			},
 			{
-				Line:        "abs queue latest 5",
-				Description: "Queue the 5 latest published uncleaned episodes",
+				Line:        "abs queue latest",
+				Description: "Queue the 10 latest published uncleaned episodes",
+			},
+			{
+				Line:        "abs queue latest 10",
+				Description: "Queue the 10 latest published uncleaned episodes",
+			},
+			{
+				Line:        "abs queue add",
+				Description: "Queue all episodes needing ad removal across all podcasts",
 			},
 			{
 				Line:        "abs queue run",
@@ -541,6 +556,14 @@ func buildQueueCommand(opts *CLIOptions, action *string) clihelp.Command {
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "queue"
+			if len(ctx.Args) > 0 {
+				switch strings.ToLower(ctx.Args[0]) {
+				case "latest":
+					opts.QueueSubcmd = "latest"
+					opts.Args = ctx.Args[1:]
+					return nil
+				}
+			}
 			opts.Args = ctx.Args
 			return nil
 		},
@@ -577,14 +600,22 @@ func buildQueueAddSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "add",
 		Description: "Add uncleaned episodes to the ad removal queue (defaults to all)",
-		UsageLine:   "abs queue add [id... | all]",
+		UsageLine:   "abs queue add [id... | all | latest [N]]",
 		Parameters: []clihelp.Param{
-			{Name: "[id... | all]", Description: "Episode ID(s), podcast ID(s), or 'all' to queue all uncleaned episodes across library"},
+			{Name: "[id... | all | latest [N]]", Description: "Episode ID(s), podcast ID(s), 'all', or 'latest [N]' to queue uncleaned episodes"},
+		},
+		Options: []clihelp.Option{
+			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress output"),
+			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show eligible episodes without changing the queue"),
 		},
 		Examples: []clihelp.Example{
 			{
 				Line:        "abs queue add",
 				Description: "Queue all episodes needing ad removal across all podcasts",
+			},
+			{
+				Line:        "abs queue add latest 10",
+				Description: "Queue the 10 latest published uncleaned episodes",
 			},
 			{
 				Line:        "abs queue add all",
