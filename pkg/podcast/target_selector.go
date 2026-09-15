@@ -145,3 +145,39 @@ func ResolveBackendPodcastGroup(podcasts []backend.Podcast, podcastsDir, query s
 		Podcasts: []backend.Podcast{*matched},
 	}, nil
 }
+
+// WithFeedURL keeps only the podcasts that have an upstream feed, falling back
+// to the whole list when none does. A podcast with no feed cannot be checked
+// for new episodes, so narrowing to the ones that can is almost always what a
+// command means — but returning nothing at all would be worse than returning
+// everything.
+func WithFeedURL(podcasts []backend.Podcast) []backend.Podcast {
+	var active []backend.Podcast
+	for _, p := range podcasts {
+		if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
+			active = append(active, p)
+		}
+	}
+	if len(active) > 0 {
+		return active
+	}
+	return podcasts
+}
+
+// SelectBackendTargets narrows a backend's podcast list to what a query names.
+// An empty query selects everything that has a feed. A query naming a single
+// podcast selects exactly that one, feed or not, because the user asked for it
+// by name.
+func (l *Library) SelectBackendTargets(podcasts []backend.Podcast, target string) ([]backend.Podcast, error) {
+	if target == "" {
+		return WithFeedURL(podcasts), nil
+	}
+	group, err := ResolveBackendPodcastGroup(podcasts, l.cfg.PodcastsDir, target)
+	if err != nil {
+		return nil, err
+	}
+	if group.Kind == GroupKindSingle {
+		return group.Podcasts, nil
+	}
+	return WithFeedURL(group.Podcasts), nil
+}

@@ -4,8 +4,6 @@ import (
 	"fmt"
 	"os"
 	"pod/pkg/backend"
-	"pod/pkg/podcast"
-	"strings"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -154,6 +152,12 @@ func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.P
 	return filterServerTargets(podcasts, cli)
 }
 
+// filterServerTargets narrows a backend listing to what the flags name. The
+// library root comes from the loaded config rather than being re-read here.
+func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
+	return library(loadConfig(), cli, nil).SelectBackendTargets(podcasts, serverTargetName(cli))
+}
+
 func serverTargetName(cli CLIOptions) string {
 	target := cli.Podcast
 	if target == "" && len(cli.Args) > 0 {
@@ -164,37 +168,4 @@ func serverTargetName(cli CLIOptions) string {
 		}
 	}
 	return target
-}
-
-func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
-	if target := serverTargetName(cli); target != "" {
-		podcastsDir := loadConfig().PodcastsDir
-		group, err := podcast.ResolveBackendPodcastGroup(podcasts, podcastsDir, target)
-		if err != nil {
-			return nil, err
-		}
-		if group.Kind == podcast.GroupKindSingle {
-			return group.Podcasts, nil
-		}
-		var active []backend.Podcast
-		for _, p := range group.Podcasts {
-			if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
-				active = append(active, p)
-			}
-		}
-		if len(active) > 0 {
-			return active, nil
-		}
-		return group.Podcasts, nil
-	}
-	var active []backend.Podcast
-	for _, p := range podcasts {
-		if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
-			active = append(active, p)
-		}
-	}
-	if len(active) > 0 {
-		return active, nil
-	}
-	return podcasts, nil
 }

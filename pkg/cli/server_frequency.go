@@ -3,13 +3,10 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"sort"
 	"strings"
 
 	"pod/pkg/backend"
-	configPkg "pod/pkg/config"
 	"pod/pkg/podcast"
 	"pod/pkg/util"
 
@@ -95,12 +92,10 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 		fmt.Printf("\n%s (%d podcast(s))...\n\n", desc, len(targetItems))
 	}
 
-	results := make([]podcast.PodcastFreqResult, len(targetItems))
-	for i, item := range targetItems {
-		results[i] = processSingleFrequencyItem(b, item, config, cli, shouldDisable)
-	}
-
-	_ = library(config, cli, b).FeedCache().Save()
+	results := library(config, cli, b).AnalyzeFrequencies(targetItems, podcast.FrequencyOptions{
+		Refresh:       cli.Refresh,
+		DisableHourly: shouldDisable,
+	})
 
 	if !cli.Quiet {
 		printFrequencyTable(results, cli.Verbose, shouldDisable)
@@ -160,65 +155,6 @@ func collectFrequencyTargetPodcasts(config Config, cli CLIOptions) (backend.Back
 		return nil, nil, fmt.Errorf("podcast server not configured: %w", err)
 	}
 	return b, nil, nil
-}
-
-func processSingleFrequencyItem(b backend.Backend, item backend.Podcast, config Config, cli CLIOptions, shouldDisable bool) podcast.PodcastFreqResult {
-	title := item.Media.Metadata.Title
-	if title == "" {
-		title = item.ID
-	}
-	eps, epErr := podcast.GetEpisodesForFrequency(b, item, config.PodcastsDir, cli.Refresh, nil)
-	if epErr != nil {
-		return podcast.PodcastFreqResult{Title: title, Item: item, Err: epErr}
-	}
-
-	freq := backend.AnalyzePodcastFrequency(eps)
-	podDir := podcast.FindPodcastDirForItem(item, config.PodcastsDir)
-	disabled, saved := false, false
-
-	if podDir == "" && shouldDisable && freq.Type == string(backend.CadenceHourly) && config.PodcastsDir != "" {
-		safeTitle := strings.Map(func(r rune) rune {
-			if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-				return '_'
-			}
-			return r
-		}, title)
-		dirCandidate := filepath.Join(config.PodcastsDir, strings.TrimSpace(safeTitle))
-		if err := os.MkdirAll(dirCandidate, 0755); err == nil {
-			podDir = dirCandidate
-		}
-	}
-
-	if podDir != "" {
-		podCfg := configPkg.LoadPodcastConfig(podDir, configPkg.DefaultPodcastConfig(nil))
-		podCfg.Frequency = &freq
-		if shouldDisable && freq.Type == string(backend.CadenceHourly) {
-			podCfg.DownloadPolicy = configPkg.DownloadPolicyNone
-			autoDl := false
-			podCfg.AutoDownload = &autoDl
-			podCfg.AdRemoval = configPkg.AdRemovalNone
-			disabled = true
-			if b != nil {
-				targetID := item.ID
-				if targetID == "" {
-					targetID = item.Media.ID
-				}
-				_ = b.UpdatePodcastSettings(targetID, false, podCfg.IsAutoCleanupEnabled(), podCfg.AutoCleanupDays)
-			}
-		}
-		if sErr := configPkg.SavePodcastConfig(podDir, podCfg); sErr == nil {
-			saved = true
-		}
-	}
-
-	return podcast.PodcastFreqResult{
-		Title:       title,
-		Item:        item,
-		Freq:        freq,
-		PodDir:      podDir,
-		Disabled:    disabled,
-		PolicySaved: saved,
-	}
 }
 
 func printFrequencyTable(results []podcast.PodcastFreqResult, verbose bool, disableMode bool) {
