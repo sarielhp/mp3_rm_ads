@@ -65,7 +65,12 @@ func scanPodcastDiskTitles(item backend.Podcast, podcastsDir string) map[string]
 			diskTitles[name] = true
 		} else if strings.HasSuffix(name, ".mp3") {
 			diskTitles[name] = true
-			diskTitles[strings.TrimSuffix(name, ".mp3")] = true
+			stem := strings.TrimSuffix(name, ".mp3")
+			diskTitles[stem] = true
+			stripped := strings.ToLower(StripEpisodeFilenamePrefix(stem))
+			diskTitles[stripped] = true
+			diskTitles[strings.ToLower(SanitizeTitle(stripped))] = true
+			diskTitles[strings.ReplaceAll(stripped, "_", " ")] = true
 		}
 	}
 	return diskTitles
@@ -118,7 +123,21 @@ func BuildDownloadedChecker(item backend.Podcast, index *PodcastEpisodeIndex, ac
 			(title != "" && queuedTitles[title]) {
 			return true
 		}
-		return title != "" && diskTitles[title]
+		if title != "" {
+			if diskTitles[title] || diskTitles[strings.ToLower(SanitizeTitle(ep.Title))] {
+				return true
+			}
+			pubMs := GetPubMS(ep)
+			var pubTime time.Time
+			if pubMs > 0 {
+				pubTime = time.UnixMilli(pubMs).UTC()
+			}
+			fn := strings.ToLower(FormatEpisodeFilename(pubTime, ep.Episode, ep.Title))
+			if diskTitles[fn] || diskTitles[strings.TrimSuffix(fn, ".mp3")] {
+				return true
+			}
+		}
+		return false
 	}
 }
 

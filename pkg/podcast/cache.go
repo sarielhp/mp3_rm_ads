@@ -215,20 +215,28 @@ func ParseAnyPublicationTime(s string) (time.Time, error) {
 		time.RFC1123,
 		time.RFC822Z,
 		time.RFC822,
+		"Mon, 2 Jan 2006 15:04:05 -0700",
+		"Mon, 2 Jan 2006 15:04:05 MST",
+		"Mon, 02 Jan 2006 15:04:05 -0700",
+		"2 Jan 2006 15:04:05 -0700",
+		"02 Jan 2006 15:04:05 -0700",
+		"Mon, 02 Jan 2006 15:04:05 MST",
+		"Mon, 02 Jan 2006 15:04:05",
 		"2006-01-02 15:04:05 -0700",
 		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05-0700",
 		"2006-01-02 15:04",
 		"2006-01-02",
 	}
 	for _, l := range layouts {
 		if t, err := time.Parse(l, s); err == nil && !t.IsZero() {
-			return t, nil
+			return t.UTC(), nil
 		}
 	}
 	norm := NormalizeFeedTimezone(s)
 	for _, l := range layouts {
 		if t, err := time.Parse(l, norm); err == nil && !t.IsZero() {
-			return t, nil
+			return t.UTC(), nil
 		}
 	}
 	return time.Time{}, fmt.Errorf("unknown time format: %s", s)
@@ -360,7 +368,6 @@ func GetEpisodePublicationTime(filePath string) time.Time {
 		if date, err := ParseAnyPublicationTime(st.PublishedAt); err == nil && !date.IsZero() {
 			return date
 		}
-		return time.Time{}
 	}
 	dir := DetectPodcastDirForAudio(filePath)
 	if feedDate := lookupFeedXMLPublicationTime(dir, filePath); !feedDate.IsZero() {
@@ -373,6 +380,9 @@ func GetEpisodePublicationTime(filePath string) time.Time {
 				return t
 			}
 		}
+	}
+	if date, ok := ParseDatePrefix(filePath); ok {
+		return date
 	}
 	return time.Time{}
 }

@@ -1,6 +1,7 @@
 package podcast
 
 import (
+	"path/filepath"
 	"strings"
 	"time"
 	"unicode"
@@ -115,4 +116,16 @@ func StripEpisodeFilenamePrefix(stem string) string {
 		}
 	}
 	return stem
+}
+
+// ParseDatePrefix extracts a publication date from a filename starting with YYYY-MM-DD.
+func ParseDatePrefix(name string) (time.Time, bool) {
+	name = filepath.Base(name)
+	if len(name) >= 10 && name[4] == '-' && name[7] == '-' {
+		t, err := time.Parse("2006-01-02", name[:10])
+		if err == nil && !t.IsZero() {
+			return t.UTC(), true
+		}
+	}
+	return time.Time{}, false
 }

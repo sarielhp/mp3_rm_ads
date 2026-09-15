@@ -228,6 +228,55 @@ func TestPolicyAllPodcasts(t *testing.T) {
 	}
 }
 
+func TestPolicyNonFavoritesUpdate(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "regular_show")
+	pod2 := filepath.Join(tempDir, "favorite_show")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+
+	c1 := config.DefaultPodcastConfig(nil)
+	c1.DownloadPolicy = "latest"
+	_ = config.SavePodcastConfig(pod1, c1)
+
+	c2 := config.DefaultPodcastConfig(nil)
+	c2.Favorite = true
+	c2.DownloadPolicy = "new"
+	_ = config.SavePodcastConfig(pod2, c2)
+
+	cfg := Config{PodcastsDir: tempDir}
+	cli := CLIOptions{
+		Args: []string{"non-favorites"},
+		PolicyOptions: PolicyOptions{
+			DownloadPolicy: "none",
+		},
+	}
+
+	r, w, _ := os.Pipe()
+	oldStdout := os.Stdout
+	os.Stdout = w
+	err := runPolicyCommand(cfg, cli)
+	_ = w.Close()
+	os.Stdout = oldStdout
+	outBytes, _ := io.ReadAll(r)
+
+	if err != nil {
+		t.Fatalf("runPolicyCommand non-favorites failed: %v", err)
+	}
+	if !strings.Contains(string(outBytes), "Policy updated for 1 non-favorite podcast(s)") {
+		t.Errorf("expected output to mention 1 non-favorite podcast updated, got: %s", string(outBytes))
+	}
+
+	cfg1 := config.LoadPodcastConfig(pod1, config.PodcastConfig{})
+	cfg2 := config.LoadPodcastConfig(pod2, config.PodcastConfig{})
+	if cfg1.DownloadPolicy != DownloadPolicyNone {
+		t.Errorf("expected regular_show download policy to be none, got: %s", cfg1.DownloadPolicy)
+	}
+	if cfg2.DownloadPolicy != "new" || !cfg2.Favorite {
+		t.Errorf("expected favorite_show to remain untouched (new, favorite=true), got: %s, fav=%v", cfg2.DownloadPolicy, cfg2.Favorite)
+	}
+}
+
 func TestPolicyDefaultUpdate(t *testing.T) {
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "config")

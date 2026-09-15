@@ -1,0 +1,120 @@
+package podcast
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+
+	"pod/pkg/backend"
+	"pod/pkg/config"
+)
+
+func TestParsePodcastGroupKind(t *testing.T) {
+	cases := []struct {
+		input    string
+		wantKind PodcastGroupKind
+		wantOK   bool
+	}{
+		{"all", GroupKindAll, true},
+		{"*", GroupKindAll, true},
+		{"fav", GroupKindFavorites, true},
+		{"favorite", GroupKindFavorites, true},
+		{"favorites", GroupKindFavorites, true},
+		{"not-fab", GroupKindNonFavorites, true},
+		{"not-fav", GroupKindNonFavorites, true},
+		{"non-fav", GroupKindNonFavorites, true},
+		{"non-favorites", GroupKindNonFavorites, true},
+		{"unfav", GroupKindNonFavorites, true},
+		{"other", GroupKindNone, false},
+		{"", GroupKindNone, false},
+	}
+
+	for _, tc := range cases {
+		gotKind, gotOK := ParsePodcastGroupKind(tc.input)
+		if gotKind != tc.wantKind || gotOK != tc.wantOK {
+			t.Errorf("ParsePodcastGroupKind(%q) = (%v, %v), want (%v, %v)",
+				tc.input, gotKind, gotOK, tc.wantKind, tc.wantOK)
+		}
+	}
+}
+
+func TestResolvePodcastGroup(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "regular_show")
+	pod2 := filepath.Join(tempDir, "favorite_show")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+
+	c1 := config.DefaultPodcastConfig(nil)
+	_ = config.SavePodcastConfig(pod1, c1)
+
+	c2 := config.DefaultPodcastConfig(nil)
+	c2.Favorite = true
+	_ = config.SavePodcastConfig(pod2, c2)
+
+	// Group: all
+	gAll, err := ResolvePodcastGroup(tempDir, "all")
+	if err != nil || gAll.Kind != GroupKindAll || len(gAll.Entries) != 2 {
+		t.Fatalf("ResolvePodcastGroup(all) failed: %+v, err=%v", gAll, err)
+	}
+
+	// Group: fav
+	gFav, err := ResolvePodcastGroup(tempDir, "fav")
+	if err != nil || gFav.Kind != GroupKindFavorites || len(gFav.Entries) != 1 || gFav.Entries[0].Title != "favorite_show" {
+		t.Fatalf("ResolvePodcastGroup(fav) failed: %+v, err=%v", gFav, err)
+	}
+
+	// Group: not-fab
+	gNotFab, err := ResolvePodcastGroup(tempDir, "not-fab")
+	if err != nil || gNotFab.Kind != GroupKindNonFavorites || len(gNotFab.Entries) != 1 || gNotFab.Entries[0].Title != "regular_show" {
+		t.Fatalf("ResolvePodcastGroup(not-fab) failed: %+v, err=%v", gNotFab, err)
+	}
+
+	// Single: by phrase
+	gSingle, err := ResolvePodcastGroup(tempDir, "regular")
+	if err != nil || gSingle.Kind != GroupKindSingle || len(gSingle.Entries) != 1 || gSingle.Entries[0].Title != "regular_show" {
+		t.Fatalf("ResolvePodcastGroup(regular) failed: %+v, err=%v", gSingle, err)
+	}
+
+	// Ambiguous match
+	_, errAmb := ResolvePodcastGroup(tempDir, "show")
+	if errAmb == nil || !errors.Is(errAmb, ErrAmbiguousPodcast) {
+		t.Fatalf("expected ErrAmbiguousPodcast for 'show', got: %v", errAmb)
+	}
+}
+
+func TestResolveBackendPodcastGroup(t *testing.T) {
+	tempDir := t.TempDir()
+	pod1 := filepath.Join(tempDir, "ShowA")
+	pod2 := filepath.Join(tempDir, "ShowB")
+	_ = os.MkdirAll(pod1, 0755)
+	_ = os.MkdirAll(pod2, 0755)
+
+	c1 := config.DefaultPodcastConfig(nil)
+	_ = config.SavePodcastConfig(pod1, c1)
+
+	c2 := config.DefaultPodcastConfig(nil)
+	c2.Favorite = true
+	_ = config.SavePodcastConfig(pod2, c2)
+
+	podcasts := []backend.Podcast{
+		{ID: "p1", Path: pod1, Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Show A"}}},
+		{ID: "p2", Path: pod2, Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Show B"}}},
+	}
+
+	gFav, err := ResolveBackendPodcastGroup(podcasts, tempDir, "favorites")
+	if err != nil || len(gFav.Podcasts) != 1 || gFav.Podcasts[0].ID != "p2" {
+		t.Fatalf("ResolveBackendPodcastGroup(favorites) failed: %+v, err=%v", gFav, err)
+	}
+
+	gNotFav, err := ResolveBackendPodcastGroup(podcasts, tempDir, "not-fav")
+	if err != nil || len(gNotFav.Podcasts) != 1 || gNotFav.Podcasts[0].ID != "p1" {
+		t.Fatalf("ResolveBackendPodcastGroup(not-fav) failed: %+v, err=%v", gNotFav, err)
+	}
+
+	gSingle, err := ResolveBackendPodcastGroup(podcasts, tempDir, "show a")
+	if err != nil || len(gSingle.Podcasts) != 1 || gSingle.Podcasts[0].ID != "p1" {
+		t.Fatalf("ResolveBackendPodcastGroup(show a) failed: %+v, err=%v", gSingle, err)
+	}
+}

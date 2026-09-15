@@ -154,6 +154,7 @@ type PolicyOptions struct {
 	FavoriteStr      string
 	PolicyAll        bool
 	SetDefaultPolicy bool
+	NonFavorites     bool
 }
 
 type BackendOptions struct {

@@ -146,10 +146,6 @@ func showServerUsage() {
 	_ = app.RenderCommand(clihelp.Options{}, "server")
 }
 
-func matchBackendPodcast(podcasts []backend.Podcast, target string) (*backend.Podcast, error) {
-	return podcast.MatchBackendPodcasts(podcasts, target)
-}
-
 func resolveServerTargetPodcasts(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
 	podcasts, err := b.Podcasts()
 	if err != nil {
@@ -172,11 +168,24 @@ func serverTargetName(cli CLIOptions) string {
 
 func filterServerTargets(podcasts []backend.Podcast, cli CLIOptions) ([]backend.Podcast, error) {
 	if target := serverTargetName(cli); target != "" {
-		matched, err := matchBackendPodcast(podcasts, target)
+		podcastsDir := loadConfig().PodcastsDir
+		group, err := podcast.ResolveBackendPodcastGroup(podcasts, podcastsDir, target)
 		if err != nil {
 			return nil, err
 		}
-		return []backend.Podcast{*matched}, nil
+		if group.Kind == podcast.GroupKindSingle {
+			return group.Podcasts, nil
+		}
+		var active []backend.Podcast
+		for _, p := range group.Podcasts {
+			if strings.TrimSpace(p.Media.Metadata.FeedURL) != "" {
+				active = append(active, p)
+			}
+		}
+		if len(active) > 0 {
+			return active, nil
+		}
+		return group.Podcasts, nil
 	}
 	var active []backend.Podcast
 	for _, p := range podcasts {

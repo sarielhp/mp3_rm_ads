@@ -309,6 +309,11 @@ func resolveEpisodePublicationTime(mp3Path string, st *types.EpisodeStatusFile, 
 			pt = t
 		}
 	}
+	if pt.IsZero() {
+		if t, ok := podcast.ParseDatePrefix(mp3Path); ok {
+			pt = t
+		}
+	}
 	if pt.IsZero() && fi != nil && !fi.ModTime().IsZero() {
 		pt = fi.ModTime()
 	}

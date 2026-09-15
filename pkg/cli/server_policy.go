@@ -33,8 +33,8 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		podcastsDir = "."
 	}
 
-	if len(cli.Args) == 0 && !cli.PolicyAll {
-		return fmt.Errorf("missing podcast identifier for policy command")
+	if len(cli.Args) == 0 && !cli.PolicyAll && !cli.NonFavorites {
+		return fmt.Errorf("missing podcast identifier or group for policy command")
 	}
 
 	if err := parseShorthandNumberPolicy(&cli); err != nil {
@@ -50,11 +50,21 @@ func runPolicyCommand(cfg Config, cli CLIOptions) error {
 		return handleDefaultPolicy(cli)
 	}
 
-	if strings.EqualFold(target, "all") || cli.PolicyAll {
-		return handleAllPodcastsPolicy(cfg, podcastsDir, cli)
+	if cli.NonFavorites && target == "" {
+		target = "not-fav"
+	} else if cli.PolicyAll && target == "" {
+		target = "all"
 	}
 
-	return handleSinglePodcastPolicy(cfg, podcastsDir, target, cli)
+	group, err := podcast.ResolvePodcastGroup(podcastsDir, target)
+	if err != nil {
+		return err
+	}
+
+	if group.Kind == podcast.GroupKindSingle {
+		return handleSinglePodcastPolicy(cfg, podcastsDir, group.Entries[0].Dir, cli)
+	}
+	return handlePodcastGroupPolicy(cfg, group, cli)
 }
 
 func handleDefaultPolicy(cli CLIOptions) error {
@@ -99,29 +109,29 @@ func applyDefaultPolicyChanges(cfg *Config, cli CLIOptions) {
 	}
 }
 
-func handleAllPodcastsPolicy(cfg Config, podcastsDir string, cli CLIOptions) error {
-	entries := podcast.ScanPodcastDirs(podcastsDir)
-	if len(entries) == 0 {
-		return fmt.Errorf("no podcasts found in %s", podcastsDir)
+func handlePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, cli CLIOptions) error {
+	if len(group.Entries) == 0 {
+		return fmt.Errorf("no matching podcasts found for %s", group.Label)
 	}
 
 	hasUpdates := checkHasPolicyUpdates(cli)
 	if !hasUpdates {
-		return displayAllPodcastsPolicy(entries, cli)
+		return displayPodcastGroupPolicy(group, cli)
 	}
 
-	return updateAllPodcastsPolicy(cfg, entries, cli)
+	return updatePodcastGroupPolicy(cfg, group, cli)
 }
 
-func updateAllPodcastsPolicy(cfg Config, entries []podcast.PodcastDirEntry, cli CLIOptions) error {
+func updatePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, cli CLIOptions) error {
 	updated := 0
 	var sampleCfg config.PodcastConfig
-	for _, entry := range entries {
+	for _, entry := range group.Entries {
 		pCfg := config.LoadPodcastConfig(entry.Dir, config.DefaultPodcastConfig(&cfg))
 		applyPolicyOptionChanges(&pCfg, cli)
 		if err := config.SavePodcastConfig(entry.Dir, pCfg); err != nil {
 			return fmt.Errorf("failed to save policy for %s: %w", entry.Title, err)
 		}
+		_ = syncPolicyWithBackend(&ResolvedPodcast{Dir: entry.Dir, ShortID: entry.ShortID, Title: entry.Title}, pCfg.IsAutoDownloadEnabled(), pCfg.IsAutoCleanupEnabled(), pCfg.AutoCleanupDays)
 		sampleCfg = pCfg
 		updated++
 	}
@@ -143,26 +153,36 @@ func updateAllPodcastsPolicy(cfg Config, entries []podcast.PodcastDirEntry, cli 
 			"download_policy": sampleCfg.DownloadPolicy,
 			"ad_removal":      sampleCfg.AdRemoval,
 			"set_default":     cli.SetDefaultPolicy,
+			"group":           group.Kind,
+			"group_label":     group.Label,
 		}
 		data, _ := json.MarshalIndent(res, "", "  ")
 		fmt.Println(string(data))
 		return nil
 	}
 
+	scope := "podcast(s)"
+	if group.Kind == podcast.GroupKindNonFavorites {
+		scope = "non-favorite podcast(s)"
+	} else if group.Kind == podcast.GroupKindFavorites {
+		scope = "favorite podcast(s)"
+	}
+
 	dlBadge := config.DownloadPolicyBadge(sampleCfg.DownloadPolicy, sampleCfg.DownloadK)
 	adBadge := config.AdRemovalModeBadge(sampleCfg.AdRemoval)
-	fmt.Printf("Policy updated for %d podcast(s): AutoDownload=%v %s, AdRemoval=%s %s%s\n",
-		updated, sampleCfg.IsAutoDownloadEnabled(), dlBadge, sampleCfg.AdRemoval, adBadge, defaultMsg)
+	fmt.Printf("Policy updated for %d %s: AutoDownload=%v %s, AdRemoval=%s %s%s\n",
+		updated, scope, sampleCfg.IsAutoDownloadEnabled(), dlBadge, sampleCfg.AdRemoval, adBadge, defaultMsg)
 	return nil
 }
 
-func displayAllPodcastsPolicy(entries []podcast.PodcastDirEntry, cli CLIOptions) error {
+func displayPodcastGroupPolicy(group *podcast.ResolvedPodcastGroup, cli CLIOptions) error {
 	var results []PodcastPolicyResult
-	for _, entry := range entries {
+	for _, entry := range group.Entries {
 		pCfg := config.LoadPodcastConfig(entry.Dir, config.PodcastConfig{})
 		results = append(results, PodcastPolicyResult{
 			ID:              entry.ShortID,
 			Title:           entry.Title,
+			Favorite:        pCfg.Favorite,
 			AutoDownload:    pCfg.IsAutoDownloadEnabled(),
 			DownloadPolicy:  pCfg.DownloadPolicy,
 			DownloadK:       pCfg.DownloadK,
@@ -181,7 +201,7 @@ func displayAllPodcastsPolicy(entries []podcast.PodcastDirEntry, cli CLIOptions)
 		return nil
 	}
 
-	fmt.Printf("\nPolicies for all podcasts (%d total):\n", len(results))
+	fmt.Printf("\nPolicies for %s (%d total):\n", group.Label, len(results))
 	fmt.Printf("%-8s  %-30s  %-15s  %-12s\n", "ID", "TITLE", "AUTO DOWNLOAD", "AD REMOVAL")
 	fmt.Println(strings.Repeat("-", 72))
 	for _, r := range results {
@@ -359,6 +379,10 @@ func applyPolicyOptionChanges(cfg *PodcastConfig, cli CLIOptions) {
 	}
 	if cli.DownloadPolicy != "" {
 		cfg.DownloadPolicy = config.NormalizeDownloadPolicy(cli.DownloadPolicy)
+		if cfg.DownloadPolicy == config.DownloadPolicyNone && cli.AutoDownloadStr == "" {
+			autoDl := false
+			cfg.AutoDownload = &autoDl
+		}
 	}
 	if cli.DownloadK > 0 {
 		cfg.DownloadK = cli.DownloadK
@@ -418,14 +442,15 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 	return clihelp.Command{
 		Name:        "policy",
 		Description: "View or update podcast download and AdR policy",
-		UsageLine:   "pod server policy [<podcast-id>|all|default] [<number>] [options]",
+		UsageLine:   "pod server policy [<podcast-id>|all|default|non-favorites] [<number>] [options]",
 		Parameters: []clihelp.Param{
-			{Name: "[<podcast-id>|all|default]", Description: "Target podcast identifier, 'all' for all podcasts, or 'default' for global config"},
+			{Name: "[<podcast-id>|all|default|non-favorites]", Description: "Target podcast identifier, 'all' for all podcasts, 'non-favorites' for non-favorites, or 'default' for global config"},
 			{Name: "[<number>]", Description: "Shorthand: auto-download latest K episodes with ad-removal all"},
 		},
 		Args: clihelp.RangeArgs(0, 2),
 		Options: []clihelp.Option{
 			clihelp.Bool(&opts.PolicyAll, "--all", false, "Apply policy to all podcasts in library"),
+			clihelp.Bool(&opts.NonFavorites, "--non-favorites", false, "Apply policy or filter only to podcasts that are not marked as favorite"),
 			clihelp.Bool(&opts.SetDefaultPolicy, "--set-default", false, "Also update global default configuration for new podcasts"),
 			clihelp.String(&opts.FavoriteStr, "--favorite <bool>", "", "Set as favorite (auto-downloads all new episodes and removes ads)"),
 			clihelp.String(&opts.AutoDownloadStr, "--auto-download <bool>", "", "Enable automatic downloads (true/false)"),
@@ -440,6 +465,10 @@ func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Comma
 			{
 				Line:        "pod server policy 42 1",
 				Description: "Shorthand: auto-download latest 1 episode and remove all ads",
+			},
+			{
+				Line:        "pod server policy non-favorites --download-policy none",
+				Description: "Disable auto-download for all podcasts that are not marked as favorite",
 			},
 			{
 				Line:        "pod server policy all --auto-download false",
