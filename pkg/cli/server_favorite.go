@@ -160,7 +160,7 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 		return fmt.Errorf("failed to save podcast config: %w", err)
 	}
 
-	syncMsg := syncPolicyWithBackend(pod, pod.Config.IsAutoDownloadEnabled(), pod.Config.IsAutoCleanupEnabled(), pod.Config.AutoCleanupDays)
+	syncMsg := backendSyncMessage(library(cfg, cli, mustBackend(cfg, cli)).SyncPolicy(pod.Dir, pod.UUID, pod.ShortID, pod.Config))
 	sinceStr := ""
 	if pod.Config.FavoriteSince != nil {
 		sinceStr = pod.Config.FavoriteSince.Format("2006-01-02 15:04")

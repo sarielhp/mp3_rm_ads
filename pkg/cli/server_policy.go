@@ -3,7 +3,6 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
-	"path/filepath"
 	"pod/pkg/backend"
 	"pod/pkg/config"
 	"pod/pkg/podcast"
@@ -25,6 +24,60 @@ type PodcastPolicyResult struct {
 	AutoCleanupDays int    `json:"auto_cleanup_days"`
 	AdRemoval       string `json:"ad_removal"`
 	BackendSync     string `json:"backend_sync"`
+}
+
+// policyUpdate translates the policy flags into the library's request type.
+func policyUpdate(cli CLIOptions) podcast.PolicyUpdate {
+	return podcast.PolicyUpdate{
+		Favorite:       cli.FavoriteStr,
+		AutoDownload:   cli.AutoDownloadStr,
+		DownloadPolicy: cli.DownloadPolicy,
+		DownloadK:      cli.DownloadK,
+		AutoCleanup:    cli.AutoCleanupStr,
+		CleanupDays:    cli.CleanupDays,
+		AdRemoval:      cli.AdRemovalMode,
+	}
+}
+
+func policyDefaults(cfg Config) config.PolicyDefaults {
+	return config.PolicyDefaults{
+		DownloadPolicy: cfg.DefaultDownloadPolicy,
+		DownloadK:      cfg.DefaultDownloadK,
+		AdRemoval:      cfg.DefaultAdRemoval,
+	}
+}
+
+func backendSyncMessage(s podcast.BackendSync) string {
+	switch {
+	case s.Backend == "":
+		return "Local only (no backend)"
+	case s.Err != nil:
+		return fmt.Sprintf("Sync error: %v", s.Err)
+	default:
+		return fmt.Sprintf("Synced to %s", s.Backend)
+	}
+}
+
+func backendConnectionMessage(name string) string {
+	if name == "" {
+		return "Backend not connected"
+	}
+	return fmt.Sprintf("Connected to %s", name)
+}
+
+func policyResult(st podcast.PolicyState, sync string) PodcastPolicyResult {
+	return PodcastPolicyResult{
+		ID:              st.ID,
+		Title:           st.Title,
+		Favorite:        st.Favorite,
+		AutoDownload:    st.AutoDownload,
+		DownloadPolicy:  st.DownloadPolicy,
+		DownloadK:       st.DownloadK,
+		AutoCleanup:     st.AutoCleanup,
+		AutoCleanupDays: st.AutoCleanupDays,
+		AdRemoval:       st.AdRemoval,
+		BackendSync:     sync,
+	}
 }
 
 func runPolicyCommand(cfg Config, cli CLIOptions) error {
@@ -90,7 +143,7 @@ func handleDefaultPolicy(cli CLIOptions) error {
 
 func applyDefaultPolicyChanges(cfg *Config, cli CLIOptions) {
 	if cli.AutoDownloadStr != "" {
-		if parseBoolString(cli.AutoDownloadStr) {
+		if podcast.ParsePolicyBool(cli.AutoDownloadStr) {
 			if cfg.DefaultDownloadPolicy == "" || cfg.DefaultDownloadPolicy == config.DownloadPolicyNone {
 				cfg.DefaultDownloadPolicy = config.DownloadPolicyLatest
 			}
@@ -114,7 +167,7 @@ func handlePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, c
 		return fmt.Errorf("no matching podcasts found for %s", group.Label)
 	}
 
-	hasUpdates := checkHasPolicyUpdates(cli)
+	hasUpdates := !policyUpdate(cli).IsEmpty()
 	if !hasUpdates {
 		return displayPodcastGroupPolicy(group, cli)
 	}
@@ -123,17 +176,10 @@ func handlePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, c
 }
 
 func updatePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, cli CLIOptions) error {
-	updated := 0
-	var sampleCfg config.PodcastConfig
-	for _, entry := range group.Entries {
-		pCfg := config.LoadPodcastConfig(entry.Dir, config.DefaultPodcastConfig(&cfg))
-		applyPolicyOptionChanges(&pCfg, cli)
-		if err := config.SavePodcastConfig(entry.Dir, pCfg); err != nil {
-			return fmt.Errorf("failed to save policy for %s: %w", entry.Title, err)
-		}
-		_ = syncPolicyWithBackend(&ResolvedPodcast{Dir: entry.Dir, ShortID: entry.ShortID, Title: entry.Title}, pCfg.IsAutoDownloadEnabled(), pCfg.IsAutoCleanupEnabled(), pCfg.AutoCleanupDays)
-		sampleCfg = pCfg
-		updated++
+	lib := library(cfg, cli, mustBackend(cfg, cli))
+	res, err := lib.SetGroupPolicy(group.Entries, policyUpdate(cli), policyDefaults(cfg))
+	if err != nil {
+		return err
 	}
 
 	defaultMsg := ""
@@ -147,49 +193,48 @@ func updatePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, c
 	}
 
 	if cli.JSON {
-		res := map[string]any{
-			"updated_count":   updated,
-			"auto_download":   sampleCfg.IsAutoDownloadEnabled(),
-			"download_policy": sampleCfg.DownloadPolicy,
-			"ad_removal":      sampleCfg.AdRemoval,
+		data, _ := json.MarshalIndent(map[string]any{
+			"updated_count":   res.Updated,
+			"auto_download":   res.Applied.IsAutoDownloadEnabled(),
+			"download_policy": res.Applied.DownloadPolicy,
+			"ad_removal":      res.Applied.AdRemoval,
 			"set_default":     cli.SetDefaultPolicy,
 			"group":           group.Kind,
 			"group_label":     group.Label,
-		}
-		data, _ := json.MarshalIndent(res, "", "  ")
+		}, "", "  ")
 		fmt.Println(string(data))
 		return nil
 	}
 
 	scope := "podcast(s)"
-	if group.Kind == podcast.GroupKindNonFavorites {
+	switch group.Kind {
+	case podcast.GroupKindNonFavorites:
 		scope = "non-favorite podcast(s)"
-	} else if group.Kind == podcast.GroupKindFavorites {
+	case podcast.GroupKindFavorites:
 		scope = "favorite podcast(s)"
 	}
-
-	dlBadge := config.DownloadPolicyBadge(sampleCfg.DownloadPolicy, sampleCfg.DownloadK)
-	adBadge := config.AdRemovalModeBadge(sampleCfg.AdRemoval)
+	dlBadge := config.DownloadPolicyBadge(res.Applied.DownloadPolicy, res.Applied.DownloadK)
+	adBadge := config.AdRemovalModeBadge(res.Applied.AdRemoval)
 	fmt.Printf("Policy updated for %d %s: AutoDownload=%v %s, AdRemoval=%s %s%s\n",
-		updated, scope, sampleCfg.IsAutoDownloadEnabled(), dlBadge, sampleCfg.AdRemoval, adBadge, defaultMsg)
+		res.Updated, scope, res.Applied.IsAutoDownloadEnabled(), dlBadge, res.Applied.AdRemoval, adBadge, defaultMsg)
 	return nil
 }
 
+// mustBackend returns the configured backend, or nil when none is reachable.
+// Policy sync is best-effort: a missing backend is reported, not fatal.
+func mustBackend(cfg Config, cli CLIOptions) backend.Backend {
+	b, err := backend.FromAppConfig(&cfg, reporter(cli))
+	if err != nil {
+		return nil
+	}
+	return b
+}
+
 func displayPodcastGroupPolicy(group *podcast.ResolvedPodcastGroup, cli CLIOptions) error {
-	var results []PodcastPolicyResult
-	for _, entry := range group.Entries {
-		pCfg := config.LoadPodcastConfig(entry.Dir, config.PodcastConfig{})
-		results = append(results, PodcastPolicyResult{
-			ID:              entry.ShortID,
-			Title:           entry.Title,
-			Favorite:        pCfg.Favorite,
-			AutoDownload:    pCfg.IsAutoDownloadEnabled(),
-			DownloadPolicy:  pCfg.DownloadPolicy,
-			DownloadK:       pCfg.DownloadK,
-			AutoCleanup:     pCfg.IsAutoCleanupEnabled(),
-			AutoCleanupDays: pCfg.AutoCleanupDays,
-			AdRemoval:       pCfg.AdRemoval,
-		})
+	states := podcast.GroupPolicies(group.Entries)
+	results := make([]PodcastPolicyResult, 0, len(states))
+	for _, st := range states {
+		results = append(results, policyResult(st, ""))
 	}
 
 	if cli.JSON {
@@ -224,13 +269,13 @@ func handleSinglePodcastPolicy(cfg Config, podcastsDir, target string, cli CLIOp
 	}
 
 	pod := resolved.Podcast
-	hasUpdates := checkHasPolicyUpdates(cli)
+	hasUpdates := !policyUpdate(cli).IsEmpty()
 
 	if !hasUpdates {
-		return displayPodcastPolicy(pod, cli)
+		return displayPodcastPolicy(cfg, cli, pod)
 	}
 
-	if err := updatePodcastPolicy(pod, cli); err != nil {
+	if err := updatePodcastPolicy(cfg, cli, pod); err != nil {
 		return err
 	}
 
@@ -269,33 +314,11 @@ func parseShorthandNumberPolicy(cli *CLIOptions) error {
 	return nil
 }
 
-func checkHasPolicyUpdates(cli CLIOptions) bool {
-	return cli.AutoDownloadStr != "" ||
-		cli.DownloadPolicy != "" ||
-		cli.DownloadK > 0 ||
-		cli.AutoCleanupStr != "" ||
-		cli.CleanupDays > 0 ||
-		cli.AdRemovalMode != "" ||
-		cli.FavoriteStr != "" ||
-		cli.SetDefaultPolicy
-}
-
-func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
-	cfgGlobal := loadConfig()
-	syncStatus := getBackendSyncInfo(pod, cfgGlobal)
-
-	res := PodcastPolicyResult{
-		ID:              pod.ShortID,
-		Title:           pod.Title,
-		Favorite:        pod.Config.Favorite,
-		AutoDownload:    pod.Config.IsAutoDownloadEnabled(),
-		DownloadPolicy:  pod.Config.DownloadPolicy,
-		DownloadK:       pod.Config.DownloadK,
-		AutoCleanup:     pod.Config.IsAutoCleanupEnabled(),
-		AutoCleanupDays: pod.Config.AutoCleanupDays,
-		AdRemoval:       pod.Config.AdRemoval,
-		BackendSync:     syncStatus,
-	}
+func displayPodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) error {
+	lib := library(cfg, cli, mustBackend(cfg, cli))
+	res := policyResult(
+		podcast.PolicyStateOf(pod.ShortID, pod.Title, pod.Config),
+		backendConnectionMessage(lib.BackendName()))
 
 	if cli.JSON {
 		data, err := json.MarshalIndent(res, "", "  ")
@@ -305,7 +328,6 @@ func displayPodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 		fmt.Println(string(data))
 		return nil
 	}
-
 	printPodcastPolicyDetails(res)
 	return nil
 }
@@ -331,29 +353,15 @@ func printPodcastPolicyDetails(res PodcastPolicyResult) {
 	fmt.Printf("%s\n\n", strings.Repeat("=", 65))
 }
 
-func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
-	applyPolicyOptionChanges(&pod.Config, cli)
-
-	if err := config.SavePodcastConfig(pod.Dir, pod.Config); err != nil {
-		return fmt.Errorf("failed to save podcast config: %w", err)
+func updatePodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) error {
+	lib := library(cfg, cli, mustBackend(cfg, cli))
+	applied, sync, err := lib.SetPodcastPolicy(pod.Dir, pod.UUID, pod.ShortID, pod.Config, policyUpdate(cli))
+	if err != nil {
+		return err
 	}
-
-	autoDl := pod.Config.IsAutoDownloadEnabled()
-	autoCl := pod.Config.IsAutoCleanupEnabled()
-	syncMsg := syncPolicyWithBackend(pod, autoDl, autoCl, pod.Config.AutoCleanupDays)
-
-	res := PodcastPolicyResult{
-		ID:              pod.ShortID,
-		Title:           pod.Title,
-		Favorite:        pod.Config.Favorite,
-		AutoDownload:    autoDl,
-		DownloadPolicy:  pod.Config.DownloadPolicy,
-		DownloadK:       pod.Config.DownloadK,
-		AutoCleanup:     autoCl,
-		AutoCleanupDays: pod.Config.AutoCleanupDays,
-		AdRemoval:       pod.Config.AdRemoval,
-		BackendSync:     syncMsg,
-	}
+	pod.Config = applied
+	syncMsg := backendSyncMessage(sync)
+	res := policyResult(podcast.PolicyStateOf(pod.ShortID, pod.Title, applied), syncMsg)
 
 	if cli.JSON {
 		data, _ := json.MarshalIndent(res, "", "  ")
@@ -362,80 +370,14 @@ func updatePodcastPolicy(pod *ResolvedPodcast, cli CLIOptions) error {
 	}
 
 	favBadge := ""
-	if pod.Config.Favorite {
+	if applied.Favorite {
 		favBadge = " ⭐ [Favorite]"
 	}
 	fmt.Printf("Policy updated for %s [%s]%s: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
-		util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), favBadge, autoDl, pod.Config.DownloadPolicy, autoCl, pod.Config.AutoCleanupDays, pod.Config.AdRemoval, syncMsg)
+		util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), favBadge,
+		res.AutoDownload, applied.DownloadPolicy, res.AutoCleanup, applied.AutoCleanupDays,
+		applied.AdRemoval, syncMsg)
 	return nil
-}
-
-func applyPolicyOptionChanges(cfg *PodcastConfig, cli CLIOptions) {
-	if cli.FavoriteStr != "" {
-		cfg.SetFavorite(parseBoolString(cli.FavoriteStr))
-	}
-	if cli.AutoDownloadStr != "" {
-		cfg.SetAutoDownload(parseBoolString(cli.AutoDownloadStr))
-	}
-	if cli.DownloadPolicy != "" {
-		cfg.DownloadPolicy = config.NormalizeDownloadPolicy(cli.DownloadPolicy)
-		if cfg.DownloadPolicy == config.DownloadPolicyNone && cli.AutoDownloadStr == "" {
-			autoDl := false
-			cfg.AutoDownload = &autoDl
-		}
-	}
-	if cli.DownloadK > 0 {
-		cfg.DownloadK = cli.DownloadK
-	}
-	if cli.AutoCleanupStr != "" {
-		cfg.SetAutoCleanup(parseBoolString(cli.AutoCleanupStr))
-	}
-	if cli.CleanupDays > 0 {
-		cfg.AutoCleanupDays = cli.CleanupDays
-		autoCl := true
-		cfg.AutoCleanup = &autoCl
-	}
-	if cli.AdRemovalMode != "" {
-		cfg.AdRemoval = config.NormalizeAdRemovalMode(cli.AdRemovalMode)
-	}
-}
-
-func parseBoolString(s string) bool {
-	v := strings.ToLower(strings.TrimSpace(s))
-	if v == "true" || v == "1" || v == "yes" || v == "on" || v == "enable" || v == "enabled" {
-		return true
-	}
-	return false
-}
-
-func getBackendSyncInfo(pod *ResolvedPodcast, cfg Config) string {
-	b, err := backend.FromAppConfig(&cfg, nil)
-	if err != nil || b == nil {
-		return "Backend not connected"
-	}
-	return fmt.Sprintf("Connected to %s", b.Name())
-}
-
-func syncPolicyWithBackend(pod *ResolvedPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) string {
-	cfg := loadConfig()
-	b, err := backend.FromAppConfig(&cfg, nil)
-	if err != nil || b == nil {
-		return "Local only (no backend)"
-	}
-
-	targetID := pod.UUID
-	if targetID == "" {
-		targetID = pod.ShortID
-	}
-	if targetID == "" {
-		targetID = filepath.Base(pod.Dir)
-	}
-
-	err = b.UpdatePodcastSettings(targetID, autoDownload, autoCleanup, autoCleanupDays)
-	if err != nil {
-		return fmt.Sprintf("Sync error: %v", err)
-	}
-	return fmt.Sprintf("Synced to %s", b.Name())
 }
 
 func buildServerPolicySubcommand(opts *CLIOptions, action *string) clihelp.Command {
