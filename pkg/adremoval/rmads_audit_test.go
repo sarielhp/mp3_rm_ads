@@ -12,8 +12,10 @@ import (
 )
 
 func TestAuditRepairsAndQueuesDownloadedEpisodes(t *testing.T) {
+	t.Parallel()
 	for _, transcript := range []string{"missing", "", "{}", "invalid", `{"text":"short"}`} {
 		t.Run(transcript, func(t *testing.T) {
+			t.Parallel()
 			root := t.TempDir()
 			dir := filepath.Join(root, "show", "episode")
 			if err := os.MkdirAll(dir, 0755); err != nil {
@@ -53,6 +55,7 @@ func TestAuditRepairsAndQueuesDownloadedEpisodes(t *testing.T) {
 }
 
 func TestAuditReportsQueueErrors(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	path := filepath.Join(root, "episode.mp3")
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
@@ -73,6 +76,7 @@ func TestAuditReportsQueueErrors(t *testing.T) {
 }
 
 func TestAuditFailedDetectionQueuesAndPreservesTranscript(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	path := filepath.Join(root, "episode.mp3")
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
@@ -96,6 +100,7 @@ func TestAuditFailedDetectionQueuesAndPreservesTranscript(t *testing.T) {
 }
 
 func TestStaleCleanAudioMessage(t *testing.T) {
+	t.Parallel()
 	clean := &types.EpisodeStatusFile{Status: types.StateDone, Cleaned: types.EpisodeAudioMeta{DurationSec: 90}}
 	if got := staleCleanAudioMessage(clean, 120); got == "" {
 		t.Fatal("expected original-length audio to be reported as uncut")
@@ -106,6 +111,7 @@ func TestStaleCleanAudioMessage(t *testing.T) {
 }
 
 func TestAuditExcludesPrecutAndWorkFiles(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	names := []string{
 		"episode.mp3", "precut.mp3", "episode.precut.mp3", "episode.PRECUT.MP3",
@@ -130,6 +136,7 @@ func TestAuditExcludesPrecutAndWorkFiles(t *testing.T) {
 }
 
 func TestInvalidCleanStateMessageRequiresTranscript(t *testing.T) {
+	t.Parallel()
 	path := filepath.Join(t.TempDir(), "episode.transcript.json")
 	clean := &types.EpisodeStatusFile{Status: types.StateDone}
 	if got := invalidCleanStateMessage(clean, 0, path); got == "" {
@@ -144,6 +151,7 @@ func TestInvalidCleanStateMessageRequiresTranscript(t *testing.T) {
 }
 
 func TestInspectEpisodeTranscriptReportsCompletedEpisodeWithoutTranscript(t *testing.T) {
+	t.Parallel()
 	audioPath := filepath.Join(t.TempDir(), "episode.mp3")
 	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
@@ -161,6 +169,7 @@ func TestInspectEpisodeTranscriptReportsCompletedEpisodeWithoutTranscript(t *tes
 }
 
 func TestInspectEpisodeTranscriptRejectsShortCompletedTranscript(t *testing.T) {
+	t.Parallel()
 	audioPath := filepath.Join(t.TempDir(), "episode.mp3")
 	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
@@ -182,6 +191,7 @@ func TestInspectEpisodeTranscriptRejectsShortCompletedTranscript(t *testing.T) {
 }
 
 func TestReportAndHealInvalidCleanStateResetsCleanState(t *testing.T) {
+	t.Parallel()
 	audioPath := filepath.Join(t.TempDir(), "episode.mp3")
 	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)

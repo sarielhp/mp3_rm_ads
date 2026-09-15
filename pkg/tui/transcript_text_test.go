@@ -21,6 +21,7 @@ func TestTranscriptTextFormatsAndErrors(t *testing.T) {
 		{"missing", "", "", "", true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			base := filepath.Join(t.TempDir(), "episode")
 			if tc.suffix != "" {
 				if err := os.WriteFile(base+".transcript"+tc.suffix, []byte(tc.data), 0644); err != nil {

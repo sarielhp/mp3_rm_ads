@@ -39,6 +39,7 @@ func writePodcastConfig(t *testing.T, lib, show, adRemoval string) {
 }
 
 func TestExpandDirectoryArgsFindsNestedPodfetchEpisodes(t *testing.T) {
+	t.Parallel()
 	lib := t.TempDir()
 	writePodcastConfig(t, lib, "Show", "all")
 	wantA := writeEpisode(t, lib, "Show", "Episode A")
@@ -65,6 +66,7 @@ func TestExpandDirectoryArgsFindsNestedPodfetchEpisodes(t *testing.T) {
 }
 
 func TestExpandDirectoryArgsAppliesLatestPolicyPerPodcast(t *testing.T) {
+	t.Parallel()
 	// "latest" has to compare a podcast's episodes against each other, which
 	// only works when they are grouped by podcast rather than by episode.
 	lib := t.TempDir()
@@ -80,6 +82,7 @@ func TestExpandDirectoryArgsAppliesLatestPolicyPerPodcast(t *testing.T) {
 }
 
 func TestGetActiveBackendAlwaysStandalone(t *testing.T) {
+	t.Parallel()
 	cfg := types.Config{}
 	cfg.BackendType = "podfetch"
 	cfg.PodfetchURL = "http://127.0.0.1:8000"
@@ -91,6 +94,7 @@ func TestGetActiveBackendAlwaysStandalone(t *testing.T) {
 }
 
 func TestExpandDirectoryArgsProcessesPodcastWithNoConfig(t *testing.T) {
+	t.Parallel()
 	// No podcast.json must mean "use the defaults", not "silently skip".
 	lib := t.TempDir()
 	want := writeEpisode(t, lib, "Unconfigured", "Episode A")
@@ -102,6 +106,7 @@ func TestExpandDirectoryArgsProcessesPodcastWithNoConfig(t *testing.T) {
 }
 
 func TestExpandDirectoryArgsHonoursAppDefaultAdRemoval(t *testing.T) {
+	t.Parallel()
 	// An app-wide default of "none" opts every unconfigured podcast out.
 	lib := t.TempDir()
 	writeEpisode(t, lib, "Unconfigured", "Episode A")
@@ -114,6 +119,7 @@ func TestExpandDirectoryArgsHonoursAppDefaultAdRemoval(t *testing.T) {
 }
 
 func TestExpandDirectoryArgsWritesMissingPodcastConfig(t *testing.T) {
+	t.Parallel()
 	lib := t.TempDir()
 	writeEpisode(t, lib, "Unconfigured", "Episode A")
 	cfgPath := filepath.Join(lib, "Unconfigured", "podcast.json")
@@ -146,6 +152,7 @@ func TestExpandDirectoryArgsWritesMissingPodcastConfig(t *testing.T) {
 }
 
 func TestExpandDirectoryArgsKeepsExistingPodcastConfig(t *testing.T) {
+	t.Parallel()
 	// An existing file is never overwritten by the defaults.
 	lib := t.TempDir()
 	writePodcastConfig(t, lib, "Show", "latest")

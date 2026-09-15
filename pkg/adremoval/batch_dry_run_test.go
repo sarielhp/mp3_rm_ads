@@ -60,6 +60,7 @@ func diffTrees(before, after map[string]string) []string {
 }
 
 func TestProcDryRunMutatesNothing(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	pod := filepath.Join(dir, "Show")
 	if err := os.MkdirAll(filepath.Join(pod, ".work"), 0755); err != nil {

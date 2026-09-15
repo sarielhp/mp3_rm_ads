@@ -54,6 +54,7 @@ func offlineProfile() types.LLMProfile {
 }
 
 func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mp3 := filepath.Join(dir, "ep.mp3")
 	if err := os.WriteFile(mp3, []byte("not an mp3"), 0644); err != nil {
@@ -74,6 +75,7 @@ func TestTranscribeFailureReturnsInsteadOfPanicking(t *testing.T) {
 }
 
 func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mp3 := filepath.Join(dir, "ep.mp3")
 	writeRealMP3(t, mp3, 10)
@@ -97,6 +99,7 @@ func TestRecutDoesNotFallThroughIntoTheFullPipeline(t *testing.T) {
 }
 
 func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mp3 := filepath.Join(dir, "ep.mp3")
 	writeRealMP3(t, mp3, 10)
@@ -130,6 +133,7 @@ func TestTranscribeMinDoesNotWriteCutMetadata(t *testing.T) {
 }
 
 func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mp3 := filepath.Join(dir, "ep.mp3")
 	writeRealMP3(t, mp3, 10)
@@ -159,6 +163,7 @@ func TestNoAdsDetectedDoesNotReEncodeOrCreatePrecut(t *testing.T) {
 }
 
 func TestAdDetectionFailureDoesNotMarkEpisodeClean(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	mp3 := filepath.Join(dir, "ep.mp3")
 	writeRealMP3(t, mp3, 10)

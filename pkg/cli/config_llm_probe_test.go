@@ -23,6 +23,7 @@ func TestLLMProfileProbe(t *testing.T) {
 		{"bad key", `Unauthorized`, 401, true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			requests := 0
 			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				requests++

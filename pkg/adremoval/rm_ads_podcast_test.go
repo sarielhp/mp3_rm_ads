@@ -64,6 +64,7 @@ func markEpisodeClean(t *testing.T, mp3Path string) {
 }
 
 func TestFindLatestUncleanedLocalEpisode(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Science Hour", []string{
 		"Old Ep",
@@ -95,6 +96,7 @@ func TestFindLatestUncleanedLocalEpisode(t *testing.T) {
 }
 
 func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "History Show", []string{
 		"Napoleon Part 1",
@@ -145,6 +147,7 @@ func TestHandlePodcastRmAdsWorkflow_MultiItemQueueSkip(t *testing.T) {
 }
 
 func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Coding Talk", []string{
 		"Go 1.26",
@@ -180,6 +183,7 @@ func TestHandlePodcastRmAdsWorkflow_DryRun(t *testing.T) {
 }
 
 func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Show A", []string{
 		"Episode 1",
@@ -227,6 +231,7 @@ func TestFindTargetEpisodeFromBackend_FeedCatalog(t *testing.T) {
 }
 
 func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Show B", []string{
 		"Episode 1",
@@ -267,6 +272,7 @@ func TestFindTargetEpisodeFromBackend_AllClean(t *testing.T) {
 }
 
 func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Clean Show", []string{
 		"Episode Test",
@@ -297,6 +303,7 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 }
 
 func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Offline Show", []string{
 		"Episode 1",
@@ -339,6 +346,7 @@ func TestHandlePodcastRmAdsWorkflow_OfflineBackendFallback(t *testing.T) {
 }
 
 func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tmp, "Solo Show", []string{
 		"Ep 1",
@@ -381,6 +389,7 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 }
 
 func TestCountAllQueuedEpisodes(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	p1, _ := createTestPodcastWithEpisodes(t, tmp, "Show 1", []string{"E1"})
 	p2, _ := createTestPodcastWithEpisodes(t, tmp, "Show 2", []string{"E2"})
@@ -401,6 +410,7 @@ func TestCountAllQueuedEpisodes(t *testing.T) {
 }
 
 func TestResolveMatchingEpisodeAudioFile(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "My Show")
 	epDir := filepath.Join(podDir, "Episode 1 Subfolder")
@@ -437,6 +447,7 @@ func TestResolveMatchingEpisodeAudioFile(t *testing.T) {
 }
 
 func TestFindLocalPathForFeedEpisode_SubfolderFuzzy(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "Haaretz Weekly")
 	subDir := filepath.Join(podDir, "-קיבלתי את המידע מיד אחרי הטבח. לקח לי שנה וחצי לוודא שנתניהו הוזהר לפני 7.10- - פרק 670")
@@ -459,6 +470,7 @@ func TestFindLocalPathForFeedEpisode_SubfolderFuzzy(t *testing.T) {
 }
 
 func TestFindTargetEpisodeFromBackend_SubfolderUncleaned(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "Haaretz Show")
 	subDir := filepath.Join(podDir, "-קיבלתי את המידע מיד אחרי הטבח- - פרק 670")

@@ -12,6 +12,7 @@ import (
 )
 
 func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "My Show")
 	if err := os.MkdirAll(podDir, 0755); err != nil {
@@ -59,6 +60,7 @@ func TestFindTargetEpisodeFromBackend_OnlyDownloadsLatest(t *testing.T) {
 }
 
 func TestFindLocalPathForFeedEpisode_ShowPrefixAndSubdir(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "The Show")
 
@@ -91,6 +93,7 @@ func TestFindLocalPathForFeedEpisode_ShowPrefixAndSubdir(t *testing.T) {
 }
 
 func TestResolveMatchingEpisodeAudioFile_ContainerPath(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir := filepath.Join(tmp, "The News")
 	if err := os.MkdirAll(podDir, 0755); err != nil {

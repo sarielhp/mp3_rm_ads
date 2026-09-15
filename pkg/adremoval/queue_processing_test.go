@@ -11,6 +11,7 @@ import (
 )
 
 func TestQueuedCompletedEpisodeWithoutTranscriptIsNotSkipped(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "episode.mp3")
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
@@ -29,6 +30,7 @@ func TestQueuedCompletedEpisodeWithoutTranscriptIsNotSkipped(t *testing.T) {
 }
 
 func TestQueueRetainsLockedEpisode(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "episode.mp3")
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {

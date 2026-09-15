@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -226,7 +227,9 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 	}
 	if totalDownloaded > 0 && !cli.DryRun && !cli.NoWait {
 		if len(config.PostProcessors) > 0 {
-			runPostProcessors(outFor(cli), config.PostProcessors, cli.Quiet)
+			if err := runPostProcessors(outFor(cli), errFor(cli), config.PostProcessors, cli.Quiet); err != nil {
+				return err
+			}
 		} else {
 			if targets, ok := resolveTargetAudioArgs(cli, config); ok {
 				adremoval.ProcessFiles(targets, cli.ProcOptions, config, "proc")
@@ -236,26 +239,36 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 	return nil
 }
 
-func runPostProcessors(w io.Writer, processors []string, quiet bool) {
+// runPostProcessors runs each configured post-processor in turn.
+//
+// A failing processor is reported and does not stop the others, but the
+// combined failure is returned. It used to be discarded outright, so a
+// post-processor that never worked was indistinguishable from one that did:
+// the command printed "Running post-processor: ..." and exited 0 either way.
+func runPostProcessors(out, errOut io.Writer, processors []string, quiet bool) error {
 	if !quiet {
-		fmt.Fprintf(w, "\n=== Executing %d Post-Processor(s) ===\n", len(processors))
+		fmt.Fprintf(out, "\n=== Executing %d Post-Processor(s) ===\n", len(processors))
 	}
+	var failures []error
 	for _, proc := range processors {
-		if !quiet {
-			fmt.Fprintf(w, "Running post-processor: %s...\n", proc)
-		}
 		parts := strings.Fields(proc)
 		if len(parts) == 0 {
 			continue
 		}
-		var cmd *exec.Cmd
-		if len(parts) > 1 {
-			cmd = exec.Command(parts[0], parts[1:]...)
-		} else {
-			cmd = exec.Command(parts[0])
+		if !quiet {
+			fmt.Fprintf(out, "Running post-processor: %s...\n", proc)
 		}
-		cmd.Stdout = os.Stdout
-		cmd.Stderr = os.Stderr
-		_ = cmd.Run()
+		cmd := exec.Command(parts[0], parts[1:]...)
+		cmd.Stdout = out
+		cmd.Stderr = errOut
+		if err := cmd.Run(); err != nil {
+			fmt.Fprintf(errOut, "Post-processor %q failed: %v\n", proc, err)
+			failures = append(failures, fmt.Errorf("%s: %w", proc, err))
+		}
 	}
+	if len(failures) > 0 {
+		return fmt.Errorf("%d of %d post-processor(s) failed: %w",
+			len(failures), len(processors), errors.Join(failures...))
+	}
+	return nil
 }
