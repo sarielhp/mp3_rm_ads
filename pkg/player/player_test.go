@@ -12,6 +12,7 @@ import (
 )
 
 func TestFormatPlayerTime(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		in   float64
 		want string
@@ -32,6 +33,7 @@ func TestFormatPlayerTime(t *testing.T) {
 }
 
 func TestRenderProgressBar(t *testing.T) {
+	t.Parallel()
 	p := &AudioPlayer{
 		Position: 60,
 		Duration: 120,
@@ -47,6 +49,7 @@ func TestRenderProgressBar(t *testing.T) {
 }
 
 func TestRenderVolumeBar(t *testing.T) {
+	t.Parallel()
 	p := &AudioPlayer{
 		Volume: 70,
 		Muted:  false,
@@ -98,6 +101,7 @@ func TestPlayerQueueManagement(t *testing.T) {
 }
 
 func TestPlayerSeekBoundaries(t *testing.T) {
+	t.Parallel()
 	track := types.PlayerTrack{Duration: 100}
 	p := &AudioPlayer{
 		Current:  &track,
@@ -123,9 +127,9 @@ func TestPlayerSeekBoundaries(t *testing.T) {
 }
 
 func TestUnplayableTrackDoesNotDrainTheQueue(t *testing.T) {
-	orig := playerSpawnEnabled
-	playerSpawnEnabled = true
-	t.Cleanup(func() { playerSpawnEnabled = orig })
+	orig := playerSpawnAllowed()
+	SetPlayerSpawnEnabled(true)
+	t.Cleanup(func() { SetPlayerSpawnEnabled(orig) })
 
 	missing := filepath.Join(t.TempDir(), "gone")
 	p := &AudioPlayer{Volume: 70}
@@ -167,9 +171,9 @@ func TestUnplayableTrackDoesNotDrainTheQueue(t *testing.T) {
 }
 
 func TestUnplayableTrackDoesNotPersistAnEmptiedQueue(t *testing.T) {
-	orig := playerSpawnEnabled
-	playerSpawnEnabled = true
-	t.Cleanup(func() { playerSpawnEnabled = orig })
+	orig := playerSpawnAllowed()
+	SetPlayerSpawnEnabled(true)
+	t.Cleanup(func() { SetPlayerSpawnEnabled(orig) })
 
 	missing := filepath.Join(t.TempDir(), "gone")
 	p := &AudioPlayer{Volume: 70}

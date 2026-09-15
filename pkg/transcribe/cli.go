@@ -15,16 +15,30 @@ import (
 	"pod/pkg/util"
 )
 
-var extraWhisperModelDirs []string
+// extraWhisperModelDirs is set from configuration at startup and read on every
+// transcription. The guard is there because tests set it too, and a test that
+// does so runs alongside parallel tests that transcribe.
+var (
+	extraWhisperModelDirsMu util.Mutex
+	extraWhisperModelDirs   []string
+)
 
 func SetExtraWhisperModelDirs(dirs []string) {
-	extraWhisperModelDirs = dirs
+	extraWhisperModelDirsMu.Lock()
+	defer extraWhisperModelDirsMu.Unlock()
+	extraWhisperModelDirs = append([]string(nil), dirs...)
+}
+
+func extraWhisperModelDirsValue() []string {
+	extraWhisperModelDirsMu.Lock()
+	defer extraWhisperModelDirsMu.Unlock()
+	return append([]string(nil), extraWhisperModelDirs...)
 }
 
 func GetWhisperModelSearchDirs() []string {
 	var dirs []string
-	if len(extraWhisperModelDirs) > 0 {
-		dirs = append(dirs, extraWhisperModelDirs...)
+	if extra := extraWhisperModelDirsValue(); len(extra) > 0 {
+		dirs = append(dirs, extra...)
 	}
 	dirs = append(dirs, "/media/dockers/whisper/models")
 	if home, err := os.UserHomeDir(); err == nil && home != "" {

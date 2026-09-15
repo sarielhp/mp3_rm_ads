@@ -9,7 +9,6 @@ import (
 )
 
 func TestBuildWhisperCLIArgs(t *testing.T) {
-	t.Parallel()
 	args := BuildWhisperCLIArgs("audio.mp3", "model.bin", "out_base", "en", "prompt text", 4, 4, true)
 	expectedFlags := []string{
 		"-m", "model.bin",
@@ -38,7 +37,6 @@ func TestBuildWhisperCLIArgs(t *testing.T) {
 }
 
 func TestBuildWhisperCLIArgsNotGreedy(t *testing.T) {
-	t.Parallel()
 	args := BuildWhisperCLIArgs("audio.mp3", "model.bin", "out_base", "", "", 0, 0, false)
 	for _, arg := range args {
 		if arg == "-bs" || arg == "-bo" || arg == "-nf" {
@@ -48,7 +46,6 @@ func TestBuildWhisperCLIArgsNotGreedy(t *testing.T) {
 }
 
 func TestParseWhisperCLIJSON(t *testing.T) {
-	t.Parallel()
 	sampleJSON := `{
 		"result": {"language": "en"},
 		"transcription": [
@@ -98,7 +95,6 @@ func TestParseWhisperCLIJSON(t *testing.T) {
 }
 
 func TestParseWhisperCLIJSONInvalid(t *testing.T) {
-	t.Parallel()
 	_, err := ParseWhisperCLIJSON([]byte("not json"))
 	if err == nil {
 		t.Error("expected error for invalid json, got nil")
@@ -106,7 +102,6 @@ func TestParseWhisperCLIJSONInvalid(t *testing.T) {
 }
 
 func TestParseWhisperTimestamp(t *testing.T) {
-	t.Parallel()
 	sec := ParseWhisperTimestamp("01:02:03,500")
 	expected := 3600.0 + 120.0 + 3.0 + 0.5
 	if sec != expected {
@@ -118,7 +113,6 @@ func TestParseWhisperTimestamp(t *testing.T) {
 }
 
 func TestParseWhisperCLITimestampsFallback(t *testing.T) {
-	t.Parallel()
 	sampleJSON := `{
 		"result": {"language": "en"},
 		"transcription": [
@@ -142,7 +136,6 @@ func TestParseWhisperCLITimestampsFallback(t *testing.T) {
 }
 
 func TestResolveWhisperModelPath(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	fakeModel := filepath.Join(tmpDir, "ggml-tiny.en.bin")
 	if err := os.WriteFile(fakeModel, []byte("fake model"), 0644); err != nil {
@@ -180,7 +173,6 @@ func TestResolveWhisperModelPath(t *testing.T) {
 }
 
 func TestRunWhisperCLITranscriptionMock(t *testing.T) {
-	t.Parallel()
 	tmpDir := t.TempDir()
 	modelFile := filepath.Join(tmpDir, "ggml-tiny.en.bin")
 	_ = os.WriteFile(modelFile, []byte("fake model"), 0644)
@@ -236,7 +228,6 @@ exit 0
 }
 
 func TestRunWhisperCLITranscriptionError(t *testing.T) {
-	t.Parallel()
 	profile := types.WhisperProfile{
 		Engine: types.WhisperEngineLocal,
 		Model:  "/nonexistent/model.bin",
@@ -248,7 +239,6 @@ func TestRunWhisperCLITranscriptionError(t *testing.T) {
 }
 
 func TestResolveWhisperCLIBinary(t *testing.T) {
-	t.Parallel()
 	bin := ResolveWhisperCLIBinary("sh")
 	if bin == "" {
 		t.Error("expected to find sh binary")

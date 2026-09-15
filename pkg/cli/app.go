@@ -6,17 +6,34 @@ import (
 	"strings"
 
 	"github.com/sarielhp/clihelp"
+
+	"pod/pkg/util"
 )
 
-var embeddedVersion string
+// embeddedVersion is written once by main before anything else runs, and read
+// whenever a command renders its version. The guard is not for that ordering —
+// it is because tests write it too, and a test that does so runs alongside
+// parallel tests that read it.
+var (
+	embeddedVersionMu util.Mutex
+	embeddedVersion   string
+)
 
 func SetEmbeddedVersion(v string) {
+	embeddedVersionMu.Lock()
+	defer embeddedVersionMu.Unlock()
 	embeddedVersion = v
 }
 
+func embeddedVersionValue() string {
+	embeddedVersionMu.Lock()
+	defer embeddedVersionMu.Unlock()
+	return embeddedVersion
+}
+
 func getVersion() string {
-	if embeddedVersion != "" {
-		return embeddedVersion
+	if v := embeddedVersionValue(); v != "" {
+		return v
 	}
 	if data, err := os.ReadFile("VERSION"); err == nil {
 		return strings.TrimSpace(string(data))

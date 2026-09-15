@@ -36,18 +36,32 @@ var globalPlayer = &AudioPlayer{
 	Volume: 70,
 }
 
-var playerSpawnEnabled = true
+// playerSpawnEnabled gates spawning a real audio process. Tests turn it off,
+// and production code reads it from whatever goroutine is handling playback,
+// so it needs a guard rather than being a bare package variable.
+var (
+	playerSpawnMu      util.Mutex
+	playerSpawnEnabled = true
+)
 
 func GetGlobalPlayer() *AudioPlayer {
 	return globalPlayer
 }
 
 func SetPlayerSpawnEnabled(enabled bool) {
+	playerSpawnMu.Lock()
+	defer playerSpawnMu.Unlock()
 	playerSpawnEnabled = enabled
 }
 
+func playerSpawnAllowed() bool {
+	playerSpawnMu.Lock()
+	defer playerSpawnMu.Unlock()
+	return playerSpawnEnabled
+}
+
 func IsAudioSpawnDisabled() bool {
-	return !playerSpawnEnabled || os.Getenv("ABS_NO_AUDIO") == "1" || os.Getenv("ABS_PLAYER_DISABLED") == "1"
+	return !playerSpawnAllowed() || os.Getenv("ABS_NO_AUDIO") == "1" || os.Getenv("ABS_PLAYER_DISABLED") == "1"
 }
 
 func init() {
