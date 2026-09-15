@@ -21,7 +21,6 @@ func TestParsePodcastGroupKind(t *testing.T) {
 		{"fav", GroupKindFavorites, true},
 		{"favorite", GroupKindFavorites, true},
 		{"favorites", GroupKindFavorites, true},
-		{"not-fab", GroupKindNonFavorites, true},
 		{"not-fav", GroupKindNonFavorites, true},
 		{"non-fav", GroupKindNonFavorites, true},
 		{"non-favorites", GroupKindNonFavorites, true},
@@ -65,10 +64,10 @@ func TestResolvePodcastGroup(t *testing.T) {
 		t.Fatalf("ResolvePodcastGroup(fav) failed: %+v, err=%v", gFav, err)
 	}
 
-	// Group: not-fab
-	gNotFab, err := ResolvePodcastGroup(tempDir, "not-fab")
-	if err != nil || gNotFab.Kind != GroupKindNonFavorites || len(gNotFab.Entries) != 1 || gNotFab.Entries[0].Title != "regular_show" {
-		t.Fatalf("ResolvePodcastGroup(not-fab) failed: %+v, err=%v", gNotFab, err)
+	// Group: not-fav
+	gNotFav, err := ResolvePodcastGroup(tempDir, "not-fav")
+	if err != nil || gNotFav.Kind != GroupKindNonFavorites || len(gNotFav.Entries) != 1 || gNotFav.Entries[0].Title != "regular_show" {
+		t.Fatalf("ResolvePodcastGroup(not-fav) failed: %+v, err=%v", gNotFav, err)
 	}
 
 	// Single: by phrase

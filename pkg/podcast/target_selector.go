@@ -25,7 +25,7 @@ func ParsePodcastGroupKind(query string) (PodcastGroupKind, bool) {
 		return GroupKindAll, true
 	case "fav", "favs", "favorite", "favorites":
 		return GroupKindFavorites, true
-	case "not-fab", "not-fav", "not-favs", "not-favorite", "not-favorites",
+	case "not-fav", "not-favs", "not-favorite", "not-favorites",
 		"non-fav", "non-favs", "non-favorite", "non-favorites", "unfav":
 		return GroupKindNonFavorites, true
 	default:

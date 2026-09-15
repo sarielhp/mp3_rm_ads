@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pod/pkg/backend"
+	"pod/pkg/pipeline"
 	"pod/pkg/util"
 )
 
@@ -292,6 +293,7 @@ func (b *StandaloneBackend) DownloadEpisodes(podcastID string, episodes []backen
 		if err := b.downloader.DownloadEpisode(context.Background(), encURL, destPath, b.cfg.Quiet); err != nil {
 			return fmt.Errorf("download %s: %w", ep.Title, err)
 		}
+		initDownloadedEpisodeStatus(destPath, fn, ep, pubTime)
 	}
 	sub := Subscription{
 		ID:       p.ID,
@@ -303,6 +305,20 @@ func (b *StandaloneBackend) DownloadEpisodes(podcastID string, episodes []backen
 	_ = WritePodcastFeedXML(p.Path, sub, b.cfg.ServerBaseURL, nil)
 	_ = WritePodcastWebpage(p.Path, sub, b.cfg.ServerBaseURL, nil)
 	return nil
+}
+
+func initDownloadedEpisodeStatus(audioPath, filename string, ep backend.FeedEpisode, pubTime time.Time) {
+	st := pipeline.GetOrCreateEpisodeStatus(audioPath)
+	if st != nil {
+		if !pubTime.IsZero() {
+			st.PublishedAt = pubTime.UTC().Format(time.RFC3339)
+			st.PublicationSource = "feed"
+		}
+		if st.MediaFile == "" {
+			st.MediaFile = filename
+		}
+		_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(audioPath), st)
+	}
 }
 
 func (b *StandaloneBackend) DeletePodcastEpisode(podcastID, episodeID string) error {
