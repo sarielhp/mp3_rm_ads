@@ -27,7 +27,7 @@ func getVersion() string {
 			return strings.TrimSpace(string(data))
 		}
 	}
-	return "0.2.72"
+	return "dev"
 }
 
 func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {

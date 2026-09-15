@@ -23,10 +23,6 @@ func Execute(args []string) int {
 	}
 	_, _ = config.EnsureConfigExists()
 	appCfg := loadConfig()
-	if err := preparePublicationSource(action, appCfg, cli); err != nil {
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
-		return 1
-	}
 	if !cli.DryRun {
 		root := appCfg.PodcastsDir
 		if cli.PodcastsDir != "" {
