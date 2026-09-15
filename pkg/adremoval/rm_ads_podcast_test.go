@@ -437,14 +437,14 @@ func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
 
 	go func() {
 		time.Sleep(100 * time.Millisecond)
-		relPath := filepath.Join("Remote Show", "Ep 1.mp3")
+		relPath := filepath.Join("Remote Show", epFilename)
 		remEpPath := filepath.Join(remoteWorkDir, relPath)
 		_ = os.MkdirAll(filepath.Dir(remEpPath), 0755)
 		_ = os.WriteFile(remEpPath, []byte("cleaned remote audio"), 0644)
 		_ = os.WriteFile(strings.TrimSuffix(remEpPath, filepath.Ext(remEpPath))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644)
 		remStat := pipeline.StatusPathFor(remEpPath)
 		_ = pipeline.SaveEpisodeStatus(remStat, &types.EpisodeStatusFile{
-			MediaFile: "Ep 1.mp3",
+			MediaFile: epFilename,
 			Status:    types.StateReadyForCopyBack,
 			Original:  types.EpisodeAudioMeta{DurationSec: 100},
 			Cleaned:   types.EpisodeAudioMeta{DurationSec: 80},

@@ -494,6 +494,8 @@ func selectSubEpisodesToDownload(podDir string, feedEps []backend.FeedEpisode, s
 	for _, f := range util.FindMP3Files(podDir) {
 		name := strings.ToLower(strings.TrimSuffix(filepath.Base(f), ".mp3"))
 		existingFiles[name] = true
+		stripped := strings.ToLower(podcast.StripEpisodeFilenamePrefix(name))
+		existingFiles[stripped] = true
 	}
 
 	podCfg := config.LoadPodcastConfig(podDir, config.DefaultPodcastConfig(&cfg))
@@ -509,7 +511,13 @@ func selectSubEpisodesToDownload(podDir string, feedEps []backend.FeedEpisode, s
 	isDownloaded := func(ep backend.FeedEpisode) bool {
 		safeStem := strings.ToLower(podcast.SanitizeTitle(ep.Title))
 		rawStem := strings.ToLower(strings.TrimSpace(ep.Title))
-		return existingFiles[safeStem] || existingFiles[rawStem]
+		pubMs := podcast.GetPubMS(ep)
+		var pubTime time.Time
+		if pubMs > 0 {
+			pubTime = time.UnixMilli(pubMs).UTC()
+		}
+		formatted := strings.ToLower(strings.TrimSuffix(podcast.FormatEpisodeFilename(pubTime, ep.Episode, ep.Title), ".mp3"))
+		return existingFiles[formatted] || existingFiles[safeStem] || existingFiles[rawStem]
 	}
 
 	sortedCatalog := make([]backend.FeedEpisode, len(feedEps))
@@ -576,8 +584,12 @@ func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backe
 		return fmt.Errorf("no enclosure URL found")
 	}
 
-	safeTitle := podcast.SanitizeTitle(ep.Title)
-	fn := safeTitle + ".mp3"
+	pubMs := podcast.GetPubMS(ep)
+	var pubTime time.Time
+	if pubMs > 0 {
+		pubTime = time.UnixMilli(pubMs).UTC()
+	}
+	fn := podcast.FormatEpisodeFilename(pubTime, ep.Episode, ep.Title)
 	destPath := filepath.Join(podDir, fn)
 
 	if !quiet {

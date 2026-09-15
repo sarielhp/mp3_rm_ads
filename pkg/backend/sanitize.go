@@ -2,36 +2,53 @@ package backend
 
 import (
 	"strings"
+	"unicode"
 )
 
 func sanitizePodcastName(s string) string {
-	cleaned := strings.Map(func(r rune) rune {
-		if r == '/' || r == '\\' || r == ':' || r == '*' || r == '?' || r == '"' || r == '<' || r == '>' || r == '|' {
-			return '_'
-		}
-		return r
-	}, s)
-	cleaned = strings.TrimSpace(cleaned)
-	if cleaned == "" || cleaned == ".." || cleaned == "." || strings.Trim(cleaned, ".") == "" || strings.HasPrefix(cleaned, "../") || strings.HasPrefix(cleaned, ".._") {
+	res := SanitizePodcastTitle(s)
+	if res == "untitled" {
 		return "podcast_escaped"
 	}
-	return cleaned
+	return res
 }
 
 func SanitizePodcastTitle(title string) string {
 	title = strings.TrimSpace(title)
 	if title == "" {
-		return "Untitled Podcast"
+		return "untitled"
 	}
-	badChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
-	for _, c := range badChars {
-		title = strings.ReplaceAll(title, c, "_")
+	for _, q := range []string{"'", "\"", "`", "’", "‘", "“", "”"} {
+		title = strings.ReplaceAll(title, q, "")
 	}
-	title = strings.TrimSpace(title)
-	if title == "" || title == ".." || title == "." || strings.Trim(title, ".") == "" || strings.HasPrefix(title, "../") || strings.HasPrefix(title, ".._") {
-		return "Untitled Podcast"
+
+	var sb strings.Builder
+	lastUnderscore := false
+
+	for _, r := range title {
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			sb.WriteRune(r)
+			lastUnderscore = false
+		} else {
+			if !lastUnderscore && sb.Len() > 0 {
+				sb.WriteRune('_')
+				lastUnderscore = true
+			}
+		}
 	}
-	return title
+
+	res := strings.Trim(sb.String(), "_")
+	if res == "" || res == ".." || res == "." {
+		return "untitled"
+	}
+	runes := []rune(res)
+	if len(runes) > 120 {
+		res = strings.Trim(string(runes[:120]), "_")
+	}
+	if res == "" {
+		return "untitled"
+	}
+	return res
 }
 
 func StripHTML(s string) string {

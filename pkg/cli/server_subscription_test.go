@@ -41,7 +41,7 @@ func TestServerSubscriptionCommands(t *testing.T) {
 		t.Fatalf("handleServerFeed failed: %v", err)
 	}
 
-	feedPath := filepath.Join(podcastsDir, "Test Podcast", "feed.xml")
+	feedPath := filepath.Join(podcastsDir, podcast.SanitizeTitle("Test Podcast"), "feed.xml")
 	if _, err := os.Stat(feedPath); err != nil {
 		t.Fatalf("expected feed.xml at %s: %v", feedPath, err)
 	}

@@ -340,17 +340,27 @@ func findLocalPathForFeedEpisode(podDir string, fe backend.FeedEpisode, item *ba
 	podBase := filepath.Base(podDir)
 	safeTitle := podcast.SanitizeTitle(fe.Title)
 	feStripped := stripShowPrefix(fe.Title, podBase)
+	pubMs := podcast.GetPubMS(fe)
+	var pubTime time.Time
+	if pubMs > 0 {
+		pubTime = time.UnixMilli(pubMs).UTC()
+	}
+	targetStem := strings.ToLower(util.StripExt(podcast.FormatEpisodeFilename(pubTime, fe.Episode, fe.Title)))
 	for _, mp3 := range util.FindMP3Files(podDir) {
 		base := util.StripExt(filepath.Base(mp3))
+		strippedBase := podcast.StripEpisodeFilenamePrefix(base)
 		title := podcast.EpisodeTitleFromPath(mp3)
 		baseStripped := stripShowPrefix(base, podBase)
 		titleStripped := stripShowPrefix(title, podBase)
-		if strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
+		if strings.EqualFold(base, targetStem) ||
+			strings.EqualFold(base, safeTitle) || strings.EqualFold(base, fe.Title) ||
+			strings.EqualFold(strippedBase, safeTitle) ||
 			strings.EqualFold(title, safeTitle) || strings.EqualFold(title, fe.Title) ||
 			strings.EqualFold(podcast.SanitizeTitle(title), safeTitle) ||
 			strings.EqualFold(baseStripped, feStripped) ||
 			strings.EqualFold(titleStripped, feStripped) ||
 			isFuzzyEpisodeMatch(title, fe.Title) ||
+			isFuzzyEpisodeMatch(strippedBase, fe.Title) ||
 			isFuzzyEpisodeMatch(titleStripped, feStripped) {
 			return mp3, true
 		}

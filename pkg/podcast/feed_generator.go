@@ -115,7 +115,16 @@ func buildFeedEpisodeLookup(eps []backend.FeedEpisode) map[string]backend.FeedEp
 		titleKey := strings.ToLower(strings.TrimSpace(ep.Title))
 		if titleKey != "" {
 			m[titleKey] = ep
-			m[strings.ToLower(SanitizeTitle(ep.Title))] = ep
+			sanitized := strings.ToLower(SanitizeTitle(ep.Title))
+			m[sanitized] = ep
+			pubMs := GetPubMS(ep)
+			var pubTime time.Time
+			if pubMs > 0 {
+				pubTime = time.UnixMilli(pubMs).UTC()
+			}
+			fn := strings.ToLower(FormatEpisodeFilename(pubTime, ep.Episode, ep.Title))
+			m[fn] = ep
+			m[strings.TrimSuffix(fn, ".mp3")] = ep
 		}
 		if ep.GUID != "" {
 			m[ep.GUID] = ep
@@ -138,6 +147,18 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 	if !hasMatch {
 		matched, hasMatch = feedMap[strings.ToLower(strings.TrimSpace(title))]
 	}
+	if !hasMatch {
+		baseStem := strings.ToLower(util.StripExt(filepath.Base(path)))
+		matched, hasMatch = feedMap[baseStem]
+	}
+	if !hasMatch {
+		stripped := strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(title)))
+		matched, hasMatch = feedMap[stripped]
+	}
+	if !hasMatch {
+		strippedBase := strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(util.StripExt(filepath.Base(path)))))
+		matched, hasMatch = feedMap[strippedBase]
+	}
 
 	guid := ""
 	pubDateStr := ""
@@ -150,6 +171,9 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 		pubMs = GetPubMS(matched)
 		desc = matched.Description
 		durSec = matched.DurationSeconds
+		if matched.Title != "" {
+			title = matched.Title
+		}
 	}
 	if guid == "" {
 		h := sha256.Sum256([]byte(relPath))

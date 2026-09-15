@@ -282,8 +282,13 @@ func (b *StandaloneBackend) DownloadEpisodes(podcastID string, episodes []backen
 		if encURL == "" {
 			continue
 		}
-		safeTitle := SanitizeTitle(ep.Title)
-		destPath := filepath.Join(p.Path, safeTitle+".mp3")
+		pubMs := GetPubMS(ep)
+		var pubTime time.Time
+		if pubMs > 0 {
+			pubTime = time.UnixMilli(pubMs).UTC()
+		}
+		fn := FormatEpisodeFilename(pubTime, ep.Episode, ep.Title)
+		destPath := filepath.Join(p.Path, fn)
 		if err := b.downloader.DownloadEpisode(context.Background(), encURL, destPath, b.cfg.Quiet); err != nil {
 			return fmt.Errorf("download %s: %w", ep.Title, err)
 		}

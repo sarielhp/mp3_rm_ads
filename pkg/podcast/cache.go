@@ -267,6 +267,9 @@ func parseFeedXMLDates(data []byte) map[string]time.Time {
 		if titleKey != "" {
 			m[titleKey] = t
 			m[strings.ToLower(SanitizeTitle(title))] = t
+			fn := strings.ToLower(FormatEpisodeFilename(t, "", title))
+			m[fn] = t
+			m[strings.TrimSuffix(fn, ".mp3")] = t
 		}
 		if it.Enclosure.URL != "" {
 			uBase := strings.ToLower(strings.TrimSpace(filepath.Base(it.Enclosure.URL)))
@@ -308,6 +311,7 @@ func lookupFeedXMLPublicationTime(dir, filePath string) time.Time {
 	baseName := filepath.Base(filePath)
 	cleanStem := strings.ToLower(strings.TrimSpace(util.StripExt(baseName)))
 	cleanTitle := strings.ToLower(strings.TrimSpace(EpisodeTitleFromPath(filePath)))
+	strippedStem := strings.ToLower(StripEpisodeFilenamePrefix(cleanStem))
 
 	if t, ok := dates[cleanStem]; ok && !t.IsZero() {
 		return t
@@ -316,6 +320,12 @@ func lookupFeedXMLPublicationTime(dir, filePath string) time.Time {
 		return t
 	}
 	if t, ok := dates[strings.ToLower(SanitizeTitle(cleanTitle))]; ok && !t.IsZero() {
+		return t
+	}
+	if t, ok := dates[strippedStem]; ok && !t.IsZero() {
+		return t
+	}
+	if t, ok := dates[strings.ToLower(SanitizeTitle(strippedStem))]; ok && !t.IsZero() {
 		return t
 	}
 	return time.Time{}

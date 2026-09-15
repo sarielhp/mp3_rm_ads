@@ -44,20 +44,3 @@ func FilterByAdRemovalPolicy(files []string, dir string, cfg config.PodcastConfi
 	}
 	return []string{list[0].path}
 }
-
-// SanitizeTitle turns an episode or podcast title into a safe filename stem.
-func SanitizeTitle(title string) string {
-	title = strings.TrimSpace(title)
-	if title == "" {
-		return "Untitled Podcast"
-	}
-	badChars := []string{"/", "\\", ":", "*", "?", "\"", "<", ">", "|", "\n", "\r", "\t"}
-	for _, c := range badChars {
-		title = strings.ReplaceAll(title, c, "_")
-	}
-	title = strings.TrimSpace(title)
-	if title == "" || title == ".." || title == "." || strings.Trim(title, ".") == "" || strings.HasPrefix(title, "../") || strings.HasPrefix(title, ".._") {
-		return "Untitled Podcast"
-	}
-	return title
-}
