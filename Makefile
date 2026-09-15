@@ -70,8 +70,8 @@ push: bump
 install: build
 	@install -d "$$HOME/bin"
 	@install -m 755 pod "$$HOME/bin/pod"
-	@ln -sf pod "$$HOME/bin/abs"
-	@echo "Installed to $$HOME/bin/pod (with $$HOME/bin/abs symlink)"
+	@rm -f "$$HOME/bin/abs"
+	@echo "Installed to $$HOME/bin/pod"
 
 ci: check
 snapshot:

@@ -12,7 +12,7 @@
 
 | Script | Purpose |
 |--------|---------|
-| `tools/build_local` | Build local `./pod` binary (with `./abs` symlink) strictly within repo directory |
+| `tools/build_local` | Build local `./pod` binary strictly within repo directory |
 | `tools/check` | Full quality gate: format → tidy → vet → staticcheck → test → build |
 | `tools/format.sh` | Run `gofmt -s -w .` only |
 | `tools/lint` | Static analysis: `go vet` + `staticcheck` (respecting baseline) + `tools/audit_lines` |
@@ -252,7 +252,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
     or `go list -m -u <pkg>`) and upgrade with `go get <pkg>@latest`.
 11. **No CLI Aliases**: Avoid defining command or subcommand aliases in CLI apps (`clihelp`). Each command and subcommand must have a single canonical name to maintain clarity, prevent command-space collisions, and keep documentation consistent.
-12. **Local Build Isolation**: All local Go builds must be executed using `./tools/build_local` (or `make build`). The build script must generate a local binary (`./abs`) within this repository directory and must NEVER write into or modify directories outside this repository.
+12. **Local Build Isolation**: All local Go builds must be executed using `./tools/build_local` (or `make build`). The build script must generate a local binary (`./pod`) within this repository directory and must NEVER write into or modify directories outside this repository.
 
 ## Test Suite
 

@@ -31,8 +31,7 @@ end
 begin
   File.chmod(0755, target_binary)
   FileUtils.rm_f(legacy_binary)
-  FileUtils.ln_s("pod", legacy_binary)
 rescue Errno::EROFS, Errno::EPERM
   # Ignored in read-only / restricted sandbox
 end
-puts "Built ./pod successfully (and created ./abs compatibility symlink)."
+puts "Built ./pod successfully."
