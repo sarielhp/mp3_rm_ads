@@ -31,7 +31,7 @@ func TestPublicationDatesRepairAndUnknown(t *testing.T) {
 		t.Fatal("trusted a legacy file timestamp")
 	}
 	date := time.Date(2026, 9, 9, 9, 0, 0, 0, time.UTC)
-	cache := &CachedPodcastIndex{Episodes: []CachedEpisodeSummary{{Path: first, PublishedAt: 1}, {Path: second, PublishedAt: 1}}}
+	cache := &CachedPodcastIndex{Episodes: []CachedEpisodeSummary{{EpisodeFile: EpisodeFile{Path: first, PublishedAt: 1}}, {EpisodeFile: EpisodeFile{Path: second, PublishedAt: 1}}}}
 	if err := SavePodcastCache(dir, cache); err != nil {
 		t.Fatal(err)
 	}

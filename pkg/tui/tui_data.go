@@ -125,7 +125,7 @@ func loadSingleTUIEpisode(mp3 string, cachedByPath, cachedByName map[string]podc
 func applyCachedSummaryToEpisode(ep *tuiEpisode, ce podcast.CachedEpisodeSummary) {
 	ep.title = ce.Title
 	ep.publishedAt = ce.PublishedAt
-	ep.duration = ce.Duration
+	ep.duration = ce.DurationSec
 	ep.season = ce.Season
 	ep.episode = ce.Episode
 	if ce.HasTranscript {
@@ -222,12 +222,14 @@ func buildCachedEpisodeSummary(ep tuiEpisode, podDir string, podABSData *backend
 	}
 
 	return podcast.CachedEpisodeSummary{
-		Path:          absPath,
-		Filename:      ep.filename,
-		Title:         title,
-		PublishedAt:   pubAt,
-		Duration:      dur,
-		FileSize:      ep.fileSize,
+		EpisodeFile: podcast.EpisodeFile{
+			Path:        absPath,
+			Filename:    ep.filename,
+			Title:       title,
+			PublishedAt: pubAt,
+			DurationSec: dur,
+			SizeBytes:   ep.fileSize,
+		},
 		Season:        season,
 		Episode:       episode,
 		HasAdsRemoved: ep.hasAdsRemoved,

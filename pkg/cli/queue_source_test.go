@@ -40,7 +40,7 @@ func TestQueueTodayStandalone(t *testing.T) {
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
 	}
-	cached := []podcast.CachedEpisodeSummary{{Path: path, Filename: "today.mp3", PublishedAt: now.UnixMilli()}}
+	cached := []podcast.CachedEpisodeSummary{{EpisodeFile: podcast.EpisodeFile{Path: path, Filename: "today.mp3", PublishedAt: now.UnixMilli()}}}
 	if err := podcast.SavePodcastCache(dir, &podcast.CachedPodcastIndex{Episodes: cached}); err != nil {
 		t.Fatal(err)
 	}

@@ -15,14 +15,9 @@ import (
 )
 
 type LocalEpisodeMeta struct {
-	Path        string
-	Filename    string
-	Title       string
+	EpisodeFile
 	GUID        string
 	PubDate     string
-	PublishedAt int64
-	DurationSec float64
-	SizeBytes   int64
 	Description string
 }
 
@@ -76,6 +71,26 @@ func buildFeedEpisodeLookup(eps []backend.FeedEpisode) map[string]backend.FeedEp
 	return m
 }
 
+// lookupFeedEpisode finds the feed entry for a downloaded file by trying the
+// title and the file stem in turn, each both as-is and with the date prefix
+// that FormatEpisodeFilename adds stripped off. The order is significant: the
+// first key that hits wins, and the later keys are progressively lossier.
+func lookupFeedEpisode(path, title string, feedMap map[string]backend.FeedEpisode) (backend.FeedEpisode, bool) {
+	stem := util.StripExt(filepath.Base(path))
+	for _, key := range []string{
+		strings.ToLower(SanitizeTitle(title)),
+		strings.ToLower(strings.TrimSpace(title)),
+		strings.ToLower(stem),
+		strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(title))),
+		strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(stem))),
+	} {
+		if ep, ok := feedMap[key]; ok {
+			return ep, true
+		}
+	}
+	return backend.FeedEpisode{}, false
+}
+
 func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]backend.FeedEpisode) LocalEpisodeMeta {
 	relPath := filepath.Base(path)
 	if podDir != "" {
@@ -85,23 +100,7 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 	}
 	fn := relPath
 	title := EpisodeTitleFromPath(path)
-	cleanKey := strings.ToLower(SanitizeTitle(title))
-	matched, hasMatch := feedMap[cleanKey]
-	if !hasMatch {
-		matched, hasMatch = feedMap[strings.ToLower(strings.TrimSpace(title))]
-	}
-	if !hasMatch {
-		baseStem := strings.ToLower(util.StripExt(filepath.Base(path)))
-		matched, hasMatch = feedMap[baseStem]
-	}
-	if !hasMatch {
-		stripped := strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(title)))
-		matched, hasMatch = feedMap[stripped]
-	}
-	if !hasMatch {
-		strippedBase := strings.ToLower(SanitizeTitle(StripEpisodeFilenamePrefix(util.StripExt(filepath.Base(path)))))
-		matched, hasMatch = feedMap[strippedBase]
-	}
+	matched, hasMatch := lookupFeedEpisode(path, title, feedMap)
 
 	guid := ""
 	pubDateStr := ""
@@ -144,14 +143,16 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 	}
 
 	return LocalEpisodeMeta{
-		Path:        path,
-		Filename:    fn,
-		Title:       title,
+		EpisodeFile: EpisodeFile{
+			Path:        path,
+			Filename:    fn,
+			Title:       title,
+			PublishedAt: pubMs,
+			DurationSec: durSec,
+			SizeBytes:   fi.Size(),
+		},
 		GUID:        guid,
 		PubDate:     pubDateStr,
-		PublishedAt: pubMs,
-		DurationSec: durSec,
-		SizeBytes:   fi.Size(),
 		Description: desc,
 	}
 }

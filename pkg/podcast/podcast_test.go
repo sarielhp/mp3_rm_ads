@@ -232,7 +232,7 @@ func TestPodcastCache(t *testing.T) {
 		PodcastName: "Test Podcast",
 		PodcastDir:  podDir,
 		Episodes: []CachedEpisodeSummary{
-			{Title: "Ep 1", Filename: "ep1.mp3"},
+			{EpisodeFile: EpisodeFile{Title: "Ep 1", Filename: "ep1.mp3"}},
 		},
 	}
 

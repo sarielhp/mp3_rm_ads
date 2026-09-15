@@ -29,8 +29,8 @@ func TestQueueDisplayContinuesPastAmbiguousEntries(t *testing.T) {
 	date := time.Date(2026, 9, 10, 12, 34, 0, 0, time.UTC)
 	title := "A meaningful episode title that is long enough to require shortening in the queue table"
 	cache := &podcast.CachedPodcastIndex{Episodes: []podcast.CachedEpisodeSummary{
-		{Path: "first/podcast.mp3", ID: "e12345", Title: title, Duration: 1234, PublishedAt: date.UnixMilli()},
-		{Path: "second/podcast.mp3", ID: "e54321", Title: "Different episode", Duration: 55},
+		{ID: "e12345", EpisodeFile: podcast.EpisodeFile{Path: "first/podcast.mp3", Title: title, DurationSec: 1234, PublishedAt: date.UnixMilli()}},
+		{ID: "e54321", EpisodeFile: podcast.EpisodeFile{Path: "second/podcast.mp3", Title: "Different episode", DurationSec: 55}},
 	}}
 	if err := podcast.SavePodcastCache(dir, cache); err != nil {
 		t.Fatal(err)

@@ -61,7 +61,7 @@ func populateQueueEpisodeDetails(item *queueEpisodeItem, ep podcast.CachedEpisod
 	if item.Title == "" {
 		item.Title = podcast.EpisodeTitleFromPath(item.AudioPath)
 	}
-	item.DurationSec = ep.Duration
+	item.DurationSec = ep.DurationSec
 	if ep.PublishedAt > 0 {
 		item.PublishedAt = time.UnixMilli(ep.PublishedAt).Format(time.RFC3339)
 	}

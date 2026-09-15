@@ -19,11 +19,13 @@ func TestGeneratePodcastWebpage(t *testing.T) {
 
 	episodes := []LocalEpisodeMeta{
 		{
-			Path:        filepath.Join(podDir, "Episode 1.mp3"),
-			Filename:    "Episode 1.mp3",
-			Title:       "Episode 1: The Beginning",
-			DurationSec: 3600,
-			SizeBytes:   50000000,
+			EpisodeFile: EpisodeFile{
+				Path:        filepath.Join(podDir, "Episode 1.mp3"),
+				Filename:    "Episode 1.mp3",
+				Title:       "Episode 1: The Beginning",
+				DurationSec: 3600,
+				SizeBytes:   50000000,
+			},
 			PubDate:     "Mon, 01 Jan 2026 12:00:00 +0000",
 			Description: "First episode of the show.",
 		},

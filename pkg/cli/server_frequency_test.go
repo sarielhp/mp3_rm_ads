@@ -30,8 +30,10 @@ func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
 	baseH := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := 0; i < 15; i++ {
 		hourlyEpisodes = append(hourlyEpisodes, podcast.CachedEpisodeSummary{
-			Title:       fmt.Sprintf("H %d", i),
-			PublishedAt: baseH.Add(time.Duration(i) * time.Hour).UnixMilli(),
+			EpisodeFile: podcast.EpisodeFile{
+				Title:       fmt.Sprintf("H %d", i),
+				PublishedAt: baseH.Add(time.Duration(i) * time.Hour).UnixMilli(),
+			},
 		})
 	}
 	_ = podcast.SavePodcastCache(hourlyDir, &podcast.CachedPodcastIndex{
@@ -52,8 +54,10 @@ func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
 	baseD := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := 0; i < 15; i++ {
 		dailyEpisodes = append(dailyEpisodes, podcast.CachedEpisodeSummary{
-			Title:       fmt.Sprintf("D %d", i),
-			PublishedAt: baseD.Add(time.Duration(i) * 24 * time.Hour).UnixMilli(),
+			EpisodeFile: podcast.EpisodeFile{
+				Title:       fmt.Sprintf("D %d", i),
+				PublishedAt: baseD.Add(time.Duration(i) * 24 * time.Hour).UnixMilli(),
+			},
 		})
 	}
 	_ = podcast.SavePodcastCache(dailyDir, &podcast.CachedPodcastIndex{
@@ -115,8 +119,10 @@ func TestHandleServerDisableHourly(t *testing.T) {
 	baseH := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	for i := 0; i < 12; i++ {
 		hourlyEpisodes = append(hourlyEpisodes, podcast.CachedEpisodeSummary{
-			Title:       fmt.Sprintf("News %d", i),
-			PublishedAt: baseH.Add(time.Duration(i) * time.Hour).UnixMilli(),
+			EpisodeFile: podcast.EpisodeFile{
+				Title:       fmt.Sprintf("News %d", i),
+				PublishedAt: baseH.Add(time.Duration(i) * time.Hour).UnixMilli(),
+			},
 		})
 	}
 	_ = podcast.SavePodcastCache(hourlyDir, &podcast.CachedPodcastIndex{

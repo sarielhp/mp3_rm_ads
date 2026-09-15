@@ -16,19 +16,36 @@ import (
 	"pod/pkg/util"
 )
 
+// EpisodeFile is what every representation of a downloaded episode agrees on:
+// where the audio is, what it is called, when it was published, how long it
+// runs and how large it is. Types that describe an episode embed it rather
+// than restating it, so these six fields and their JSON names are defined once.
+//
+// It is deliberately not a universal Episode type. The representations that
+// embed it differ in what they add — cache bookkeeping, feed metadata, display
+// state — and flattening those into one struct would produce a thirty-field
+// record where most fields are meaningless for most callers.
+type EpisodeFile struct {
+	Path        string  `json:"path"`
+	Filename    string  `json:"filename"`
+	Title       string  `json:"title"`
+	PublishedAt int64   `json:"published_at"`
+	DurationSec float64 `json:"duration"`
+	SizeBytes   int64   `json:"file_size"`
+}
+
 type CachedEpisodeSummary struct {
-	ID            string  `json:"id,omitempty"`
-	Path          string  `json:"path"`
-	Filename      string  `json:"filename"`
-	Title         string  `json:"title"`
-	PublishedAt   int64   `json:"published_at"`
-	Duration      float64 `json:"duration"`
-	FileSize      int64   `json:"file_size"`
-	Season        string  `json:"season,omitempty"`
-	Episode       string  `json:"episode,omitempty"`
-	HasAdsRemoved bool    `json:"has_ads_removed"`
-	HasTranscript bool    `json:"has_transcript,omitempty"`
-	Favorite      bool    `json:"favorite,omitempty"`
+	// ID is only ever read, never written: it carries the episode short ID
+	// that older versions of pod stored here, and episodeShortID still falls
+	// back to it when resolving an episode from a cache written back then.
+	ID string `json:"id,omitempty"`
+
+	EpisodeFile
+
+	Season        string `json:"season,omitempty"`
+	Episode       string `json:"episode,omitempty"`
+	HasAdsRemoved bool   `json:"has_ads_removed"`
+	HasTranscript bool   `json:"has_transcript,omitempty"`
 }
 
 type CachedPodcastIndex struct {

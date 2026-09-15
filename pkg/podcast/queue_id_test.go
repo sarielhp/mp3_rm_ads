@@ -18,7 +18,7 @@ func TestEpisodeIDsDistinguishCachedNestedPaths(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	cache := &CachedPodcastIndex{Episodes: []CachedEpisodeSummary{{Path: a, Filename: "podcast.mp3", ID: "e12345"}}}
+	cache := &CachedPodcastIndex{Episodes: []CachedEpisodeSummary{{ID: "e12345", EpisodeFile: EpisodeFile{Path: a, Filename: "podcast.mp3"}}}}
 	if err := SavePodcastCache(dir, cache); err != nil {
 		t.Fatal(err)
 	}

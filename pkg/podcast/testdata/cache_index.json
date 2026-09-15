@@ -1,0 +1,33 @@
+{
+  "podcast_name": "Show \u0026 Co",
+  "podcast_dir": "/lib/Show",
+  "abs_item_id": "abs-1",
+  "author": "An Author",
+  "description": "Desc",
+  "feed_url": "https://e.com/f.xml",
+  "cover_path": "/lib/Show/cover.jpg",
+  "updated_at": "2023-11-14T22:13:20Z",
+  "episodes": [
+    {
+      "path": "/lib/Show/a.mp3",
+      "filename": "a.mp3",
+      "title": "Ep A",
+      "published_at": 1600000000000,
+      "duration": 1234.5,
+      "file_size": 999,
+      "season": "1",
+      "episode": "2",
+      "has_ads_removed": true,
+      "has_transcript": true
+    },
+    {
+      "path": "/lib/Show/b.mp3",
+      "filename": "b.mp3",
+      "title": "",
+      "published_at": 0,
+      "duration": 0,
+      "file_size": 0,
+      "has_ads_removed": false
+    }
+  ]
+}

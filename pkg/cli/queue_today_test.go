@@ -34,12 +34,12 @@ func TestQueueTodaySelection(t *testing.T) {
 	}
 	markEpisodeClean(t, paths[5])
 	index := &podcast.CachedPodcastIndex{Episodes: []podcast.CachedEpisodeSummary{
-		{Filename: filepath.Base(paths[6]), PublishedAt: now.UnixMilli()},
-		{Filename: "unknown extended.mp3", PublishedAt: now.UnixMilli()},
+		{EpisodeFile: podcast.EpisodeFile{Filename: filepath.Base(paths[6]), PublishedAt: now.UnixMilli()}},
+		{EpisodeFile: podcast.EpisodeFile{Filename: "unknown extended.mp3", PublishedAt: now.UnixMilli()}},
 	}}
 	for i, date := range dates[:6] {
 		if published, err := time.Parse(time.RFC3339, date); err == nil {
-			index.Episodes = append(index.Episodes, podcast.CachedEpisodeSummary{Path: paths[i], PublishedAt: published.UnixMilli()})
+			index.Episodes = append(index.Episodes, podcast.CachedEpisodeSummary{EpisodeFile: podcast.EpisodeFile{Path: paths[i], PublishedAt: published.UnixMilli()}})
 		}
 	}
 	if err := podcast.SavePodcastCache(dir, index); err != nil {
@@ -89,8 +89,8 @@ func TestQueueTodayRequiresSourcePublicationDate(t *testing.T) {
 		}
 	}
 	cache := &podcast.CachedPodcastIndex{Episodes: []podcast.CachedEpisodeSummary{
-		{Path: paths[0], PublishedAt: now.AddDate(0, 0, -5).UnixMilli()},
-		{Path: paths[1], PublishedAt: now.UnixMilli()},
+		{EpisodeFile: podcast.EpisodeFile{Path: paths[0], PublishedAt: now.AddDate(0, 0, -5).UnixMilli()}},
+		{EpisodeFile: podcast.EpisodeFile{Path: paths[1], PublishedAt: now.UnixMilli()}},
 	}}
 	if err := podcast.SavePodcastCache(dir, cache); err != nil {
 		t.Fatal(err)
@@ -159,7 +159,11 @@ func TestQueueTodayNestedEpisodesResolveForRun(t *testing.T) {
 			date = now.AddDate(0, 0, -1)
 		}
 		episodes = append(episodes, podcast.CachedEpisodeSummary{
-			Path: path, Filename: "podcast.mp3", PublishedAt: date.UnixMilli(),
+			EpisodeFile: podcast.EpisodeFile{
+				Path:        path,
+				Filename:    "podcast.mp3",
+				PublishedAt: date.UnixMilli(),
+			},
 		})
 	}
 	if err := podcast.SavePodcastCache(dir, &podcast.CachedPodcastIndex{Episodes: episodes}); err != nil {
