@@ -8,6 +8,7 @@ import (
 )
 
 func TestPodFetchLoginAndTestConnection(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.Header.Get("Authorization") == "Bearer my-api-key" || r.Header.Get("x-api-key") == "my-api-key" {
 			w.WriteHeader(http.StatusOK)
@@ -88,6 +89,7 @@ func setupMockPodFetchServer() *httptest.Server {
 }
 
 func TestPodFetchLibrariesAndPodcasts(t *testing.T) {
+	t.Parallel()
 	srv := setupMockPodFetchServer()
 	defer srv.Close()
 

@@ -14,6 +14,7 @@ import (
 // SanitizeTitle, which strips a title to letters and digits, would turn
 // "Ep. 5: The Long Now" into a different directory name entirely.
 func TestPathSafeTitleReplacesOnlyIllegalCharacters(t *testing.T) {
+	t.Parallel()
 	cases := map[string]string{
 		"Ep. 5: The Long Now": "Ep. 5_ The Long Now",
 		"A/B Testing":         "A_B Testing",
@@ -34,6 +35,7 @@ func TestPathSafeTitleReplacesOnlyIllegalCharacters(t *testing.T) {
 }
 
 func TestAnalyzeFrequenciesRecordsCadenceInPodcastConfig(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "Show")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -81,6 +83,7 @@ func TestAnalyzeFrequenciesRecordsCadenceInPodcastConfig(t *testing.T) {
 // run is read-only apart from recording cadence where there is already a home
 // for it.
 func TestAnalyzeFrequenciesDoesNotCreateDirectoriesByDefault(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	item := backend.Podcast{ID: "p1"}
 	item.Media.Metadata.Title = "Nowhere Show"
@@ -101,6 +104,7 @@ func TestAnalyzeFrequenciesDoesNotCreateDirectoriesByDefault(t *testing.T) {
 }
 
 func TestSelectBackendTargets(t *testing.T) {
+	t.Parallel()
 	withFeed := backend.Podcast{ID: "a"}
 	withFeed.Media.Metadata.Title = "Alpha"
 	withFeed.Media.Metadata.FeedURL = "https://example.com/a.xml"
@@ -131,6 +135,7 @@ func TestSelectBackendTargets(t *testing.T) {
 
 // When nothing has a feed, returning the whole list beats returning nothing.
 func TestWithFeedURLFallsBackToEverything(t *testing.T) {
+	t.Parallel()
 	a := backend.Podcast{ID: "a"}
 	b := backend.Podcast{ID: "b"}
 	if got := WithFeedURL([]backend.Podcast{a, b}); len(got) != 2 {

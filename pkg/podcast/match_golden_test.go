@@ -19,6 +19,7 @@ var updateMatchGolden = flag.Bool("update-match", false, "rewrite testdata/match
 // user commands; this records the whole table instead of spot-checking it.
 // Regenerate with: go test ./pkg/podcast -update-match
 func TestMatchGolden(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	mk := func(folder, title string, fav bool) {
 		d := filepath.Join(root, folder)

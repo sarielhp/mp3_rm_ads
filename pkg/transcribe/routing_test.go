@@ -7,6 +7,7 @@ import (
 )
 
 func TestContainsHebrew(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input    string
 		expected bool
@@ -26,6 +27,7 @@ func TestContainsHebrew(t *testing.T) {
 }
 
 func TestWhisperProfileSupportsLanguage(t *testing.T) {
+	t.Parallel()
 	wpEn := types.WhisperProfile{Engine: types.WhisperEngineLocal, Model: "tiny.en", Languages: []string{"en"}}
 	if !WhisperProfileSupportsLanguage(wpEn, "en") {
 		t.Errorf("expected wpEn to support en")
@@ -49,6 +51,7 @@ func TestWhisperProfileSupportsLanguage(t *testing.T) {
 }
 
 func TestResolveLocalWhisperProfileHebrewRouting(t *testing.T) {
+	t.Parallel()
 	origUsable := WhisperProfileUsable
 	WhisperProfileUsable = func(wp types.WhisperProfile) bool { return true }
 	t.Cleanup(func() { WhisperProfileUsable = origUsable })

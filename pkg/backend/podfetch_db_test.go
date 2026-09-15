@@ -64,6 +64,7 @@ func setupTestPodFetchDB(t *testing.T) string {
 }
 
 func TestPodFetchDBDirectSync(t *testing.T) {
+	t.Parallel()
 	dbPath := setupTestPodFetchDB(t)
 	be := NewPodFetch(Config{DBPath: dbPath})
 
@@ -90,6 +91,7 @@ func TestPodFetchDBDirectSync(t *testing.T) {
 }
 
 func TestPodFetchModernSchemaCompatibility(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	dbPath := filepath.Join(tempDir, "podcast.db")
 	db, err := sql.Open("sqlite3", dbPath)

@@ -24,6 +24,7 @@ func queueFixture(t *testing.T) (root, podDir string) {
 }
 
 func TestEnqueuePodcastIsIdempotent(t *testing.T) {
+	t.Parallel()
 	_, podDir := queueFixture(t)
 
 	n, err := EnqueuePodcast(podDir)
@@ -52,6 +53,7 @@ func TestEnqueuePodcastIsIdempotent(t *testing.T) {
 }
 
 func TestClearPodcastQueueEmptiesIt(t *testing.T) {
+	t.Parallel()
 	_, podDir := queueFixture(t)
 	if _, err := EnqueuePodcast(podDir); err != nil {
 		t.Fatal(err)
@@ -72,6 +74,7 @@ func TestClearPodcastQueueEmptiesIt(t *testing.T) {
 // whose queue was already empty. Changing that would quietly change what the
 // number on screen means.
 func TestClearAllQueuesCountsQueueFilesNotEntries(t *testing.T) {
+	t.Parallel()
 	root, podDir := queueFixture(t)
 	emptyDir := filepath.Join(root, "Empty")
 	if err := os.MkdirAll(emptyDir, 0755); err != nil {
@@ -98,6 +101,7 @@ func TestClearAllQueuesCountsQueueFilesNotEntries(t *testing.T) {
 }
 
 func TestQueueItemsAcrossLibraryAndByTarget(t *testing.T) {
+	t.Parallel()
 	root, podDir := queueFixture(t)
 	if _, err := EnqueuePodcast(podDir); err != nil {
 		t.Fatal(err)
@@ -127,6 +131,7 @@ func TestQueueItemsAcrossLibraryAndByTarget(t *testing.T) {
 }
 
 func TestQueueItemsRejectsAnEpisodeThatIsNotQueued(t *testing.T) {
+	t.Parallel()
 	root, podDir := queueFixture(t)
 	lib := Open(Config{PodcastsDir: root}, nil, nil)
 	if _, err := lib.QueueItems(filepath.Join(podDir, "ep1.mp3")); err == nil {
@@ -135,6 +140,7 @@ func TestQueueItemsRejectsAnEpisodeThatIsNotQueued(t *testing.T) {
 }
 
 func TestQueueFilenameIsRelativeInsideThePodcast(t *testing.T) {
+	t.Parallel()
 	if got := QueueFilename("/lib/Show", "/lib/Show/ep1.mp3"); got != "ep1.mp3" {
 		t.Errorf("got %q, want %q", got, "ep1.mp3")
 	}

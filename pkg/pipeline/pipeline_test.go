@@ -12,6 +12,7 @@ import (
 )
 
 func TestEnsureABSIgnore(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	if err := EnsureABSIgnore(tempDir); err != nil {
 		t.Fatalf("EnsureABSIgnore failed: %v", err)
@@ -29,6 +30,7 @@ func TestEnsureABSIgnore(t *testing.T) {
 }
 
 func TestParseABSEpisodePublishedAt(t *testing.T) {
+	t.Parallel()
 	ep1 := &backend.Episode{PublishedAt: 1724000000000}
 	if got := ParseABSEpisodePublishedAt(ep1); got != 1724000000000 {
 		t.Errorf("expected 1724000000000, got %d", got)
@@ -52,6 +54,7 @@ func TestParseABSEpisodePublishedAt(t *testing.T) {
 }
 
 func TestNormalizeEpisodeTitle(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		in   string
 		want string
@@ -68,6 +71,7 @@ func TestNormalizeEpisodeTitle(t *testing.T) {
 }
 
 func TestQuarantineAbandonedDuplicates(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Hard Fork")
 	_ = os.MkdirAll(podDir, 0755)
@@ -121,6 +125,7 @@ func TestQuarantineAbandonedDuplicates(t *testing.T) {
 }
 
 func TestResolveAudioFiles(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	mp3Path := filepath.Join(tempDir, "ep.mp3")
 	_ = os.WriteFile(mp3Path, []byte("audio"), 0644)
@@ -138,6 +143,7 @@ func TestResolveAudioFiles(t *testing.T) {
 }
 
 func TestResolveOutputFile(t *testing.T) {
+	t.Parallel()
 	mainMP3 := "/podcasts/ep1.mp3"
 	out := ResolveOutputFile(mainMP3, "", 1)
 	if out != mainMP3 {
@@ -152,6 +158,7 @@ func TestResolveOutputFile(t *testing.T) {
 }
 
 func TestFormatTranscript(t *testing.T) {
+	t.Parallel()
 	td := &types.TranscriptionData{
 		Segments: []types.TranscriptionSegment{
 			{Start: 0.0, End: 5.0, Text: "Hello"},

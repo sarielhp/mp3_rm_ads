@@ -7,6 +7,7 @@ import (
 )
 
 func TestStringDisplayWidth(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input string
 		want  int
@@ -34,6 +35,7 @@ func TestStringDisplayWidth(t *testing.T) {
 }
 
 func TestPadCell(t *testing.T) {
+	t.Parallel()
 	left := padCell("abc", 5, AlignLeft)
 	if left != "abc  " {
 		t.Errorf("AlignLeft want %q, got %q", "abc  ", left)
@@ -56,6 +58,7 @@ func TestPadCell(t *testing.T) {
 }
 
 func TestRenderTableBordersConnected(t *testing.T) {
+	t.Parallel()
 	cols := []TableColumn{
 		{Header: "ID", Width: 5, Align: AlignCenter},
 		{Header: "Title", Width: 10, Align: AlignLeft},
@@ -97,6 +100,7 @@ func TestRenderTableBordersConnected(t *testing.T) {
 }
 
 func TestCompactDownloadPolicy(t *testing.T) {
+	t.Parallel()
 	if compactDownloadPolicy("latest", 0) != "New" {
 		t.Errorf("expected 'New'")
 	}
@@ -112,6 +116,7 @@ func TestCompactDownloadPolicy(t *testing.T) {
 }
 
 func TestCompactAdRemoval(t *testing.T) {
+	t.Parallel()
 	if compactAdRemoval("all") != "All" {
 		t.Errorf("expected 'All'")
 	}
@@ -124,6 +129,7 @@ func TestCompactAdRemoval(t *testing.T) {
 }
 
 func TestFormatRelativeDate(t *testing.T) {
+	t.Parallel()
 	loc := time.UTC
 	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
 
@@ -151,6 +157,7 @@ func TestFormatRelativeDate(t *testing.T) {
 }
 
 func TestFormatRelativeDateStr(t *testing.T) {
+	t.Parallel()
 	loc := time.UTC
 	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
 
@@ -177,6 +184,7 @@ func TestFormatRelativeDateStr(t *testing.T) {
 }
 
 func TestFormatRelativeDateTime(t *testing.T) {
+	t.Parallel()
 	loc := time.UTC
 	now := time.Date(2026, 9, 8, 14, 30, 0, 0, loc)
 

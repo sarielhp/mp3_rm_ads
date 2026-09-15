@@ -19,19 +19,46 @@ import (
 
 var (
 	testFeedRetryMu    util.Mutex
-	testFeedRetryDelay time.Duration
+	testFeedRetryDelay *time.Duration
+	testFeedTransport  http.RoundTripper
 )
 
-func SetTestFeedRetryDelay(d time.Duration) {
+// SetFeedRetryDelay overrides the wait between feed fetch attempts. Pass a
+// pointer to zero to remove the wait entirely; pass nil to restore the default
+// backoff. A plain duration cannot express "no wait", which is why this takes
+// a pointer — the previous hook treated zero as "unset" and so could only ever
+// make the wait longer.
+func SetFeedRetryDelay(d *time.Duration) {
 	testFeedRetryMu.Lock()
 	defer testFeedRetryMu.Unlock()
 	testFeedRetryDelay = d
 }
 
-func getTestFeedRetryDelay() time.Duration {
+// SetFeedTransport substitutes the HTTP transport used for every feed fetch.
+// Tests install one that refuses to leave the machine, so a suite cannot
+// silently depend on the network, on a third party's uptime, or on DNS.
+func SetFeedTransport(rt http.RoundTripper) {
 	testFeedRetryMu.Lock()
 	defer testFeedRetryMu.Unlock()
-	return testFeedRetryDelay
+	testFeedTransport = rt
+}
+
+func feedRetryDelay() (time.Duration, bool) {
+	testFeedRetryMu.Lock()
+	defer testFeedRetryMu.Unlock()
+	if testFeedRetryDelay == nil {
+		return 0, false
+	}
+	return *testFeedRetryDelay, true
+}
+
+func activeFeedTransport() http.RoundTripper {
+	testFeedRetryMu.Lock()
+	defer testFeedRetryMu.Unlock()
+	if testFeedTransport != nil {
+		return testFeedTransport
+	}
+	return feedTransport
 }
 
 type FeedCacheEntry struct {
@@ -522,8 +549,10 @@ func isTransientHTTPStatus(code int) bool {
 }
 
 func feedSleepBackoff(attempt int) {
-	if d := getTestFeedRetryDelay(); d > 0 {
-		time.Sleep(d)
+	if d, ok := feedRetryDelay(); ok {
+		if d > 0 {
+			time.Sleep(d)
+		}
 		return
 	}
 	jitter := time.Duration(rand.Intn(500)) * time.Millisecond
@@ -553,7 +582,7 @@ func feedHTTPClient(timeout time.Duration) *http.Client {
 	if timeout <= 0 {
 		timeout = defaultFeedFetchTimeout
 	}
-	return &http.Client{Transport: feedTransport, Timeout: timeout}
+	return &http.Client{Transport: activeFeedTransport(), Timeout: timeout}
 }
 
 // FeedFetchOptions configures a single conditional feed fetch.

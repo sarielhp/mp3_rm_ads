@@ -10,6 +10,7 @@ import (
 )
 
 func TestParseAnyPublicationTime(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input string
 		want  time.Time
@@ -44,6 +45,7 @@ func TestParseAnyPublicationTime(t *testing.T) {
 }
 
 func TestGetEpisodePublicationTimeFromFeedXML(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "ShowA")
 	if err := os.MkdirAll(podDir, 0755); err != nil {
@@ -78,6 +80,7 @@ func TestGetEpisodePublicationTimeFromFeedXML(t *testing.T) {
 }
 
 func TestGetEpisodePublicationTimeFromFeedSourceStatus(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "ShowB")
 	if err := os.MkdirAll(podDir, 0755); err != nil {

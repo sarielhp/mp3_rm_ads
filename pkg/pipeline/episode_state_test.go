@@ -11,6 +11,7 @@ import (
 )
 
 func TestIsEpisodeCleanRequiresNonEmptyTranscript(t *testing.T) {
+	t.Parallel()
 	audioPath := filepath.Join(t.TempDir(), "episode.mp3")
 	if err := os.WriteFile(audioPath, []byte("audio"), 0644); err != nil {
 		t.Fatal(err)
@@ -34,6 +35,7 @@ func TestIsEpisodeCleanRequiresNonEmptyTranscript(t *testing.T) {
 }
 
 func TestGetOrCreateEpisodeStatusFavoriteInheritance(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "FavPodcast")
 	_ = os.MkdirAll(podDir, 0755)

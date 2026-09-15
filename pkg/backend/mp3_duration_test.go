@@ -7,6 +7,7 @@ import (
 )
 
 func TestGetMP3DiskDurationNative_NonExistent(t *testing.T) {
+	t.Parallel()
 	dur := GetMP3DiskDurationNative("/non/existent/path/audio.mp3")
 	if dur != 0 {
 		t.Fatalf("expected 0 for non-existent file, got %v", dur)
@@ -14,6 +15,7 @@ func TestGetMP3DiskDurationNative_NonExistent(t *testing.T) {
 }
 
 func TestGetMP3DiskDurationNative_CorruptStreamReturnsZero(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	corruptFile := filepath.Join(dir, "corrupt.mp3")
 	// Invalid MP3 bytes that fail decoding before reaching EOF cleanly
@@ -29,6 +31,7 @@ func TestGetMP3DiskDurationNative_CorruptStreamReturnsZero(t *testing.T) {
 }
 
 func TestGetMP3DiskDuration_EmptyOrCorrupt(t *testing.T) {
+	t.Parallel()
 	if dur := GetMP3DiskDuration(""); dur != 0 {
 		t.Fatalf("expected 0 for empty path, got %v", dur)
 	}

@@ -9,6 +9,7 @@ import (
 )
 
 func TestServerSubscriptionCommands(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	subsFile := filepath.Join(tmpDir, "podcasts.json")
 	podcastsDir := filepath.Join(tmpDir, "podcasts")

@@ -13,6 +13,7 @@ import (
 )
 
 func TestGeminiPromptContent(t *testing.T) {
+	t.Parallel()
 	if len(types.GeminiAdRemovalPrompt) == 0 {
 		t.Fatal("expected GeminiAdRemovalPrompt to be non-empty")
 	}
@@ -24,6 +25,7 @@ func TestGeminiPromptContent(t *testing.T) {
 }
 
 func TestParseGeminiJSONStringValid(t *testing.T) {
+	t.Parallel()
 	rawJSON := `{
 		"cuts": [
 			{"start": 10.5, "end": 45.0, "type": "advertisement", "reason": "Sponsor Wolt"},
@@ -54,6 +56,7 @@ func TestParseGeminiJSONStringValid(t *testing.T) {
 }
 
 func TestParseGeminiJSONStringMarkdownBlocks(t *testing.T) {
+	t.Parallel()
 	rawJSON := "```json\n{\n  \"cuts\": [],\n  \"segments\": [{\"start\": 1.0, \"end\": 2.0, \"text\": \"test\"}]\n}\n```"
 	payload, err := ParseGeminiJSONString(rawJSON)
 	if err != nil {
@@ -74,6 +77,7 @@ func TestParseGeminiJSONStringMarkdownBlocks(t *testing.T) {
 }
 
 func TestParseGeminiJSONStringErrors(t *testing.T) {
+	t.Parallel()
 	for _, invalid := range []string{"", "   \t  ", "{not-valid-json}", "random text"} {
 		_, err := ParseGeminiJSONString(invalid)
 		if err == nil {
@@ -83,6 +87,7 @@ func TestParseGeminiJSONStringErrors(t *testing.T) {
 }
 
 func TestParseGeminiContentResponse(t *testing.T) {
+	t.Parallel()
 	if _, err := ParseGeminiContentResponse(nil); err == nil {
 		t.Error("expected error for nil response")
 	}
@@ -120,6 +125,7 @@ func TestParseGeminiContentResponse(t *testing.T) {
 }
 
 func TestConvertGeminiToAbsTypes(t *testing.T) {
+	t.Parallel()
 	tdEmpty, adsEmpty := ConvertGeminiToAbsTypes(nil)
 	if tdEmpty == nil || len(adsEmpty) != 0 {
 		t.Errorf("expected empty result for nil payload, got td=%v ads=%v", tdEmpty, adsEmpty)
@@ -163,6 +169,7 @@ func TestConvertGeminiToAbsTypes(t *testing.T) {
 }
 
 func TestComputeGeminiChunks(t *testing.T) {
+	t.Parallel()
 	c1 := ComputeGeminiChunks(1200.0, 1800.0)
 	if len(c1) != 1 || c1[0].StartSec != 0 || c1[0].DurSec != 1200.0 {
 		t.Errorf("unexpected chunks for 1200s: %+v", c1)
@@ -194,6 +201,7 @@ func TestComputeGeminiChunks(t *testing.T) {
 }
 
 func TestMergeGeminiChunkResults(t *testing.T) {
+	t.Parallel()
 	r1 := &types.GeminiChunkResult{
 		Index:    0,
 		StartSec: 0.0,
@@ -231,6 +239,7 @@ func TestMergeGeminiChunkResults(t *testing.T) {
 }
 
 func TestPrepareGeminiChunksSingle(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	mockAudio := filepath.Join(tempDir, "ep.mp3")
 	chunks := []types.GeminiChunkInfo{{Index: 0, StartSec: 0, DurSec: 600.0}}
@@ -245,6 +254,7 @@ func TestPrepareGeminiChunksSingle(t *testing.T) {
 }
 
 func TestSplitAudioChunkInvalidFile(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	workDir := filepath.Join(tempDir, ".work")
 	_ = os.MkdirAll(workDir, 0755)
@@ -256,6 +266,7 @@ func TestSplitAudioChunkInvalidFile(t *testing.T) {
 }
 
 func TestParseGeminiStudioResponse(t *testing.T) {
+	t.Parallel()
 	validBody := []byte(`{
 		"candidates": [
 			{
@@ -285,11 +296,13 @@ func TestParseGeminiStudioResponse(t *testing.T) {
 }
 
 func TestDeleteGeminiStudioFileNoop(t *testing.T) {
+	t.Parallel()
 	DeleteGeminiStudioFile(context.Background(), "", "")
 	DeleteGeminiStudioFile(context.Background(), "key", "")
 }
 
 func TestGeminiStudioNoKeyInURLError(t *testing.T) {
+	t.Parallel()
 	apiKey := "AIzaSySuperSecretKey12345"
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -316,6 +329,7 @@ func TestGeminiStudioNoKeyInURLError(t *testing.T) {
 }
 
 func TestFormatGeminiErrorBody(t *testing.T) {
+	t.Parallel()
 	jsonErr := []byte(`{"error":{"code":503,"message":"Model high demand","status":"UNAVAILABLE"}}`)
 	got := FormatGeminiErrorBody(jsonErr)
 	expected := "Model high demand (UNAVAILABLE)"
@@ -375,6 +389,7 @@ func TestFormatGeminiErrorBody(t *testing.T) {
 }
 
 func TestGeminiUploadAudioToGCSNonExistentFile(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	nonExistent := filepath.Join(tempDir, "missing.mp3")
 	ctx := context.Background()
@@ -385,12 +400,14 @@ func TestGeminiUploadAudioToGCSNonExistentFile(t *testing.T) {
 }
 
 func TestGeminiDeleteGCSObjectEmptyPrefix(t *testing.T) {
+	t.Parallel()
 	ctx := context.Background()
 	DeleteGCSObject(ctx, "test-bucket", "")
 	DeleteGCSObject(ctx, "test-bucket", "short")
 }
 
 func TestProcessGeminiChunksParallelCancelledContext(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
 
@@ -405,6 +422,7 @@ func TestProcessGeminiChunksParallelCancelledContext(t *testing.T) {
 }
 
 func TestExtractGeminiRetryDelay(t *testing.T) {
+	t.Parallel()
 	body := []byte(`{
 		"error": {
 			"code": 429,
@@ -434,6 +452,7 @@ func TestExtractGeminiRetryDelay(t *testing.T) {
 }
 
 func TestIsGeminiDailyQuotaExhaustedWithRetryIn(t *testing.T) {
+	t.Parallel()
 	body := []byte(`{
 		"error": {
 			"code": 429,

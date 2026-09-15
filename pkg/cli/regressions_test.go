@@ -54,6 +54,7 @@ func TestRegressionIssue2_TestCommandTargetValidation(t *testing.T) {
 }
 
 func TestRegressionIssue3_ConfigGetErrorHandling(t *testing.T) {
+	t.Parallel()
 	cfg := Config{PodcastsDir: "/tmp/podcasts"}
 
 	if err := handleConfigGet(cfg, "invalid_setting_name_xyz"); err == nil {

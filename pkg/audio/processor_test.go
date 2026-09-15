@@ -27,6 +27,7 @@ func (m *mockProcessor) PreserveMetadata(ctx context.Context, src, dst string) e
 }
 
 func TestMockAudioProcessor(t *testing.T) {
+	t.Parallel()
 	var proc AudioProcessor = &mockProcessor{dur: 120.5}
 	dur, err := proc.Duration(context.Background(), "test.mp3")
 	if err != nil || dur != 120.5 {
@@ -40,6 +41,7 @@ func TestMockAudioProcessor(t *testing.T) {
 }
 
 func TestDefaultProcessorInstance(t *testing.T) {
+	t.Parallel()
 	if DefaultProcessor == nil {
 		t.Fatal("DefaultProcessor should not be nil")
 	}

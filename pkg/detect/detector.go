@@ -84,7 +84,9 @@ func CallLLMChat(profile types.LLMProfile, sysPrompt, userPrompt string, maxToke
 	var lastErr error
 	for attempt := 0; attempt < 3; attempt++ {
 		if attempt > 0 {
-			time.Sleep(time.Duration(1<<attempt) * 500 * time.Millisecond)
+			if d := retryBackoff(attempt); d > 0 {
+				time.Sleep(d)
+			}
 		}
 		req, err := http.NewRequest("POST", profile.URL, bytes.NewReader(body))
 		if err != nil {

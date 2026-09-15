@@ -11,6 +11,7 @@ import (
 
 // Moved here from pkg/cli with the planner it covers.
 func TestPlanSubscriptionDownloadsInParallel(t *testing.T) {
+	t.Parallel()
 	feed := func(title, ep, url string) *httptest.Server {
 		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.Header().Set("Content-Type", "application/xml")
@@ -63,6 +64,7 @@ func TestPlanSubscriptionDownloadsInParallel(t *testing.T) {
 // title or a newly downloaded cover reaches feed.xml without waiting for the
 // next episode.
 func TestExecuteSubscriptionDownloadsPublishesWithNothingToDownload(t *testing.T) {
+	t.Parallel()
 	podDir := t.TempDir()
 	lib := Open(Config{PodcastsDir: t.TempDir()}, nil, nil)
 
@@ -80,6 +82,7 @@ func TestExecuteSubscriptionDownloadsPublishesWithNothingToDownload(t *testing.T
 }
 
 func TestExecuteSubscriptionDownloadsUpdatesCatalogAndFeed(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	podcastsDir := filepath.Join(root, "podcasts")
 	showDir := filepath.Join(podcastsDir, "Show")

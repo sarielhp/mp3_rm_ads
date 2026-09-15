@@ -11,6 +11,7 @@ import (
 )
 
 func TestParsePodcastGroupKind(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input    string
 		wantKind PodcastGroupKind
@@ -39,6 +40,7 @@ func TestParsePodcastGroupKind(t *testing.T) {
 }
 
 func TestResolvePodcastGroup(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "regular_show")
 	pod2 := filepath.Join(tempDir, "favorite_show")
@@ -84,6 +86,7 @@ func TestResolvePodcastGroup(t *testing.T) {
 }
 
 func TestResolveBackendPodcastGroup(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "ShowA")
 	pod2 := filepath.Join(tempDir, "ShowB")

@@ -18,6 +18,7 @@ func (m *mockTranscriber) Transcribe(ctx context.Context, path string, opts Opti
 }
 
 func TestFallbackTranscriberPrimarySucceeds(t *testing.T) {
+	t.Parallel()
 	primary := &mockTranscriber{td: &types.TranscriptionData{Text: "Primary text"}}
 	secondary := &mockTranscriber{td: &types.TranscriptionData{Text: "Secondary text"}}
 
@@ -39,6 +40,7 @@ func TestFallbackTranscriberPrimarySucceeds(t *testing.T) {
 }
 
 func TestFallbackTranscriberFallsBackOnPrimaryFailure(t *testing.T) {
+	t.Parallel()
 	primary := &mockTranscriber{err: errors.New("primary connection failed")}
 	secondary := &mockTranscriber{td: &types.TranscriptionData{Text: "Secondary text"}}
 

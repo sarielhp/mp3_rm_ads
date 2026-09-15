@@ -13,6 +13,7 @@ import (
 )
 
 func TestFindMP3Files(t *testing.T) {
+	t.Parallel()
 	d := t.TempDir()
 	os.WriteFile(d+"/a.mp3", []byte("x"), 0644)
 	os.WriteFile(d+"/a.txt", []byte("x"), 0644)
@@ -25,6 +26,7 @@ func TestFindMP3Files(t *testing.T) {
 }
 
 func TestSafeMove(t *testing.T) {
+	t.Parallel()
 	d := t.TempDir()
 	src, dst := d+"/s.txt", d+"/d.txt"
 	os.WriteFile(src, []byte("x"), 0644)
@@ -35,6 +37,7 @@ func TestSafeMove(t *testing.T) {
 }
 
 func TestCopyFile(t *testing.T) {
+	t.Parallel()
 	d := t.TempDir()
 	src, dst := d+"/s.txt", d+"/d.txt"
 	os.WriteFile(src, []byte("x"), 0644)
@@ -45,6 +48,7 @@ func TestCopyFile(t *testing.T) {
 }
 
 func TestSelectProfile(t *testing.T) {
+	t.Parallel()
 	cfg := Config{ActiveProfileID: 2, Profiles: []LLMProfile{{ID: 1, Name: "One", Model: "m1"}, {ID: 2, Name: "Two", Model: "m2"}}}
 	if p, _ := config.SelectLLMProfile(&cfg, ""); p.ID != 2 {
 		t.Error("default profile")

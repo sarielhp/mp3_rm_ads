@@ -8,6 +8,7 @@ import (
 )
 
 func TestBackendRegistry(t *testing.T) {
+	t.Parallel()
 	b3, err := New("podfetch", Config{Host: "http://localhost:8000"})
 	if err != nil {
 		t.Fatalf("failed to create backend 'podfetch': %v", err)
@@ -31,6 +32,7 @@ func TestBackendRegistry(t *testing.T) {
 }
 
 func TestFeedEpisodeUnmarshalJSON(t *testing.T) {
+	t.Parallel()
 	jsonData := `{
 		"title": "Test Title",
 		"pubDate": "Mon, 31 Aug 2026 12:00:00 GMT",
@@ -63,6 +65,7 @@ func TestFeedEpisodeUnmarshalJSON(t *testing.T) {
 }
 
 func TestOPMLRoundtrip(t *testing.T) {
+	t.Parallel()
 	feeds := []OPMLFeed{
 		{Title: "Podcast One", URL: "https://example.com/feed1.xml"},
 		{Title: "Podcast Two & Three", URL: "https://example.com/feed2.xml"},
@@ -94,6 +97,7 @@ func TestOPMLRoundtrip(t *testing.T) {
 }
 
 func TestAnalyzePodcastFrequency(t *testing.T) {
+	t.Parallel()
 	now := time.Now().UnixMilli()
 	dayMs := int64(24 * 3600 * 1000)
 

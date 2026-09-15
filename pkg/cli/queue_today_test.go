@@ -14,6 +14,7 @@ import (
 )
 
 func TestQueueTodaySelection(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	zone, err := time.LoadLocation("America/Chicago")
 	if err != nil {
@@ -72,6 +73,7 @@ func TestQueueTodaySelection(t *testing.T) {
 }
 
 func TestQueueTodayRequiresSourcePublicationDate(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 	dir, paths := createTestPodcastWithEpisodes(t, root, "SourceDates", []string{"old", "today", "unknown"})
@@ -142,6 +144,7 @@ func TestQueueTodayParsing(t *testing.T) {
 }
 
 func TestQueueTodayNestedEpisodesResolveForRun(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "show")
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)

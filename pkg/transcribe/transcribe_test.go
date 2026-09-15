@@ -13,6 +13,7 @@ import (
 )
 
 func TestBuildWavHeader(t *testing.T) {
+	t.Parallel()
 	dataSize := 32000
 	header := BuildWavHeader(dataSize)
 
@@ -34,6 +35,7 @@ func TestBuildWavHeader(t *testing.T) {
 }
 
 func TestMatchProgress(t *testing.T) {
+	t.Parallel()
 	h, m, s, ok := matchProgressHMS("whisper.cpp: processing audio (01:23:45)")
 	if !ok || h != 1 || m != 23 || s != 45 {
 		t.Errorf("matchProgressHMS failed: got (%d, %d, %d, %v)", h, m, s, ok)
@@ -51,6 +53,7 @@ func TestMatchProgress(t *testing.T) {
 }
 
 func TestBuildWhisperMultipartBody_File(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	filePath := filepath.Join(tmpDir, "sample.mp3")
 	fileData := []byte("fake-mp3-audio-bytes")
@@ -112,6 +115,7 @@ func TestBuildWhisperMultipartBody_File(t *testing.T) {
 }
 
 func TestBuildWhisperMultipartBody_PCM(t *testing.T) {
+	t.Parallel()
 	pcmData := []byte{0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08}
 	reader, contentType, err := BuildWhisperMultipartBody("/tmp/virtual.wav", "", "auto", pcmData)
 	if err != nil {
@@ -153,6 +157,7 @@ func TestBuildWhisperMultipartBody_PCM(t *testing.T) {
 }
 
 func TestReadLimitedBody(t *testing.T) {
+	t.Parallel()
 	raw := []byte("short message")
 	res, err := ReadLimitedBody(bytes.NewReader(raw), 50)
 	if err != nil {
@@ -169,6 +174,7 @@ func TestReadLimitedBody(t *testing.T) {
 }
 
 func TestSortSegments(t *testing.T) {
+	t.Parallel()
 	segs := []types.TranscriptionSegment{
 		{Start: 10.0, End: 12.0, Text: "third"},
 		{Start: 1.0, End: 3.0, Text: "first"},
@@ -184,6 +190,7 @@ func TestSortSegments(t *testing.T) {
 }
 
 func TestJoinSegmentText(t *testing.T) {
+	t.Parallel()
 	if got := JoinSegmentText(nil); got != "" {
 		t.Errorf("expected empty string for nil, got %q", got)
 	}
@@ -201,6 +208,7 @@ func TestJoinSegmentText(t *testing.T) {
 }
 
 func TestMergeSegments(t *testing.T) {
+	t.Parallel()
 	if got := MergeSegments(nil); got != nil {
 		t.Errorf("expected nil for nil input")
 	}
@@ -224,6 +232,7 @@ func TestMergeSegments(t *testing.T) {
 }
 
 func TestAdjustChunkSegment(t *testing.T) {
+	t.Parallel()
 	ch := ChunkInfo{
 		ActualStart:  1200,
 		ActualEnd:    2400,

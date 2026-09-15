@@ -3,6 +3,7 @@ package podcast
 import "testing"
 
 func TestSubscriptionMatches(t *testing.T) {
+	t.Parallel()
 	sub := Subscription{ID: "ab12", Title: "The Daily Show"}
 
 	cases := []struct {
@@ -30,6 +31,7 @@ func TestSubscriptionMatches(t *testing.T) {
 // The empty-title case used to be reachable through the inline copies in the
 // CLI; keep it defined rather than accidental.
 func TestSubscriptionMatchesEmptyTitleStillMatchesByID(t *testing.T) {
+	t.Parallel()
 	sub := Subscription{ID: "zz99"}
 	if !SubscriptionMatches(sub, "zz99") {
 		t.Error("id match should not depend on a title being set")

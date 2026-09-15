@@ -11,6 +11,7 @@ import (
 )
 
 func TestGeneratePodcastFeedXML(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	podDir := filepath.Join(tmpDir, "Hardcore_History")
 	_ = os.MkdirAll(podDir, 0755)
@@ -96,6 +97,7 @@ func TestGeneratePodcastFeedXML(t *testing.T) {
 }
 
 func TestGeneratePodcastFeedXML_FallbackToRemoteImage(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	podDir := filepath.Join(tmpDir, "Show_No_Local_Cover")
 	_ = os.MkdirAll(podDir, 0755)
@@ -124,6 +126,7 @@ func TestGeneratePodcastFeedXML_FallbackToRemoteImage(t *testing.T) {
 }
 
 func TestParseRSSFeedExtractsImage(t *testing.T) {
+	t.Parallel()
 	itunesXML := []byte(`<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
 		<channel>
 			<title>Itunes Show</title>
@@ -168,6 +171,7 @@ func TestParseRSSFeedExtractsImage(t *testing.T) {
 }
 
 func TestEnsurePodcastCoverCopiesDetailsCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	podDir := filepath.Join(tmpDir, "TestShow")
 	detailsDir := filepath.Join(podDir, ".cache", "details")

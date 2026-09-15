@@ -8,6 +8,7 @@ import (
 )
 
 func TestExtractHostAndPort(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		url          string
 		expectedHost string
@@ -31,6 +32,7 @@ func TestExtractHostAndPort(t *testing.T) {
 }
 
 func TestRoundFloat(t *testing.T) {
+	t.Parallel()
 	if got := RoundFloat(3.14159, 2); got != 3.14 {
 		t.Errorf("RoundFloat(3.14159, 2) = %f; want 3.14", got)
 	}
@@ -40,6 +42,7 @@ func TestRoundFloat(t *testing.T) {
 }
 
 func TestShellQuote(t *testing.T) {
+	t.Parallel()
 	if got := ShellQuote("simple"); got != "'simple'" {
 		t.Errorf("ShellQuote(simple) = %q; want 'simple'", got)
 	}
@@ -49,6 +52,7 @@ func TestShellQuote(t *testing.T) {
 }
 
 func TestRepeatStrAndTruncate(t *testing.T) {
+	t.Parallel()
 	if got := RepeatStr("ab", 3); got != "ababab" {
 		t.Errorf("RepeatStr(ab, 3) = %q; want ababab", got)
 	}
@@ -61,6 +65,7 @@ func TestRepeatStrAndTruncate(t *testing.T) {
 }
 
 func TestTempFileValidation(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	sourceAudio := filepath.Join(tmpDir, "episode.mp3")
 	workDir := WorkDirFor(sourceAudio)
@@ -81,6 +86,7 @@ func TestTempFileValidation(t *testing.T) {
 }
 
 func TestFileLock(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	target := filepath.Join(tmpDir, "job")
 
@@ -105,6 +111,7 @@ func TestFileLock(t *testing.T) {
 }
 
 func TestDisplayNameRTL(t *testing.T) {
+	t.Parallel()
 	testCases := []string{
 		"השבוע - פודקאסט הארץ",
 		"המרקרים",

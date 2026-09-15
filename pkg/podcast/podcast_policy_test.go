@@ -9,6 +9,7 @@ import (
 )
 
 func TestPolicyUpdateIsEmpty(t *testing.T) {
+	t.Parallel()
 	if !(PolicyUpdate{}).IsEmpty() {
 		t.Error("a zero PolicyUpdate should be empty")
 	}
@@ -23,6 +24,7 @@ func TestPolicyUpdateIsEmpty(t *testing.T) {
 }
 
 func TestParsePolicyBool(t *testing.T) {
+	t.Parallel()
 	for _, s := range []string{"true", "TRUE", "1", "yes", "on", "enable", "enabled", " Yes "} {
 		if !ParsePolicyBool(s) {
 			t.Errorf("ParsePolicyBool(%q) = false, want true", s)
@@ -39,6 +41,7 @@ func TestParsePolicyBool(t *testing.T) {
 // settings contradict each other. But an explicit --auto-download on the same
 // command wins, because the user said it outright.
 func TestApplyPolicyUpdateNoneDisablesAutoDownload(t *testing.T) {
+	t.Parallel()
 	cfg := config.PodcastConfig{}
 	ApplyPolicyUpdate(&cfg, PolicyUpdate{DownloadPolicy: "none"})
 	if cfg.IsAutoDownloadEnabled() {
@@ -53,6 +56,7 @@ func TestApplyPolicyUpdateNoneDisablesAutoDownload(t *testing.T) {
 }
 
 func TestApplyPolicyUpdateCleanupDaysEnablesCleanup(t *testing.T) {
+	t.Parallel()
 	cfg := config.PodcastConfig{}
 	ApplyPolicyUpdate(&cfg, PolicyUpdate{CleanupDays: 14})
 	if !cfg.IsAutoCleanupEnabled() || cfg.AutoCleanupDays != 14 {
@@ -61,6 +65,7 @@ func TestApplyPolicyUpdateCleanupDaysEnablesCleanup(t *testing.T) {
 }
 
 func TestApplyPolicyUpdateLeavesUnsetFieldsAlone(t *testing.T) {
+	t.Parallel()
 	cfg := config.PodcastConfig{DownloadPolicy: "latest_k", DownloadK: 5, AdRemoval: "all"}
 	ApplyPolicyUpdate(&cfg, PolicyUpdate{CleanupDays: 3})
 
@@ -78,6 +83,7 @@ func TestApplyPolicyUpdateLeavesUnsetFieldsAlone(t *testing.T) {
 // surprising enough to state outright — a user who sets --favorite true after
 // configuring a download policy will find the policy replaced.
 func TestApplyPolicyUpdateFavoriteRewritesRelatedSettings(t *testing.T) {
+	t.Parallel()
 	cfg := config.PodcastConfig{DownloadPolicy: "latest_k", DownloadK: 5, AdRemoval: "none"}
 	ApplyPolicyUpdate(&cfg, PolicyUpdate{Favorite: "true"})
 
@@ -103,6 +109,7 @@ func TestApplyPolicyUpdateFavoriteRewritesRelatedSettings(t *testing.T) {
 }
 
 func TestSetGroupPolicyAppliesToEveryPodcast(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	var entries []PodcastDirEntry
 	for _, name := range []string{"A", "B", "C"} {
@@ -132,6 +139,7 @@ func TestSetGroupPolicyAppliesToEveryPodcast(t *testing.T) {
 // With no backend configured, syncing is a no-op that reports no backend
 // rather than failing the whole policy change.
 func TestSyncPolicyWithoutBackendIsNotAnError(t *testing.T) {
+	t.Parallel()
 	lib := Open(Config{}, nil, nil)
 	got := lib.SyncPolicy("/lib/Show", "", "abc", config.PodcastConfig{})
 	if got.Backend != "" || got.Err != nil {
@@ -143,6 +151,7 @@ func TestSyncPolicyWithoutBackendIsNotAnError(t *testing.T) {
 }
 
 func TestGroupPoliciesReadsStoredSettingsOnly(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "A")
 	if err := os.MkdirAll(dir, 0755); err != nil {

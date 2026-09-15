@@ -13,6 +13,7 @@ import (
 // a reordered embed silently orphans every cache already on disk. Regenerate
 // deliberately with: go test ./pkg/podcast -update-cache
 func TestCacheWireFormat(t *testing.T) {
+	t.Parallel()
 	idx := CachedPodcastIndex{
 		PodcastName: "Show & Co",
 		PodcastDir:  "/lib/Show",
@@ -47,6 +48,7 @@ func TestCacheWireFormat(t *testing.T) {
 // writes that field any more, but episodeShortID still reads it, so it has to
 // survive a decode.
 func TestCacheIDFieldStillDecodes(t *testing.T) {
+	t.Parallel()
 	raw := []byte(`{"episodes":[{"id":"e12345","path":"/lib/a.mp3","filename":"a.mp3"}]}`)
 	var idx CachedPodcastIndex
 	if err := json.Unmarshal(raw, &idx); err != nil {

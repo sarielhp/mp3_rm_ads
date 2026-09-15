@@ -9,6 +9,7 @@ import (
 )
 
 func TestReadKeyFile(t *testing.T) {
+	t.Parallel()
 	if got := ReadKeyFile(""); got != "" {
 		t.Errorf("expected empty string for empty path, got %q", got)
 	}
@@ -36,6 +37,7 @@ func TestReadKeyFile(t *testing.T) {
 }
 
 func TestResolveGeminiAPIKeyFile(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	keyPath := filepath.Join(tmpDir, "gemini_key.txt")
 	if err := os.WriteFile(keyPath, []byte("gemini-test-key-file"), 0600); err != nil {
@@ -121,6 +123,7 @@ func TestResolveGeminiAPIKeyNoSearch(t *testing.T) {
 }
 
 func TestResolveLLMAPIKey(t *testing.T) {
+	t.Parallel()
 	enabled := true
 	disabled := false
 	cfg := &types.Config{

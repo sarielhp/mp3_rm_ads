@@ -35,7 +35,7 @@ A `Makefile` at the project root delegates to all scripts:
 
 | Target | Action |
 |--------|--------|
-| `make check` | Full quality gate |
+| `make check` | Quality gate for committing: format, vet, staticcheck, line audit, tests, build. No race detector — see `make ci` |
 | `make visual` | Run full live PTY visual audit across all 19 TUI screens (`tools/visual_audit`) |
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
 | `make audit` | Audit Go source file line lengths (`tools/audit_lines`) |
@@ -53,7 +53,7 @@ A `Makefile` at the project root delegates to all scripts:
 | `make snapshot` | Fast WIP micro-commit (`tools/snapshot ARGS="..."`) |
 | `make snap` | Alias for `make snapshot` |
 | `make checkpoint` | Micro-commit all changes (delegates to `make snapshot`) |
-| `make ci` | Alias for `make check` |
+| `make ci` | Release gate: everything in `make check` plus the race detector and govulncheck |
 | `make clean` | Remove binary |
 
 ### Workflow

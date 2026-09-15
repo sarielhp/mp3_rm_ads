@@ -6,6 +6,7 @@ import (
 )
 
 func TestSanitizeTitle(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected string
@@ -32,6 +33,7 @@ func TestSanitizeTitle(t *testing.T) {
 }
 
 func TestFormatEpisodeFilename(t *testing.T) {
+	t.Parallel()
 	date := time.Date(2024, 3, 15, 0, 0, 0, 0, time.UTC)
 
 	tests := []struct {
@@ -87,6 +89,7 @@ func TestFormatEpisodeFilename(t *testing.T) {
 }
 
 func TestStripEpisodeFilenamePrefix(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		input    string
 		expected string

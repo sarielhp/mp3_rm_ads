@@ -13,6 +13,7 @@ import (
 )
 
 func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	a, ap := createTestPodcastWithEpisodes(t, root, "Alpha", []string{"episode"})
 	b, bp := createTestPodcastWithEpisodes(t, root, "Beta", []string{"episode"})
@@ -60,6 +61,7 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 }
 
 func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"other", "requested"})
 	if _, err := pipeline.AddToQueueChecked(dir, filepath.Base(paths[0])); err != nil {
@@ -104,6 +106,7 @@ func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
 }
 
 func TestQueuePriorityStringMatching(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	createTestPodcastWithEpisodes(t, root, "History Show", []string{"episode1"})
 	createTestPodcastWithEpisodes(t, root, "Science Show", []string{"episode2"})

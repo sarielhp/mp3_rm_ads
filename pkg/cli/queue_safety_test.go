@@ -33,6 +33,7 @@ func queueTree(t *testing.T, root string) map[string]string {
 }
 
 func TestQueueReadOnlyAndEligibility(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "Show")
 	if err := os.MkdirAll(filepath.Join(dir, ".work"), 0755); err != nil {
@@ -72,6 +73,7 @@ func TestQueueReadOnlyAndEligibility(t *testing.T) {
 }
 
 func TestQueueCommandsSurfaceCorruptQueue(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir, _ := createTestPodcastWithEpisodes(t, root, "Show", []string{"episode"})
 	path := filepath.Join(dir, "queue.json")

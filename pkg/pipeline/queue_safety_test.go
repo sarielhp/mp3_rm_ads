@@ -8,6 +8,7 @@ import (
 )
 
 func TestQueuePathsAndRemoval(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	for _, name := range []string{"a/podcast.mp3", "b/podcast.mp3", "precut.mp3", ".work/temp.mp3"} {
 		path := filepath.Join(dir, name)
@@ -44,6 +45,7 @@ func TestQueuePathsAndRemoval(t *testing.T) {
 }
 
 func TestQueueErrorsPreserveFile(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "queue.json")
 	if err := os.WriteFile(path, []byte("broken"), 0644); err != nil {
@@ -66,6 +68,7 @@ func TestQueueErrorsPreserveFile(t *testing.T) {
 }
 
 func TestCleanRejectsInvalidTranscriptAndFailedDetection(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	path := filepath.Join(dir, "episode.mp3")
 	if err := SaveEpisodeStatus(StatusPathFor(path), &types.EpisodeStatusFile{Status: types.StateDone}); err != nil {
@@ -92,6 +95,7 @@ func TestCleanRejectsInvalidTranscriptAndFailedDetection(t *testing.T) {
 }
 
 func TestResolveQueueAudioPathNested(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	nestedDir := filepath.Join(dir, "Ballot Bots — The Weekly")
 	if err := os.MkdirAll(nestedDir, 0755); err != nil {

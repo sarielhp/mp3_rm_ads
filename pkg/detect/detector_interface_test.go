@@ -29,6 +29,7 @@ func (m *mockAdDetector) DetectAds(ctx context.Context, text string) ([]types.Ad
 }
 
 func TestConfirmingDetectorRecoversAdsOnRetry(t *testing.T) {
+	t.Parallel()
 	mock := &mockAdDetector{
 		segs: [][]types.AdSegment{
 			{},                                   // initial empty
@@ -49,6 +50,7 @@ func TestConfirmingDetectorRecoversAdsOnRetry(t *testing.T) {
 }
 
 func TestConfirmingDetectorFailsOnRetryError(t *testing.T) {
+	t.Parallel()
 	mock := &mockAdDetector{
 		segs: [][]types.AdSegment{{}, {}},
 		errs: []error{nil, errors.New("rate limited")},
@@ -61,6 +63,7 @@ func TestConfirmingDetectorFailsOnRetryError(t *testing.T) {
 }
 
 func TestConfirmingDetectorBelievesConfirmedEmpty(t *testing.T) {
+	t.Parallel()
 	mock := &mockAdDetector{
 		segs: [][]types.AdSegment{{}, {}, {}},
 	}

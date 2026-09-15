@@ -8,6 +8,7 @@ import (
 )
 
 func TestResolvePodcastTarget(t *testing.T) {
+	t.Parallel()
 	tmp := t.TempDir()
 	podDir, _ := createTestPodcastWithEpisodes(t, tmp, "Daily Tech", []string{"Ep 1"})
 	cfg := config.LoadPodcastConfig(podDir, config.PodcastConfig{})

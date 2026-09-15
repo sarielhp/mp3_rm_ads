@@ -27,6 +27,7 @@ func (b *flushTestBackend) ActiveDownloads(string) ([]backend.ActiveDownload, er
 }
 
 func TestFlushPreservesTranscriptsAndDisablesDownloads(t *testing.T) {
+	t.Parallel()
 	for _, mode := range []string{"flush", "dry-run", "settings failure", "active download"} {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
@@ -87,6 +88,7 @@ func TestFlushPreservesTranscriptsAndDisablesDownloads(t *testing.T) {
 }
 
 func TestFlushRejectsUnsafeTargets(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	for _, path := range []string{".", "..", "../outside", "/tmp"} {
 		if _, err := flushPodcastDir(root, path); err == nil {

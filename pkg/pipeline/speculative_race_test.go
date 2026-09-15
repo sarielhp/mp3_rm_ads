@@ -10,6 +10,7 @@ import (
 )
 
 func TestAwaitRaceResultsGeminiWins(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -31,6 +32,7 @@ func TestAwaitRaceResultsGeminiWins(t *testing.T) {
 }
 
 func TestAwaitRaceResultsGemini503FallbackToLocal(t *testing.T) {
+	t.Parallel()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -56,6 +58,7 @@ func TestAwaitRaceResultsGemini503FallbackToLocal(t *testing.T) {
 }
 
 func TestResolveSpeculativeRacersDefaultDisabled(t *testing.T) {
+	t.Parallel()
 	cfg := types.Config{
 		WhisperConfig: types.WhisperConfig{
 			WhisperURL: "http://127.0.0.1:8088/inference",
@@ -75,6 +78,7 @@ func TestResolveSpeculativeRacersDefaultDisabled(t *testing.T) {
 }
 
 func TestResolveSpeculativeRacersCustomServices(t *testing.T) {
+	t.Parallel()
 	origUsable := transcribe.WhisperProfileUsable
 	transcribe.WhisperProfileUsable = func(wp types.WhisperProfile) bool { return true }
 	t.Cleanup(func() { transcribe.WhisperProfileUsable = origUsable })

@@ -8,6 +8,7 @@ import (
 )
 
 func TestCleanupStaleWorkDirs(t *testing.T) {
+	t.Parallel()
 	for _, scenario := range []string{"stale", "fresh child", "boundary", "locked", "worker", "symlink"} {
 		t.Run(scenario, func(t *testing.T) {
 			root := t.TempDir()

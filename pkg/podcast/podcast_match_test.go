@@ -10,6 +10,7 @@ import (
 )
 
 func TestMatchLocalPodcastsUniqueName(t *testing.T) {
+	t.Parallel()
 	entries := []PodcastDirEntry{
 		{ShortID: "p01", Title: "Hardcore History", FolderName: "hardcore_history", Dir: "/podcasts/hh"},
 		{ShortID: "p02", Title: "Lex Fridman Podcast", FolderName: "lex_fridman", Dir: "/podcasts/lex"},
@@ -25,6 +26,7 @@ func TestMatchLocalPodcastsUniqueName(t *testing.T) {
 }
 
 func TestMatchLocalPodcastsAmbiguous(t *testing.T) {
+	t.Parallel()
 	entries := []PodcastDirEntry{
 		{ShortID: "p01", Title: "The Daily News", Dir: "/podcasts/p1"},
 		{ShortID: "p02", Title: "The Daily Show", Dir: "/podcasts/p2"},
@@ -56,6 +58,7 @@ func TestMatchLocalPodcastsAmbiguous(t *testing.T) {
 }
 
 func TestMatchLocalPodcastsAmbiguousMoreThanFive(t *testing.T) {
+	t.Parallel()
 	var entries []PodcastDirEntry
 	for i := 1; i <= 7; i++ {
 		entries = append(entries, PodcastDirEntry{
@@ -87,6 +90,7 @@ func TestMatchLocalPodcastsAmbiguousMoreThanFive(t *testing.T) {
 }
 
 func TestMatchLocalPodcastsFallbackToID(t *testing.T) {
+	t.Parallel()
 	entries := []PodcastDirEntry{
 		{ShortID: "p01", Title: "Hardcore History", Dir: "/podcasts/hh"},
 		{ShortID: "p02", Title: "Lex Fridman Podcast", Dir: "/podcasts/lex"},
@@ -102,6 +106,7 @@ func TestMatchLocalPodcastsFallbackToID(t *testing.T) {
 }
 
 func TestMatchBackendPodcastsAmbiguous(t *testing.T) {
+	t.Parallel()
 	podcasts := []backend.Podcast{
 		{ID: "101", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "News Daily"}}},
 		{ID: "102", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Science Daily"}}},

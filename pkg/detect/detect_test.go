@@ -12,6 +12,7 @@ import (
 )
 
 func TestExtractJSONArray(t *testing.T) {
+	t.Parallel()
 	raw := `Here are the ads:
 [
   {"start": 10.5, "end": 25.0, "reason": "sponsor plug"},
@@ -35,6 +36,7 @@ Hope this helps!`
 }
 
 func TestExtractJSONArrayEmpty(t *testing.T) {
+	t.Parallel()
 	empty := `[]`
 	ads, err := ExtractJSONArray(empty)
 	if err != nil {
@@ -68,6 +70,7 @@ func adStubServer(t *testing.T, bodies ...string) (*httptest.Server, *int32) {
 }
 
 func TestDetectAdsRetriesEmptyAnswer(t *testing.T) {
+	t.Parallel()
 	// A single empty answer is the observed flake: re-asking must recover the
 	// ads rather than marking the episode clean.
 	found := `[{"start": 0.0, "end": 36.6, "reason": "Preroll promo"}]`
@@ -87,6 +90,7 @@ func TestDetectAdsRetriesEmptyAnswer(t *testing.T) {
 }
 
 func TestDetectAdsAcceptsConfirmedEmptyAnswer(t *testing.T) {
+	t.Parallel()
 	// A genuinely ad-free episode still returns empty, after confirmation.
 	srv, calls := adStubServer(t, "[]")
 	profile := types.LLMProfile{Name: "stub", Type: "openrouter", URL: srv.URL, Model: "stub"}
@@ -104,6 +108,7 @@ func TestDetectAdsAcceptsConfirmedEmptyAnswer(t *testing.T) {
 }
 
 func TestDetectAdsDoesNotRetryWhenAdsFound(t *testing.T) {
+	t.Parallel()
 	// A non-empty answer is taken at face value: no extra calls, no cost.
 	srv, calls := adStubServer(t, `[{"start":1,"end":2,"reason":"ad"}]`)
 	profile := types.LLMProfile{Name: "stub", Type: "openrouter", URL: srv.URL, Model: "stub"}
@@ -118,6 +123,7 @@ func TestDetectAdsDoesNotRetryWhenAdsFound(t *testing.T) {
 }
 
 func TestDetectAdsFailsWhenConfirmationErrors(t *testing.T) {
+	t.Parallel()
 	var calls int32
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		n := atomic.AddInt32(&calls, 1)

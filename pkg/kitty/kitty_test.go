@@ -7,6 +7,7 @@ import (
 )
 
 func TestKittyClearGraphics(t *testing.T) {
+	t.Parallel()
 	got := KittyClearGraphics()
 	if !strings.Contains(got, "\x1b_Ga=d,d=A") {
 		t.Errorf("unexpected clear graphics sequence: %q", got)
@@ -14,6 +15,7 @@ func TestKittyClearGraphics(t *testing.T) {
 }
 
 func TestEncodeKittyGraphics(t *testing.T) {
+	t.Parallel()
 	if got := EncodeKittyGraphics(nil, 10, 10, 100); got != "" {
 		t.Errorf("expected empty string for nil data, got %q", got)
 	}
@@ -29,6 +31,7 @@ func TestEncodeKittyGraphics(t *testing.T) {
 }
 
 func TestWrapTitleLines(t *testing.T) {
+	t.Parallel()
 	short := WrapTitleLines("Short")
 	if len(short) != 1 || short[0] != "Short" {
 		t.Errorf("unexpected wrap for short title: %v", short)
@@ -46,6 +49,7 @@ func TestWrapTitleLines(t *testing.T) {
 }
 
 func TestGenerateGenericCover(t *testing.T) {
+	t.Parallel()
 	img := GenerateGenericCover("Tech News Daily")
 	if img == nil {
 		t.Fatalf("expected non-nil image")
@@ -57,6 +61,7 @@ func TestGenerateGenericCover(t *testing.T) {
 }
 
 func TestScaleImageThumbnail(t *testing.T) {
+	t.Parallel()
 	src := image.NewRGBA(image.Rect(0, 0, 100, 100))
 	scaled := ScaleImageThumbnail(src, 50, 50)
 	if scaled == nil {
@@ -68,5 +73,6 @@ func TestScaleImageThumbnail(t *testing.T) {
 }
 
 func TestClearImageMemoryCache(t *testing.T) {
+	t.Parallel()
 	ClearImageMemoryCache()
 }

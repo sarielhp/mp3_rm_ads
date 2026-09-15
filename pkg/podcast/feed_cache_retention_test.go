@@ -37,6 +37,7 @@ func readCacheFile(t *testing.T, path string) map[string]*FeedCacheEntry {
 }
 
 func TestFeedCacheDropsEntriesPastRetention(t *testing.T) {
+	t.Parallel()
 	path := writeCacheFile(t, map[string]*FeedCacheEntry{
 		"https://fresh.example.com/feed.xml": {
 			FeedURL: "https://fresh.example.com/feed.xml", ETag: `"v1"`,
@@ -70,6 +71,7 @@ func TestFeedCacheDropsEntriesPastRetention(t *testing.T) {
 }
 
 func TestFeedCacheMigratesLegacyEpisodeRecords(t *testing.T) {
+	t.Parallel()
 	url := "https://legacy.example.com/feed.xml"
 	path := writeCacheFile(t, map[string]*FeedCacheEntry{
 		url: {
@@ -100,6 +102,7 @@ func TestFeedCacheMigratesLegacyEpisodeRecords(t *testing.T) {
 }
 
 func TestFeedCacheEntryFeedEpisodesPrefersPubDates(t *testing.T) {
+	t.Parallel()
 	entry := &FeedCacheEntry{PubDates: []FeedCachePubDate{{Title: "New", PublishedAt: 7}}}
 	eps := entry.FeedEpisodes()
 	if len(eps) != 1 || eps[0].Title != "New" || eps[0].PublishedAt != 7 {
@@ -117,6 +120,7 @@ func TestFeedCacheEntryFeedEpisodesPrefersPubDates(t *testing.T) {
 }
 
 func TestFeedCacheUnchangedFileIsNotRewritten(t *testing.T) {
+	t.Parallel()
 	url := "https://fresh.example.com/feed.xml"
 	path := writeCacheFile(t, map[string]*FeedCacheEntry{
 		url: {FeedURL: url, ETag: `"v1"`, LastChecked: time.Now()},
@@ -142,6 +146,7 @@ func TestFeedCacheUnchangedFileIsNotRewritten(t *testing.T) {
 // The sweep replaces an entry wholesale, so it must not discard the
 // publication history the frequency analysis keeps there.
 func TestFeedSweepPreservesPublicationHistory(t *testing.T) {
+	t.Parallel()
 	body := feedXML("Mon, 01 Sep 2026 10:00:00 -0000", feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000"))
 	srv, _ := etagServer(t, `"v1"`, body)
 

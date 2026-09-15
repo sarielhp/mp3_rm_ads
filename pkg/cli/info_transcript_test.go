@@ -11,6 +11,7 @@ import (
 )
 
 func TestResolveTranscriptAfterAudioRemoved(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"episode"})
 	id := podcast.EpisodeShortIDReadOnly(dir, podcast.GeneratePodcastShortID("Show"), paths[0])

@@ -28,6 +28,7 @@ func TestOpenProvidesOwnedState(t *testing.T) {
 }
 
 func TestOpenKeepsReporter(t *testing.T) {
+	t.Parallel()
 	lines := &progress.Lines{}
 	if got := Open(Config{}, nil, lines).Progress(); got != progress.Reporter(lines) {
 		t.Error("Open replaced the caller's Reporter")
@@ -50,6 +51,7 @@ func TestLibrariesShareTheDefaultFileBackedState(t *testing.T) {
 }
 
 func TestLibraryResolvesAgainstItsOwnRoot(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "Some_Show")
 	if err := os.MkdirAll(dir, 0755); err != nil {
@@ -77,6 +79,7 @@ func TestLibraryResolvesAgainstItsOwnRoot(t *testing.T) {
 // Config is the boundary this step exists to draw. If a field creeps in, the
 // library has started to care about something that is not its business.
 func TestConfigStaysThreeFields(t *testing.T) {
+	t.Parallel()
 	got := reflect.TypeOf(Config{})
 	want := []string{"PodcastsDir", "SubscriptionsFile", "ServerBaseURL"}
 	if got.NumField() != len(want) {
@@ -92,6 +95,7 @@ func TestConfigStaysThreeFields(t *testing.T) {
 // The application config carries transcription profiles, LLM keys and the
 // terminal UI's colours. The podcast library has no business seeing any of it.
 func TestLibraryDoesNotReadTheApplicationConfig(t *testing.T) {
+	t.Parallel()
 	entries, err := os.ReadDir(".")
 	if err != nil {
 		t.Fatal(err)

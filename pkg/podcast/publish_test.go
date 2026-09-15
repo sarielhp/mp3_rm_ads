@@ -8,6 +8,7 @@ import (
 )
 
 func TestGeneratePodcastWebpage(t *testing.T) {
+	t.Parallel()
 	podDir := t.TempDir()
 	sub := Subscription{
 		ID:       "pod1",
@@ -58,6 +59,7 @@ func TestGeneratePodcastWebpage(t *testing.T) {
 }
 
 func TestGenerateCatalogWebpage(t *testing.T) {
+	t.Parallel()
 	podcastsDir := t.TempDir()
 	subs := []Subscription{
 		{

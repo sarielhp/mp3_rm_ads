@@ -9,6 +9,7 @@ import (
 )
 
 func TestStandaloneBackend(t *testing.T) {
+	t.Parallel()
 	podcastsDir := t.TempDir()
 	storePath := filepath.Join(t.TempDir(), "podcasts.json")
 

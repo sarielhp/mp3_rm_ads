@@ -7,6 +7,7 @@ import (
 )
 
 func TestSubscriptionStoreCRUD(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	storeFile := filepath.Join(tmpDir, "podcasts.json")
 
@@ -66,6 +67,7 @@ func TestSubscriptionStoreCRUD(t *testing.T) {
 }
 
 func TestSubscriptionStoreImportOPML(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	storeFile := filepath.Join(tmpDir, "podcasts.json")
 

@@ -7,6 +7,7 @@ import (
 )
 
 func TestOrSubstitutesDiscardForNil(t *testing.T) {
+	t.Parallel()
 	r := Or(nil)
 	if r == nil {
 		t.Fatal("Or(nil) returned nil")
@@ -17,6 +18,7 @@ func TestOrSubstitutesDiscardForNil(t *testing.T) {
 }
 
 func TestOrPassesThroughNonNil(t *testing.T) {
+	t.Parallel()
 	l := &Lines{}
 	if got := Or(l); got != Reporter(l) {
 		t.Errorf("Or replaced a non-nil Reporter")
@@ -24,6 +26,7 @@ func TestOrPassesThroughNonNil(t *testing.T) {
 }
 
 func TestWriterRoutesStreamsAndAppendsNewline(t *testing.T) {
+	t.Parallel()
 	var out, errOut bytes.Buffer
 	r := Writer(&out, &errOut, false)
 	r.Infof("hello %s", "world")
@@ -38,6 +41,7 @@ func TestWriterRoutesStreamsAndAppendsNewline(t *testing.T) {
 }
 
 func TestWriterDoesNotDoubleNewline(t *testing.T) {
+	t.Parallel()
 	var out bytes.Buffer
 	Writer(&out, nil, false).Infof("already\n")
 	if out.String() != "already\n" {
@@ -46,6 +50,7 @@ func TestWriterDoesNotDoubleNewline(t *testing.T) {
 }
 
 func TestWriterDetailRequiresVerbose(t *testing.T) {
+	t.Parallel()
 	var quiet, loud bytes.Buffer
 	Writer(&quiet, nil, false).Detailf("detail")
 	Writer(&loud, nil, true).Detailf("detail")
@@ -59,6 +64,7 @@ func TestWriterDetailRequiresVerbose(t *testing.T) {
 }
 
 func TestWriterNilStreamIsSilent(t *testing.T) {
+	t.Parallel()
 	r := Writer(nil, nil, true)
 	r.Infof("dropped")
 	r.Detailf("dropped")
@@ -66,6 +72,7 @@ func TestWriterNilStreamIsSilent(t *testing.T) {
 }
 
 func TestLinesCollectsByLevel(t *testing.T) {
+	t.Parallel()
 	l := &Lines{}
 	l.Infof("i%d", 1)
 	l.Detailf("d%d", 2)
@@ -86,6 +93,7 @@ func TestLinesCollectsByLevel(t *testing.T) {
 }
 
 func TestDiscardIsUsable(t *testing.T) {
+	t.Parallel()
 	Discard.Infof("x")
 	Discard.Detailf("x")
 	Discard.Warnf("x")

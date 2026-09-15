@@ -93,7 +93,11 @@ if full_mode
     end
   end
 else
-  run_cmd("Go test (race detector)", "go test -race -timeout 180s ./...")
+  # No race detector here. It costs ~4s on this suite and, more importantly,
+  # -race keeps its own build cache: a developer who runs `go test ./...` and
+  # then `make check` would pay for every package twice. `make bump` runs
+  # --full, so nothing reaches a release without it.
+  run_cmd("Go test", "go test -timeout 180s ./...")
 end
 
 # 6. Build

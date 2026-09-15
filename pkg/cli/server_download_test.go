@@ -171,6 +171,7 @@ func TestServerDownloadCountSelectsNewestOrOldest(t *testing.T) {
 }
 
 func TestServerDownloadAmbiguousTarget(t *testing.T) {
+	t.Parallel()
 	podcasts := []backend.Podcast{
 		{ID: "101", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Daily News"}}},
 		{ID: "102", Media: backend.PodcastMedia{Metadata: backend.PodcastMetadata{Title: "Daily Tech"}}},

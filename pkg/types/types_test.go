@@ -6,6 +6,7 @@ import (
 )
 
 func TestAdSegmentJSON(t *testing.T) {
+	t.Parallel()
 	seg := AdSegment{
 		Start:  10.5,
 		End:    30.2,
@@ -27,6 +28,7 @@ func TestAdSegmentJSON(t *testing.T) {
 }
 
 func TestConfigFlags(t *testing.T) {
+	t.Parallel()
 	var cfg Config
 	if !cfg.IsGeminiAPIKeyEnabled() {
 		t.Error("expected default GeminiAPIKeyEnabled to be true")
@@ -70,6 +72,7 @@ func TestConfigFlags(t *testing.T) {
 }
 
 func TestEpisodeStatusFileFavorite(t *testing.T) {
+	t.Parallel()
 	st := EpisodeStatusFile{}
 	if st.IsFavorite() {
 		t.Errorf("expected initially not favorite")

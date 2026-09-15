@@ -5,6 +5,7 @@ import (
 )
 
 func TestBuildCutFilterComplex(t *testing.T) {
+	t.Parallel()
 	keep := [][2]float64{
 		{0.0, 10.5},
 		{20.0, 35.2},
@@ -17,6 +18,7 @@ func TestBuildCutFilterComplex(t *testing.T) {
 }
 
 func TestFormatCUETime(t *testing.T) {
+	t.Parallel()
 	if got := FormatCUETime(0); got != "00:00:00" {
 		t.Errorf("FormatCUETime(0) = %q; want 00:00:00", got)
 	}
@@ -26,6 +28,7 @@ func TestFormatCUETime(t *testing.T) {
 }
 
 func TestComputeSplitPoints(t *testing.T) {
+	t.Parallel()
 	keep := [][2]float64{
 		{10.0, 20.0},
 		{30.0, 40.0},

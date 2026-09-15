@@ -6,6 +6,7 @@ import (
 )
 
 func TestParseFlagsDownloadAll(t *testing.T) {
+	t.Parallel()
 	origArgs := os.Args
 	defer func() { os.Args = origArgs }()
 

@@ -11,6 +11,7 @@ import (
 )
 
 func TestFeedCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	cachePath := filepath.Join(tmpDir, "feed_cache.json")
 	mgr := NewFeedCacheManager(cachePath)
@@ -51,6 +52,7 @@ func TestFeedCache(t *testing.T) {
 }
 
 func TestParseRSSXML(t *testing.T) {
+	t.Parallel()
 	xmlData := []byte(`<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0">
   <channel>
@@ -85,6 +87,7 @@ func TestParseRSSXML(t *testing.T) {
 }
 
 func TestPodcastShortID(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		title    string
 		want5Len bool
@@ -105,6 +108,7 @@ func TestPodcastShortID(t *testing.T) {
 }
 
 func TestEpisodeShortID(t *testing.T) {
+	t.Parallel()
 	podShort := "plntm"
 	epKey := "123_Inflation.mp3"
 	id := GenerateEpisodeShortID(podShort, epKey)
@@ -119,6 +123,7 @@ func TestEpisodeShortID(t *testing.T) {
 }
 
 func TestDownloadQueue(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	qPath := filepath.Join(tmpDir, "dl_queue.json")
 	q := NewDownloadQueue(qPath)
@@ -169,6 +174,7 @@ func TestDownloadQueue(t *testing.T) {
 }
 
 func TestDownloadPolicy(t *testing.T) {
+	t.Parallel()
 	catalog := []backend.FeedEpisode{
 		{Title: "Ep 1", EnclosureURL: "https://example.com/1.mp3"},
 		{Title: "Ep 2", EnclosureURL: "https://example.com/2.mp3"},
@@ -196,6 +202,7 @@ func TestDownloadPolicy(t *testing.T) {
 }
 
 func TestOrphanPodcasts(t *testing.T) {
+	t.Parallel()
 	podcasts := []backend.Podcast{
 		{
 			ID: "p1",
@@ -224,6 +231,7 @@ func TestOrphanPodcasts(t *testing.T) {
 }
 
 func TestPodcastCache(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	podDir := filepath.Join(tmpDir, "TestPodcast")
 	_ = os.MkdirAll(podDir, 0755)
@@ -250,6 +258,7 @@ func TestPodcastCache(t *testing.T) {
 }
 
 func TestSelectNewEpisodes(t *testing.T) {
+	t.Parallel()
 	t0 := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	t1 := time.Date(2026, 1, 2, 0, 0, 0, 0, time.UTC)
 	t2 := time.Date(2026, 1, 3, 0, 0, 0, 0, time.UTC)

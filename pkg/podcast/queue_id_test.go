@@ -7,6 +7,7 @@ import (
 )
 
 func TestEpisodeIDsDistinguishCachedNestedPaths(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	a := filepath.Join(dir, "a", "podcast.mp3")
 	b := filepath.Join(dir, "b", "podcast.mp3")

@@ -12,6 +12,7 @@ import (
 )
 
 func TestDownloaderSuccess(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if !strings.Contains(r.Header.Get("User-Agent"), "pod") {
 			http.Error(w, "invalid user agent", http.StatusBadRequest)
@@ -41,6 +42,7 @@ func TestDownloaderSuccess(t *testing.T) {
 }
 
 func TestDownloaderHTTPError(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "not found", http.StatusNotFound)
 	}))
@@ -61,6 +63,7 @@ func TestDownloaderHTTPError(t *testing.T) {
 }
 
 func TestDownloaderContextCancelled(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		time.Sleep(500 * time.Millisecond)
 		_, _ = w.Write([]byte("too slow"))
@@ -81,6 +84,7 @@ func TestDownloaderContextCancelled(t *testing.T) {
 }
 
 func TestDownloadCoverImage(t *testing.T) {
+	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "image/jpeg")
 		_, _ = w.Write([]byte("fake cover image bytes"))

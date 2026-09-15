@@ -9,6 +9,7 @@ import (
 )
 
 func TestLLMProfileProbe(t *testing.T) {
+	t.Parallel()
 	for _, tc := range []struct {
 		name, content string
 		status        int
@@ -55,6 +56,7 @@ func TestLLMProfileProbe(t *testing.T) {
 }
 
 func TestLLMTestRejectsInvalidConfiguration(t *testing.T) {
+	t.Parallel()
 	for _, id := range []string{"bad", "0", "-1", "3"} {
 		if err := testLLMProfile(Config{}, id); err == nil {
 			t.Fatalf("accepted missing/invalid profile %q", id)

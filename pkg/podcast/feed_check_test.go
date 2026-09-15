@@ -69,6 +69,7 @@ func etagServer(t *testing.T, etag, body string) (*httptest.Server, *int) {
 }
 
 func TestCheckFeedsForUpdatesUsesConditionalGet(t *testing.T) {
+	t.Parallel()
 	body := feedXML("Mon, 01 Sep 2026 10:00:00 -0000", feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000"))
 	srv, bodyServed := etagServer(t, `"v1"`, body)
 
@@ -101,6 +102,7 @@ func TestCheckFeedsForUpdatesUsesConditionalGet(t *testing.T) {
 }
 
 func TestCheckFeedsForUpdatesDetectsNewEpisode(t *testing.T) {
+	t.Parallel()
 	older := feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000")
 	newer := feedItem("Ep 2", "g2", "Tue, 02 Sep 2026 10:00:00 -0000")
 
@@ -141,6 +143,7 @@ func TestCheckFeedsForUpdatesDetectsNewEpisode(t *testing.T) {
 // Roughly one feed in six serves no usable validator, so the content markers
 // are the only thing standing between an unchanged feed and needless work.
 func TestCheckFeedsForUpdatesFallsBackToContentMarkers(t *testing.T) {
+	t.Parallel()
 	served := 0
 	body := feedXML("Mon, 01 Sep 2026 10:00:00 -0000", feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000"))
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -166,6 +169,7 @@ func TestCheckFeedsForUpdatesFallsBackToContentMarkers(t *testing.T) {
 }
 
 func TestCheckFeedsForUpdatesForceIgnoresCache(t *testing.T) {
+	t.Parallel()
 	body := feedXML("Mon, 01 Sep 2026 10:00:00 -0000", feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000"))
 	srv, bodyServed := etagServer(t, `"v1"`, body)
 
@@ -186,6 +190,7 @@ func TestCheckFeedsForUpdatesForceIgnoresCache(t *testing.T) {
 }
 
 func TestCheckFeedsForUpdatesUnreadableFeedFallsBackToServer(t *testing.T) {
+	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 	}))
@@ -212,12 +217,14 @@ func TestCheckFeedsForUpdatesUnreadableFeedFallsBackToServer(t *testing.T) {
 }
 
 func TestCheckFeedsForUpdatesEmptyInput(t *testing.T) {
+	t.Parallel()
 	if res := CheckFeedsForUpdates(nil, EpisodeIndex{}, checkOpts(newTestCache(t))); len(res) != 0 {
 		t.Fatalf("expected no results, got %d", len(res))
 	}
 }
 
 func TestCheckFeedsForUpdatesCatchesUnindexedEpisodeEvenIfOriginUnchanged(t *testing.T) {
+	t.Parallel()
 	ep1 := feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000")
 	ep2 := feedItem("Ep 2", "g2", "Tue, 02 Sep 2026 10:00:00 -0000")
 	body := feedXML("Tue, 02 Sep 2026 10:00:00 -0000", ep2, ep1)

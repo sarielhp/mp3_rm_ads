@@ -16,6 +16,7 @@ import (
 )
 
 func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
+	t.Parallel()
 	rootTmp := t.TempDir()
 
 	hourlyDir := filepath.Join(rootTmp, "Hourly Podcast")
@@ -106,6 +107,7 @@ func TestHandleServerFrequency_LocalDirectory(t *testing.T) {
 }
 
 func TestHandleServerDisableHourly(t *testing.T) {
+	t.Parallel()
 	rootTmp := t.TempDir()
 
 	hourlyDir := filepath.Join(rootTmp, "News Hourly")

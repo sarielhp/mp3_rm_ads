@@ -11,6 +11,7 @@ import (
 )
 
 func TestQueueCatalogRejectsUnsafeAndConflictingPaths(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	path := filepath.Join(root, "episode.mp3")
 	if err := os.WriteFile(path, []byte("audio"), 0644); err != nil {
@@ -30,6 +31,7 @@ func TestQueueCatalogRejectsUnsafeAndConflictingPaths(t *testing.T) {
 }
 
 func TestQueueTodayStandalone(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir := filepath.Join(root, "Show")
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)

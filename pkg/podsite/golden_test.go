@@ -60,6 +60,7 @@ func fixture() (Show, []Episode) {
 }
 
 func TestRenderFeedGolden(t *testing.T) {
+	t.Parallel()
 	show, eps := fixture()
 	data, err := RenderFeed(show, eps, "http://srv:8080/podcasts")
 	if err != nil {
@@ -75,6 +76,7 @@ func TestRenderFeedGolden(t *testing.T) {
 }
 
 func TestRenderFeedRemoteImageFallback(t *testing.T) {
+	t.Parallel()
 	show, eps := fixture()
 	show.CoverFile = ""
 	data, err := RenderFeed(show, eps, "http://srv:8080/podcasts")
@@ -85,6 +87,7 @@ func TestRenderFeedRemoteImageFallback(t *testing.T) {
 }
 
 func TestRenderShowPageGolden(t *testing.T) {
+	t.Parallel()
 	show, eps := fixture()
 	data, err := RenderShowPage(show, eps, "http://srv:8080/podcasts")
 	if err != nil {
@@ -100,6 +103,7 @@ func TestRenderShowPageGolden(t *testing.T) {
 }
 
 func TestRenderCatalogGolden(t *testing.T) {
+	t.Parallel()
 	entries := []CatalogEntry{
 		{Title: "Zeta Show", Folder: "Zeta Show", CoverSrc: "Zeta%20Show/cover.jpg", EpisodeCount: 3},
 		{Title: "alpha show", Folder: "alpha show", CoverSrc: "https://remote.example.com/art.jpg", EpisodeCount: 0},
@@ -119,6 +123,7 @@ func TestRenderCatalogGolden(t *testing.T) {
 
 // RenderCatalog sorts for display; it must not reorder the caller's slice.
 func TestRenderCatalogDoesNotMutateInput(t *testing.T) {
+	t.Parallel()
 	entries := []CatalogEntry{{Title: "Zeta"}, {Title: "alpha"}}
 	if _, err := RenderCatalog(entries, CatalogOptions{}); err != nil {
 		t.Fatal(err)

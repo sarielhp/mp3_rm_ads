@@ -10,6 +10,7 @@ import (
 )
 
 func TestQueueLatestDefaultCount(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	titles := []string{"Ep1", "Ep2", "Ep3", "Ep4", "Ep5", "Ep6", "Ep7", "Ep8", "Ep9", "Ep10", "Ep11", "Ep12"}
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", titles)
@@ -52,6 +53,7 @@ func TestQueueLatestDefaultCount(t *testing.T) {
 }
 
 func TestQueueLatestExcludesClean(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	titles := []string{"Old", "Middle", "Newest"}
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", titles)
@@ -84,6 +86,7 @@ func TestQueueLatestExcludesClean(t *testing.T) {
 }
 
 func TestQueueLatestTargetPodcast(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dirA, pathsA := createTestPodcastWithEpisodes(t, root, "ShowA", []string{"A1", "A2"})
 	dirB, _ := createTestPodcastWithEpisodes(t, root, "ShowB", []string{"B1", "B2"})
@@ -118,6 +121,7 @@ func TestQueueLatestTargetPodcast(t *testing.T) {
 }
 
 func TestQueueLatestDryRun(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir, _ := createTestPodcastWithEpisodes(t, root, "Show", []string{"Ep1", "Ep2"})
 
@@ -190,6 +194,7 @@ func TestQueueLatestParsing(t *testing.T) {
 }
 
 func TestQueueRoutingLatest(t *testing.T) {
+	t.Parallel()
 	root := t.TempDir()
 	dir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"E1", "E2", "E3"})
 

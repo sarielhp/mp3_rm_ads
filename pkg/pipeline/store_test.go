@@ -9,6 +9,7 @@ import (
 )
 
 func TestFileEpisodeStateStoreUpdateAndGet(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	audioPath := filepath.Join(dir, "episode.mp3")
 

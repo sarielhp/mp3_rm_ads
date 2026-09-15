@@ -34,6 +34,7 @@ func downloadFixture() (backend.Podcast, []backend.FeedEpisode) {
 }
 
 func TestExecuteEpisodeDownloadsReportsToReporter(t *testing.T) {
+	t.Parallel()
 	item, eps := downloadFixture()
 	lines := &progress.Lines{}
 
@@ -64,6 +65,7 @@ func TestExecuteEpisodeDownloadsReportsToReporter(t *testing.T) {
 // A nil Progress is the default for every non-interactive caller, including
 // the TUI. It must be silent rather than panicking or falling back to stdout.
 func TestExecuteEpisodeDownloadsSilentWithoutReporter(t *testing.T) {
+	t.Parallel()
 	item, eps := downloadFixture()
 	b := &recordingBackend{}
 
@@ -77,6 +79,7 @@ func TestExecuteEpisodeDownloadsSilentWithoutReporter(t *testing.T) {
 }
 
 func TestExecuteEpisodeDownloadsDryRunSkipsBackend(t *testing.T) {
+	t.Parallel()
 	item, eps := downloadFixture()
 	b := &recordingBackend{}
 	lines := &progress.Lines{}

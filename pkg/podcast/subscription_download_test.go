@@ -14,6 +14,7 @@ import (
 // part of a download run that decides what a user actually gets, so it is
 // tested against the library rather than through a command's flag struct.
 func TestSelectSubscriptionEpisodesRespectsPolicy(t *testing.T) {
+	t.Parallel()
 	podDir := filepath.Join(t.TempDir(), "Show")
 	if err := os.MkdirAll(podDir, 0755); err != nil {
 		t.Fatal(err)
@@ -62,6 +63,7 @@ func TestSelectSubscriptionEpisodesRespectsPolicy(t *testing.T) {
 }
 
 func TestSelectSubscriptionEpisodesExplicitCountOverridesPolicy(t *testing.T) {
+	t.Parallel()
 	podDir := t.TempDir()
 	feedEps := []backend.FeedEpisode{
 		{Title: "Ep 3", PublishedAt: 3000, EnclosureURL: "http://e.com/3.mp3"},
@@ -82,6 +84,7 @@ func TestSelectSubscriptionEpisodesExplicitCountOverridesPolicy(t *testing.T) {
 }
 
 func TestSubscriptionTargets(t *testing.T) {
+	t.Parallel()
 	subs := []Subscription{
 		{ID: "p1", Title: "Podcast 1"},
 		{ID: "p2", Title: "Podcast 2", Disabled: true},
@@ -104,6 +107,7 @@ func TestSubscriptionTargets(t *testing.T) {
 }
 
 func TestShouldQueueForAdRemoval(t *testing.T) {
+	t.Parallel()
 	podDir := t.TempDir()
 	defaults := config.PolicyDefaults{AdRemoval: "none"}
 

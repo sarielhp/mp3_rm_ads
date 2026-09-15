@@ -7,6 +7,7 @@ import (
 )
 
 func TestParseRSSFeedCapturesChannelMarkers(t *testing.T) {
+	t.Parallel()
 	raw := []byte(feedXML("Mon, 01 Sep 2026 10:00:00 -0000",
 		feedItem("Ep 2", "g2", "Tue, 02 Sep 2026 10:00:00 -0000"),
 		feedItem("Ep 1", "g1", "Mon, 01 Sep 2026 10:00:00 -0000")))
@@ -30,6 +31,7 @@ func TestParseRSSFeedCapturesChannelMarkers(t *testing.T) {
 }
 
 func TestParseRSSFeedLatestGUIDIgnoresFeedOrder(t *testing.T) {
+	t.Parallel()
 	// Some publishers list episodes oldest first, so the newest entry cannot
 	// be assumed to be the first one.
 	raw := []byte(feedXML("",
@@ -46,6 +48,7 @@ func TestParseRSSFeedLatestGUIDIgnoresFeedOrder(t *testing.T) {
 }
 
 func TestEpisodeIndexMatchesAcrossIdentifiers(t *testing.T) {
+	t.Parallel()
 	pods := []backend.Podcast{testPodcast("p1", "Show",
 		"https://example.com/feed.xml",
 		backend.Episode{GUID: "g1", Title: "First Episode", EnclosureURL: "http://cdn.example.com/1.mp3"},
@@ -77,6 +80,7 @@ func TestEpisodeIndexMatchesAcrossIdentifiers(t *testing.T) {
 }
 
 func TestEpisodeIndexPendingCountsMissingAudio(t *testing.T) {
+	t.Parallel()
 	pods := []backend.Podcast{testPodcast("p1", "Show", "https://example.com/feed.xml",
 		backend.Episode{GUID: "g1", Title: "Downloaded", AudioFile: &backend.PodcastAudioFile{Duration: 1}},
 		backend.Episode{GUID: "g2", Title: "Catalogued Only"},
@@ -89,6 +93,7 @@ func TestEpisodeIndexPendingCountsMissingAudio(t *testing.T) {
 }
 
 func TestEpisodeIndexUnknownPodcastTreatsEverythingAsNew(t *testing.T) {
+	t.Parallel()
 	index := BuildEpisodeIndexFromPodcasts(nil, nil)
 	unknown := index.Unknown("missing", []backend.FeedEpisode{{GUID: "g1"}, {GUID: "g2"}})
 	if len(unknown) != 2 {
@@ -97,6 +102,7 @@ func TestEpisodeIndexUnknownPodcastTreatsEverythingAsNew(t *testing.T) {
 }
 
 func TestBuildEpisodeIndexPrefersBackendCatalog(t *testing.T) {
+	t.Parallel()
 	pods := []backend.Podcast{testPodcast("p1", "Show", "https://example.com/feed.xml")}
 	index := BuildEpisodeIndex(catalogBackend{}, pods)
 	idx := index["p1"]

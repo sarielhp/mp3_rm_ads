@@ -8,6 +8,7 @@ import (
 )
 
 func TestFormatClock(t *testing.T) {
+	t.Parallel()
 	if got := FormatClock(0); got != "00:00" {
 		t.Errorf("FormatClock(0) = %q; want 00:00", got)
 	}
@@ -20,6 +21,7 @@ func TestFormatClock(t *testing.T) {
 }
 
 func TestFormatSRTTime(t *testing.T) {
+	t.Parallel()
 	if got := FormatSRTTime(0); got != "00:00:00,000" {
 		t.Errorf("FormatSRTTime(0) = %q; want 00:00:00,000", got)
 	}
@@ -29,6 +31,7 @@ func TestFormatSRTTime(t *testing.T) {
 }
 
 func TestCalculateKeepSegments(t *testing.T) {
+	t.Parallel()
 	ads := []types.AdSegment{
 		{Start: 10, End: 20},
 		{Start: 30, End: 40},
@@ -43,6 +46,7 @@ func TestCalculateKeepSegments(t *testing.T) {
 }
 
 func TestSaveCutsJSON(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	mainFile := filepath.Join(tmpDir, "podcast.mp3")
 

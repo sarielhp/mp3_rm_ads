@@ -11,6 +11,7 @@ import (
 )
 
 func TestDefaultConfigNoUsername(t *testing.T) {
+	t.Parallel()
 	cfg := DefaultConfig()
 	data, err := json.Marshal(cfg)
 	if err != nil {
@@ -23,6 +24,7 @@ func TestDefaultConfigNoUsername(t *testing.T) {
 }
 
 func TestDefaultConfig(t *testing.T) {
+	t.Parallel()
 	cfg := DefaultConfig()
 	if cfg.ActiveProfileID != 3 {
 		t.Errorf("expected ActiveProfileID 3, got %d", cfg.ActiveProfileID)
@@ -64,6 +66,7 @@ func TestEnsureConfigExists(t *testing.T) {
 }
 
 func TestPodcastConfigCycle(t *testing.T) {
+	t.Parallel()
 	mode := AdRemovalNone
 	mode = CycleAdRemovalMode(mode)
 	if mode != AdRemovalLatest {
@@ -80,6 +83,7 @@ func TestPodcastConfigCycle(t *testing.T) {
 }
 
 func TestSubscriptionsFilePath(t *testing.T) {
+	t.Parallel()
 	defaultPath := SubscriptionsFilePath(nil)
 	if !strings.HasSuffix(defaultPath, "podcasts.json") {
 		t.Errorf("expected default path to end in podcasts.json, got %s", defaultPath)
