@@ -253,6 +253,7 @@ func TestTUISaveQueueNil(t *testing.T) {
 
 func makeTestModel() *tuiModel {
 	return &tuiModel{
+		lib:    testLibrary(),
 		ready:  true,
 		screen: screenPodcasts,
 		width:  80,

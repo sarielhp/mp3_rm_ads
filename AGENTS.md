@@ -193,7 +193,8 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/pod_player.sock`), MPRIS |
 | `pkg/podcast` | Standalone podcast manager, subscription store, native downloader; owns publishing (`PublishPodcast`, `PublishCatalog`) |
 | `pkg/podsite` | Pure static-site renderer: RSS feed and HTML player bytes. Imports no podcast code — callers pass in resolved data |
-| `pkg/podcast` (cont.) | `EpisodeFile` is the shared core of an episode on disk; representations embed it rather than restating the six fields. Cache wire format is pinned by `TestCacheWireFormat` |
+| `pkg/podcast` (cont.) | `podcast.Library` (`Open`) is the entry point for anything needing library-wide state; it owns the feed cache and download queue. `podcast.Config` is three fields and must stay that way (`TestConfigStaysThreeFields`) |
+| `pkg/podcast` (cont. 2) | `EpisodeFile` is the shared core of an episode on disk; representations embed it rather than restating the six fields. Cache wire format is pinned by `TestCacheWireFormat` |
 | `pkg/progress` | `progress.Reporter`: how library packages report progress without choosing where it goes. A nil Reporter is silent |
 | `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |

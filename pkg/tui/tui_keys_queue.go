@@ -3,7 +3,6 @@ package tui
 import (
 	"pod/pkg/backend"
 	"pod/pkg/config"
-	"pod/pkg/podcast"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -123,7 +122,7 @@ func (m *tuiModel) handleAdQueueKey(s string) (tea.Model, tea.Cmd) {
 }
 
 func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
-	items := podcast.DefaultDownloadQueue().Items()
+	items := m.lib.Queue().Items()
 	switch s {
 	case "up", "k":
 		if m.dlqIdx > 0 {
@@ -142,14 +141,14 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 		}
 	case "d", "D", "x", "X":
 		if len(items) > 0 && m.dlqIdx < len(items) {
-			podcast.DefaultDownloadQueue().Remove(items[m.dlqIdx].ID)
+			m.lib.Queue().Remove(items[m.dlqIdx].ID)
 			m.showToast("Removed from download queue", ToastInfo)
 			if m.dlqIdx >= len(items)-1 && m.dlqIdx > 0 {
 				m.dlqIdx--
 			}
 		}
 	case "c", "C":
-		podcast.DefaultDownloadQueue().Clear()
+		m.lib.Queue().Clear()
 		m.showToast("Download queue cleared", ToastInfo)
 		m.dlqIdx = 0
 		m.dlqScroll = 0
@@ -161,7 +160,7 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 				bCli, _ = backend.FromAppConfig(cfg, nil)
 			}
 		}
-		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(bCli)
 		m.showToast("Triggered download processing", ToastInfo)
 	case "esc", "q", "Q":
 		m.handleEscape()

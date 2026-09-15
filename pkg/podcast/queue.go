@@ -84,7 +84,10 @@ func defaultDownloadQueuePath() string {
 var globalDownloadQueueOnce util.Once
 var globalDownloadQueue *DownloadQueue
 
-func DefaultDownloadQueue() *DownloadQueue {
+// defaultDownloadQueue is the process-wide download queue for the default
+// queue file. It is unexported: callers outside this package reach it through
+// Library.Queue, so library state is owned rather than ambient.
+func defaultDownloadQueue() *DownloadQueue {
 	globalDownloadQueueOnce.Do(func() {
 		globalDownloadQueue = NewDownloadQueue("")
 	})

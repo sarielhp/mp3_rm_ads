@@ -105,7 +105,7 @@ func (m *tuiModel) drawLatestEpisodesScreen() string {
 	end := min(len(items), start+maxVis)
 
 	for i := start; i < end; i++ {
-		out.WriteString(renderLatestEpisodeRow(items[i], i == m.latestIdx, m.width))
+		out.WriteString(renderLatestEpisodeRow(items[i], i == m.latestIdx, m.width, m.lib.Queue()))
 	}
 
 	renderLatestEpisodesFooter(m, len(items), maxVis, dividerWidth, out)
@@ -133,7 +133,7 @@ func adjustLatestEpisodesScroll(m *tuiModel, totalItems, maxVis int) {
 	}
 }
 
-func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) string {
+func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int, dlQueue *podcast.DownloadQueue) string {
 	ep := item.episode
 	displayNameStr := ep.displayTitle()
 	d := ep.displayDate()
@@ -146,7 +146,7 @@ func renderLatestEpisodeRow(item tuiLatestItem, isSelected bool, width int) stri
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 	}
-	inQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
+	inQueue := dlQueue.IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || dlQueue.IsEpisodeInQueue(epGUID, "", ep.filename)
 
 	podTag := fmt.Sprintf("[%s]", truncate(util.DisplayName(item.podcastName), 18))
 	availWidth := width - 2
@@ -237,7 +237,7 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 		DurationSec:  ep.duration,
 	}
 
-	ok, reason := podcast.DefaultDownloadQueue().Enqueue(dlItem)
+	ok, reason := m.lib.Queue().Enqueue(dlItem)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
 		var bCli backend.Backend
@@ -247,7 +247,7 @@ func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 				bCli, _ = backend.FromAppConfig(cfg, nil)
 			}
 		}
-		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {

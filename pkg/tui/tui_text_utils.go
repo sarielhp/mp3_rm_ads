@@ -1,8 +1,9 @@
 package tui
 
 import (
-	"github.com/charmbracelet/lipgloss"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 )
 
 func wrapDescription(descClean string, maxW int) []string {

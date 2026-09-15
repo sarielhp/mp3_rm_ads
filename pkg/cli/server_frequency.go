@@ -100,7 +100,7 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 		results[i] = processSingleFrequencyItem(b, item, config, cli, shouldDisable)
 	}
 
-	_ = podcast.DefaultFeedCache().Save()
+	_ = library(config, cli, b).FeedCache().Save()
 
 	if !cli.Quiet {
 		printFrequencyTable(results, cli.Verbose, shouldDisable)

@@ -115,7 +115,10 @@ type FeedCacheManager struct {
 var globalFeedCacheOnce util.Once
 var globalFeedCache *FeedCacheManager
 
-func DefaultFeedCache() *FeedCacheManager {
+// defaultFeedCache is the process-wide feed cache for the default cache path.
+// It is unexported: callers outside this package reach it through
+// Library.FeedCache, so library state is owned rather than ambient.
+func defaultFeedCache() *FeedCacheManager {
 	globalFeedCacheOnce.Do(func() {
 		globalFeedCache = NewFeedCacheManager("")
 	})
@@ -679,15 +682,15 @@ func FetchFeedDirect(feedURL string, cachedETag, cachedLastMod string) ([]backen
 }
 
 func cacheDocImage(feedURL, imageURL string) {
-	entry := DefaultFeedCache().Get(feedURL)
+	entry := defaultFeedCache().Get(feedURL)
 	if entry != nil {
 		if entry.ImageURL == "" {
 			entry.ImageURL = imageURL
-			DefaultFeedCache().Put(feedURL, entry)
+			defaultFeedCache().Put(feedURL, entry)
 		}
 		return
 	}
-	DefaultFeedCache().Put(feedURL, &FeedCacheEntry{
+	defaultFeedCache().Put(feedURL, &FeedCacheEntry{
 		FeedURL:  feedURL,
 		ImageURL: imageURL,
 	})

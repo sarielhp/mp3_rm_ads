@@ -191,7 +191,7 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 				DurationSec:  ep.duration,
 				EnclosureURL: encURL,
 			}
-			_, _ = podcast.DefaultDownloadQueue().Enqueue(item)
+			_, _ = m.lib.Queue().Enqueue(item)
 			count++
 		}
 	}

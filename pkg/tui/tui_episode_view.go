@@ -36,7 +36,7 @@ func (m *tuiModel) drawEpisodeDetail() string {
 		out.WriteString(kitty.KittyClearGraphics())
 	}
 
-	fullTitle, dateStr, totalDurStr, badgeLeft, descClean := formatEpisodeDetailFields(pod, ep, absEp, m.epIdx)
+	fullTitle, dateStr, totalDurStr, badgeLeft, descClean := formatEpisodeDetailFields(pod, ep, absEp, m.epIdx, m.lib.Queue())
 	maxLines := max(10, m.height-6)
 
 	if m.showEpisodePlayerPane && m.width >= 70 {
@@ -64,7 +64,7 @@ func resolveABSEpisode(podDir string, ep tuiEpisode) *backend.Episode {
 	return absEp
 }
 
-func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *backend.Episode, epIdx int) (string, string, string, string, string) {
+func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *backend.Episode, epIdx int, dlQueue *podcast.DownloadQueue) (string, string, string, string, string) {
 	epNum := ep.displayEpisodeNum(epIdx + 1)
 	displayHeader := ep.displayTitle()
 	d := ep.displayDate()
@@ -88,7 +88,7 @@ func formatEpisodeDetailFields(pod tuiPodcast, ep tuiEpisode, absEp *backend.Epi
 	if ep.absData != nil {
 		epGUID = ep.absData.ID
 	}
-	inDLQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
+	inDLQueue := dlQueue.IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || dlQueue.IsEpisodeInQueue(epGUID, "", ep.filename)
 
 	badgeLeft := ""
 	if inDLQueue {

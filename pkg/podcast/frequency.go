@@ -25,7 +25,7 @@ const freqCacheEpisodeLimit = 100
 
 func GetEpisodesForFrequency(client backend.Backend, item backend.Podcast, podcastsDir string, refresh bool, feedCache *FeedCacheManager) ([]backend.FeedEpisode, error) {
 	if feedCache == nil {
-		feedCache = DefaultFeedCache()
+		feedCache = defaultFeedCache()
 	}
 	feedURL := item.Media.Metadata.FeedURL
 	podDir := FindPodcastDirForItem(item, podcastsDir)

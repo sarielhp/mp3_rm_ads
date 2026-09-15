@@ -51,7 +51,7 @@ func handleServerFlush(cfg Config, cli CLIOptions) error {
 	if err != nil {
 		return err
 	}
-	return flushPodcastAudio(b, item, dir, cli, podcast.DefaultDownloadQueue())
+	return flushPodcastAudio(b, item, dir, cli, library(cfg, cli, b).Queue())
 }
 
 func resolveFlushPodcast(root, query string, items []backend.Podcast) (backend.Podcast, string, error) {

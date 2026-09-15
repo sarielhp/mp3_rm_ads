@@ -72,13 +72,13 @@ func TestLatestEpisodesSortingAndBuilding(t *testing.T) {
 
 func TestLatestEpisodesNavigationAndDKey(t *testing.T) {
 	tempDir := t.TempDir()
-	podcast.DefaultDownloadQueue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
+	testLibrary().Queue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
 	defer func() {
-		podcast.DefaultDownloadQueue().WaitWorkerForTest()
-		podcast.DefaultDownloadQueue().SetFilePath("")
+		testLibrary().Queue().WaitWorkerForTest()
+		testLibrary().Queue().SetFilePath("")
 	}()
 
-	podcast.DefaultDownloadQueue().Clear()
+	testLibrary().Queue().Clear()
 
 	m := makeTestModel()
 	m.width = 100
@@ -100,7 +100,7 @@ func TestLatestEpisodesNavigationAndDKey(t *testing.T) {
 		t.Errorf("expected success toast after pressing 'd' in latest view, got %+v", m.toast)
 	}
 
-	queuedItems := podcast.DefaultDownloadQueue().Items()
+	queuedItems := testLibrary().Queue().Items()
 	if len(queuedItems) != 1 {
 		t.Fatalf("expected 1 item in download queue, got %d", len(queuedItems))
 	}
@@ -128,13 +128,13 @@ func TestLatestEpisodesNavigationAndDKey(t *testing.T) {
 
 func TestDKeyInEpisodeViews(t *testing.T) {
 	tempDir := t.TempDir()
-	podcast.DefaultDownloadQueue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
+	testLibrary().Queue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
 	defer func() {
-		podcast.DefaultDownloadQueue().WaitWorkerForTest()
-		podcast.DefaultDownloadQueue().SetFilePath("")
+		testLibrary().Queue().WaitWorkerForTest()
+		testLibrary().Queue().SetFilePath("")
 	}()
 
-	podcast.DefaultDownloadQueue().Clear()
+	testLibrary().Queue().Clear()
 
 	m := makeTestModel()
 	m.width = 100
@@ -164,15 +164,15 @@ func TestDKeyInEpisodeViews(t *testing.T) {
 
 func TestDownloadQueueViewAndKeyHandling(t *testing.T) {
 	tempDir := t.TempDir()
-	podcast.DefaultDownloadQueue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
+	testLibrary().Queue().SetFilePath(filepath.Join(tempDir, "download_queue.json"))
 	defer func() {
-		podcast.DefaultDownloadQueue().WaitWorkerForTest()
-		podcast.DefaultDownloadQueue().SetFilePath("")
+		testLibrary().Queue().WaitWorkerForTest()
+		testLibrary().Queue().SetFilePath("")
 	}()
 
-	podcast.DefaultDownloadQueue().Clear()
+	testLibrary().Queue().Clear()
 
-	podcast.DefaultDownloadQueue().Enqueue(podcast.DownloadQueueItem{
+	testLibrary().Queue().Enqueue(podcast.DownloadQueueItem{
 		ID:           "test-ep-1",
 		PodcastTitle: "Science Show",
 		EpisodeTitle: "Mars Exploration",
@@ -180,7 +180,7 @@ func TestDownloadQueueViewAndKeyHandling(t *testing.T) {
 		AddedAt:      time.Now().UTC(),
 	})
 
-	podcast.DefaultDownloadQueue().Enqueue(podcast.DownloadQueueItem{
+	testLibrary().Queue().Enqueue(podcast.DownloadQueueItem{
 		ID:           "test-ep-2",
 		PodcastTitle: "History Show",
 		EpisodeTitle: "Ancient Rome",
@@ -203,12 +203,12 @@ func TestDownloadQueueViewAndKeyHandling(t *testing.T) {
 		t.Errorf("expected removal toast, got %+v", m.toast)
 	}
 
-	if len(podcast.DefaultDownloadQueue().Items()) != 1 {
-		t.Fatalf("expected 1 item left in queue, got %d", len(podcast.DefaultDownloadQueue().Items()))
+	if len(testLibrary().Queue().Items()) != 1 {
+		t.Fatalf("expected 1 item left in queue, got %d", len(testLibrary().Queue().Items()))
 	}
 
 	m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
-	if len(podcast.DefaultDownloadQueue().Items()) != 0 {
-		t.Errorf("expected 0 items after clear, got %d", len(podcast.DefaultDownloadQueue().Items()))
+	if len(testLibrary().Queue().Items()) != 0 {
+		t.Errorf("expected 0 items after clear, got %d", len(testLibrary().Queue().Items()))
 	}
 }

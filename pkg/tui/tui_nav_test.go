@@ -202,7 +202,7 @@ func TestTUIModelInit(t *testing.T) {
 			return map[string][]string{"/tmp/test": {"a.mp3"}}
 		},
 	}
-	m := newTuiModel(bk, "/tmp/test", nil)
+	m := newTuiModel(bk, "/tmp/test", nil, testLibrary())
 	cmd := m.Init()
 
 	msg := cmd()
@@ -241,7 +241,7 @@ func TestTUIModelInitError(t *testing.T) {
 			return map[string][]string{}
 		},
 	}
-	m := newTuiModel(bk, "/tmp/test", nil)
+	m := newTuiModel(bk, "/tmp/test", nil, testLibrary())
 	cmd := m.Init()
 
 	msg := cmd()

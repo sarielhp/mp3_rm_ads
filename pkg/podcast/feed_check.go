@@ -82,7 +82,7 @@ func (r *FeedCheckResult) NeedsServer() bool {
 func CheckFeedsForUpdates(podcasts []backend.Podcast, index EpisodeIndex, opts FeedCheckOptions) []FeedCheckResult {
 	cache := opts.Cache
 	if cache == nil {
-		cache = DefaultFeedCache()
+		cache = defaultFeedCache()
 	}
 	results := make([]FeedCheckResult, len(podcasts))
 	if len(podcasts) == 0 {

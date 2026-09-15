@@ -122,7 +122,7 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 	}
 
 	imgURL := ""
-	if entry := podcast.DefaultFeedCache().Get(feedURL); entry != nil {
+	if entry := library(cfg, cli, nil).FeedCache().Get(feedURL); entry != nil {
 		imgURL = entry.ImageURL
 	}
 	sub := podcast.Subscription{Title: title, FeedURL: feedURL, ImageURL: imgURL}
@@ -197,7 +197,7 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 			continue
 		}
 		if sub.ImageURL == "" {
-			if entry := podcast.DefaultFeedCache().Get(sub.FeedURL); entry != nil && entry.ImageURL != "" {
+			if entry := library(cfg, cli, nil).FeedCache().Get(sub.FeedURL); entry != nil && entry.ImageURL != "" {
 				sub.ImageURL = entry.ImageURL
 				_ = store.Add(sub)
 				_ = store.Save()
@@ -430,7 +430,7 @@ func executeSubDownloads(plans []subDownloadPlan, store *podcast.SubscriptionSto
 		} else {
 			_ = podcast.PublishPodcast(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
 		}
-		updateSubscriptionCover(&plan, store)
+		updateSubscriptionCover(&plan, store, library(cfg, cli, nil).FeedCache())
 	}
 
 	if cfg.PodcastsDir != "" && store != nil {
@@ -443,9 +443,9 @@ func executeSubDownloads(plans []subDownloadPlan, store *podcast.SubscriptionSto
 	return nil
 }
 
-func updateSubscriptionCover(plan *subDownloadPlan, store *podcast.SubscriptionStore) {
+func updateSubscriptionCover(plan *subDownloadPlan, store *podcast.SubscriptionStore, feedCache *podcast.FeedCacheManager) {
 	if plan.sub.ImageURL == "" && store != nil {
-		if entry := podcast.DefaultFeedCache().Get(plan.sub.FeedURL); entry != nil && entry.ImageURL != "" {
+		if entry := feedCache.Get(plan.sub.FeedURL); entry != nil && entry.ImageURL != "" {
 			plan.sub.ImageURL = entry.ImageURL
 			_ = store.Add(plan.sub)
 			_ = store.Save()

@@ -129,7 +129,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		DurationSec:  ep.duration,
 		EnclosureURL: ep.enclosureURL,
 	}
-	ok, reason := podcast.DefaultDownloadQueue().Enqueue(item)
+	ok, reason := m.lib.Queue().Enqueue(item)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
 		cfg, err := config.LoadConfig()
@@ -137,7 +137,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		if err == nil {
 			bCli, _ = backend.FromAppConfig(cfg, nil)
 		}
-		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {
@@ -188,7 +188,7 @@ func (m *tuiModel) batchQueueDownload() {
 			DurationSec:  ep.duration,
 			EnclosureURL: ep.enclosureURL,
 		}
-		ok, _ := podcast.DefaultDownloadQueue().Enqueue(item)
+		ok, _ := m.lib.Queue().Enqueue(item)
 		if ok {
 			queuedCount++
 		}
@@ -201,7 +201,7 @@ func (m *tuiModel) batchQueueDownload() {
 		if err == nil {
 			bCli, _ = backend.FromAppConfig(cfg, nil)
 		}
-		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(bCli)
 	} else {
 		m.showToast("No new episodes enqueued", ToastWarning)
 	}

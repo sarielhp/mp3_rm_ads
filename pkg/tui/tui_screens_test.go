@@ -55,7 +55,7 @@ func TestTUINewModelWithConfig(t *testing.T) {
 			Cyan: "#ff0000",
 		},
 	}
-	m := newTuiModel(bk, "/tmp/test", cfg)
+	m := newTuiModel(bk, "/tmp/test", cfg, testLibrary())
 	if m == nil {
 		t.Error("newTuiModel should return non-nil model")
 	}

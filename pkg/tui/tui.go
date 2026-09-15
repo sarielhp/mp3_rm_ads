@@ -9,6 +9,7 @@ import (
 
 	"pod/pkg/audio"
 	"pod/pkg/kitty"
+	"pod/pkg/podcast"
 	"pod/pkg/types"
 
 	"github.com/charmbracelet/bubbles/viewport"
@@ -16,6 +17,11 @@ import (
 )
 
 type tuiModel struct {
+	// lib is the podcast library this TUI is a view of. Everything that used
+	// to reach podcast.DefaultDownloadQueue() goes through it, so the TUI
+	// holds library state instead of sharing a process global with the CLI.
+	lib *podcast.Library
+
 	width                   int
 	height                  int
 	ready                   bool
@@ -95,11 +101,12 @@ type episodeDurationMsg struct {
 	duration float64
 }
 
-func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *types.Config) *tuiModel {
+func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *types.Config, lib *podcast.Library) *tuiModel {
 	if cfg != nil {
 		applyTUIColorConfig(cfg.TUIColor)
 	}
 	return &tuiModel{
+		lib:              lib,
 		screen:           screenPodcasts,
 		loading:          true,
 		bk:               bk,
@@ -326,6 +333,12 @@ func RunTUI(cfg *types.Config, podcastsDir string) error {
 	}
 	podcastsDir = resolveLocalPath(podcastsDir)
 
+	lib := podcast.Open(podcast.Config{
+		PodcastsDir:       podcastsDir,
+		SubscriptionsFile: cfg.SubscriptionsFile,
+		ServerBaseURL:     cfg.ServerBaseURL,
+	}, nil, nil)
+
 	bk := &TuiBackend{
 		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
 			return loadTUIPodcastsABS(dir, *cfg)
@@ -337,7 +350,7 @@ func RunTUI(cfg *types.Config, podcastsDir string) error {
 		GetDuration: audio.GetAudioDuration,
 	}
 
-	p := tea.NewProgram(newTuiModel(bk, podcastsDir, cfg), tea.WithAltScreen())
+	p := tea.NewProgram(newTuiModel(bk, podcastsDir, cfg, lib), tea.WithAltScreen())
 	_, err := p.Run()
 	return err
 }

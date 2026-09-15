@@ -6,7 +6,6 @@ import (
 
 	"pod/pkg/config"
 	"pod/pkg/kitty"
-	"pod/pkg/podcast"
 	"pod/pkg/util"
 )
 
@@ -46,7 +45,7 @@ func (m *tuiModel) drawPodcastDetail() string {
 		if ep.absData != nil {
 			epGUID = ep.absData.ID
 		}
-		inDLQueue := podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || podcast.DefaultDownloadQueue().IsEpisodeInQueue(epGUID, "", ep.filename)
+		inDLQueue := m.lib.Queue().IsEpisodeInQueue(epGUID, "", ep.displayTitle()) || m.lib.Queue().IsEpisodeInQueue(epGUID, "", ep.filename)
 		isQueued := isFileInQueue(ep.filename, queueEntries)
 		out.WriteString(renderPodcastDetailEpisodeRow(m, ep, i == m.epIdx, m.isEpisodeSelected(ep.path), inDLQueue, isQueued))
 		out.WriteByte('\n')

@@ -89,3 +89,18 @@ func reporter(cli CLIOptions) progress.Reporter {
 	}
 	return progress.Writer(os.Stdout, os.Stderr, cli.Verbose)
 }
+
+// library opens the podcast library for this command. It is the CLI's single
+// translation point from the 48-field application config to the three fields
+// the library actually needs.
+func library(cfg Config, cli CLIOptions, b backend.Backend) *podcast.Library {
+	podcastsDir := cfg.PodcastsDir
+	if cli.PodcastsDir != "" {
+		podcastsDir = cli.PodcastsDir
+	}
+	return podcast.Open(podcast.Config{
+		PodcastsDir:       podcastsDir,
+		SubscriptionsFile: config.SubscriptionsFilePath(&cfg),
+		ServerBaseURL:     cfg.ServerBaseURL,
+	}, b, reporter(cli))
+}

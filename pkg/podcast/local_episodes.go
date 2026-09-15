@@ -223,15 +223,15 @@ func resolveCoverImageURL(sub *Subscription) string {
 	if sub.FeedURL == "" {
 		return ""
 	}
-	if entry := DefaultFeedCache().Get(sub.FeedURL); entry != nil && entry.ImageURL != "" {
+	if entry := defaultFeedCache().Get(sub.FeedURL); entry != nil && entry.ImageURL != "" {
 		sub.ImageURL = entry.ImageURL
 		return entry.ImageURL
 	}
 	if doc, err := FetchFeedDoc(sub.FeedURL); err == nil && doc != nil && doc.ImageURL != "" {
 		sub.ImageURL = doc.ImageURL
-		if entry := DefaultFeedCache().Get(sub.FeedURL); entry != nil {
+		if entry := defaultFeedCache().Get(sub.FeedURL); entry != nil {
 			entry.ImageURL = doc.ImageURL
-			DefaultFeedCache().Put(sub.FeedURL, entry)
+			defaultFeedCache().Put(sub.FeedURL, entry)
 		}
 		return doc.ImageURL
 	}

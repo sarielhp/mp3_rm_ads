@@ -91,20 +91,40 @@ func (c *PodcastConfig) SetAutoCleanup(enabled bool) {
 	}
 }
 
+// PolicyDefaults are the three application-wide settings that shape a
+// podcast's own configuration when it has none of its own. Callers that hold
+// only these — the podcast library, for one — pass them directly instead of
+// synthesising a whole types.Config around them.
+type PolicyDefaults struct {
+	DownloadPolicy string
+	DownloadK      int
+	AdRemoval      string
+}
+
 func DefaultPodcastConfig(appCfg *types.Config) PodcastConfig {
+	var d PolicyDefaults
+	if appCfg != nil {
+		d = PolicyDefaults{
+			DownloadPolicy: appCfg.DefaultDownloadPolicy,
+			DownloadK:      appCfg.DefaultDownloadK,
+			AdRemoval:      appCfg.DefaultAdRemoval,
+		}
+	}
+	return DefaultPodcastConfigFrom(d)
+}
+
+func DefaultPodcastConfigFrom(d PolicyDefaults) PodcastConfig {
 	dlPolicy := "latest"
 	dlK := 3
 	adPolicy := "all"
-	if appCfg != nil {
-		if appCfg.DefaultDownloadPolicy != "" {
-			dlPolicy = appCfg.DefaultDownloadPolicy
-		}
-		if appCfg.DefaultDownloadK > 0 {
-			dlK = appCfg.DefaultDownloadK
-		}
-		if appCfg.DefaultAdRemoval != "" {
-			adPolicy = appCfg.DefaultAdRemoval
-		}
+	if d.DownloadPolicy != "" {
+		dlPolicy = d.DownloadPolicy
+	}
+	if d.DownloadK > 0 {
+		dlK = d.DownloadK
+	}
+	if d.AdRemoval != "" {
+		adPolicy = d.AdRemoval
 	}
 	autoDl := NormalizeDownloadPolicy(dlPolicy) != DownloadPolicyNone
 	autoCl := false

@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"pod/pkg/player"
-	"pod/pkg/podcast"
 	"pod/pkg/util"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -52,7 +51,7 @@ func (m *tuiModel) renderTopNavBar() string {
 	for _, q := range m.queue {
 		adQueueCount += len(q)
 	}
-	dlQueueCount := len(podcast.DefaultDownloadQueue().Items())
+	dlQueueCount := len(m.lib.Queue().Items())
 
 	tabs := []tabInfo{
 		{num: 1, label: "Podcasts", screen: screenPodcasts},

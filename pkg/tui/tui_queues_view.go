@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"pod/pkg/player"
-	"pod/pkg/podcast"
 	"pod/pkg/types"
 	"pod/pkg/util"
 )
@@ -247,7 +246,7 @@ func (m *tuiModel) drawAdQueueScreen() string {
 func (m *tuiModel) drawDownloadQueueScreen() string {
 	out := &strings.Builder{}
 
-	items := podcast.DefaultDownloadQueue().Items()
+	items := m.lib.Queue().Items()
 	total := len(items)
 
 	banner := tuiHeaderBanner.Render(fmt.Sprintf(" DOWNLOAD QUEUE — %d items ", total))

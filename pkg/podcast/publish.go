@@ -119,7 +119,7 @@ func PublishPodcast(podDir string, sub Subscription, baseURL string, feedEpisode
 	EnsurePodcastCover(podDir, &sub)
 
 	if len(feedEpisodes) == 0 && sub.FeedURL != "" {
-		if entry := DefaultFeedCache().Get(sub.FeedURL); entry != nil {
+		if entry := defaultFeedCache().Get(sub.FeedURL); entry != nil {
 			feedEpisodes = entry.FeedEpisodes()
 		}
 	}

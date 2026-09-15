@@ -10,7 +10,6 @@ import (
 	"pod/pkg/backend"
 	"pod/pkg/config"
 	"pod/pkg/progress"
-	"pod/pkg/types"
 )
 
 type DownloadOptions struct {
@@ -146,16 +145,10 @@ func BuildDownloadedChecker(item backend.Podcast, index *PodcastEpisodeIndex, ac
 
 func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, opts DownloadOptions) ([]backend.FeedEpisode, []string) {
 	podDir := FindPodcastDirForItem(item, opts.PodcastsDir)
-	var appCfg *types.Config
-	if opts.DefaultDownloadPolicy != "" || opts.DefaultDownloadK > 0 {
-		appCfg = &types.Config{
-			PolicyConfig: types.PolicyConfig{
-				DefaultDownloadPolicy: opts.DefaultDownloadPolicy,
-				DefaultDownloadK:      opts.DefaultDownloadK,
-			},
-		}
-	}
-	podCfg := config.DefaultPodcastConfig(appCfg)
+	podCfg := config.DefaultPodcastConfigFrom(config.PolicyDefaults{
+		DownloadPolicy: opts.DefaultDownloadPolicy,
+		DownloadK:      opts.DefaultDownloadK,
+	})
 	if podDir != "" {
 		podCfg = config.LoadPodcastConfig(podDir, podCfg)
 	}
