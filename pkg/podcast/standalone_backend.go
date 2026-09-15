@@ -302,8 +302,7 @@ func (b *StandaloneBackend) DownloadEpisodes(podcastID string, episodes []backen
 		Folder:   p.RelPath,
 		ImageURL: p.Media.Metadata.ImageURL,
 	}
-	_ = WritePodcastFeedXML(p.Path, sub, b.cfg.ServerBaseURL, nil)
-	_ = WritePodcastWebpage(p.Path, sub, b.cfg.ServerBaseURL, nil)
+	_ = PublishPodcast(p.Path, sub, b.cfg.ServerBaseURL, nil)
 	return nil
 }
 
@@ -337,8 +336,7 @@ func (b *StandaloneBackend) DeletePodcastEpisode(podcastID, episodeID string) er
 					Folder:   p.RelPath,
 					ImageURL: p.Media.Metadata.ImageURL,
 				}
-				_ = WritePodcastFeedXML(p.Path, sub, b.cfg.ServerBaseURL, nil)
-				_ = WritePodcastWebpage(p.Path, sub, b.cfg.ServerBaseURL, nil)
+				_ = PublishPodcast(p.Path, sub, b.cfg.ServerBaseURL, nil)
 				return nil
 			}
 		}

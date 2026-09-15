@@ -2,6 +2,7 @@
 /pod
 scratch/
 *.xml
+!pkg/podsite/testdata/*.xml
 .work/
 .review_state.json
 reports/

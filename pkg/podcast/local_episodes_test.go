@@ -39,9 +39,9 @@ func TestGeneratePodcastFeedXML(t *testing.T) {
 	}
 
 	baseURL := "http://myserver.tailscale.net:8080/podcasts"
-	err := WritePodcastFeedXML(podDir, sub, baseURL, feedEps)
+	err := PublishPodcast(podDir, sub, baseURL, feedEps)
 	if err != nil {
-		t.Fatalf("WritePodcastFeedXML failed: %v", err)
+		t.Fatalf("PublishPodcast failed: %v", err)
 	}
 
 	feedPath := filepath.Join(podDir, "feed.xml")
@@ -67,8 +67,16 @@ func TestGeneratePodcastFeedXML(t *testing.T) {
 		t.Errorf("missing or incorrect enclosure URL: %s", content)
 	}
 
-	// Verify it can be unmarshaled as valid XML
-	var parsedDoc rssDocument
+	// Verify it can be unmarshaled as valid XML. Parsed with a struct local to
+	// the test rather than the renderer's own types, so the assertion checks the
+	// wire format instead of re-reading podsite's marshaling decisions.
+	var parsedDoc struct {
+		Channel struct {
+			Items []struct {
+				GUID string `xml:"guid"`
+			} `xml:"item"`
+		} `xml:"channel"`
+	}
 	if err := xml.Unmarshal(data, &parsedDoc); err != nil {
 		t.Fatalf("feed.xml is not valid XML: %v", err)
 	}
@@ -82,8 +90,8 @@ func TestGeneratePodcastFeedXML(t *testing.T) {
 	if !strings.Contains(content, "<url>http://myserver.tailscale.net:8080/podcasts/Hardcore_History/cover.jpg</url>") {
 		t.Errorf("channel <image><url> missing from XML:\n%s", content)
 	}
-	if item.GUID.Value != "guid-ep-69" {
-		t.Errorf("expected GUID guid-ep-69, got %s", item.GUID.Value)
+	if item.GUID != "guid-ep-69" {
+		t.Errorf("expected GUID guid-ep-69, got %s", item.GUID)
 	}
 }
 

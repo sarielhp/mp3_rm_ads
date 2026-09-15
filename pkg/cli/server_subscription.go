@@ -137,7 +137,7 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 		fmt.Printf("Added podcast subscription: [%s] %s\n", util.BoldCyan(added.ID), added.Title)
 		podDir := filepath.Join(cfg.PodcastsDir, added.Folder)
 		if cfg.ServerBaseURL != "" {
-			_ = podcast.WritePodcastFeedXML(podDir, *added, cfg.ServerBaseURL, eps)
+			_ = podcast.PublishPodcast(podDir, *added, cfg.ServerBaseURL, eps)
 			fmt.Printf("Local RSS feed available at: %s/%s/feed.xml\n", strings.TrimRight(cfg.ServerBaseURL, "/"), added.Folder)
 		}
 	}
@@ -191,7 +191,7 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 			continue
 		}
 		podDir := filepath.Join(cfg.PodcastsDir, sub.Folder)
-		if err := podcast.WritePodcastFeedXML(podDir, sub, cfg.ServerBaseURL, nil); err != nil {
+		if err := podcast.PublishPodcast(podDir, sub, cfg.ServerBaseURL, nil); err != nil {
 			fmt.Fprintf(os.Stderr, "Warning: failed to write feed for %s: %v\n", sub.Title, err)
 			continue
 		}
@@ -206,7 +206,7 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 		fmt.Printf("Updated feed: %s (%d episodes)\n", filepath.Join(podDir, "feed.xml"), len(eps))
 	}
 	if target == "" && cfg.PodcastsDir != "" {
-		if err := podcast.WriteCatalogWebpage(cfg.PodcastsDir, subs, cfg.ServerBaseURL); err == nil {
+		if err := podcast.PublishCatalog(cfg.PodcastsDir, subs); err == nil {
 			fmt.Printf("Updated catalog webpage: %s\n", filepath.Join(cfg.PodcastsDir, "index.html"))
 		}
 	}
@@ -427,13 +427,13 @@ func executeSubDownloads(plans []subDownloadPlan, store *podcast.SubscriptionSto
 				podcastsDownloaded++
 			}
 		} else {
-			_ = podcast.WritePodcastFeedXML(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
+			_ = podcast.PublishPodcast(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
 		}
 		updateSubscriptionCover(&plan, store)
 	}
 
 	if cfg.PodcastsDir != "" && store != nil {
-		_ = podcast.WriteCatalogWebpage(cfg.PodcastsDir, store.List(), cfg.ServerBaseURL)
+		_ = podcast.PublishCatalog(cfg.PodcastsDir, store.List())
 	}
 
 	if !cli.Quiet && totalDownloaded > 0 {
@@ -485,7 +485,7 @@ func executePodcastSubDownloads(downloader *podcast.Downloader, plan subDownload
 			downloaded++
 		}
 	}
-	_ = podcast.WritePodcastFeedXML(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
+	_ = podcast.PublishPodcast(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
 	return downloaded, nil
 }
 

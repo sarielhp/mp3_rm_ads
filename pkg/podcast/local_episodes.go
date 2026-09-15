@@ -3,9 +3,6 @@ package podcast
 import (
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/xml"
-	"fmt"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -13,63 +10,9 @@ import (
 	"time"
 
 	"pod/pkg/backend"
-	"pod/pkg/format"
 	"pod/pkg/pipeline"
 	"pod/pkg/util"
 )
-
-type rssDocument struct {
-	XMLName xml.Name   `xml:"rss"`
-	Version string     `xml:"version,attr"`
-	ITunes  string     `xml:"xmlns:itunes,attr"`
-	Channel rssChannel `xml:"channel"`
-}
-
-type rssChannel struct {
-	Title       string          `xml:"title"`
-	Link        string          `xml:"link"`
-	Description string          `xml:"description"`
-	Language    string          `xml:"language,omitempty"`
-	Author      string          `xml:"itunes:author,omitempty"`
-	Image       *rssFeedImage   `xml:"image,omitempty"`
-	ITunesImage *rssItunesImage `xml:"itunes:image,omitempty"`
-	Items       []rssItemXML    `xml:"item"`
-}
-
-type rssFeedImage struct {
-	URL   string `xml:"url"`
-	Title string `xml:"title"`
-	Link  string `xml:"link"`
-}
-
-type rssItunesImage struct {
-	Href string `xml:"href,attr"`
-}
-
-type rssItemXML struct {
-	Title       string          `xml:"title"`
-	Description rssCData        `xml:"description"`
-	PubDate     string          `xml:"pubDate"`
-	GUID        rssGUID         `xml:"guid"`
-	Enclosure   rssEnclosure    `xml:"enclosure"`
-	Duration    string          `xml:"itunes:duration,omitempty"`
-	Image       *rssItunesImage `xml:"itunes:image,omitempty"`
-}
-
-type rssCData struct {
-	Value string `xml:",cdata"`
-}
-
-type rssGUID struct {
-	IsPermaLink bool   `xml:"isPermaLink,attr"`
-	Value       string `xml:",chardata"`
-}
-
-type rssEnclosure struct {
-	URL    string `xml:"url,attr"`
-	Length int64  `xml:"length,attr"`
-	Type   string `xml:"type,attr"`
-}
 
 type LocalEpisodeMeta struct {
 	Path        string
@@ -213,84 +156,6 @@ func buildEpisodeMeta(path, podDir string, fi os.FileInfo, feedMap map[string]ba
 	}
 }
 
-func GeneratePodcastFeedXML(sub Subscription, podDir string, episodes []LocalEpisodeMeta, baseURL string) ([]byte, error) {
-	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
-	if baseURL == "" {
-		baseURL = strings.TrimRight(strings.TrimSpace(os.Getenv("SERVER_BASE_URL")), "/")
-	}
-	folder := sub.Folder
-	if folder == "" {
-		folder = filepath.Base(podDir)
-	}
-
-	channelURL := fmt.Sprintf("%s/%s/", baseURL, url.PathEscape(folder))
-	if baseURL == "" {
-		channelURL = fmt.Sprintf("/%s/", url.PathEscape(folder))
-	}
-	channel := rssChannel{
-		Title:       sub.Title,
-		Link:        channelURL,
-		Description: fmt.Sprintf("Ad-free podcast feed for %s", sub.Title),
-		Language:    "en",
-		Author:      "pod",
-	}
-
-	coverPath := findLocalCover(podDir)
-	coverURL := ""
-	if coverPath != "" && baseURL != "" {
-		coverURL = fmt.Sprintf("%s/%s/%s", baseURL, url.PathEscape(folder), url.PathEscape(filepath.Base(coverPath)))
-	} else if sub.ImageURL != "" {
-		coverURL = sub.ImageURL
-	}
-
-	if coverURL != "" {
-		channel.Image = &rssFeedImage{
-			URL:   coverURL,
-			Title: sub.Title,
-			Link:  channelURL,
-		}
-		channel.ITunesImage = &rssItunesImage{Href: coverURL}
-	}
-
-	for _, ep := range episodes {
-		encURL := escapeRelPath(ep.Filename)
-		if baseURL != "" {
-			encURL = fmt.Sprintf("%s/%s/%s", baseURL, url.PathEscape(folder), escapeRelPath(ep.Filename))
-		}
-		itemXML := rssItemXML{
-			Title:       ep.Title,
-			Description: rssCData{Value: ep.Description},
-			PubDate:     ep.PubDate,
-			GUID:        rssGUID{IsPermaLink: false, Value: ep.GUID},
-			Enclosure: rssEnclosure{
-				URL:    encURL,
-				Length: ep.SizeBytes,
-				Type:   "audio/mpeg",
-			},
-		}
-		if ep.DurationSec > 0 {
-			itemXML.Duration = format.FormatClock(ep.DurationSec)
-		}
-		if coverURL != "" {
-			itemXML.Image = &rssItunesImage{Href: coverURL}
-		}
-		channel.Items = append(channel.Items, itemXML)
-	}
-
-	doc := rssDocument{
-		Version: "2.0",
-		ITunes:  "http://www.itunes.com/dtds/podcast-1.0.dtd",
-		Channel: channel,
-	}
-
-	data, err := xml.MarshalIndent(doc, "", "  ")
-	if err != nil {
-		return nil, fmt.Errorf("marshal feed xml: %w", err)
-	}
-	header := []byte("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n")
-	return append(header, append(data, '\n')...), nil
-}
-
 func findLocalCover(podDir string) string {
 	candidates := []string{"cover.jpg", "cover.png", "cover.jpeg", "cover.webp", "folder.jpg", "folder.png"}
 	for _, c := range candidates {
@@ -370,38 +235,4 @@ func resolveCoverImageURL(sub *Subscription) string {
 		return doc.ImageURL
 	}
 	return ""
-}
-
-func WritePodcastFeedXML(podDir string, sub Subscription, baseURL string, feedEpisodes []backend.FeedEpisode) error {
-	if err := os.MkdirAll(podDir, 0755); err != nil {
-		return err
-	}
-	EnsurePodcastCover(podDir, &sub)
-
-	if len(feedEpisodes) == 0 && sub.FeedURL != "" {
-		if entry := DefaultFeedCache().Get(sub.FeedURL); entry != nil {
-			feedEpisodes = entry.FeedEpisodes()
-		}
-	}
-
-	episodes := CollectLocalEpisodes(podDir, feedEpisodes)
-	data, err := GeneratePodcastFeedXML(sub, podDir, episodes, baseURL)
-	if err != nil {
-		return err
-	}
-
-	feedFile := filepath.Join(podDir, "feed.xml")
-	if err := util.WriteFileAtomic(feedFile, data, 0644); err != nil {
-		return err
-	}
-	_ = WritePodcastWebpage(podDir, sub, baseURL, feedEpisodes)
-	return nil
-}
-
-func escapeRelPath(p string) string {
-	parts := strings.Split(filepath.ToSlash(p), "/")
-	for i, seg := range parts {
-		parts[i] = url.PathEscape(seg)
-	}
-	return strings.Join(parts, "/")
 }

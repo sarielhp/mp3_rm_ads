@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:itunes="http://www.itunes.com/dtds/podcast-1.0.dtd">
+  <channel>
+    <title>Hardcore History &amp; Friends</title>
+    <link>http://srv:8080/podcasts/Hardcore%20History/</link>
+    <description>Ad-free podcast feed for Hardcore History &amp; Friends</description>
+    <language>en</language>
+    <itunes:author>pod</itunes:author>
+    <image>
+      <url>https://remote.example.com/art.jpg</url>
+      <title>Hardcore History &amp; Friends</title>
+      <link>http://srv:8080/podcasts/Hardcore%20History/</link>
+    </image>
+    <itunes:image href="https://remote.example.com/art.jpg"></itunes:image>
+    <item>
+      <title>Episode 69 - Twilight &amp; Ash</title>
+      <description><![CDATA[Ampersand & <tags> and "quotes".]]></description>
+      <pubDate>Sun, 13 Sep 2020 12:26:40 +0000</pubDate>
+      <guid isPermaLink="false">guid-ep-69</guid>
+      <enclosure url="http://srv:8080/podcasts/Hardcore%20History/2020-09-13%20-%20Episode%2069%20-%20Twilight%20&amp;%20Ash.mp3" length="24" type="audio/mpeg"></enclosure>
+      <itunes:duration>04:12:35</itunes:duration>
+      <itunes:image href="https://remote.example.com/art.jpg"></itunes:image>
+    </item>
+    <item>
+      <title>Ep 70 - ünïcôde</title>
+      <description><![CDATA[Ep 70 - ünïcôde]]></description>
+      <pubDate>Sat, 02 Jan 2021 00:00:00 +0000</pubDate>
+      <guid isPermaLink="false">pod:ep:0badc0de</guid>
+      <enclosure url="http://srv:8080/podcasts/Hardcore%20History/2021-01-02%20-%20Ep%2070%20-%20%C3%BCn%C3%AFc%C3%B4de.mp3" length="2048" type="audio/mpeg"></enclosure>
+      <itunes:image href="https://remote.example.com/art.jpg"></itunes:image>
+    </item>
+  </channel>
+</rss>

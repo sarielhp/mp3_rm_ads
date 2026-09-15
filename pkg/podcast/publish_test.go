@@ -45,8 +45,8 @@ func TestGeneratePodcastWebpage(t *testing.T) {
 		t.Errorf("expected HTML to contain audio player")
 	}
 
-	if err := WritePodcastWebpage(podDir, sub, "http://localhost:8080/podcasts", nil); err != nil {
-		t.Fatalf("WritePodcastWebpage failed: %v", err)
+	if err := PublishPodcast(podDir, sub, "http://localhost:8080/podcasts", nil); err != nil {
+		t.Fatalf("PublishPodcast failed: %v", err)
 	}
 
 	idxPath := filepath.Join(podDir, "index.html")
@@ -72,7 +72,7 @@ func TestGenerateCatalogWebpage(t *testing.T) {
 		},
 	}
 
-	htmlData, err := GenerateCatalogWebpageHTML(podcastsDir, subs, "http://localhost:8080/podcasts")
+	htmlData, err := GenerateCatalogWebpageHTML(podcastsDir, subs)
 	if err != nil {
 		t.Fatalf("GenerateCatalogWebpageHTML failed: %v", err)
 	}
@@ -82,8 +82,8 @@ func TestGenerateCatalogWebpage(t *testing.T) {
 		t.Errorf("expected catalog HTML to contain both show titles")
 	}
 
-	if err := WriteCatalogWebpage(podcastsDir, subs, "http://localhost:8080/podcasts"); err != nil {
-		t.Fatalf("WriteCatalogWebpage failed: %v", err)
+	if err := PublishCatalog(podcastsDir, subs); err != nil {
+		t.Fatalf("PublishCatalog failed: %v", err)
 	}
 
 	idxPath := filepath.Join(podcastsDir, "index.html")

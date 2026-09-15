@@ -563,7 +563,7 @@ func refreshPodcastFeedXML(podDir string, cfg types.Config) {
 		sub.Title = filepath.Base(podDir)
 		sub.Folder = filepath.Base(podDir)
 	}
-	_ = podcast.WritePodcastFeedXML(podDir, sub, cfg.ServerBaseURL, nil)
+	_ = podcast.PublishPodcast(podDir, sub, cfg.ServerBaseURL, nil)
 }
 
 func queueItemFilename(podDir, audioPath string) string {

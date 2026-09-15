@@ -171,7 +171,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 
 | Directory / Package | Purpose |
 |---------------------|---------|
-| `main.go`, `cmd/abs/main.go` | Lean entrypoints delegating directly to `pkg/cli.Execute(os.Args[1:])` |
+| `main.go` | The single entrypoint: embeds `VERSION` and delegates to `pkg/cli.Execute(os.Args[1:])` |
 | `pkg/types` | Core domain types, state enums, configuration data structures, manifests |
 | `pkg/util` | Cross-cutting utilities: safe atomic file operations, locks, shell quoting, ANSI colors |
 | `pkg/config` | Configuration loading/saving, profile cost estimation, environment overrides, podcast configs |
@@ -183,7 +183,8 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/gemini` | Direct audio transcription and processing with Gemini Flash 2.5 API |
 | `pkg/pipeline` | Core processing pipeline: transcription → detection → cutting, episode status tracking |
 | `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/pod_player.sock`), MPRIS |
-| `pkg/podcast` | Standalone podcast manager, subscription store, native downloader, feed & web generator |
+| `pkg/podcast` | Standalone podcast manager, subscription store, native downloader; owns publishing (`PublishPodcast`, `PublishCatalog`) |
+| `pkg/podsite` | Pure static-site renderer: RSS feed and HTML player bytes. Imports no podcast code — callers pass in resolved data |
 | `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
 | `pkg/tui` | Full-featured interactive terminal UI (Bubbletea/Lipgloss) spanning 19 screens and modes |
