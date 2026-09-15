@@ -1,20 +1,16 @@
 package cli
 
 import (
-	"context"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 	"time"
 
 	"github.com/sarielhp/clihelp"
 	"pod/pkg/backend"
 	"pod/pkg/config"
-	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/progress"
 	"pod/pkg/util"
 )
 
@@ -269,12 +265,23 @@ func renderSubscriptionList(subs []podcast.Subscription, podcastsDir string, ver
 	return nil
 }
 
-type subDownloadPlan struct {
-	sub        podcast.Subscription
-	podDir     string
-	feedEps    []backend.FeedEpisode
-	toDownload []backend.FeedEpisode
-	err        error
+func subscriptionDownloadOptions(cfg Config, cli CLIOptions) podcast.SubscriptionDownloadOptions {
+	target := cli.Podcast
+	if target == "" && len(cli.Args) > 0 {
+		target = cli.Args[0]
+	}
+	return podcast.SubscriptionDownloadOptions{
+		Target:      target,
+		Jobs:        cli.FeedJobs,
+		Count:       cli.Count,
+		CountGiven:  cli.CountGiven,
+		DownloadAll: cli.DownloadAll,
+		Defaults: config.PolicyDefaults{
+			DownloadPolicy: cfg.DefaultDownloadPolicy,
+			DownloadK:      cfg.DefaultDownloadK,
+			AdRemoval:      cfg.DefaultAdRemoval,
+		},
+	}
 }
 
 func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config, cli CLIOptions) error {
@@ -282,7 +289,10 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 	if len(subs) == 0 {
 		return fmt.Errorf("no subscriptions found in %s", store.FilePath())
 	}
-	targets := resolveSubTargets(subs, cli)
+
+	lib := library(cfg, cli, nil)
+	opts := subscriptionDownloadOptions(cfg, cli)
+	targets := podcast.SubscriptionTargets(subs, opts.Target)
 	if len(targets) == 0 {
 		if !cli.Quiet {
 			fmt.Println("No matching podcast subscriptions found.")
@@ -290,103 +300,52 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 		return nil
 	}
 
-	plans := planSubDownloads(targets, cfg, cli)
-	return executeSubDownloads(plans, store, cfg, cli)
-}
-
-func resolveSubTargets(subs []podcast.Subscription, cli CLIOptions) []podcast.Subscription {
-	target := cli.Podcast
-	if target == "" && len(cli.Args) > 0 {
-		target = cli.Args[0]
-	}
-	var targets []podcast.Subscription
-	for _, sub := range subs {
-		if sub.Disabled {
-			continue
-		}
-		if !podcast.SubscriptionMatches(sub, target) {
-			continue
-		}
-		targets = append(targets, sub)
-	}
-	return targets
-}
-
-func planSubDownloads(targets []podcast.Subscription, cfg Config, cli CLIOptions) []subDownloadPlan {
 	start := time.Now()
-	plans := make([]subDownloadPlan, len(targets))
-	workers := podcast.FeedCheckWorkers(cli.FeedJobs, len(targets))
-
-	jobs := make(chan int)
-	var wg util.WaitGroup
-	var mu util.Mutex
-	done := 0
-
-	for w := 0; w < workers; w++ {
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-			for i := range jobs {
-				plans[i] = planOneSubDownload(targets[i], cfg, cli)
-				mu.Lock()
-				done++
-				if !cli.Quiet {
-					fmt.Printf("\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, len(targets))
-					os.Stdout.Sync()
-				}
-				mu.Unlock()
-			}
-		}()
-	}
-
-	for i := range targets {
-		jobs <- i
-	}
-	close(jobs)
-	wg.Wait()
-
+	plans := lib.PlanSubscriptionDownloads(targets, opts, feedCheckProgress(cli, len(targets)))
 	if !cli.Quiet {
 		fmt.Print("\r\x1b[K")
 	}
 	reportSubDownloadPlans(plans, time.Since(start), cli)
-	return plans
+
+	if cli.DryRun {
+		printDryRunPlans(plans, cli)
+		return nil
+	}
+
+	res := lib.ExecuteSubscriptionDownloads(plans, store, opts)
+	for _, err := range res.Failures {
+		fmt.Fprintf(os.Stderr, "Warning: failed downloading %v\n", err)
+	}
+	if !cli.Quiet && res.Downloaded > 0 {
+		fmt.Printf("Downloaded %d episode(s) across %d podcast(s).\n", res.Downloaded, res.Podcasts)
+	}
+	return nil
 }
 
-func planOneSubDownload(sub podcast.Subscription, cfg Config, cli CLIOptions) subDownloadPlan {
-	podDir := filepath.Join(cfg.PodcastsDir, sub.Folder)
-	plan := subDownloadPlan{
-		sub:    sub,
-		podDir: podDir,
+// feedCheckProgress returns the in-place counter shown while feeds are read,
+// or nil when the caller asked for quiet.
+func feedCheckProgress(cli CLIOptions, total int) func(done, total int) {
+	if cli.Quiet {
+		return nil
 	}
-	if strings.TrimSpace(sub.FeedURL) == "" {
-		plan.err = fmt.Errorf("no RSS feed URL configured")
-		return plan
+	return func(done, total int) {
+		fmt.Printf("\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
+		os.Stdout.Sync()
 	}
-
-	feedEps, _, _, _, err := podcast.FetchFeedDirect(sub.FeedURL, "", "")
-	if err != nil {
-		plan.err = fmt.Errorf("fetch feed %s: %w", sub.FeedURL, err)
-		return plan
-	}
-	plan.feedEps = feedEps
-	if len(feedEps) > 0 {
-		plan.toDownload = selectSubEpisodesToDownload(podDir, feedEps, sub, cli, cfg)
-	}
-	return plan
 }
 
-func reportSubDownloadPlans(plans []subDownloadPlan, elapsed time.Duration, cli CLIOptions) {
+func reportSubDownloadPlans(plans []podcast.SubscriptionPlan, elapsed time.Duration, cli CLIOptions) {
 	if cli.Quiet {
 		return
 	}
 	selected, episodes, failed := 0, 0, 0
 	for i := range plans {
-		if plans[i].err != nil {
+		if plans[i].Err != nil {
 			failed++
 		}
-		if len(plans[i].toDownload) > 0 {
+		if len(plans[i].ToDownload) > 0 {
 			selected++
-			episodes += len(plans[i].toDownload)
+			episodes += len(plans[i].ToDownload)
 		}
 	}
 	fmt.Printf("Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
@@ -397,222 +356,28 @@ func reportSubDownloadPlans(plans []subDownloadPlan, elapsed time.Duration, cli 
 	fmt.Println(".")
 
 	for i := range plans {
-		pTitle := util.DisplayName(plans[i].sub.Title)
+		pTitle := util.DisplayName(plans[i].Sub.Title)
 		switch {
-		case plans[i].err != nil:
-			fmt.Printf("  ! %s: %v\n", pTitle, plans[i].err)
-		case cli.Verbose && len(plans[i].toDownload) == 0:
+		case plans[i].Err != nil:
+			fmt.Printf("  ! %s: %v\n", pTitle, plans[i].Err)
+		case cli.Verbose && len(plans[i].ToDownload) == 0:
 			fmt.Printf("  - %s: up to date\n", pTitle)
 		}
 	}
 }
 
-func executeSubDownloads(plans []subDownloadPlan, store *podcast.SubscriptionStore, cfg Config, cli CLIOptions) error {
-	if cli.DryRun {
-		printDryRunPlans(plans)
-		return nil
+func printDryRunPlans(plans []podcast.SubscriptionPlan, cli CLIOptions) {
+	if cli.Quiet {
+		return
 	}
-
-	downloader := podcast.NewDownloader()
-	totalDownloaded, podcastsDownloaded := 0, 0
 	for _, plan := range plans {
-		if plan.err != nil {
+		if len(plan.ToDownload) == 0 {
 			continue
 		}
-		if len(plan.toDownload) > 0 {
-			n, err := executePodcastSubDownloads(downloader, plan, cfg, cli)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "Warning: failed downloading %s: %v\n", plan.sub.Title, err)
-			} else {
-				totalDownloaded += n
-				podcastsDownloaded++
-			}
-		} else {
-			_ = podcast.PublishPodcast(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
-		}
-		updateSubscriptionCover(&plan, store, library(cfg, cli, nil).FeedCache())
-	}
-
-	if cfg.PodcastsDir != "" && store != nil {
-		_ = podcast.PublishCatalog(cfg.PodcastsDir, store.List())
-	}
-
-	if !cli.Quiet && totalDownloaded > 0 {
-		fmt.Printf("Downloaded %d episode(s) across %d podcast(s).\n", totalDownloaded, podcastsDownloaded)
-	}
-	return nil
-}
-
-func updateSubscriptionCover(plan *subDownloadPlan, store *podcast.SubscriptionStore, feedCache *podcast.FeedCacheManager) {
-	if plan.sub.ImageURL == "" && store != nil {
-		if entry := feedCache.Get(plan.sub.FeedURL); entry != nil && entry.ImageURL != "" {
-			plan.sub.ImageURL = entry.ImageURL
-			_ = store.Add(plan.sub)
-			_ = store.Save()
-		}
-	}
-}
-
-func printDryRunPlans(plans []subDownloadPlan) {
-	for _, plan := range plans {
-		if len(plan.toDownload) == 0 {
-			continue
-		}
-		fmt.Printf("\n=== Podcast: %s ===\n", util.BoldCyan(plan.sub.Title))
-		fmt.Printf("Found %d episode(s) to download:\n", len(plan.toDownload))
-		for idx, ep := range plan.toDownload {
+		fmt.Printf("\n=== Podcast: %s ===\n", util.BoldCyan(plan.Sub.Title))
+		fmt.Printf("Found %d episode(s) to download:\n", len(plan.ToDownload))
+		for idx, ep := range plan.ToDownload {
 			fmt.Printf("  %d. %s\n", idx+1, ep.Title)
 		}
 	}
-}
-
-func executePodcastSubDownloads(downloader *podcast.Downloader, plan subDownloadPlan, cfg Config, cli CLIOptions) (int, error) {
-	if err := os.MkdirAll(plan.podDir, 0755); err != nil {
-		return 0, err
-	}
-	if !cli.Quiet {
-		fmt.Printf("\n=== Podcast: %s ===\n", util.BoldCyan(plan.sub.Title))
-		fmt.Printf("Found %d episode(s) to download:\n", len(plan.toDownload))
-		for idx, ep := range plan.toDownload {
-			fmt.Printf("  %d. %s\n", idx+1, ep.Title)
-		}
-	}
-	shouldQueue := shouldQueueEpisode(plan.podDir, plan.sub, cfg)
-	downloaded := 0
-	for _, ep := range plan.toDownload {
-		if err := executeSingleEpisodeDownload(downloader, plan.podDir, ep, cli.Quiet, shouldQueue); err != nil {
-			fmt.Fprintf(os.Stderr, "    Download error for %q: %v\n", ep.Title, err)
-		} else {
-			downloaded++
-		}
-	}
-	_ = podcast.PublishPodcast(plan.podDir, plan.sub, cfg.ServerBaseURL, plan.feedEps)
-	return downloaded, nil
-}
-
-func selectSubEpisodesToDownload(podDir string, feedEps []backend.FeedEpisode, sub podcast.Subscription, cli CLIOptions, cfg Config) []backend.FeedEpisode {
-	existingFiles := make(map[string]bool)
-	for _, f := range util.FindMP3Files(podDir) {
-		name := strings.ToLower(strings.TrimSuffix(filepath.Base(f), ".mp3"))
-		existingFiles[name] = true
-		stripped := strings.ToLower(podcast.StripEpisodeFilenamePrefix(name))
-		existingFiles[stripped] = true
-	}
-
-	podCfg := config.LoadPodcastConfig(podDir, config.DefaultPodcastConfig(&cfg))
-	if sub.DownloadPolicy != "" {
-		podCfg.DownloadPolicy = sub.DownloadPolicy
-		autoDl := config.NormalizeDownloadPolicy(sub.DownloadPolicy) != config.DownloadPolicyNone
-		podCfg.AutoDownload = &autoDl
-	}
-	if sub.DownloadK > 0 {
-		podCfg.DownloadK = sub.DownloadK
-	}
-
-	isDownloaded := func(ep backend.FeedEpisode) bool {
-		safeStem := strings.ToLower(podcast.SanitizeTitle(ep.Title))
-		rawStem := strings.ToLower(strings.TrimSpace(ep.Title))
-		pubMs := podcast.GetPubMS(ep)
-		var pubTime time.Time
-		if pubMs > 0 {
-			pubTime = time.UnixMilli(pubMs).UTC()
-		}
-		formatted := strings.ToLower(strings.TrimSuffix(podcast.FormatEpisodeFilename(pubTime, ep.Episode, ep.Title), ".mp3"))
-		return existingFiles[formatted] || existingFiles[safeStem] || existingFiles[rawStem]
-	}
-
-	sortedCatalog := make([]backend.FeedEpisode, len(feedEps))
-	copy(sortedCatalog, feedEps)
-	sort.Slice(sortedCatalog, func(i, j int) bool {
-		return podcast.GetPubMS(sortedCatalog[i]) < podcast.GetPubMS(sortedCatalog[j])
-	})
-
-	if cli.DownloadAll {
-		eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, config.DownloadPolicyAll, 0, false)
-		if cli.CountGiven && cli.Count > 0 && len(eps) > cli.Count {
-			eps = eps[:cli.Count]
-		}
-		return eps
-	}
-
-	if cli.CountGiven && cli.Count > 0 {
-		eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, config.DownloadPolicyAll, 0, false)
-		if len(eps) > cli.Count {
-			eps = eps[:cli.Count]
-		}
-		return eps
-	}
-
-	if podCfg.Favorite || config.NormalizeDownloadPolicy(podCfg.DownloadPolicy) == config.DownloadPolicyNew {
-		eps, _ := podcast.SelectNewEpisodes(sortedCatalog, nil, isDownloaded, podCfg.FavoriteSince)
-		return eps
-	}
-
-	if !podCfg.IsAutoDownloadEnabled() {
-		return nil
-	}
-
-	policy := config.NormalizeDownloadPolicy(podCfg.DownloadPolicy)
-	k := podCfg.DownloadK
-	if k <= 0 {
-		k = cfg.DefaultDownloadK
-	}
-	eps, _ := podcast.SelectEpisodesByDownloadPolicy(sortedCatalog, isDownloaded, policy, k, false)
-	return eps
-}
-
-func shouldQueueEpisode(podDir string, sub podcast.Subscription, cfg Config) bool {
-	podCfg := config.LoadPodcastConfig(podDir, config.DefaultPodcastConfig(&cfg))
-	if podCfg.Favorite {
-		return true
-	}
-	adPolicy := sub.AdRemoval
-	if adPolicy == "" {
-		adPolicy = podCfg.AdRemoval
-	}
-	if adPolicy == "" {
-		adPolicy = cfg.DefaultAdRemoval
-	}
-	return config.NormalizeAdRemovalMode(adPolicy) != config.AdRemovalNone
-}
-
-func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backend.FeedEpisode, quiet bool, shouldQueue bool) error {
-	encURL := ep.EnclosureURL
-	if ep.Enclosure != nil && ep.Enclosure.URL != "" {
-		encURL = ep.Enclosure.URL
-	}
-	if encURL == "" {
-		return fmt.Errorf("no enclosure URL found")
-	}
-
-	pubMs := podcast.GetPubMS(ep)
-	var pubTime time.Time
-	if pubMs > 0 {
-		pubTime = time.UnixMilli(pubMs).UTC()
-	}
-	fn := podcast.FormatEpisodeFilename(pubTime, ep.Episode, ep.Title)
-	destPath := filepath.Join(podDir, fn)
-
-	rep := progress.Discard
-	if !quiet {
-		rep = progress.Writer(os.Stdout, os.Stderr, false)
-	}
-	rep.Infof("  Downloading: %s", ep.Title)
-
-	if err := d.DownloadEpisode(context.Background(), encURL, destPath, rep); err != nil {
-		return err
-	}
-
-	st := pipeline.GetOrCreateEpisodeStatus(destPath)
-	pubMS := podcast.GetPubMS(ep)
-	if pubMS > 0 {
-		st.PublishedAt = time.UnixMilli(pubMS).UTC().Format(time.RFC3339)
-		st.PublicationSource = "feed"
-		_ = pipeline.SaveEpisodeStatus(pipeline.StatusPathFor(destPath), st)
-	}
-
-	if shouldQueue {
-		pipeline.AddToQueue(podDir, fn)
-	}
-	return nil
 }
