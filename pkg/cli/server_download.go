@@ -104,21 +104,15 @@ func resolveDownloadTargets(b backend.Backend, cli CLIOptions) ([]backend.Podcas
 	start := time.Now()
 	podcasts, err := backend.ListPodcastsFrom(b)
 	if err != nil {
-		if !cli.Quiet {
-			fmt.Println()
-		}
+		fmt.Fprintln(outFor(cli))
 		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
 	}
 	targets, err := filterServerTargets(podcasts, cli)
 	if err != nil {
-		if !cli.Quiet {
-			fmt.Println()
-		}
+		fmt.Fprintln(outFor(cli))
 		return nil, err
 	}
-	if !cli.Quiet {
-		fmt.Printf(" %d podcast(s) (%.1fs).\n", len(targets), time.Since(start).Seconds())
-	}
+	fmt.Fprintf(outFor(cli), " %d podcast(s) (%.1fs).\n", len(targets), time.Since(start).Seconds())
 	return targets, nil
 }
 
@@ -137,9 +131,7 @@ func planServerDownloads(b backend.Backend, config Config, cli CLIOptions, podca
 		}
 	}
 	plans := podcast.PlanDownloads(b, podcasts, index, downloadOptions(config, cli), progress)
-	if !cli.Quiet {
-		fmt.Print("\r\x1b[K")
-	}
+	fmt.Fprint(outFor(cli), "\r\x1b[K")
 	reportDownloadPlans(plans, time.Since(start), cli)
 	return plans
 }
@@ -228,9 +220,7 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 		fmt.Printf("Queued %d episode download(s) across %d podcast(s).\n", totalDownloaded, fromPodcasts)
 	}
 	if totalDownloaded > 0 && !cli.NoWait && !cli.DryRun {
-		if !cli.Quiet {
-			fmt.Printf("Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
-		}
+		fmt.Fprintf(outFor(cli), "Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
 		if err := b.WaitForActiveDownloads(podcasts, 5*time.Minute); err != nil {
 			return fmt.Errorf("waiting for downloads: %w", err)
 		}

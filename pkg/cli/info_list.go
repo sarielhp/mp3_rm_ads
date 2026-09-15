@@ -65,9 +65,7 @@ func podcastExistsByIndexOrID(podcastsDir, query string) bool {
 func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
 	entries := podcast.ScanPodcastDirs(podcastsDir)
 	if len(entries) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No podcasts found.")
-		}
+		fmt.Fprintln(outFor(cli), "No podcasts found.")
 		return nil
 	}
 
@@ -166,9 +164,7 @@ func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
 
 	allMp3s := util.FindMP3Files(podcastsDir)
 	if len(allMp3s) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No podcast audio files (.mp3) found.")
-		}
+		fmt.Fprintln(outFor(cli), "No podcast audio files (.mp3) found.")
 		return nil
 	}
 

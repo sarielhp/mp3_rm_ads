@@ -148,9 +148,7 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 	}
 
 	if len(candidates) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No uncleaned episodes found to queue.")
-		}
+		fmt.Fprintln(outFor(cli), "No uncleaned episodes found to queue.")
 		return nil
 	}
 

@@ -46,9 +46,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
 				return []string{arg}, true
 			}
-			if !cli.Quiet {
-				fmt.Printf("Podcast matching '%s' not found.\n", arg)
-			}
+			fmt.Fprintf(outFor(cli), "Podcast matching '%s' not found.\n", arg)
 			return nil, false
 		}
 		return cli.Args, true

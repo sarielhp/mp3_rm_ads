@@ -37,9 +37,7 @@ func handleServerTimeline(config Config, cli CLIOptions) error {
 		return err
 	}
 	for _, item := range podcasts {
-		if !cli.Quiet {
-			fmt.Printf("\nTimeline for %s (%d episodes):\n", util.Bold(util.DisplayName(item.Media.Metadata.Title)), len(item.Media.Episodes))
-		}
+		fmt.Fprintf(outFor(cli), "\nTimeline for %s (%d episodes):\n", util.Bold(util.DisplayName(item.Media.Metadata.Title)), len(item.Media.Episodes))
 		for i, ep := range item.Media.Episodes {
 			if i >= 10 && !cli.Verbose {
 				break

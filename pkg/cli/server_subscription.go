@@ -103,9 +103,7 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 
 	var eps []backend.FeedEpisode
 	if title == "" {
-		if !cli.Quiet {
-			fmt.Printf("Inspecting feed: %s\n", feedURL)
-		}
+		fmt.Fprintf(outFor(cli), "Inspecting feed: %s\n", feedURL)
 		fetchedEps, _, _, _, err := podcast.FetchFeedDirect(feedURL, "", "")
 		if err == nil && len(fetchedEps) > 0 {
 			eps = fetchedEps
@@ -162,9 +160,7 @@ func handleServerRemove(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("save subscriptions: %w", err)
 	}
 
-	if !cli.Quiet {
-		fmt.Printf("Removed subscription: %s\n", query)
-	}
+	fmt.Fprintf(outFor(cli), "Removed subscription: %s\n", query)
 	return nil
 }
 
@@ -224,9 +220,7 @@ func handleServerImport(cfg Config, cli CLIOptions) error {
 		if err != nil {
 			return fmt.Errorf("import OPML: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Printf("Imported %d new subscription(s) from %s\n", n, cli.Args[0])
-		}
+		fmt.Fprintf(outFor(cli), "Imported %d new subscription(s) from %s\n", n, cli.Args[0])
 		return nil
 	}
 
@@ -238,9 +232,7 @@ func handleServerImport(cfg Config, cli CLIOptions) error {
 	if err != nil {
 		return fmt.Errorf("backend import failed: %w", err)
 	}
-	if !cli.Quiet {
-		fmt.Printf("Imported %d new subscription(s) from backend into %s\n", n, store.FilePath())
-	}
+	fmt.Fprintf(outFor(cli), "Imported %d new subscription(s) from backend into %s\n", n, store.FilePath())
 	return nil
 }
 
@@ -294,17 +286,13 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 	opts := subscriptionDownloadOptions(cfg, cli)
 	targets := podcast.SubscriptionTargets(subs, opts.Target)
 	if len(targets) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No matching podcast subscriptions found.")
-		}
+		fmt.Fprintln(outFor(cli), "No matching podcast subscriptions found.")
 		return nil
 	}
 
 	start := time.Now()
 	plans := lib.PlanSubscriptionDownloads(targets, opts, feedCheckProgress(cli, len(targets)))
-	if !cli.Quiet {
-		fmt.Print("\r\x1b[K")
-	}
+	fmt.Fprint(outFor(cli), "\r\x1b[K")
 	reportSubDownloadPlans(plans, time.Since(start), cli)
 
 	if cli.DryRun {

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 
 	"pod/pkg/backend"
@@ -103,4 +104,15 @@ func library(cfg Config, cli CLIOptions, b backend.Backend) *podcast.Library {
 		SubscriptionsFile: config.SubscriptionsFilePath(&cfg),
 		ServerBaseURL:     cfg.ServerBaseURL,
 	}, b, reporter(cli))
+}
+
+// out is the stream for ordinary command output: stdout, or a discard when
+// --quiet. Printing through it makes quiet correctness a property of the
+// writer rather than something each call site has to remember to check —
+// which is how `server download --dry-run --quiet` came to print 11 KB.
+func outFor(cli CLIOptions) io.Writer {
+	if cli.Quiet {
+		return io.Discard
+	}
+	return os.Stdout
 }

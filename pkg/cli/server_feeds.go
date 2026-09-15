@@ -212,9 +212,7 @@ func handleServerFeeds(config Config, cli CLIOptions) error {
 	if err != nil {
 		return err
 	}
-	if !cli.Quiet {
-		fmt.Printf("Checking %d podcast feed(s) directly for new episodes...\n", len(podcasts))
-	}
+	fmt.Fprintf(outFor(cli), "Checking %d podcast feed(s) directly for new episodes...\n", len(podcasts))
 	reportFeedCheck(checkServerFeeds(b, podcasts, cli), cli)
 	return nil
 }

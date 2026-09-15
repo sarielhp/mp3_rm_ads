@@ -46,8 +46,6 @@ func handleServerRescan(config Config, cli CLIOptions) error {
 	if err != nil {
 		return fmt.Errorf("rescan failed: %w", err)
 	}
-	if !cli.Quiet {
-		fmt.Printf("Rescan completed: checked %d episodes, updated %d.\n", res.CheckedCount, res.RescanCount)
-	}
+	fmt.Fprintf(outFor(cli), "Rescan completed: checked %d episodes, updated %d.\n", res.CheckedCount, res.RescanCount)
 	return nil
 }

@@ -295,15 +295,11 @@ func handleQueueRun(lib *podcast.Library, cfg Config, cli CLIOptions, target str
 	}
 	podcast.SortQueueItems(items)
 	if len(items) == 0 {
-		if !cli.Quiet {
-			fmt.Println("AdR queue is currently empty.")
-		}
+		fmt.Fprintln(outFor(cli), "AdR queue is currently empty.")
 		return nil
 	}
 
-	if !cli.Quiet {
-		fmt.Printf("Found %d episode(s) in AdR queue.\n", len(items))
-	}
+	fmt.Fprintf(outFor(cli), "Found %d episode(s) in AdR queue.\n", len(items))
 
 	if cli.DryRun {
 		for _, it := range items {
@@ -324,22 +320,16 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 	for i := range items {
 		podcast.SortQueueItems(items[i:])
 		it := items[i]
-		if !cli.Quiet {
-			fmt.Printf("\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, util.DisplayName(it.Title), util.BoldCyan(it.EpisodeID))
-		}
+		fmt.Fprintf(outFor(cli), "\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, util.DisplayName(it.Title), util.BoldCyan(it.EpisodeID))
 
 		if !util.FileExists(it.AudioPath) {
-			if !cli.Quiet {
-				fmt.Printf("Audio file not found on disk: %s (retained in queue)\n", it.Filename)
-			}
+			fmt.Fprintf(outFor(cli), "Audio file not found on disk: %s (retained in queue)\n", it.Filename)
 			failedEpisodes = append(failedEpisodes, it.Filename)
 			continue
 		}
 
 		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && pipeline.IsEpisodeClean(it.AudioPath) {
-			if !cli.Quiet {
-				fmt.Printf("Episode already has ads removed: %s (removing from queue)\n", it.Filename)
-			}
+			fmt.Fprintf(outFor(cli), "Episode already has ads removed: %s (removing from queue)\n", it.Filename)
 			if _, err := pipeline.RemoveQueuedAudio(it.PodcastDir, it.AudioPath); err != nil {
 				return err
 			}

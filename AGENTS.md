@@ -168,6 +168,12 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
   `TestLibraryPackagesDoNotWriteToTheTerminal` in `pkg/progress`. Writing to an
   `io.Writer` the caller supplied is fine. The processing packages (`pipeline`,
   `adremoval`, `remote`) still print and are not yet on the list
+- **In `pkg/cli`, print through `outFor(cli)`, not `fmt.Printf`.** `outFor`
+  returns stdout, or `io.Discard` under `--quiet`, so honouring the flag is a
+  property of the writer instead of something each call site remembers. A
+  forgotten `if !cli.Quiet` is what made `server download --dry-run --quiet`
+  print 11 KB. Keep an explicit guard only where the block does real work
+  besides printing, or writes to stderr
 - `os/exec` for external commands (ffmpeg, ffprobe, docker)
 - Custom `syncMu` / `syncMutex` / `syncWG` for thread safety (no sync package)
 - All errors are returned; `os.Exit(1)` only in `main()` and fatal helpers

@@ -361,9 +361,7 @@ func runConfigCommand(config *Config, cli CLIOptions) error {
 		if err := podcast.ResetCache(); err != nil {
 			return fmt.Errorf("error resetting cache: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Println("Cache reset successfully.")
-		}
+		fmt.Fprintln(outFor(cli), "Cache reset successfully.")
 	case "migrate":
 		handleConfigMigrate(config, cli.ConfigVal)
 	default:

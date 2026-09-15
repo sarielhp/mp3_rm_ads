@@ -55,17 +55,13 @@ func runTranscriptForEpisode(ep *ResolvedEpisode, cli CLIOptions) error {
 
 	if exportFormat == "txt" {
 		out, _ := format.ConvertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
-		if !cli.Quiet {
-			fmt.Printf("Exported TXT: %s\n", out)
-		}
+		fmt.Fprintf(outFor(cli), "Exported TXT: %s\n", out)
 		return nil
 	}
 
 	if exportFormat == "srt" {
 		out, _ := format.ConvertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
-		if !cli.Quiet {
-			fmt.Printf("Exported SRT: %s\n", out)
-		}
+		fmt.Fprintf(outFor(cli), "Exported SRT: %s\n", out)
 		return nil
 	}
 

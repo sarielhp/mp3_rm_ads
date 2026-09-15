@@ -154,9 +154,7 @@ func handleServerOPML(cfg Config, cli CLIOptions) error {
 		if err := os.WriteFile(targetFile, data, 0644); err != nil {
 			return fmt.Errorf("failed to write OPML file: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Printf("Exported podcast subscriptions to %s\n", targetFile)
-		}
+		fmt.Fprintf(outFor(cli), "Exported podcast subscriptions to %s\n", targetFile)
 		return nil
 	case "import":
 		if targetFile == "" {
@@ -170,9 +168,7 @@ func handleServerOPML(cfg Config, cli CLIOptions) error {
 		if err != nil {
 			return fmt.Errorf("OPML import failed: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Printf("Imported %d new feed(s) from %s\n", res.Subscribed, targetFile)
-		}
+		fmt.Fprintf(outFor(cli), "Imported %d new feed(s) from %s\n", res.Subscribed, targetFile)
 		return nil
 	default:
 		return fmt.Errorf("must specify 'import <file>' or 'export <file>'")
@@ -200,9 +196,7 @@ func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
 		if err := os.WriteFile(targetFile, data, 0644); err != nil {
 			return fmt.Errorf("failed to write OPML file: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Printf("Exported podcast subscriptions to %s\n", targetFile)
-		}
+		fmt.Fprintf(outFor(cli), "Exported podcast subscriptions to %s\n", targetFile)
 		return nil
 	case "import":
 		if targetFile == "" {
@@ -216,9 +210,7 @@ func handleStandaloneOPML(cfg Config, cli CLIOptions) error {
 		if err != nil {
 			return fmt.Errorf("OPML import failed: %w", err)
 		}
-		if !cli.Quiet {
-			fmt.Printf("Imported %d new feed(s) from %s\n", n, targetFile)
-		}
+		fmt.Fprintf(outFor(cli), "Imported %d new feed(s) from %s\n", n, targetFile)
 		return nil
 	default:
 		return fmt.Errorf("must specify 'import <file>' or 'export <file>'")

@@ -77,9 +77,7 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 		return err
 	}
 	if len(targetItems) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No podcasts found to analyze.")
-		}
+		fmt.Fprintln(outFor(cli), "No podcasts found to analyze.")
 		return nil
 	}
 

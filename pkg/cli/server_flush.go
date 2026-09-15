@@ -152,9 +152,7 @@ func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli 
 	if err := pipeline.UpdateQueue(dir, func([]string) []string { return nil }); err != nil {
 		return err
 	}
-	if !cli.Quiet {
-		fmt.Printf("Removed %d audio files from %s; transcripts kept. Automatic downloads disabled. Deleted audio can only be recovered from backups or by downloading it again.\n", len(files), item.Media.Metadata.Title)
-	}
+	fmt.Fprintf(outFor(cli), "Removed %d audio files from %s; transcripts kept. Automatic downloads disabled. Deleted audio can only be recovered from backups or by downloading it again.\n", len(files), item.Media.Metadata.Title)
 	return nil
 }
 

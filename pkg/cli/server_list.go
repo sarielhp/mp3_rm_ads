@@ -84,9 +84,7 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("failed to fetch podcasts: %w", err)
 	}
 	if len(podcasts) == 0 {
-		if !cli.Quiet {
-			fmt.Println("No podcasts found on server.")
-		}
+		fmt.Fprintln(outFor(cli), "No podcasts found on server.")
 		return nil
 	}
 	for idx, p := range podcasts {
