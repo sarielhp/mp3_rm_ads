@@ -64,7 +64,7 @@ func todayQueueCandidates(dir string, now time.Time, source map[string]time.Time
 			published = date
 		}
 		if !published.IsZero() && !published.Before(start) && published.Before(end) && !pipeline.IsEpisodeClean(path) {
-			candidates = append(candidates, queueFilenameForPath(dir, path))
+			candidates = append(candidates, podcast.QueueFilename(dir, path))
 		}
 	}
 	return candidates

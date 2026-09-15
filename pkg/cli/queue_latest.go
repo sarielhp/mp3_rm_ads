@@ -161,7 +161,7 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 
 	if cli.DryRun {
 		for _, it := range selected {
-			qFile := queueFilenameForPath(it.podDir, it.path)
+			qFile := podcast.QueueFilename(it.podDir, it.path)
 			qEntries, _ := pipeline.ReadQueue(it.podDir)
 			isQueued := false
 			for _, q := range qEntries {
@@ -183,7 +183,7 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 
 	addedCount, alreadyCount := 0, 0
 	for _, it := range selected {
-		qFile := queueFilenameForPath(it.podDir, it.path)
+		qFile := podcast.QueueFilename(it.podDir, it.path)
 		added, err := pipeline.AddToQueueChecked(it.podDir, qFile)
 		if err != nil {
 			return fmt.Errorf("queue episode %s: %w", it.title, err)

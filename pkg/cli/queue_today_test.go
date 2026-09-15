@@ -179,7 +179,7 @@ func TestQueueTodayNestedEpisodesResolveForRun(t *testing.T) {
 	if got := readTodayTestQueue(t, dir); !reflect.DeepEqual(got, want) {
 		t.Fatalf("queue = %v, want %v", got, want)
 	}
-	items, err := resolveQueueRunItems(root, "")
+	items, err := podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil).QueueItems("")
 	if err != nil || len(items) != 2 {
 		t.Fatalf("run items = %v, error = %v", items, err)
 	}

@@ -2,6 +2,7 @@ package cli
 
 import (
 	"path/filepath"
+	"pod/pkg/podcast"
 	"reflect"
 	"testing"
 
@@ -222,7 +223,7 @@ func TestQueueRoutingLatest(t *testing.T) {
 	}
 
 	// Test abs queue add latest 1
-	_ = clearPodcastQueue(dir)
+	_ = podcast.ClearPodcastQueue(dir)
 	err = runQueueCommand(cfg, CLIOptions{
 		QueueSubcmd: "add",
 		Args:        []string{"latest", "1"},

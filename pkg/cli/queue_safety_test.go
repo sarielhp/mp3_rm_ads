@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
 	"reflect"
 	"testing"
 	"time"
@@ -46,10 +47,10 @@ func TestQueueReadOnlyAndEligibility(t *testing.T) {
 		t.Fatal(err)
 	}
 	before := queueTree(t, root)
-	if err := handleQueueList(root, "Show", CLIOptions{ProcOptions: ProcOptions{Quiet: true}}); err != nil {
+	if err := handleQueueList(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), "Show", CLIOptions{ProcOptions: ProcOptions{Quiet: true}}); err != nil {
 		t.Fatal(err)
 	}
-	if err := handleQueueRun(Config{PodcastsDir: root}, CLIOptions{ProcOptions: ProcOptions{DryRun: true}}, "episode.mp3"); err != nil {
+	if err := handleQueueRun(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), Config{PodcastsDir: root}, CLIOptions{ProcOptions: ProcOptions{DryRun: true}}, "episode.mp3"); err != nil {
 		t.Fatal(err)
 	}
 	if err := handleQueueToday(root, CLIOptions{ProcOptions: ProcOptions{DryRun: true}}, time.Now()); err != nil {
@@ -58,14 +59,14 @@ func TestQueueReadOnlyAndEligibility(t *testing.T) {
 	if !reflect.DeepEqual(before, queueTree(t, root)) {
 		t.Fatal("read-only command changed metadata")
 	}
-	if err := handleQueueAdd(root, []string{"all"}); err != nil {
+	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := pipeline.ReadQueue(dir)
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("queue=%v error=%v", entries, err)
 	}
-	if err := handleQueueAdd(root, []string{"episode.precut.mp3"}); err == nil {
+	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"episode.precut.mp3"}); err == nil {
 		t.Fatal("direct precut target accepted")
 	}
 }

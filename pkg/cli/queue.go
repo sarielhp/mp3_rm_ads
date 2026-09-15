@@ -15,18 +15,7 @@ import (
 	"github.com/sarielhp/clihelp"
 )
 
-type queueEpisodeItem struct {
-	PodcastID       string  `json:"podcast_id"`
-	EpisodeID       string  `json:"episode_id"`
-	Title           string  `json:"title"`
-	AudioPath       string  `json:"audio_path"`
-	PodcastDir      string  `json:"podcast_dir"`
-	Filename        string  `json:"filename"`
-	DurationSec     float64 `json:"duration_sec"`
-	PublishedAt     string  `json:"published_at,omitempty"`
-	ResolutionError string  `json:"resolution_error,omitempty"`
-	Priority        int     `json:"priority"`
-}
+type queueEpisodeItem = podcast.QueueItem
 
 func resolveQueueSubcmdArgs(subcmd string, args []string) (string, []string) {
 	if subcmd != "" {
@@ -49,6 +38,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		podcastsDir = "."
 	}
 
+	lib := library(cfg, cli, nil)
 	subcmd, args := resolveQueueSubcmdArgs(cli.QueueSubcmd, cli.Args)
 
 	switch subcmd {
@@ -59,7 +49,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		if len(args) > 0 {
 			target = args[0]
 		}
-		return handleQueueList(podcastsDir, target, cli)
+		return handleQueueList(lib, target, cli)
 	case "add":
 		if len(args) == 0 {
 			args = []string{"all"}
@@ -71,7 +61,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			}
 			return runQueueLatest(cfg, podcastsDir, limit, target, cli)
 		}
-		return handleQueueAdd(podcastsDir, args)
+		return handleQueueAdd(lib, args)
 	case "today":
 		if len(args) != 0 {
 			return fmt.Errorf("queue today accepts no arguments")
@@ -87,28 +77,28 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		if len(args) == 0 {
 			return fmt.Errorf("missing target ID(s) to remove from queue")
 		}
-		return handleQueueRemove(podcastsDir, args)
+		return handleQueueRemove(lib, args)
 	case "clear":
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
 		}
-		return handleQueueClear(podcastsDir, target)
+		return handleQueueClear(lib, target)
 	case "run":
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
 		}
-		return handleQueueRun(cfg, cli, target)
+		return handleQueueRun(lib, cfg, cli, target)
 	default:
 		return fmt.Errorf("unknown queue action %q (use list, add, today, latest, remove, clear, or run)", subcmd)
 	}
 }
 
-func handleQueueList(podcastsDir, target string, cli CLIOptions) error {
+func handleQueueList(lib *podcast.Library, target string, cli CLIOptions) error {
 	var entries []podcast.PodcastDirEntry
 	if target != "" {
-		res, err := resolveQueueTarget(podcastsDir, target)
+		res, err := lib.ResolveQueueTarget(target)
 		if err != nil {
 			return err
 		}
@@ -128,7 +118,7 @@ func handleQueueList(podcastsDir, target string, cli CLIOptions) error {
 			}}
 		}
 	} else {
-		entries = scanQueuePodcasts(podcastsDir)
+		entries = lib.QueuePodcasts()
 	}
 
 	var allItems []queueEpisodeItem
@@ -140,7 +130,7 @@ func handleQueueList(podcastsDir, target string, cli CLIOptions) error {
 		allItems = append(allItems, items...)
 	}
 
-	sortQueueItems(allItems)
+	podcast.SortQueueItems(allItems)
 	if cli.JSON {
 		data, err := json.MarshalIndent(allItems, "", "  ")
 		if err != nil {
@@ -159,36 +149,6 @@ func handleQueueList(podcastsDir, target string, cli CLIOptions) error {
 
 	printQueueTable(allItems)
 	return nil
-}
-
-func collectPodcastQueueItems(p podcast.PodcastDirEntry) ([]queueEpisodeItem, error) {
-	filenames, err := pipeline.ReadQueue(p.Dir)
-	if err != nil {
-		return nil, err
-	}
-
-	var list []queueEpisodeItem
-	for _, fn := range filenames {
-		mp3Path, err := pipeline.ResolveQueueAudioPath(p.Dir, fn)
-		if err != nil {
-			return nil, fmt.Errorf("queue %s: %w", p.Dir, err)
-		}
-		epID := podcast.EpisodeShortIDReadOnly(p.Dir, p.ShortID, mp3Path)
-		title := podcast.EpisodeTitleFromPath(mp3Path)
-		if title == "" {
-			title = util.StripExt(fn)
-		}
-
-		list = append(list, queueEpisodeItem{
-			PodcastID:  p.ShortID,
-			EpisodeID:  epID,
-			Title:      title,
-			AudioPath:  mp3Path,
-			PodcastDir: p.Dir,
-			Filename:   fn,
-		})
-	}
-	return list, nil
 }
 
 func printQueueTable(items []queueEpisodeItem) {
@@ -214,13 +174,13 @@ func printQueueTable(items []queueEpisodeItem) {
 	fmt.Println()
 }
 
-func handleQueueAdd(podcastsDir string, targets []string) error {
+func handleQueueAdd(lib *podcast.Library, targets []string) error {
 	for _, query := range targets {
 		if strings.EqualFold(query, "all") || query == "*" || query == "--all" {
-			entries := scanQueuePodcasts(podcastsDir)
+			entries := lib.QueuePodcasts()
 			totalAdded := 0
 			for _, p := range entries {
-				count, err := addPodcastEpisodesToQueue(p.Dir)
+				count, err := podcast.EnqueuePodcast(p.Dir)
 				if err != nil {
 					return err
 				}
@@ -234,14 +194,14 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 			continue
 		}
 
-		res, err := resolveQueueTarget(podcastsDir, query)
+		res, err := lib.ResolveQueueTarget(query)
 		if err != nil {
 			return fmt.Errorf("failed to resolve %q: %w", query, err)
 		}
 
 		if res.IsEpisode() {
 			ep := res.Episode
-			added, err := pipeline.AddToQueueChecked(ep.PodcastDir, queueFilenameForPath(ep.PodcastDir, ep.Path))
+			added, err := pipeline.AddToQueueChecked(ep.PodcastDir, podcast.QueueFilename(ep.PodcastDir, ep.Path))
 			if err != nil {
 				return err
 			}
@@ -252,7 +212,7 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
-			count, err := addPodcastEpisodesToQueue(pod.Dir)
+			count, err := podcast.EnqueuePodcast(pod.Dir)
 			if err != nil {
 				return err
 			}
@@ -263,42 +223,9 @@ func handleQueueAdd(podcastsDir string, targets []string) error {
 	return nil
 }
 
-func addPodcastEpisodesToQueue(podDir string) (int, error) {
-	mp3s := util.FindMP3Files(podDir)
-	var candidates []string
-	for _, mp3 := range mp3s {
-		if pipeline.IsQueueAudioPath(mp3) && !pipeline.IsEpisodeClean(mp3) {
-			candidates = append(candidates, queueFilenameForPath(podDir, mp3))
-		}
-	}
-	if len(candidates) == 0 {
-		return 0, nil
-	}
-
-	addedCount := 0
-	err := pipeline.UpdateQueue(podDir, func(entries []string) []string {
-		existing := make(map[string]bool)
-		for _, e := range entries {
-			existing[strings.ToLower(e)] = true
-		}
-		for _, fn := range candidates {
-			if !existing[strings.ToLower(fn)] {
-				entries = append(entries, fn)
-				existing[strings.ToLower(fn)] = true
-				addedCount++
-			}
-		}
-		return entries
-	})
-	if err != nil {
-		return 0, err
-	}
-	return addedCount, nil
-}
-
-func handleQueueRemove(podcastsDir string, targets []string) error {
+func handleQueueRemove(lib *podcast.Library, targets []string) error {
 	for _, query := range targets {
-		res, err := resolveQueueTarget(podcastsDir, query)
+		res, err := lib.ResolveQueueTarget(query)
 		if err != nil {
 			return fmt.Errorf("failed to resolve %q: %w", query, err)
 		}
@@ -316,7 +243,7 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
-			if err := clearPodcastQueue(pod.Dir); err != nil {
+			if err := podcast.ClearPodcastQueue(pod.Dir); err != nil {
 				return err
 			}
 			fmt.Printf("Cleared queue for %s [%s]\n", util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID))
@@ -325,14 +252,14 @@ func handleQueueRemove(podcastsDir string, targets []string) error {
 	return nil
 }
 
-func handleQueueClear(podcastsDir, target string) error {
+func handleQueueClear(lib *podcast.Library, target string) error {
 	if target != "" {
-		res, err := resolveQueueTarget(podcastsDir, target)
+		res, err := lib.ResolveQueueTarget(target)
 		if err != nil {
 			return err
 		}
 		if res.IsPodcast() {
-			if err := clearPodcastQueue(res.Podcast.Dir); err != nil {
+			if err := podcast.ClearPodcastQueue(res.Podcast.Dir); err != nil {
 				return err
 			}
 			fmt.Printf("Queue cleared for %s [%s]\n", util.Bold(util.DisplayName(res.Podcast.Title)), util.BoldCyan(res.Podcast.ShortID))
@@ -346,12 +273,12 @@ func handleQueueClear(podcastsDir, target string) error {
 		}
 	}
 
-	entries := scanQueuePodcasts(podcastsDir)
+	entries := lib.QueuePodcasts()
 	clearedCount := 0
 	for _, p := range entries {
 		qFile := filepath.Join(p.Dir, "queue.json")
 		if _, err := os.Stat(qFile); err == nil {
-			if err := clearPodcastQueue(p.Dir); err != nil {
+			if err := podcast.ClearPodcastQueue(p.Dir); err != nil {
 				return err
 			}
 			clearedCount++
@@ -361,17 +288,12 @@ func handleQueueClear(podcastsDir, target string) error {
 	return nil
 }
 
-func handleQueueRun(cfg Config, cli CLIOptions, target string) error {
-	podcastsDir := cfg.PodcastsDir
-	if podcastsDir == "" {
-		podcastsDir = "."
-	}
-
-	items, err := resolveQueueRunItems(podcastsDir, target)
+func handleQueueRun(lib *podcast.Library, cfg Config, cli CLIOptions, target string) error {
+	items, err := lib.QueueItems(target)
 	if err != nil {
 		return err
 	}
-	sortQueueItems(items)
+	podcast.SortQueueItems(items)
 	if len(items) == 0 {
 		if !cli.Quiet {
 			fmt.Println("AdR queue is currently empty.")
@@ -394,81 +316,13 @@ func handleQueueRun(cfg Config, cli CLIOptions, target string) error {
 	return executeQueueRun(items, cli, cfg)
 }
 
-func resolveQueueRunItems(podcastsDir, target string) ([]queueEpisodeItem, error) {
-	if target != "" {
-		return resolveTargetQueueItems(podcastsDir, target)
-	}
-	var allItems []queueEpisodeItem
-	entries := scanQueuePodcasts(podcastsDir)
-	for _, p := range entries {
-		items, err := collectPodcastQueueItems(p)
-		if err != nil {
-			return nil, err
-		}
-		allItems = append(allItems, items...)
-	}
-	return allItems, nil
-}
-
-func resolveTargetQueueItems(podcastsDir, target string) ([]queueEpisodeItem, error) {
-	res, err := resolveQueueTarget(podcastsDir, target)
-	if err != nil {
-		return nil, err
-	}
-	if res.IsPodcast() {
-		p := podcast.PodcastDirEntry{
-			Dir:        res.Podcast.Dir,
-			FolderName: res.Podcast.FolderName,
-			Title:      res.Podcast.Title,
-			ShortID:    res.Podcast.ShortID,
-		}
-		return collectPodcastQueueItems(p)
-	}
-	if res.IsEpisode() {
-		p := podcast.PodcastDirEntry{
-			Dir:        res.Episode.PodcastDir,
-			FolderName: filepath.Base(res.Episode.PodcastDir),
-			Title:      res.Episode.PodcastTitle,
-			ShortID:    res.Episode.PodcastShortID,
-		}
-		items, err := collectPodcastQueueItems(p)
-		if err != nil {
-			return nil, err
-		}
-		var matched []queueEpisodeItem
-		for _, it := range items {
-			if queuePathsMatch(it.PodcastDir, it.Filename, res.Episode.Path) {
-				matched = append(matched, it)
-			}
-		}
-		if len(matched) == 0 {
-			return nil, fmt.Errorf("episode %q [%s] is not in the AdR queue", res.Episode.Filename, res.Episode.ShortID)
-		}
-		return matched, nil
-	}
-	return nil, fmt.Errorf("unrecognized target %q", target)
-}
-
-func queueFilenameForPath(podDir, audioPath string) string {
-	rel, err := filepath.Rel(podDir, audioPath)
-	if err == nil && rel != "." && !strings.HasPrefix(rel, ".."+string(filepath.Separator)) && rel != ".." {
-		return rel
-	}
-	return filepath.Base(audioPath)
-}
-
-func queuePathsMatch(podDir, queuedFilename, audioPath string) bool {
-	path, err := pipeline.ResolveQueueAudioPath(podDir, queuedFilename)
-	return err == nil && filepath.Clean(path) == filepath.Clean(audioPath)
-}
-
 func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error {
 	total := len(items)
 	processedCount := 0
 	var failedEpisodes []string
 
 	for i := range items {
-		sortQueueItems(items[i:])
+		podcast.SortQueueItems(items[i:])
 		it := items[i]
 		if !cli.Quiet {
 			fmt.Printf("\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, util.DisplayName(it.Title), util.BoldCyan(it.EpisodeID))

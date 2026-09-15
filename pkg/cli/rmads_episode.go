@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path/filepath"
 	"pod/pkg/pipeline"
+	"pod/pkg/podcast"
 	"strconv"
 	"strings"
 )
@@ -41,7 +42,7 @@ func runUrgentEpisode(cfg Config, cli CLIOptions) (bool, error) {
 }
 
 func enqueueUrgentEpisode(ep *ResolvedEpisode) (queueEpisodeItem, error) {
-	item := queueEpisodeItem{PodcastID: ep.PodcastShortID, EpisodeID: ep.ShortID, Title: ep.Title, AudioPath: ep.Path, PodcastDir: ep.PodcastDir, Filename: queueFilenameForPath(ep.PodcastDir, ep.Path), Priority: 10}
+	item := queueEpisodeItem{PodcastID: ep.PodcastShortID, EpisodeID: ep.ShortID, Title: ep.Title, AudioPath: ep.Path, PodcastDir: ep.PodcastDir, Filename: podcast.QueueFilename(ep.PodcastDir, ep.Path), Priority: 10}
 	path, err := pipeline.ResolveQueueAudioPath(ep.PodcastDir, item.Filename)
 	if err != nil || filepath.Clean(path) != filepath.Clean(ep.Path) {
 		return item, fmt.Errorf("episode audio is not available in its podcast: %s", ep.ShortID)

@@ -7,9 +7,6 @@ import (
 	"os"
 	"path/filepath"
 	"pod/pkg/config"
-	"pod/pkg/pipeline"
-	"pod/pkg/podcast"
-	"sort"
 	"strconv"
 )
 
@@ -66,30 +63,4 @@ func handleQueuePriority(root string, args []string) error {
 	}
 	fmt.Printf("Podcast %s [%s] priority: %d\n", pod.Title, pod.ShortID, cfg.Priority)
 	return nil
-}
-
-func sortQueueItems(items []queueEpisodeItem) {
-	for i := range items {
-		items[i].Priority = podcast.EpisodePriority(items[i].PodcastDir, items[i].AudioPath)
-	}
-	sort.SliceStable(items, func(i, j int) bool { return items[i].Priority > items[j].Priority })
-}
-
-func clearPodcastQueue(dir string) error {
-	entries, err := pipeline.ReadQueue(dir)
-	if err != nil {
-		return err
-	}
-	for _, entry := range entries {
-		path, err := pipeline.ResolveQueueAudioPath(dir, entry)
-		if err != nil {
-			continue
-		}
-		if err := pipeline.ClearQueuePriority(path); err != nil {
-			return err
-		}
-	}
-	return pipeline.UpdateQueue(dir, func([]string) []string {
-		return []string{}
-	})
 }

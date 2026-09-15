@@ -59,7 +59,7 @@ func TestQueueDisplayContinuesPastAmbiguousEntries(t *testing.T) {
 	if !reflect.DeepEqual(before, queueTree(t, dir)) {
 		t.Fatal("listing mutated queue or metadata")
 	}
-	if _, err := collectPodcastQueueItems(podcast.PodcastDirEntry{Dir: dir}); err == nil {
+	if _, err := podcast.PodcastQueue(podcast.PodcastDirEntry{Dir: dir}); err == nil {
 		t.Fatal("processing accepted ambiguous entry")
 	}
 	assertQueueTableColumns(t, items)

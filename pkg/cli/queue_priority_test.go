@@ -16,17 +16,17 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 	root := t.TempDir()
 	a, ap := createTestPodcastWithEpisodes(t, root, "Alpha", []string{"episode"})
 	b, bp := createTestPodcastWithEpisodes(t, root, "Beta", []string{"episode"})
-	if err := handleQueueAdd(root, []string{"all"}); err != nil {
+	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
 		t.Fatal(err)
 	}
 	if err := handleQueuePriority(root, []string{"Beta", "8"}); err != nil {
 		t.Fatal(err)
 	}
-	items, err := resolveQueueRunItems(root, "")
+	items, err := podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil).QueueItems("")
 	if err != nil {
 		t.Fatal(err)
 	}
-	sortQueueItems(items)
+	podcast.SortQueueItems(items)
 	if items[0].AudioPath != bp[0] || items[0].Priority != 8 || items[1].Priority != 0 {
 		t.Fatalf("order=%+v", items)
 	}

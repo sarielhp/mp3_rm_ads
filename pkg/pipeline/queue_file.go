@@ -11,6 +11,10 @@ import (
 	"pod/pkg/util"
 )
 
+// QueueFileName is the per-podcast ad-removal queue, stored in the podcast's
+// own directory.
+const QueueFileName = "queue.json"
+
 // queueUpdateMu serialises queue writes within this process; the file lock
 // below serialises them against other processes. The CLI and the TUI each used
 // to keep their own copy of this function and their own mutex, so neither
@@ -22,7 +26,7 @@ func UpdateQueue(dir string, mutate func([]string) []string) error {
 	queueUpdateMu.Lock()
 	defer queueUpdateMu.Unlock()
 
-	path := filepath.Join(dir, "queue.json")
+	path := filepath.Join(dir, QueueFileName)
 	lock, err := util.AcquireFileLockWithTimeout(path, 5*time.Second)
 	if err != nil || lock == nil {
 		return fmt.Errorf("queue is locked: %w", err)
@@ -92,7 +96,7 @@ func RemoveFromQueueChecked(podDir, filename string) (bool, error) {
 }
 
 func ReadQueue(dir string) ([]string, error) {
-	path := filepath.Join(dir, "queue.json")
+	path := filepath.Join(dir, QueueFileName)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -109,7 +113,7 @@ func ReadQueue(dir string) ([]string, error) {
 
 // QueuedEpisodes reports the episode filenames queued in a podcast directory.
 func QueuedEpisodes(podDir string) []string {
-	data, err := os.ReadFile(filepath.Join(podDir, "queue.json"))
+	data, err := os.ReadFile(filepath.Join(podDir, QueueFileName))
 	if err != nil {
 		return nil
 	}
