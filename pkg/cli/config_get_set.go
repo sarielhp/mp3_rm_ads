@@ -95,8 +95,6 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		return nil
 	}
 	switch normKey {
-	case "remote-ffmpeg", "remote-ffmpeg-host", "ffmpeg-host", "rffmpeg":
-		cfg.RemoteFFmpegHost = val
 	case "whisper-url", "whisper.url":
 		cfg.WhisperURL = val
 	case "whisper-language", "whisper.language", "language", "lang":
@@ -131,16 +129,6 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		}
 	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
 		cfg.DefaultAdRemoval = config.NormalizeAdRemovalMode(val)
-	case "remote-host", "remote.host", "rhost":
-		cfg.RemoteHost = val
-	case "default-processing", "default.processing", "processing":
-		norm := strings.ToLower(val)
-		if norm != "local" && norm != "remote" {
-			return fmt.Errorf("invalid default processing value: '%s' (must be 'local' or 'remote')", val)
-		}
-		cfg.DefaultProcessing = norm
-	case "remote-work-dir", "remote.work-dir", "remote-workdir", "rworkdir":
-		cfg.RemoteWorkDir = val
 	default:
 		return fmt.Errorf("unknown configuration key: '%s'", key)
 	}
@@ -167,14 +155,6 @@ func handleConfigGet(cfg Config, key string) error {
 		fmt.Println(cfg.PodfetchDBPath)
 	case "server-base-url", "server.base-url", "server-url", "base-url":
 		fmt.Println(cfg.ServerBaseURL)
-	case "remote-ffmpeg", "remote-ffmpeg-host", "rffmpeg":
-		fmt.Println(cfg.RemoteFFmpegHost)
-	case "remote-host", "remote.host", "rhost":
-		fmt.Println(cfg.RemoteHost)
-	case "default-processing", "default.processing", "processing":
-		fmt.Println(cfg.DefaultProcessing)
-	case "remote-work-dir", "remote.work-dir", "remote-workdir", "rworkdir":
-		fmt.Println(cfg.RemoteWorkDir)
 	case "whisper-url", "whisper.url":
 		fmt.Println(cfg.WhisperURL)
 	case "whisper-language", "whisper.language", "lang":
@@ -234,15 +214,6 @@ func printConfig(cfg Config) {
 	if cfg.DefaultAdRemoval != "" {
 		fmt.Printf("  default_ad_policy:        %s\n", cfg.DefaultAdRemoval)
 	}
-	if cfg.DefaultProcessing != "" {
-		fmt.Printf("  default_processing:       %s\n", cfg.DefaultProcessing)
-	}
-	if cfg.RemoteHost != "" {
-		fmt.Printf("  remote_host:              %s\n", cfg.RemoteHost)
-	}
-	if cfg.RemoteWorkDir != "" {
-		fmt.Printf("  remote_work_dir:          %s\n", cfg.RemoteWorkDir)
-	}
 	fmt.Printf("  whisper_url:              %s\n", cfg.WhisperURL)
 	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
 	if cfg.WhisperDockerContainer != "" {
@@ -269,9 +240,6 @@ func printConfig(cfg Config) {
 	}
 	if cfg.PodfetchDBPath != "" {
 		fmt.Printf("  podfetch_db_path:         %s\n", cfg.PodfetchDBPath)
-	}
-	if cfg.RemoteFFmpegHost != "" {
-		fmt.Printf("  remote_ffmpeg_host:       %s\n", cfg.RemoteFFmpegHost)
 	}
 	if cfg.GeminiAPIKeyFile != "" {
 		fmt.Printf("  gemini_api_key_file:      %s\n", cfg.GeminiAPIKeyFile)

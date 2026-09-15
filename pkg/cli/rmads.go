@@ -1,9 +1,7 @@
 package cli
 
 import (
-	"fmt"
 	"pod/pkg/adremoval"
-	"pod/pkg/remote"
 
 	"github.com/sarielhp/clihelp"
 )
@@ -16,8 +14,6 @@ func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 		Subcommands: []clihelp.Command{
 			buildRmAdsRecutSubcommand(opts, action),
 			buildRmAdsExportSubcommand(opts, action),
-			buildRmAdsCollectSubcommand(opts, action),
-			buildRmAdsClearSubcommand(opts, action),
 			buildRmAdsAuditSubcommand(opts, action),
 		},
 		Options: getTranscriptionOptions(opts),
@@ -28,18 +24,6 @@ func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 				case "audit":
 					opts.ProcSubcmd = "audit"
 					opts.Args = ctx.Args[1:]
-					return nil
-				case "collect":
-					opts.ProcSubcmd = "collect"
-					if len(ctx.Args) > 1 {
-						opts.RemoteHost = ctx.Args[1]
-					}
-					return nil
-				case "clear":
-					opts.ProcSubcmd = "clear"
-					if len(ctx.Args) > 1 {
-						opts.RemoteHost = ctx.Args[1]
-					}
 					return nil
 				case "recut":
 					opts.ProcSubcmd = "recut"
@@ -58,53 +42,6 @@ func buildRmAdsCommand(opts *CLIOptions, action *string) clihelp.Command {
 	}
 }
 
-func buildRmAdsCollectSubcommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "collect",
-		Description: "Pull completed batches from remote host",
-		UsageLine:   "pod rm_ads collect [host] [options]",
-		Parameters: []clihelp.Param{
-			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
-		},
-		Args: clihelp.MaximumNArgs(1),
-		Options: []clihelp.Option{
-			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "rm_ads"
-			opts.ProcSubcmd = "collect"
-			if len(ctx.Args) > 0 {
-				opts.RemoteHost = ctx.Args[0]
-			}
-			return nil
-		},
-	}
-}
-
-func buildRmAdsClearSubcommand(opts *CLIOptions, action *string) clihelp.Command {
-	return clihelp.Command{
-		Name:        "clear",
-		Description: "Stop remote workers and clear remote queue",
-		UsageLine:   "pod rm_ads clear [host] [options]",
-		Parameters: []clihelp.Param{
-			{Name: "[host]", Description: "Target remote SSH host (defaults to configured remote_host)"},
-		},
-		Args: clihelp.MaximumNArgs(1),
-		Options: []clihelp.Option{
-			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
-		},
-		Run: func(ctx *clihelp.Context) error {
-			*action = "rm_ads"
-			opts.ProcSubcmd = "clear"
-			if len(ctx.Args) > 0 {
-				opts.RemoteHost = ctx.Args[0]
-			}
-			return nil
-		},
-	}
-}
-
 func buildRmAdsRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command {
 	return clihelp.Command{
 		Name:        "recut",
@@ -114,7 +51,6 @@ func buildRmAdsRecutSubcommand(opts *CLIOptions, action *string) clihelp.Command
 			clihelp.String(&opts.Output, "-o, --output <path>", "", "Output MP3 path or directory"),
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed debug information"),
-			clihelp.String(&opts.RemoteFFmpegHost, "--rffmpeg <host>", "", "Delegate FFmpeg audio cutting to remote SSH host"),
 			clihelp.Int(&opts.Count, "-n, --limit <number>", 0, "Maximum number of episodes to recut"),
 		},
 		Run: func(ctx *clihelp.Context) error {
@@ -224,18 +160,6 @@ func runRmAdsCommand(config Config, cli CLIOptions, action string) error {
 	}
 	if cli.ProcSubcmd == "export" {
 		runExportCommand(cli)
-		return nil
-	}
-	if cli.ProcSubcmd == "collect" {
-		if err := remote.RunRemotePull(&config, cli.RemoteHost, nil, cli.Quiet, cli.Verbose); err != nil {
-			return fmt.Errorf("error collecting from remote %s: %w", cli.RemoteHost, err)
-		}
-		return nil
-	}
-	if cli.ProcSubcmd == "clear" {
-		if err := remote.RunRemoteClear(&config, cli.RemoteHost, nil, cli.Quiet); err != nil {
-			return fmt.Errorf("error clearing remote queue on %s: %w", cli.RemoteHost, err)
-		}
 		return nil
 	}
 	if handled, err := runUrgentEpisode(config, cli); handled {

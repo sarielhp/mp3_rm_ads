@@ -77,7 +77,6 @@ func TestProcDryRunMutatesNothing(t *testing.T) {
 		Quiet:  true,
 		DryRun: true,
 	}
-	opts.Local = true
 	ProcessFiles([]string{dir}, opts, types.Config{}, "proc")
 
 	if diffs := diffTrees(before, snapshotTree(t, dir)); len(diffs) > 0 {

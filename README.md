@@ -171,11 +171,6 @@ pod player pause
 pod player status
 pod player stop
 
-# Remote processing cluster offload
-pod offload status
-pod offload push
-pod offload pull
-pod offload worker
 
 # Configuration
 pod config show
@@ -194,7 +189,6 @@ Every canonical command begins with a distinct letter (`c`, `i`, `o`, `p`, `q`, 
 |---------|--------|-------|-------------|
 | `config` | `c` | `pod config [command]` | View and manage application configuration, profiles, and cache |
 | `info` | `i` | `pod info [options] [id\|latest [N]\|status\|check]` | Library query, inspection, cuts breakdown, transcripts, and status diagnostics |
-| `offload` | `o` | `pod offload [command]` | Manage remote cluster batch processing and worker orchestration |
 | `player` | `p` | `pod player [command]` | Control background audio playback (`play`, `stop`, `pause`, `status`) |
 | `queue` | `q` | `pod queue [command]` | Manage the ad removal (AdR) processing queue (`list`, `add`, `remove`, `clear`) |
 | `rm_ads` | `r` | `pod rm_ads [command] [paths...]` | Process audio files for ad removal (`recut`, `export`, `collect`, `clear`) |

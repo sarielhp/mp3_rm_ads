@@ -14,7 +14,6 @@ import (
 	"pod/pkg/config"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/remote"
 	"pod/pkg/types"
 )
 
@@ -281,7 +280,6 @@ func TestProcessSingleQueuedTarget_LocalCompletion(t *testing.T) {
 	optsLocal := types.ProcOptions{
 		Quiet: true,
 	}
-	optsLocal.Local = true
 	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", optsLocal, types.Config{PodcastsDir: tmp})
 	if err != nil {
 		t.Fatalf("ProcessQueuedTarget failed: %v", err)
@@ -360,7 +358,6 @@ func TestHandlePodcastRmAdsWorkflow_QueueSingleAndRemove(t *testing.T) {
 	opts := types.ProcOptions{
 		Quiet: true,
 	}
-	opts.Local = true
 	config := types.Config{PodcastsDir: tmp}
 
 	pipeline.AddToQueue(resolved.Dir, filepath.Base(paths[0]))
@@ -400,79 +397,6 @@ func TestCountAllQueuedEpisodes(t *testing.T) {
 	pipeline.AddToQueue(p2, "E2.mp3")
 	if count := countAllQueuedEpisodes(tmp); count != 2 {
 		t.Fatalf("expected 2 queued, got %d", count)
-	}
-}
-
-func TestProcessSingleQueuedTarget_Remote(t *testing.T) {
-	tempDir := t.TempDir()
-	mock := NewMockRemoteTransport(tempDir)
-	remote.SetRemoteTransport(mock)
-	defer remote.SetRemoteTransport(&remote.DefaultSSHTransport{})
-
-	localPodcasts := filepath.Join(tempDir, "local_podcasts")
-	_ = os.MkdirAll(localPodcasts, 0755)
-
-	podDir, paths := createTestPodcastWithEpisodes(t, localPodcasts, "Remote Show", []string{
-		"Ep 1",
-	})
-	targetAudio := paths[0]
-	epFilename := filepath.Base(targetAudio)
-	pipeline.AddToQueue(podDir, epFilename)
-
-	remoteWorkDir := filepath.Join(tempDir, "remote_root")
-	_ = os.MkdirAll(remoteWorkDir, 0755)
-
-	cfg := types.Config{
-		RemoteConfig: types.RemoteConfig{
-			RemoteHost:    "mock-box",
-			RemoteWorkDir: remoteWorkDir,
-		},
-		PodcastsDir: localPodcasts,
-	}
-	opts := types.ProcOptions{
-		Quiet:      true,
-		Remote:     true,
-		RemoteHost: "mock-box",
-	}
-
-	go func() {
-		time.Sleep(100 * time.Millisecond)
-		relPath := filepath.Join("Remote Show", epFilename)
-		remEpPath := filepath.Join(remoteWorkDir, relPath)
-		_ = os.MkdirAll(filepath.Dir(remEpPath), 0755)
-		_ = os.WriteFile(remEpPath, []byte("cleaned remote audio"), 0644)
-		_ = os.WriteFile(strings.TrimSuffix(remEpPath, filepath.Ext(remEpPath))+".transcript.json", []byte(`{"text":"This episode contains a complete discussion with enough meaningful transcript text."}`), 0644)
-		remStat := pipeline.StatusPathFor(remEpPath)
-		_ = pipeline.SaveEpisodeStatus(remStat, &types.EpisodeStatusFile{
-			MediaFile: epFilename,
-			Status:    types.StateReadyForCopyBack,
-			Original:  types.EpisodeAudioMeta{DurationSec: 100},
-			Cleaned:   types.EpisodeAudioMeta{DurationSec: 80},
-		})
-		donePath := filepath.Join(remoteWorkDir, "done.json")
-		_ = remote.AddDoneEpisode(donePath, remote.RemoteDoneItem{
-			RelPath:          relPath,
-			Status:           types.StateReadyForCopyBack,
-			CleanedSizeBytes: int64(len("cleaned remote audio")),
-			CutDurationSec:   20,
-		})
-	}()
-
-	err := ProcessQueuedTarget(podDir, targetAudio, "rm_ads", opts, cfg)
-	if err != nil {
-		t.Fatalf("ProcessQueuedTarget remote failed: %v", err)
-	}
-
-	qFile := filepath.Join(podDir, "queue.json")
-	data, err := os.ReadFile(qFile)
-	if err == nil {
-		var entries []string
-		_ = json.Unmarshal(data, &entries)
-		for _, e := range entries {
-			if strings.EqualFold(e, epFilename) {
-				t.Fatalf("expected %s to be removed from queue.json", epFilename)
-			}
-		}
 	}
 }
 

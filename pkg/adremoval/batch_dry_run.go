@@ -4,12 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"strings"
-	"time"
 
 	"pod/pkg/pipeline"
-	"pod/pkg/remote"
 	"pod/pkg/types"
 	"pod/pkg/util"
 )
@@ -59,43 +56,7 @@ func auditFileStatus(inputFile string, opts types.ProcOptions) (category string,
 	return "completed", "Completed (0 ads)"
 }
 
-func fetchRemoteReadyCount(opts types.ProcOptions, cfg types.Config) (int, string) {
-	if opts.Local {
-		return 0, ""
-	}
-	reqHost := ""
-	if opts.Remote {
-		reqHost = cfg.RemoteHost
-	}
-	h, isRem, err := remote.ResolveProcessingHost(&cfg, reqHost, nil)
-	if err != nil || !isRem || h == "" {
-		return 0, ""
-	}
-	transport := remote.GetRemoteTransport()
-	if !remote.IsRemoteHostReachable(h, transport) {
-		return 0, h
-	}
-	remoteWorkDir := "~/abs_remote"
-	if cfg.RemoteWorkDir != "" {
-		remoteWorkDir = cfg.RemoteWorkDir
-	}
-	tempDonePath := filepath.Join(os.TempDir(), fmt.Sprintf("dryrun_done_%d.json", time.Now().UnixNano()))
-	remoteDoneFile := fmt.Sprintf("%s/done.json", remoteWorkDir)
-	remoteReadyOnServer := 0
-	if err := transport.Download(h, remoteDoneFile, tempDonePath); err == nil {
-		if doneM, err := remote.LoadDoneManifest(tempDonePath); err == nil && doneM != nil {
-			for _, it := range doneM.Episodes {
-				if it.Status == types.StateReadyForCopyBack {
-					remoteReadyOnServer++
-				}
-			}
-		}
-		_ = os.Remove(tempDonePath)
-	}
-	return remoteReadyOnServer, h
-}
-
-func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady int, targetHost string, opts types.ProcOptions, details []dryRunFileStatus) {
+func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, alreadyComplete int, opts types.ProcOptions, details []dryRunFileStatus) {
 	totalNeedingAction := needsTx + needsLLM + needsCut
 	fmt.Println()
 	fmt.Println(util.Bold("DRY RUN: Audio Processing Pipeline Status"))
@@ -104,13 +65,12 @@ func printDryRunSummary(filesCount, needsTx, needsLLM, needsCut, remotePending, 
 	fmt.Printf("  • Needs Transcription (Whisper): %d\n", needsTx)
 	fmt.Printf("  • Needs Ad Detection (LLM):      %d\n", needsLLM)
 	fmt.Printf("  • Needs Audio Cutting (FFmpeg):  %d\n", needsCut)
-	if remotePending > 0 {
-		fmt.Printf("  • In Remote Queue / Ready:       %d\n", remotePending)
-	}
-	if targetHost != "" {
-		fmt.Printf("  • Ready for Remote Collection:   %d (%s)\n", remoteReady, targetHost)
-	}
 	fmt.Printf("  • Already Processed / Ad-Free:   %d\n", alreadyComplete)
+	if remotePending > 0 {
+		// Left mid-flight by the remote processing this build no longer has.
+		// Reported so they stay visible rather than silently uncounted.
+		fmt.Printf("  • Stranded in a remote state:    %d\n", remotePending)
+	}
 	fmt.Println(strings.Repeat("─", 55))
 	fmt.Printf("  Total Needing Local Processing:  %s\n", util.Bold(fmt.Sprintf("%d", totalNeedingAction)))
 	if opts.Count > 0 && totalNeedingAction > opts.Count {
@@ -151,6 +111,5 @@ func handleProcDryRun(files []string, opts types.ProcOptions, cfg types.Config) 
 		}
 	}
 
-	remoteReady, targetHost := fetchRemoteReadyCount(opts, cfg)
-	printDryRunSummary(len(files), needsTranscribe, needsLLM, needsCut, remotePending, alreadyComplete, remoteReady, targetHost, opts, details)
+	printDryRunSummary(len(files), needsTranscribe, needsLLM, needsCut, remotePending, alreadyComplete, opts, details)
 }

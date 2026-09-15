@@ -11,10 +11,8 @@ import (
 
 	"pod/pkg/backend"
 	"pod/pkg/config"
-	"pod/pkg/format"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/remote"
 	"pod/pkg/types"
 	"pod/pkg/util"
 )
@@ -525,28 +523,14 @@ func findLatestUncleanedLocalEpisode(podDir, podTitle string, quiet bool) (strin
 func ProcessQueuedTarget(podDir, targetAudioPath, action string, opts types.ProcOptions, cfg types.Config) error {
 	opts.Normalize()
 
-	targetHost, err := resolveRemoteProcessingTargetHost(opts, cfg)
-	if err != nil {
+	if err := executeLocalBatchProcessing([]string{targetAudioPath}, opts, cfg, action); err != nil {
 		return err
-	}
-
-	if targetHost != "" {
-		if err := remote.RunRemotePush(&cfg, []string{targetAudioPath}, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
-			return fmt.Errorf("error pushing episode to remote: %w", err)
-		}
-		if err := pollAndPullRemoteEpisode(cfg, opts, targetHost, targetAudioPath); err != nil {
-			return err
-		}
-	} else {
-		if err := executeLocalBatchProcessing([]string{targetAudioPath}, opts, cfg, action); err != nil {
-			return err
-		}
 	}
 
 	if !pipeline.IsEpisodeClean(targetAudioPath) {
 		return fmt.Errorf("episode did not complete ad removal; retained in queue: %s", targetAudioPath)
 	}
-	_, err = pipeline.RemoveQueuedAudio(podDir, targetAudioPath)
+	_, err := pipeline.RemoveQueuedAudio(podDir, targetAudioPath)
 	refreshPodcastFeedXML(podDir, cfg)
 	return err
 }
@@ -571,40 +555,4 @@ func queueItemFilename(podDir, audioPath string) string {
 		return rel
 	}
 	return filepath.Base(audioPath)
-}
-
-func pollAndPullRemoteEpisode(cfg types.Config, opts types.ProcOptions, targetHost, targetAudioPath string) error {
-	if !opts.Quiet {
-		fmt.Printf("Waiting for remote processing on %s to complete...\n", targetHost)
-	}
-	startTime := time.Now()
-	for {
-		_ = remote.RunRemotePull(&cfg, targetHost, nil, true, opts.Verbose)
-		if pipeline.IsEpisodeClean(targetAudioPath) {
-			break
-		}
-		time.Sleep(3 * time.Second)
-		if time.Since(startTime) > 3600*time.Second {
-			return fmt.Errorf("timeout waiting for remote processing of %s", filepath.Base(targetAudioPath))
-		}
-	}
-
-	printRemoteEpisodeSummary(targetAudioPath, opts.Quiet)
-	return nil
-}
-
-func printRemoteEpisodeSummary(targetAudioPath string, quiet bool) {
-	if quiet {
-		return
-	}
-	origDur, cleanDur := pipeline.EpisodeDurations(targetAudioPath, pipeline.GetOrCreateEpisodeStatus(targetAudioPath))
-	cutDur := origDur - cleanDur
-	pct := 0.0
-	if origDur > 0 {
-		pct = (cutDur / origDur) * 100
-	}
-	fmt.Printf("\nCompleted ad removal for %s\n", filepath.Base(targetAudioPath))
-	fmt.Printf("Original duration: %s\n", format.FormatTime(origDur))
-	fmt.Printf("Cut duration:      %s (%.1f%% trimmed)\n", format.FormatTime(cutDur), pct)
-	fmt.Printf("Cleaned duration:  %s\n", format.FormatTime(cleanDur))
 }

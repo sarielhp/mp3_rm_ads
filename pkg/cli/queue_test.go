@@ -293,7 +293,6 @@ func TestQueueRun_CleansAndDequeues(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
-	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand run failed: %v", err)
 	}
@@ -327,7 +326,6 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 		QueueSubcmd: "run",
 		Args:        []string{pod1Cfg.ID},
 	}
-	cli.Local = true
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand target failed: %v", err)
 	}

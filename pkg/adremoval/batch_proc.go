@@ -12,7 +12,6 @@ import (
 	"pod/pkg/format"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/remote"
 	"pod/pkg/transcribe"
 	"pod/pkg/types"
 	"pod/pkg/util"
@@ -35,16 +34,6 @@ func ProcessFiles(targets []string, opts types.ProcOptions, cfg types.Config, ac
 
 	if opts.DryRun {
 		handleProcDryRun(expandedArgs, opts, cfg)
-		return
-	}
-
-	targetHost, err := resolveRemoteProcessingTargetHost(opts, cfg)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, err)
-		return
-	}
-	if targetHost != "" {
-		handleRemoteBatchExecution(expandedArgs, opts, cfg, targetHost)
 		return
 	}
 
@@ -140,71 +129,6 @@ func expandDirectoryArgs(args []string, opts types.ProcOptions, appCfg types.Con
 
 	sortFilesByPublicationTime(expandedArgs)
 	return expandedArgs
-}
-
-func resolveRemoteProcessingTargetHost(opts types.ProcOptions, cfg types.Config) (string, error) {
-	if opts.Local {
-		return "", nil
-	}
-	reqHost := opts.RemoteHost
-	if opts.Remote && reqHost == "" {
-		reqHost = cfg.RemoteHost
-		if reqHost == "" {
-			reqHost = cfg.RemoteFFmpegHost
-		}
-		if reqHost == "" {
-			return "", fmt.Errorf("remote processing requested without a remote host")
-		}
-	}
-	h, isRem, err := remote.ResolveProcessingHost(&cfg, reqHost, nil)
-	if err != nil {
-		return "", err
-	}
-	if err == nil && isRem {
-		return h, nil
-	}
-	return "", nil
-}
-
-func handleRemoteBatchExecution(expandedArgs []string, opts types.ProcOptions, cfg types.Config, targetHost string) {
-	if !opts.NoCollect && !opts.DryRun {
-		if err := remote.RunRemotePull(&cfg, targetHost, nil, opts.Quiet, opts.Verbose); err != nil {
-			if !opts.Quiet {
-				fmt.Fprintf(os.Stderr, "Warning: remote collection from %s encountered an issue: %v\n", targetHost, err)
-			}
-		}
-	}
-
-	var filesToPush []string
-	for _, f := range expandedArgs {
-		if strings.HasSuffix(f, ".json") {
-			continue
-		}
-		mainMP3File, _, _ := pipeline.ResolveAudioFiles(f, opts.Verbose)
-		if !opts.ForceTranscribe && !opts.ForceLLM && !opts.Recut && (pipeline.IsEpisodeClean(mainMP3File) || pipeline.IsEpisodeInRemoteFlight(mainMP3File)) {
-			continue
-		}
-		filesToPush = append(filesToPush, f)
-	}
-	remote.SortAudioFilesByDuration(filesToPush)
-	if opts.Count > 0 && len(filesToPush) > opts.Count {
-		filesToPush = filesToPush[:opts.Count]
-	}
-	if len(filesToPush) == 0 {
-		remoteWorkDir := cfg.RemoteWorkDir
-		if remoteWorkDir == "" {
-			remoteWorkDir = "~/abs_remote"
-		}
-		_ = remote.EnsureRemoteEnvironmentAndWorker(&cfg, targetHost, remoteWorkDir, nil, opts.Quiet)
-		if !opts.Quiet {
-			fmt.Println("All audio files are already transcribed, cleaned, or currently processing remotely.")
-		}
-		return
-	}
-	if err := remote.RunRemotePush(&cfg, filesToPush, targetHost, nil, opts.Priority, opts.Quiet, opts.Verbose); err != nil {
-		fmt.Fprintf(os.Stderr, "Error pushing batch to remote %s: %v\n", targetHost, err)
-		os.Exit(1)
-	}
 }
 
 func executeLocalBatchProcessing(expandedArgs []string, opts types.ProcOptions, cfg types.Config, action string) error {

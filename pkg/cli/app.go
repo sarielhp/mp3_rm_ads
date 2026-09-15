@@ -75,7 +75,6 @@ func buildCLIApp(action *string, opts *CLIOptions) *clihelp.App {
 		Commands: []clihelp.Command{
 			buildConfigCommand(opts, action),
 			buildInfoCommand(opts, action),
-			buildOffloadCommand(opts, action),
 			buildPlayerCommand(opts, action),
 			buildQueueCommand(opts, action),
 			buildRmAdsCommand(opts, action),

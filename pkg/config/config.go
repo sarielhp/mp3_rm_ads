@@ -33,11 +33,6 @@ func DefaultConfig() types.Config {
 			WhisperThreads:     4,
 			WhisperGreedy:      true,
 		},
-		RemoteConfig: types.RemoteConfig{
-			DefaultProcessing: "local",
-			RemoteWorkDir:     "~/abs_remote",
-			RemoteFFmpegHost:  "",
-		},
 		PolicyConfig: types.PolicyConfig{
 			DefaultDownloadPolicy: "latest",
 			DefaultDownloadK:      3,
@@ -177,18 +172,6 @@ func applyWhisperEnv(cfg *types.Config) {
 }
 
 func applyRemoteEnv(cfg *types.Config) {
-	if v := os.Getenv("REMOTE_FFMPEG_HOST"); v != "" {
-		cfg.RemoteFFmpegHost = v
-	}
-	if v := os.Getenv("REMOTE_HOST"); v != "" {
-		cfg.RemoteHost = v
-	}
-	if v := os.Getenv("DEFAULT_PROCESSING"); v != "" {
-		cfg.DefaultProcessing = v
-	}
-	if v := os.Getenv("REMOTE_WORK_DIR"); v != "" {
-		cfg.RemoteWorkDir = v
-	}
 	if v := os.Getenv("DEFAULT_DOWNLOAD_POLICY"); v != "" {
 		cfg.DefaultDownloadPolicy = NormalizeDownloadPolicy(v)
 	}

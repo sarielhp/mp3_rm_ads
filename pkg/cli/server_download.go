@@ -35,8 +35,6 @@ func buildServerDownloadSubcommand(opts *CLIOptions, action *string, countVal, k
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Show detailed info"),
-			clihelp.Bool(&opts.Remote, "--remote", false, "Offload post-download audio processing to remote host"),
-			clihelp.Bool(&opts.Local, "--local", false, "Force local post-download audio processing"),
 		},
 		Run: func(ctx *clihelp.Context) error {
 			*action = "server"

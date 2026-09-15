@@ -9,35 +9,32 @@ import (
 	"pod/pkg/config"
 	"pod/pkg/podcast"
 	"pod/pkg/progress"
-	"pod/pkg/remote"
 	"pod/pkg/types"
 	"pod/pkg/util"
 )
 
 type (
-	Config             = types.Config
-	CLIOptions         = types.CLIOptions
-	ProcOptions        = types.ProcOptions
-	PolicyOptions      = types.PolicyOptions
-	LLMProfile         = types.LLMProfile
-	AdSegment          = types.AdSegment
-	TranscriptionData  = types.TranscriptionData
-	CutsData           = types.CutsData
-	CutEntry           = types.CutEntry
-	EpisodeStatusFile  = types.EpisodeStatusFile
-	PlayerTrack        = types.PlayerTrack
-	Podcast            = backend.Podcast
-	PodcastConfig      = config.PodcastConfig
-	FeedEpisode        = backend.FeedEpisode
-	Episode            = backend.Episode
-	WhisperEngine      = types.WhisperEngine
-	WhisperProfile     = types.WhisperProfile
-	RemoteTransport    = remote.RemoteTransport
-	RemoteBatchJobItem = types.RemoteBatchJobItem
-	ResolvedPodcast    = podcast.ResolvedPodcast
-	ResolvedEpisode    = podcast.ResolvedEpisode
-	ResolvedID         = podcast.ResolvedID
-	syncWG             = util.SyncWG
+	Config            = types.Config
+	CLIOptions        = types.CLIOptions
+	ProcOptions       = types.ProcOptions
+	PolicyOptions     = types.PolicyOptions
+	LLMProfile        = types.LLMProfile
+	AdSegment         = types.AdSegment
+	TranscriptionData = types.TranscriptionData
+	CutsData          = types.CutsData
+	CutEntry          = types.CutEntry
+	EpisodeStatusFile = types.EpisodeStatusFile
+	PlayerTrack       = types.PlayerTrack
+	Podcast           = backend.Podcast
+	PodcastConfig     = config.PodcastConfig
+	FeedEpisode       = backend.FeedEpisode
+	Episode           = backend.Episode
+	WhisperEngine     = types.WhisperEngine
+	WhisperProfile    = types.WhisperProfile
+	ResolvedPodcast   = podcast.ResolvedPodcast
+	ResolvedEpisode   = podcast.ResolvedEpisode
+	ResolvedID        = podcast.ResolvedID
+	syncWG            = util.SyncWG
 )
 
 const (

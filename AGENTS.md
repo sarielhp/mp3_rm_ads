@@ -24,7 +24,6 @@
 | `tools/map.sh` | Print package structure, key types, and exported functions |
 | `tools/version.sh` | Print current version from `VERSION` file |
 | `tools/visual_audit` | Live PTY visual audit: exercises and snapshots all 19 TUI screens/modes |
-| `tools/verify_remote_queue` | Live remote queue compliance audit against 24h & duration policy |
 | `tools/bump` | Bump version, git add/commit/push (skips duplicate gate if .verified_head matches; silent, outputs "Success VERSION (commit+push)") |
 | `tools/commit <msg>` | Quality gate + stage + commit + records .verified_head (silent, outputs "Success <msg>") |
 | `tools/snapshot [msg]` | Fast WIP commit without gating (<0.1s, never pushes) |
@@ -37,7 +36,6 @@ A `Makefile` at the project root delegates to all scripts:
 | Target | Action |
 |--------|--------|
 | `make check` | Full quality gate |
-| `make verify-queue` | Verify remote queue compliance (`tools/verify_remote_queue`) |
 | `make visual` | Run full live PTY visual audit across all 19 TUI screens (`tools/visual_audit`) |
 | `make lint` | Static analysis (vet + staticcheck + line audit) |
 | `make audit` | Audit Go source file line lengths (`tools/audit_lines`) |
@@ -202,7 +200,6 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/podcast` (cont.) | `podcast.Library` (`Open`) is the entry point for anything needing library-wide state; it owns the feed cache and download queue. `podcast.Config` is three fields and must stay that way (`TestConfigStaysThreeFields`) |
 | `pkg/podcast` (cont. 2) | `EpisodeFile` is the shared core of an episode on disk; representations embed it rather than restating the six fields. Cache wire format is pinned by `TestCacheWireFormat` |
 | `pkg/progress` | `progress.Reporter`: how library packages report progress without choosing where it goes. A nil Reporter is silent |
-| `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
 | `pkg/tui` | Full-featured interactive terminal UI (Bubbletea/Lipgloss) spanning 19 screens and modes |
 | `pkg/cli` | Command-line router (`clihelp`), top-level flags, subcommands (`sync`, `queue`, `info`, `config`, etc.) |

@@ -66,9 +66,6 @@ func dispatch(action string, config *Config, cli CLIOptions) error {
 			return runStatusCommand(config, cli)
 		}
 		return runInfoCommand(*config, cli)
-	case "offload":
-		handleRemoteCommand(*config, cli)
-		return nil
 	case "player":
 		return runPlayerCommand(*config, cli)
 	case "queue":

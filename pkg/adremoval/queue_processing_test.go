@@ -10,22 +10,6 @@ import (
 	"pod/pkg/util"
 )
 
-func TestQueueRemoteHostSelection(t *testing.T) {
-	cfg := types.Config{}
-	cfg.RemoteHost = "other"
-	host, err := resolveRemoteProcessingTargetHost(types.ProcOptions{Remote: true, RemoteHost: "chosen"}, cfg)
-	if err != nil || host != "chosen" {
-		t.Fatalf("host=%q error=%v", host, err)
-	}
-	if _, err := resolveRemoteProcessingTargetHost(types.ProcOptions{Remote: true}, types.Config{}); err == nil {
-		t.Fatal("missing remote host accepted")
-	}
-	host, err = resolveRemoteProcessingTargetHost(types.ProcOptions{Local: true, RemoteHost: "chosen"}, types.Config{})
-	if err != nil || host != "" {
-		t.Fatalf("local host=%q error=%v", host, err)
-	}
-}
-
 func TestQueuedCompletedEpisodeWithoutTranscriptIsNotSkipped(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, "episode.mp3")
@@ -56,7 +40,7 @@ func TestQueueRetainsLockedEpisode(t *testing.T) {
 		t.Fatalf("lock: %v", err)
 	}
 	defer lock.Release()
-	opts := types.ProcOptions{Quiet: true, Local: true, WhisperEngine: "local"}
+	opts := types.ProcOptions{Quiet: true, WhisperEngine: "local"}
 	if err := ProcessQueuedTarget(dir, path, "rm_ads", opts, types.Config{}); err == nil {
 		t.Fatal("skipped processing reported success")
 	}

@@ -67,7 +67,7 @@ func TestRmAdsEpisodeQueuesUrgentlyAndRetainsOnFailure(t *testing.T) {
 	}
 	id := podcast.EpisodeShortIDReadOnly(dir, podcast.GeneratePodcastShortID("Show"), paths[1])
 	cfg := Config{PodcastsDir: root}
-	cli := CLIOptions{Args: []string{id}, ProcOptions: ProcOptions{DryRun: true, Quiet: true, Local: true}}
+	cli := CLIOptions{Args: []string{id}, ProcOptions: ProcOptions{DryRun: true, Quiet: true}}
 	before := queueTree(t, root)
 	if err := runRmAdsCommand(cfg, cli, "rm_ads"); err != nil {
 		t.Fatal(err)

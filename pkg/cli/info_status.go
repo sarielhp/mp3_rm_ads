@@ -10,7 +10,6 @@ import (
 	"pod/pkg/config"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/remote"
 	"pod/pkg/util"
 )
 
@@ -23,26 +22,10 @@ type podcastStatusEntry struct {
 
 func absStatus(cfg Config, showDetailed bool, quiet bool) {
 	if showDetailed {
-		targetHost := cfg.RemoteHost
-		if targetHost == "" {
-			targetHost = cfg.RemoteFFmpegHost
-		}
-		if targetHost != "" && !strings.EqualFold(targetHost, "local") {
-			renderRemoteStatusSection(&cfg, targetHost, nil, quiet)
-		}
 		renderLocalLibraryStatus(cfg, quiet)
 		return
 	}
-
 	renderLocalSummary(cfg, quiet)
-
-	targetHost := cfg.RemoteHost
-	if targetHost == "" {
-		targetHost = cfg.RemoteFFmpegHost
-	}
-	if targetHost != "" && !strings.EqualFold(targetHost, "local") {
-		renderRemoteStatusSection(&cfg, targetHost, nil, quiet)
-	}
 }
 
 func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
@@ -95,10 +78,6 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 		}
 	}
 	return podcastsCount, totalEpisodes, totalNeedsAd
-}
-
-func renderRemoteStatusSection(cfg *Config, targetHost string, transport RemoteTransport, quiet bool) {
-	_ = remote.RunRemoteStatus(cfg, targetHost, transport, quiet, false)
 }
 
 func renderLocalLibraryStatus(cfg Config, quiet bool) {

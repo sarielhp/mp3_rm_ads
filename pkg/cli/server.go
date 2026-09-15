@@ -36,8 +36,6 @@ func buildServerCommand(opts *CLIOptions, action *string, countVal, keepVal *int
 			clihelp.Bool(&opts.Quiet, "-q, --quiet", false, "Suppress progress outputs"),
 			clihelp.Bool(&opts.DryRun, "--dry-run", false, "Show output without executing"),
 			clihelp.Bool(&opts.Verbose, "-v, --verbose", false, "Detailed outputs"),
-			clihelp.Bool(&opts.Remote, "--remote", false, "Offload audio processing to remote host"),
-			clihelp.Bool(&opts.Local, "--local", false, "Force local audio processing"),
 			clihelp.Bool(&opts.PodcastsOnly, "--podcasts-only", false, "Only scan for podcasts (skip downloads)"),
 			clihelp.Bool(&opts.EpisodesOnly, "--episodes-only", false, "Only check episodes (skip podcast scan)"),
 		},

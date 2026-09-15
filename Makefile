@@ -1,9 +1,6 @@
-.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual verify-queue review-loop snapshot snap
+.PHONY: all check lint test race vuln build install format tidy vet staticcheck map version bump commit push ci checkpoint clean audit symbols template suggest-split visual review-loop snapshot snap
 
 all: check
-
-verify-queue:
-	@./tools/verify_remote_queue $(ARGS)
 
 visual:
 	@./tools/visual_audit

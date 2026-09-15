@@ -45,13 +45,8 @@ type ProcOptions struct {
 	ExportSRT bool
 	ExportTXT bool
 
-	// Remote execution.
-	Remote           bool
-	Local            bool
-	RemoteHost       string
-	RemoteFFmpegHost string
-	NoCollect        bool
-	Priority         int
+	// Priority orders the ad-removal queue; higher runs first.
+	Priority int
 
 	// Transcript audit thresholds.
 	AuditMinRatioStr string

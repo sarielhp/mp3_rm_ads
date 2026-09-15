@@ -135,14 +135,6 @@ type TUIColorConfig struct {
 // RemoteOptions holds the remote-execution flags the command line acts on
 // itself. The flags the engine acts on — Remote, Local, RemoteHost,
 // RemoteFFmpegHost, NoCollect, Priority — live in ProcOptions.
-type RemoteOptions struct {
-	SetRemoteFFmpegHost bool
-	RemoteSubcmd        string
-	RemoteWorkDir       string
-	Daemon              bool
-	IfDirty             bool
-	BatchWorkerDir      string
-}
 
 type PolicyOptions struct {
 	AutoDownloadStr  string
@@ -180,7 +172,6 @@ type BackendOptions struct {
 
 type CLIOptions struct {
 	ProcOptions
-	RemoteOptions
 	PolicyOptions
 	BackendOptions
 
@@ -256,13 +247,6 @@ type BackendConfig struct {
 	PodfetchDBPath string `json:"podfetch_db_path,omitempty"`
 }
 
-type RemoteConfig struct {
-	RemoteFFmpegHost  string `json:"remote_ffmpeg_host,omitempty"`
-	RemoteHost        string `json:"remote_host,omitempty"`
-	DefaultProcessing string `json:"default_processing,omitempty"`
-	RemoteWorkDir     string `json:"remote_work_dir,omitempty"`
-}
-
 type PolicyConfig struct {
 	DefaultDownloadPolicy string `json:"default_download_policy,omitempty"`
 	DefaultDownloadK      int    `json:"default_download_k,omitempty"`
@@ -300,7 +284,6 @@ type Config struct {
 
 	WhisperConfig
 	BackendConfig
-	RemoteConfig
 	PolicyConfig
 	GeminiConfig
 	SpeculativeConfig

@@ -73,8 +73,8 @@ func TestTopLevelCommandsUniqueFirstLetters(t *testing.T) {
 		}
 		seen[first] = cmd.Name
 	}
-	if len(app.Commands) != 8 {
-		t.Errorf("expected 8 canonical top-level commands, got %d", len(app.Commands))
+	if len(app.Commands) != 7 {
+		t.Errorf("expected 7 canonical top-level commands, got %d", len(app.Commands))
 	}
 }
 
