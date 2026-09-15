@@ -118,12 +118,13 @@ func checkUsageOutputNoRepeatedSections(t *testing.T, path []string, out string)
 }
 
 func TestUsageHelpNoRepeatedText(t *testing.T) {
+	var buf bytes.Buffer
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
 
 	for _, cmd := range app.Commands {
-		var buf bytes.Buffer
+		buf.Reset()
 		renderOpts := clihelp.Options{Writer: &buf, Width: 80}
 		if !app.RenderCommand(renderOpts, cmd.Name) {
 			t.Errorf("failed to render help for %s", cmd.Name)

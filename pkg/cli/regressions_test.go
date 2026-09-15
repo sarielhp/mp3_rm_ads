@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -57,15 +58,15 @@ func TestRegressionIssue3_ConfigGetErrorHandling(t *testing.T) {
 	t.Parallel()
 	cfg := Config{PodcastsDir: "/tmp/podcasts"}
 
-	if err := handleConfigGet(cfg, "invalid_setting_name_xyz"); err == nil {
+	if err := handleConfigGet(io.Discard, cfg, "invalid_setting_name_xyz"); err == nil {
 		t.Errorf("expected error for invalid config key, got nil")
 	}
 
-	if err := handleConfigGet(cfg, "podcasts-dir"); err != nil {
+	if err := handleConfigGet(io.Discard, cfg, "podcasts-dir"); err != nil {
 		t.Errorf("expected nil error for valid config key 'podcasts-dir', got %v", err)
 	}
 
-	if err := handleConfigGet(cfg, "dir"); err != nil {
+	if err := handleConfigGet(io.Discard, cfg, "dir"); err != nil {
 		t.Errorf("expected nil error for valid alias 'dir', got %v", err)
 	}
 }

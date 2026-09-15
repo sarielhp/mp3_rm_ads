@@ -80,7 +80,7 @@ func handleQueueTodaySource(root string, cli CLIOptions, now time.Time, source m
 		candidates := todayQueueCandidates(pod.Dir, now, source)
 		if cli.DryRun {
 			for _, filename := range candidates {
-				fmt.Printf("[dry-run] Would queue for AdR: %s\n", filepath.Join(pod.Dir, filename))
+				fmt.Fprintf(outFor(cli), "[dry-run] Would queue for AdR: %s\n", filepath.Join(pod.Dir, filename))
 			}
 			continue
 		}
@@ -107,7 +107,7 @@ func handleQueueTodaySource(root string, cli CLIOptions, now time.Time, source m
 		}
 	}
 	if !cli.Quiet && !cli.DryRun {
-		fmt.Printf("Added %d uncleaned episode(s) published today (%s, local time) to the AdR queue.\n", total, now.Format("2006-01-02"))
+		fmt.Fprintf(outFor(cli), "Added %d uncleaned episode(s) published today (%s, local time) to the AdR queue.\n", total, now.Format("2006-01-02"))
 	}
 	return nil
 }

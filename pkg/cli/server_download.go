@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"pod/pkg/adremoval"
@@ -96,21 +97,21 @@ func runServerDownloads(b backend.Backend, config Config, cli CLIOptions) error 
 // episode lists here.
 func resolveDownloadTargets(b backend.Backend, cli CLIOptions) ([]backend.Podcast, error) {
 	if !cli.Quiet {
-		fmt.Print("Reading podcast list from server...")
+		fmt.Fprint(outFor(cli), "Reading podcast list from server...")
 		os.Stdout.Sync()
 	}
 	start := time.Now()
 	podcasts, err := backend.ListPodcastsFrom(b)
 	if err != nil {
-		fmt.Fprintln(outFor(cli))
+		fmt.Fprintln(progressFor(cli))
 		return nil, fmt.Errorf("failed to fetch podcasts from server: %w", err)
 	}
 	targets, err := filterServerTargets(podcasts, cli)
 	if err != nil {
-		fmt.Fprintln(outFor(cli))
+		fmt.Fprintln(progressFor(cli))
 		return nil, err
 	}
-	fmt.Fprintf(outFor(cli), " %d podcast(s) (%.1fs).\n", len(targets), time.Since(start).Seconds())
+	fmt.Fprintf(progressFor(cli), " %d podcast(s) (%.1fs).\n", len(targets), time.Since(start).Seconds())
 	return targets, nil
 }
 
@@ -124,12 +125,12 @@ func planServerDownloads(b backend.Backend, config Config, cli CLIOptions, podca
 	progress := func(done, total int) {}
 	if !cli.Quiet {
 		progress = func(done, total int) {
-			fmt.Printf("\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
+			fmt.Fprintf(outFor(cli), "\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
 			os.Stdout.Sync()
 		}
 	}
 	plans := podcast.PlanDownloads(b, podcasts, index, downloadOptions(config, cli), progress)
-	fmt.Fprint(outFor(cli), "\r\x1b[K")
+	fmt.Fprint(progressFor(cli), "\r\x1b[K")
 	reportDownloadPlans(plans, time.Since(start), cli)
 	return plans
 }
@@ -151,27 +152,27 @@ func reportDownloadPlans(plans []podcast.DownloadPlan, elapsed time.Duration, cl
 		}
 		unknown += len(plans[i].Unknown)
 	}
-	fmt.Printf("Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
+	fmt.Fprintf(outFor(cli), "Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
 		len(plans), elapsed.Seconds(), episodes, selected)
 	if failed > 0 {
-		fmt.Printf(", %d unreadable", failed)
+		fmt.Fprintf(outFor(cli), ", %d unreadable", failed)
 	}
-	fmt.Println(".")
+	fmt.Fprintln(outFor(cli), ".")
 
 	for i := range plans {
 		pTitle := util.DisplayName(plans[i].Title())
 		switch {
 		case plans[i].Err != nil:
-			fmt.Printf("  ! %s: %v\n", pTitle, plans[i].Err)
+			fmt.Fprintf(outFor(cli), "  ! %s: %v\n", pTitle, plans[i].Err)
 		case len(plans[i].Unknown) > 0:
-			fmt.Printf("  ? %s: %d episode(s) the server has not indexed yet\n",
+			fmt.Fprintf(outFor(cli), "  ? %s: %d episode(s) the server has not indexed yet\n",
 				pTitle, len(plans[i].Unknown))
 		case cli.Verbose && len(plans[i].Episodes) == 0:
-			fmt.Printf("  - %s: up to date\n", pTitle)
+			fmt.Fprintf(outFor(cli), "  - %s: up to date\n", pTitle)
 		}
 	}
 	if unknown > 0 {
-		fmt.Printf("%d episode(s) cannot be requested until the server indexes them; run 'pod server feeds update'.\n", unknown)
+		fmt.Fprintf(outFor(cli), "%d episode(s) cannot be requested until the server indexes them; run 'pod server feeds update'.\n", unknown)
 	}
 }
 
@@ -215,17 +216,17 @@ func executeServerDownloads(b backend.Backend, config Config, cli CLIOptions, po
 
 func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, podcasts []backend.Podcast, totalDownloaded, fromPodcasts int) error {
 	if !cli.Quiet && !cli.DryRun {
-		fmt.Printf("Queued %d episode download(s) across %d podcast(s).\n", totalDownloaded, fromPodcasts)
+		fmt.Fprintf(outFor(cli), "Queued %d episode download(s) across %d podcast(s).\n", totalDownloaded, fromPodcasts)
 	}
 	if totalDownloaded > 0 && !cli.NoWait && !cli.DryRun {
-		fmt.Fprintf(outFor(cli), "Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
+		fmt.Fprintf(progressFor(cli), "Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
 		if err := b.WaitForActiveDownloads(podcasts, 5*time.Minute); err != nil {
 			return fmt.Errorf("waiting for downloads: %w", err)
 		}
 	}
 	if totalDownloaded > 0 && !cli.DryRun && !cli.NoWait {
 		if len(config.PostProcessors) > 0 {
-			runPostProcessors(config.PostProcessors, cli.Quiet)
+			runPostProcessors(outFor(cli), config.PostProcessors, cli.Quiet)
 		} else {
 			if targets, ok := resolveTargetAudioArgs(cli, config); ok {
 				adremoval.ProcessFiles(targets, cli.ProcOptions, config, "proc")
@@ -235,13 +236,13 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 	return nil
 }
 
-func runPostProcessors(processors []string, quiet bool) {
+func runPostProcessors(w io.Writer, processors []string, quiet bool) {
 	if !quiet {
-		fmt.Printf("\n=== Executing %d Post-Processor(s) ===\n", len(processors))
+		fmt.Fprintf(w, "\n=== Executing %d Post-Processor(s) ===\n", len(processors))
 	}
 	for _, proc := range processors {
 		if !quiet {
-			fmt.Printf("Running post-processor: %s...\n", proc)
+			fmt.Fprintf(w, "Running post-processor: %s...\n", proc)
 		}
 		parts := strings.Fields(proc)
 		if len(parts) == 0 {

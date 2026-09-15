@@ -1,9 +1,9 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -16,30 +16,28 @@ import (
 )
 
 func TestQueueListEmpty(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{QueueSubcmd: "list"}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runQueueCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runQueueCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	if !strings.Contains(string(outBytes), "empty") {
 		t.Errorf("expected empty queue message, got: %s", string(outBytes))
 	}
 }
 
 func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
+	var buf bytes.Buffer
 	root := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"Episode One"})
 	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
@@ -50,20 +48,13 @@ func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
 		if err := app.Execute([]string{"queue", command, "--json"}); err != nil {
 			t.Fatal(err)
 		}
-		r, w, err := os.Pipe()
-		if err != nil {
-			t.Fatal(err)
+		buf.Reset()
+		opts.Out = &buf
+		opts.Err = &buf
+		if err := runQueueCommand(Config{PodcastsDir: root}, opts); err != nil {
+			t.Fatalf("run: %v", err)
 		}
-		stdout := os.Stdout
-		os.Stdout = w
-		err = runQueueCommand(Config{PodcastsDir: root}, opts)
-		_ = w.Close()
-		os.Stdout = stdout
-		data, readErr := io.ReadAll(r)
-		_ = r.Close()
-		if err != nil || readErr != nil {
-			t.Fatalf("run: %v; read: %v", err, readErr)
-		}
+		data := buf.Bytes()
 		var items []queueEpisodeItem
 		if err := json.Unmarshal(data, &items); err != nil {
 			t.Fatal(err)
@@ -75,7 +66,10 @@ func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
 }
 
 func testQueueAddAndList(t *testing.T, cfg Config, podDir, ep1ID string) {
+	var buf bytes.Buffer
 	cliAdd := CLIOptions{QueueSubcmd: "add", Args: []string{ep1ID}}
+	cliAdd.Out = &buf
+	cliAdd.Err = &buf
 	if err := runQueueCommand(cfg, cliAdd); err != nil {
 		t.Fatalf("runQueueCommand add failed: %v", err)
 	}
@@ -91,16 +85,13 @@ func testQueueAddAndList(t *testing.T, cfg Config, podDir, ep1ID string) {
 		t.Errorf("expected [ep1.mp3] in queue, got: %v", entries)
 	}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
+	buf.Reset()
 	cliListJSON := CLIOptions{QueueSubcmd: "list", JSON: true}
+	cliListJSON.Out = &buf
+	cliListJSON.Err = &buf
 	_ = runQueueCommand(cfg, cliListJSON)
 
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	var listItems []queueEpisodeItem
 	if err := json.Unmarshal(outBytes, &listItems); err != nil || len(listItems) != 1 {
 		t.Fatalf("failed to parse queue json: %v, got %s", err, string(outBytes))
@@ -111,8 +102,11 @@ func testQueueAddAndList(t *testing.T, cfg Config, podDir, ep1ID string) {
 }
 
 func testQueueRemoveAndClear(t *testing.T, cfg Config, podDir, podID, ep1ID string) {
+	var buf bytes.Buffer
 	qFile := filepath.Join(podDir, "queue.json")
 	cliRemove := CLIOptions{QueueSubcmd: "remove", Args: []string{ep1ID}}
+	cliRemove.Out = &buf
+	cliRemove.Err = &buf
 	if err := runQueueCommand(cfg, cliRemove); err != nil {
 		t.Fatalf("runQueueCommand remove failed: %v", err)
 	}
@@ -124,6 +118,8 @@ func testQueueRemoveAndClear(t *testing.T, cfg Config, podDir, podID, ep1ID stri
 	}
 
 	cliAddPod := CLIOptions{QueueSubcmd: "add", Args: []string{podID}}
+	cliAddPod.Out = &buf
+	cliAddPod.Err = &buf
 	if err := runQueueCommand(cfg, cliAddPod); err != nil {
 		t.Fatalf("runQueueCommand add podcast failed: %v", err)
 	}
@@ -134,6 +130,8 @@ func testQueueRemoveAndClear(t *testing.T, cfg Config, podDir, podID, ep1ID stri
 	}
 
 	cliClear := CLIOptions{QueueSubcmd: "clear", Args: []string{podID}}
+	cliClear.Out = &buf
+	cliClear.Err = &buf
 	if err := runQueueCommand(cfg, cliClear); err != nil {
 		t.Fatalf("runQueueCommand clear failed: %v", err)
 	}
@@ -145,6 +143,7 @@ func testQueueRemoveAndClear(t *testing.T, cfg Config, podDir, podID, ep1ID stri
 }
 
 func TestQueueAddRemoveAndClear(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_Q")
 	_ = os.MkdirAll(podDir, 0755)
@@ -164,6 +163,7 @@ func TestQueueAddRemoveAndClear(t *testing.T) {
 }
 
 func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 
 	var wg syncWG
@@ -208,6 +208,8 @@ func TestUpdateQueue_ConcurrentTransactions(t *testing.T) {
 }
 
 func TestPrintQueueTableHebrew(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	items := []queueEpisodeItem{
 		{
 			PodcastID: "pod1",
@@ -218,16 +220,9 @@ func TestPrintQueueTableHebrew(t *testing.T) {
 		},
 	}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
+	printQueueTable(&buf, items)
 
-	printQueueTable(items)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	expected := util.DisplayName("פרק מיוחד בעברית")
@@ -237,6 +232,8 @@ func TestPrintQueueTableHebrew(t *testing.T) {
 }
 
 func TestQueueRun_Empty(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	cfg := Config{PodcastsDir: tempDir}
 	cli := CLIOptions{
@@ -245,12 +242,16 @@ func TestQueueRun_Empty(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("expected nil error on empty queue run, got: %v", err)
 	}
 }
 
 func TestQueueRun_DryRun(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "DryShow", []string{"Ep1", "Ep2"})
 	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
@@ -264,6 +265,8 @@ func TestQueueRun_DryRun(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand dry-run failed: %v", err)
 	}
@@ -278,6 +281,8 @@ func TestQueueRun_DryRun(t *testing.T) {
 }
 
 func TestQueueRun_CleansAndDequeues(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, tempDir, "QueueShow", []string{"Ep1", "Ep2"})
 	pipeline.AddToQueue(podDir, filepath.Base(paths[0]))
@@ -293,6 +298,8 @@ func TestQueueRun_CleansAndDequeues(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand run failed: %v", err)
 	}
@@ -307,6 +314,8 @@ func TestQueueRun_CleansAndDequeues(t *testing.T) {
 }
 
 func TestQueueRun_SpecificTarget(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1Dir, paths1 := createTestPodcastWithEpisodes(t, tempDir, "PodA", []string{"EpA"})
 	pod2Dir, paths2 := createTestPodcastWithEpisodes(t, tempDir, "PodB", []string{"EpB"})
@@ -326,6 +335,8 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 		QueueSubcmd: "run",
 		Args:        []string{pod1Cfg.ID},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("runQueueCommand target failed: %v", err)
 	}
@@ -346,6 +357,8 @@ func TestQueueRun_SpecificTarget(t *testing.T) {
 }
 
 func TestQueueRun_MissingFileRetained(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir, _ := createTestPodcastWithEpisodes(t, tempDir, "MissingShow", []string{})
 	pipeline.AddToQueue(podDir, "nonexistent.mp3")
@@ -357,6 +370,8 @@ func TestQueueRun_MissingFileRetained(t *testing.T) {
 		},
 		QueueSubcmd: "run",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err == nil {
 		t.Fatal("missing file should report an error")
 	}
@@ -371,6 +386,8 @@ func TestQueueRun_MissingFileRetained(t *testing.T) {
 }
 
 func TestQueueAddAllPreservesNestedEpisodePaths(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "NestedShow")
 	audioPath := filepath.Join(podDir, "2026", "ep1.mp3")
@@ -400,6 +417,8 @@ func TestQueueAddAllPreservesNestedEpisodePaths(t *testing.T) {
 
 	markEpisodeClean(t, audioPath)
 	cli := CLIOptions{QueueSubcmd: "run", ProcOptions: ProcOptions{Quiet: true}}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("queue run: %v", err)
 	}
@@ -416,6 +435,8 @@ func TestQueueAddAllPreservesNestedEpisodePaths(t *testing.T) {
 }
 
 func TestQueueRunResolvesLegacyNestedFilename(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "LegacyShow")
 	audioPath := filepath.Join(podDir, "2026", "ep1.mp3")
@@ -430,6 +451,8 @@ func TestQueueRunResolvesLegacyNestedFilename(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 	cli := CLIOptions{QueueSubcmd: "run", ProcOptions: ProcOptions{Quiet: true}}
+	cli.Out = &buf
+	cli.Err = &buf
 	if err := runQueueCommand(cfg, cli); err != nil {
 		t.Fatalf("queue run: %v", err)
 	}

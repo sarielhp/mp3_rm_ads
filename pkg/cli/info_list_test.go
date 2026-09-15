@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"io"
+	"bytes"
 	"os"
 	"path/filepath"
 	"pod/pkg/pipeline"
@@ -14,6 +14,8 @@ import (
 )
 
 func TestLsLatestCommand(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "Daily_Show")
 	pod2 := filepath.Join(tempDir, "News_Hour")
@@ -47,26 +49,21 @@ func TestLsLatestCommand(t *testing.T) {
 		PodcastsDir: tempDir,
 	}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{
 		ProcOptions: ProcOptions{
 			Count: 2,
 		},
 		InfoSubcmd: "latest",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Latest 2 Episodes Across All Podcasts") {
@@ -81,6 +78,8 @@ func TestLsLatestCommand(t *testing.T) {
 }
 
 func TestLsSinglePodcastCommand(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "ShowA")
 	_ = os.MkdirAll(pod1, 0755)
@@ -93,23 +92,18 @@ func TestLsSinglePodcastCommand(t *testing.T) {
 		PodcastsDir: tempDir,
 	}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{
 		Args: []string{id},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Podcast: ShowA") || !strings.Contains(out, "ep1") {
@@ -118,6 +112,8 @@ func TestLsSinglePodcastCommand(t *testing.T) {
 }
 
 func TestLsAllPodcastsCommand(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "Alpha_Show")
 	pod2 := filepath.Join(tempDir, "Beta_Cast")
@@ -132,21 +128,16 @@ func TestLsAllPodcastsCommand(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Podcasts in Library") || !strings.Contains(out, id1) || !strings.Contains(out, id2) {
@@ -155,6 +146,8 @@ func TestLsAllPodcastsCommand(t *testing.T) {
 }
 
 func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "Gamma_Show")
 	_ = os.MkdirAll(pod1, 0755)
@@ -164,47 +157,44 @@ func TestLsAllPodcastsJSONAndQuiet(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	// JSON test
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 
 	cliJSON := CLIOptions{Args: []string{"podcasts"}, JSON: true}
+	cliJSON.Out = &buf
+	cliJSON.Err = &buf
 	err := runInfoCommand(cfg, cliJSON)
 
-	_ = w.Close()
-	os.Stdout = oldStdout
 	if err != nil {
 		t.Fatalf("runInfoCommand json failed: %v", err)
 	}
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	if !strings.Contains(string(outBytes), id1) || !strings.Contains(string(outBytes), "episode_count") {
 		t.Errorf("expected json output with id and episode_count, got: %s", string(outBytes))
 	}
 
 	// Quiet test
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	buf.Reset()
 
 	cliQuiet := CLIOptions{
 		ProcOptions: ProcOptions{
 			Quiet: true,
 		},
 	}
+	cliQuiet.Out = &buf
+	cliQuiet.Err = &buf
 	err = runInfoCommand(cfg, cliQuiet)
 
-	_ = w.Close()
-	os.Stdout = oldStdout
 	if err != nil {
 		t.Fatalf("runInfoCommand quiet failed: %v", err)
 	}
-	qBytes, _ := io.ReadAll(r)
+	qBytes, _ := buf.Bytes(), error(nil)
 	if strings.TrimSpace(string(qBytes)) != id1 {
 		t.Errorf("expected quiet output %q, got: %s", id1, string(qBytes))
 	}
 }
 
 func TestLsSinglePodcastJSON(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "Delta_Show")
 	_ = os.MkdirAll(pod1, 0755)
@@ -213,21 +203,16 @@ func TestLsSinglePodcastJSON(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{Args: []string{id1}, JSON: true}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 	if !strings.Contains(out, "recent_episodes") || !strings.Contains(out, id1) {
 		t.Errorf("expected json episodes list, got: %s", out)
@@ -235,6 +220,8 @@ func TestLsSinglePodcastJSON(t *testing.T) {
 }
 
 func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod := filepath.Join(tempDir, "Hebrew_Podcast")
 	_ = os.MkdirAll(pod, 0755)
@@ -244,26 +231,21 @@ func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{
 		ProcOptions: ProcOptions{
 			Count: 1,
 		},
 		InfoSubcmd: "latest",
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	rawTitle := "פרק 1 - שלום עולם"
@@ -277,6 +259,8 @@ func TestLsLatestHebrewEpisodeTitle(t *testing.T) {
 }
 
 func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod := filepath.Join(tempDir, "פודקאסט_בעברית")
 	_ = os.MkdirAll(pod, 0755)
@@ -287,23 +271,18 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 	id := podcast.GetOrSetPodcastShortID(pod, "פודקאסט_בעברית")
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{
 		Args: []string{id},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	rawTitle := "פרק ראשון של הפודקאסט"
@@ -318,6 +297,8 @@ func TestLsSinglePodcastHebrewEpisodeTitle(t *testing.T) {
 }
 
 func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	items := []lsEpisodeItem{
 		{
 			podcastTitle:   "חדשות הבוקר",
@@ -331,16 +312,9 @@ func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
 		},
 	}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
+	printLatestEpisodesTable(&buf, items, 1)
 
-	printLatestEpisodesTable(items, 1)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
-
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	expectedEp := util.DisplayName("פרק בדיקה עם עברית")
@@ -355,6 +329,7 @@ func TestPrintLatestEpisodesTableHebrewDirect(t *testing.T) {
 }
 
 func TestFormatShortStatusAdR(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		input string
 		want  string
@@ -376,6 +351,7 @@ func TestFormatShortStatusAdR(t *testing.T) {
 }
 
 func TestGetEpisodeStatusLabelStaleActive(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	mp3Path := filepath.Join(tempDir, "stale_ep.mp3")
 	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {
@@ -417,6 +393,7 @@ func TestGetEpisodeStatusLabelStaleActive(t *testing.T) {
 }
 
 func TestResolveEpisodePublicationTimeFallback(t *testing.T) {
+	t.Parallel()
 	tempDir := t.TempDir()
 	mp3Path := filepath.Join(tempDir, "fallback_ep.mp3")
 	if err := os.WriteFile(mp3Path, []byte("audio"), 0644); err != nil {

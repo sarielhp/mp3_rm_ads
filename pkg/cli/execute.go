@@ -30,10 +30,10 @@ func Execute(args []string) int {
 		}
 		removed, err := util.CleanupStaleWorkDirs(root, time.Now())
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: stale work cleanup: %v\n", err)
+			fmt.Fprintf(errFor(cli), "Warning: stale work cleanup: %v\n", err)
 		}
 		if removed > 0 {
-			fmt.Fprintf(os.Stderr, "Removed %d stale .work directories (older than 24 hours).\n", removed)
+			fmt.Fprintf(errFor(cli), "Removed %d stale .work directories (older than 24 hours).\n", removed)
 		}
 	}
 
@@ -41,13 +41,13 @@ func Execute(args []string) int {
 		if errors.Is(err, podcast.ErrAmbiguousPodcast) {
 			var ambErr *podcast.AmbiguousPodcastError
 			if errors.As(err, &ambErr) {
-				fmt.Println(podcast.FormatPodcastMatches(ambErr.Matches))
+				fmt.Fprintln(outFor(cli), podcast.FormatPodcastMatches(ambErr.Matches))
 			} else {
-				fmt.Println(err.Error())
+				fmt.Fprintln(outFor(cli), err.Error())
 			}
 			return 1
 		}
-		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+		fmt.Fprintf(errFor(cli), "Error: %v\n", err)
 		return 1
 	}
 	return 0

@@ -115,9 +115,9 @@ func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli 
 		return err
 	}
 	if cli.DryRun {
-		fmt.Printf("[dry-run] Disable automatic downloads for %s; remove %d audio files; preserve transcripts.\n", item.Media.Metadata.Title, len(files))
+		fmt.Fprintf(outFor(cli), "[dry-run] Disable automatic downloads for %s; remove %d audio files; preserve transcripts.\n", item.Media.Metadata.Title, len(files))
 		for _, path := range files {
-			fmt.Println(path)
+			fmt.Fprintln(outFor(cli), path)
 		}
 		return nil
 	}
@@ -152,7 +152,7 @@ func flushPodcastAudio(b backend.Backend, item backend.Podcast, dir string, cli 
 	if err := pipeline.UpdateQueue(dir, func([]string) []string { return nil }); err != nil {
 		return err
 	}
-	fmt.Fprintf(outFor(cli), "Removed %d audio files from %s; transcripts kept. Automatic downloads disabled. Deleted audio can only be recovered from backups or by downloading it again.\n", len(files), item.Media.Metadata.Title)
+	fmt.Fprintf(progressFor(cli), "Removed %d audio files from %s; transcripts kept. Automatic downloads disabled. Deleted audio can only be recovered from backups or by downloading it again.\n", len(files), item.Media.Metadata.Title)
 	return nil
 }
 

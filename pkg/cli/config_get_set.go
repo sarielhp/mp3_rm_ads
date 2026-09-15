@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -79,19 +80,19 @@ func handleConfigSetBackend(cfg *Config, normKey, val string) bool {
 	return true
 }
 
-func handleConfigSet(cfg *Config, key, val string) error {
+func handleConfigSet(w io.Writer, cfg *Config, key, val string) error {
 	if handled, err := handleConfigSetAPIKey(cfg, key, val); handled {
 		if err != nil {
 			return err
 		}
 		_ = config.SaveConfig(cfg)
-		fmt.Printf("Updated '%s' = '%s'\n", key, val)
+		fmt.Fprintf(w, "Updated '%s' = '%s'\n", key, val)
 		return nil
 	}
 	normKey := strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 	if handleConfigSetBackend(cfg, normKey, val) {
 		_ = config.SaveConfig(cfg)
-		fmt.Printf("Updated '%s' = '%s'\n", key, val)
+		fmt.Fprintf(w, "Updated '%s' = '%s'\n", key, val)
 		return nil
 	}
 	switch normKey {
@@ -133,119 +134,119 @@ func handleConfigSet(cfg *Config, key, val string) error {
 		return fmt.Errorf("unknown configuration key: '%s'", key)
 	}
 	_ = config.SaveConfig(cfg)
-	fmt.Printf("Updated '%s' = '%s'\n", key, val)
+	fmt.Fprintf(w, "Updated '%s' = '%s'\n", key, val)
 	return nil
 }
 
-func handleConfigGet(cfg Config, key string) error {
+func handleConfigGet(w io.Writer, cfg Config, key string) error {
 	switch strings.ToLower(strings.ReplaceAll(key, "_", "-")) {
 	case "podcasts-dir", "podcasts.dir", "dir":
-		fmt.Println(cfg.PodcastsDir)
+		fmt.Fprintln(w, cfg.PodcastsDir)
 	case "backend-type", "backend.type", "backend":
-		fmt.Println(cfg.BackendType)
+		fmt.Fprintln(w, cfg.BackendType)
 	case "podfetch-url", "podfetch.url":
-		fmt.Println(cfg.PodfetchURL)
+		fmt.Fprintln(w, cfg.PodfetchURL)
 	case "podfetch-user", "podfetch.user":
-		fmt.Println(cfg.PodfetchUser)
+		fmt.Fprintln(w, cfg.PodfetchUser)
 	case "podfetch-pass", "podfetch.pass":
-		fmt.Println(cfg.PodfetchPass)
+		fmt.Fprintln(w, cfg.PodfetchPass)
 	case "podfetch-api-key", "podfetch.api-key", "podfetch-key", "podfetch-token":
-		fmt.Println(cfg.PodfetchAPIKey)
+		fmt.Fprintln(w, cfg.PodfetchAPIKey)
 	case "podfetch-db-path", "podfetch.db-path", "podfetch-db", "podfetch.db", "podfetch-sqlite-db-path":
-		fmt.Println(cfg.PodfetchDBPath)
+		fmt.Fprintln(w, cfg.PodfetchDBPath)
 	case "server-base-url", "server.base-url", "server-url", "base-url":
-		fmt.Println(cfg.ServerBaseURL)
+		fmt.Fprintln(w, cfg.ServerBaseURL)
 	case "whisper-url", "whisper.url":
-		fmt.Println(cfg.WhisperURL)
+		fmt.Fprintln(w, cfg.WhisperURL)
 	case "whisper-language", "whisper.language", "lang":
-		fmt.Println(cfg.WhisperLanguage)
+		fmt.Fprintln(w, cfg.WhisperLanguage)
 	case "active-profile-id", "llm-id":
-		fmt.Println(cfg.ActiveProfileID)
+		fmt.Fprintln(w, cfg.ActiveProfileID)
 	case "active-whisper-id", "whisper-id":
-		fmt.Println(cfg.ActiveWhisperID)
+		fmt.Fprintln(w, cfg.ActiveWhisperID)
 	case "default-download-policy", "default-download-mode", "download-policy":
-		fmt.Println(cfg.DefaultDownloadPolicy)
+		fmt.Fprintln(w, cfg.DefaultDownloadPolicy)
 	case "default-download-k", "default-k", "download-k":
-		fmt.Println(cfg.DefaultDownloadK)
+		fmt.Fprintln(w, cfg.DefaultDownloadK)
 	case "default-ad-policy", "default-ad-removal", "default-ad-mode", "ad-policy", "ad-removal":
-		fmt.Println(cfg.DefaultAdRemoval)
+		fmt.Fprintln(w, cfg.DefaultAdRemoval)
 	case "gemini-api-key-enabled":
-		fmt.Println(cfg.IsGeminiAPIKeyEnabled())
+		fmt.Fprintln(w, cfg.IsGeminiAPIKeyEnabled())
 	case "openrouter-api-key-enabled":
-		fmt.Println(cfg.IsOpenRouterAPIKeyEnabled())
+		fmt.Fprintln(w, cfg.IsOpenRouterAPIKeyEnabled())
 	case "gemini-api-key":
-		fmt.Println(config.ResolveGeminiAPIKey(&cfg))
+		fmt.Fprintln(w, config.ResolveGeminiAPIKey(&cfg))
 	case "gemini-api-key-file", "gemini-key-file", "api-key-file":
-		fmt.Println(cfg.GeminiAPIKeyFile)
+		fmt.Fprintln(w, cfg.GeminiAPIKeyFile)
 	case "gemini-model":
-		fmt.Println(cfg.GetGeminiModel())
+		fmt.Fprintln(w, cfg.GetGeminiModel())
 	case "speculative-transcription", "speculative-competition":
-		fmt.Println(cfg.IsSpeculativeTranscriptionEnabled())
+		fmt.Fprintln(w, cfg.IsSpeculativeTranscriptionEnabled())
 	case "competing-services", "speculative-services":
-		fmt.Println(strings.Join(cfg.GetCompetingServices(), ", "))
+		fmt.Fprintln(w, strings.Join(cfg.GetCompetingServices(), ", "))
 	default:
 		return fmt.Errorf("unknown configuration key %q; run 'pod config show' to list keys", key)
 	}
 	return nil
 }
 
-func setPodcastsDir(cfg *Config, dir string) {
+func setPodcastsDir(w io.Writer, cfg *Config, dir string) {
 	cfg.PodcastsDir = dir
 	_ = config.SaveConfig(cfg)
-	fmt.Printf("Default podcasts directory updated to: '%s'\n", dir)
+	fmt.Fprintf(w, "Default podcasts directory updated to: '%s'\n", dir)
 }
 
-func printConfig(cfg Config) {
-	fmt.Printf("Configuration file: '%s'\n", config.ConfigPath())
+func printConfig(w io.Writer, cfg Config) {
+	fmt.Fprintf(w, "Configuration file: '%s'\n", config.ConfigPath())
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "(not set)"
 	}
-	fmt.Printf("  podcasts_dir:             %s\n", podcastsDir)
+	fmt.Fprintf(w, "  podcasts_dir:             %s\n", podcastsDir)
 	if cfg.ServerBaseURL != "" {
-		fmt.Printf("  server_base_url:          %s\n", cfg.ServerBaseURL)
+		fmt.Fprintf(w, "  server_base_url:          %s\n", cfg.ServerBaseURL)
 	}
 	if cfg.DefaultDownloadPolicy != "" {
-		fmt.Printf("  default_download_policy:  %s\n", cfg.DefaultDownloadPolicy)
+		fmt.Fprintf(w, "  default_download_policy:  %s\n", cfg.DefaultDownloadPolicy)
 	}
 	if cfg.DefaultDownloadK > 0 {
-		fmt.Printf("  default_download_k:       %d\n", cfg.DefaultDownloadK)
+		fmt.Fprintf(w, "  default_download_k:       %d\n", cfg.DefaultDownloadK)
 	}
 	if cfg.DefaultAdRemoval != "" {
-		fmt.Printf("  default_ad_policy:        %s\n", cfg.DefaultAdRemoval)
+		fmt.Fprintf(w, "  default_ad_policy:        %s\n", cfg.DefaultAdRemoval)
 	}
-	fmt.Printf("  whisper_url:              %s\n", cfg.WhisperURL)
-	fmt.Printf("  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
+	fmt.Fprintf(w, "  whisper_url:              %s\n", cfg.WhisperURL)
+	fmt.Fprintf(w, "  whisper_speed_factor:     %.1f\n", cfg.WhisperSpeedFactor)
 	if cfg.WhisperDockerContainer != "" {
-		fmt.Printf("  whisper_docker_container: %s\n", cfg.WhisperDockerContainer)
+		fmt.Fprintf(w, "  whisper_docker_container: %s\n", cfg.WhisperDockerContainer)
 	}
 	if cfg.WhisperWakeCommand != "" {
-		fmt.Printf("  whisper_wake_command:     %s\n", cfg.WhisperWakeCommand)
+		fmt.Fprintf(w, "  whisper_wake_command:     %s\n", cfg.WhisperWakeCommand)
 	}
 	if cfg.WhisperLanguage != "" {
-		fmt.Printf("  whisper_language:         %s\n", cfg.WhisperLanguage)
+		fmt.Fprintf(w, "  whisper_language:         %s\n", cfg.WhisperLanguage)
 	}
-	fmt.Printf("  active_profile_id:        %d\n", cfg.ActiveProfileID)
+	fmt.Fprintf(w, "  active_profile_id:        %d\n", cfg.ActiveProfileID)
 	if cfg.ActiveWhisperID > 0 {
-		fmt.Printf("  active_whisper_id:        %d\n", cfg.ActiveWhisperID)
+		fmt.Fprintf(w, "  active_whisper_id:        %d\n", cfg.ActiveWhisperID)
 	}
 	if cfg.BackendType != "" {
-		fmt.Printf("  backend_type:             %s\n", cfg.BackendType)
+		fmt.Fprintf(w, "  backend_type:             %s\n", cfg.BackendType)
 	}
 	if cfg.PodfetchURL != "" {
-		fmt.Printf("  podfetch_url:             %s\n", cfg.PodfetchURL)
+		fmt.Fprintf(w, "  podfetch_url:             %s\n", cfg.PodfetchURL)
 	}
 	if cfg.PodfetchUser != "" {
-		fmt.Printf("  podfetch_user:            %s\n", cfg.PodfetchUser)
+		fmt.Fprintf(w, "  podfetch_user:            %s\n", cfg.PodfetchUser)
 	}
 	if cfg.PodfetchDBPath != "" {
-		fmt.Printf("  podfetch_db_path:         %s\n", cfg.PodfetchDBPath)
+		fmt.Fprintf(w, "  podfetch_db_path:         %s\n", cfg.PodfetchDBPath)
 	}
 	if cfg.GeminiAPIKeyFile != "" {
-		fmt.Printf("  gemini_api_key_file:      %s\n", cfg.GeminiAPIKeyFile)
+		fmt.Fprintf(w, "  gemini_api_key_file:      %s\n", cfg.GeminiAPIKeyFile)
 	}
-	fmt.Printf("  gemini_api_key_enabled:   %v\n", cfg.IsGeminiAPIKeyEnabled())
-	fmt.Printf("  openrouter_api_key_enabled: %v\n", cfg.IsOpenRouterAPIKeyEnabled())
-	fmt.Printf("  speculative_transcription: %v\n", cfg.IsSpeculativeTranscriptionEnabled())
-	fmt.Printf("  competing_services:       %s\n", strings.Join(cfg.GetCompetingServices(), ", "))
+	fmt.Fprintf(w, "  gemini_api_key_enabled:   %v\n", cfg.IsGeminiAPIKeyEnabled())
+	fmt.Fprintf(w, "  openrouter_api_key_enabled: %v\n", cfg.IsOpenRouterAPIKeyEnabled())
+	fmt.Fprintf(w, "  speculative_transcription: %v\n", cfg.IsSpeculativeTranscriptionEnabled())
+	fmt.Fprintf(w, "  competing_services:       %s\n", strings.Join(cfg.GetCompetingServices(), ", "))
 }

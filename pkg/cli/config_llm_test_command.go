@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"math"
 	"pod/pkg/config"
 	"pod/pkg/detect"
@@ -27,7 +28,7 @@ func buildConfigLLMTestSubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	}
 }
 
-func testLLMProfile(cfg Config, value string) error {
+func testLLMProfile(w io.Writer, cfg Config, value string) error {
 	id, err := strconv.Atoi(value)
 	if err != nil || id <= 0 {
 		return fmt.Errorf("invalid LLM profile ID %q", value)
@@ -36,14 +37,14 @@ func testLLMProfile(cfg Config, value string) error {
 		if profile.ID != id {
 			continue
 		}
-		fmt.Println("\n" + util.BoldCyan(fmt.Sprintf("Testing LLM [%d]: %s", id, profile.Name)))
+		fmt.Fprintln(w, "\n"+util.BoldCyan(fmt.Sprintf("Testing LLM [%d]: %s", id, profile.Name)))
 		detect.AnnounceAdDetection(profile, false)
 		started := time.Now()
 		if err := probeLLMProfile(cfg, profile); err != nil {
-			fmt.Println("\n" + util.BoldRed(fmt.Sprintf("LLM [%d] test FAILED", id)) + "\n")
+			fmt.Fprintln(w, "\n"+util.BoldRed(fmt.Sprintf("LLM [%d] test FAILED", id))+"\n")
 			return fmt.Errorf("LLM [%d]: %w", id, err)
 		}
-		fmt.Println(util.BoldGreen(fmt.Sprintf("LLM [%d] test PASSED: valid ad-detection response (%s)", id, time.Since(started).Round(time.Millisecond))))
+		fmt.Fprintln(w, util.BoldGreen(fmt.Sprintf("LLM [%d] test PASSED: valid ad-detection response (%s)", id, time.Since(started).Round(time.Millisecond))))
 		return nil
 	}
 	return fmt.Errorf("LLM profile [%d] not found", id)

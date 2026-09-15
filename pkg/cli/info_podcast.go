@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"pod/pkg/config"
 	"pod/pkg/format"
@@ -52,11 +53,11 @@ func inspectPodcastInfo(pod *ResolvedPodcast, cli CLIOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
-	printPodcastInfoCard(dto)
+	printPodcastInfoCard(outFor(cli), dto)
 	return nil
 }
 
@@ -228,6 +229,6 @@ func formatPodcastInfo(info PodcastInfoJSON) string {
 	return sb.String()
 }
 
-func printPodcastInfoCard(info PodcastInfoJSON) {
-	fmt.Print(formatPodcastInfo(info))
+func printPodcastInfoCard(w io.Writer, info PodcastInfoJSON) {
+	fmt.Fprint(w, formatPodcastInfo(info))
 }

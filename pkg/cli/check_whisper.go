@@ -10,17 +10,17 @@ import (
 	"time"
 )
 
-func testWhisperServer(whisperURL string, wakeCmd string, quiet bool) bool {
-	return testWhisperServerEx(whisperURL, wakeCmd, 5, 3*time.Second, quiet)
+func testWhisperServer(w io.Writer, whisperURL string, wakeCmd string, quiet bool) bool {
+	return testWhisperServerEx(w, whisperURL, wakeCmd, 5, 3*time.Second, quiet)
 }
 
-func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retryDelay time.Duration, quiet bool) bool {
+func testWhisperServerEx(w io.Writer, whisperURL string, wakeCmd string, maxRetries int, retryDelay time.Duration, quiet bool) bool {
 	if whisperURL == "" {
-		fmt.Println("ERROR: whisper_url is not configured in config file.")
+		fmt.Fprintln(w, "ERROR: whisper_url is not configured in config file.")
 		return false
 	}
 	if !quiet {
-		fmt.Printf("Testing whisper server at: %s\n", whisperURL)
+		fmt.Fprintf(w, "Testing whisper server at: %s\n", whisperURL)
 	}
 
 	var lastErr error
@@ -35,7 +35,7 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 		req, err := http.NewRequest("POST", whisperURL, bytes.NewReader(bodyData))
 		if err != nil {
 			if !quiet {
-				fmt.Printf("ERROR: Failed to create request: %v\n", err)
+				fmt.Fprintf(w, "ERROR: Failed to create request: %v\n", err)
 			}
 			return false
 		}
@@ -46,7 +46,7 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 			lastErr = err
 			if attempt < maxRetries {
 				if !quiet {
-					fmt.Printf("Attempt %d/%d: Connection error: %v (server may be sleeping, retrying in %v...)\n",
+					fmt.Fprintf(w, "Attempt %d/%d: Connection error: %v (server may be sleeping, retrying in %v...)\n",
 						attempt, maxRetries, err, retryDelay)
 				}
 				time.Sleep(retryDelay)
@@ -61,27 +61,27 @@ func testWhisperServerEx(whisperURL string, wakeCmd string, maxRetries int, retr
 		lastResponseBody = string(body)
 
 		if resp.StatusCode == http.StatusOK {
-			fmt.Println("SUCCESS: Whisper server responded OK (200)")
+			fmt.Fprintln(w, "SUCCESS: Whisper server responded OK (200)")
 			return true
 		}
 
 		if resp.StatusCode >= 500 && attempt < maxRetries {
 			if !quiet {
-				fmt.Printf("Attempt %d/%d: Server returned status %d: %s (server may be waking up, retrying in %v...)\n",
+				fmt.Fprintf(w, "Attempt %d/%d: Server returned status %d: %s (server may be waking up, retrying in %v...)\n",
 					attempt, maxRetries, resp.StatusCode, lastResponseBody, retryDelay)
 			}
 			time.Sleep(retryDelay)
 			continue
 		}
 
-		fmt.Printf("FAIL: Server returned status %d: %s\n", resp.StatusCode, lastResponseBody)
+		fmt.Fprintf(w, "FAIL: Server returned status %d: %s\n", resp.StatusCode, lastResponseBody)
 		return false
 	}
 
 	if lastErr != nil {
-		fmt.Printf("FAIL: Could not connect to Whisper server at '%s' after %d attempt(s): %v\n", whisperURL, maxRetries, lastErr)
+		fmt.Fprintf(w, "FAIL: Could not connect to Whisper server at '%s' after %d attempt(s): %v\n", whisperURL, maxRetries, lastErr)
 	} else {
-		fmt.Printf("FAIL: Server at '%s' returned status %d after %d attempt(s): %s\n", whisperURL, lastStatus, maxRetries, lastResponseBody)
+		fmt.Fprintf(w, "FAIL: Server at '%s' returned status %d after %d attempt(s): %s\n", whisperURL, lastStatus, maxRetries, lastResponseBody)
 	}
 	return false
 }

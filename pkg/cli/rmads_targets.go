@@ -25,7 +25,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 		matched, err := podcast.MatchLocalPodcasts(podcasts, cli.Podcast)
 		if err != nil {
 			if !errors.Is(err, podcast.ErrAmbiguousPodcast) && !cli.Quiet {
-				fmt.Printf("Podcast matching '%s' not found.\n", cli.Podcast)
+				fmt.Fprintf(outFor(cli), "Podcast matching '%s' not found.\n", cli.Podcast)
 			}
 			return nil, false
 		}
@@ -46,7 +46,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 			if fi, err := os.Stat(arg); err == nil && fi.IsDir() {
 				return []string{arg}, true
 			}
-			fmt.Fprintf(outFor(cli), "Podcast matching '%s' not found.\n", arg)
+			fmt.Fprintf(progressFor(cli), "Podcast matching '%s' not found.\n", arg)
 			return nil, false
 		}
 		return cli.Args, true
@@ -56,7 +56,7 @@ func resolveTargetAudioArgs(cli CLIOptions, config Config) ([]string, bool) {
 		if config.PodcastsDir != "" {
 			return []string{config.PodcastsDir}, true
 		}
-		fmt.Println("ERROR: No files or directories specified, and podcasts_dir is not configured.")
+		fmt.Fprintln(outFor(cli), "ERROR: No files or directories specified, and podcasts_dir is not configured.")
 		return nil, false
 	}
 	return cli.Args, true

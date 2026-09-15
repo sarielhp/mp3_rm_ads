@@ -109,16 +109,28 @@ func TestTUIBatchQueueDownload_DelegatesToWorkerOnly(t *testing.T) {
 
 	model.batchQueueDownload()
 
+	// Enqueueing triggers the download worker in a goroutine. Wait for it to
+	// settle before reading the queue: the test used to assert a status of
+	// "queued" or "downloading", which only held while the worker had not yet
+	// reached the item. Under load it had, and the test failed about one run
+	// in eight.
+	testLibrary().Queue().WaitWorkerForTest()
+
 	items := testLibrary().Queue().Items()
 	if len(items) != 1 || items[0].EpisodeTitle != "Batch Episode 1" {
 		t.Fatalf("expected batch item in download queue, got %+v", items)
 	}
-	if items[0].Status != "queued" && items[0].Status != "downloading" {
-		t.Errorf("unexpected status: %s", items[0].Status)
+	// The worker ran and owned the download — which is what "delegates to
+	// worker only" means. There is no backend in this test, so it fails, and
+	// that failure is the evidence the UI did not download inline.
+	if items[0].Status != "failed" {
+		t.Errorf("expected the worker to have handled the item, got status %q", items[0].Status)
 	}
 
 	model.epIdx = 1
 	model.enqueueCurrentEpisodeDownload()
+	testLibrary().Queue().WaitWorkerForTest()
+
 	items = testLibrary().Queue().Items()
 	if len(items) != 2 {
 		t.Fatalf("expected 2 items in download queue after single enqueue, got %d", len(items))

@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -13,7 +14,7 @@ import (
 	"pod/pkg/util"
 )
 
-func migratePodcastsManagerConfig(cfg *Config) bool {
+func migratePodcastsManagerConfig(w io.Writer, cfg *Config) bool {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		return false
@@ -58,28 +59,28 @@ func migratePodcastsManagerConfig(cfg *Config) bool {
 	}
 
 	if modified {
-		fmt.Printf("Migrated settings from podcast_manager config '%s'\n", pmConfigPath)
+		fmt.Fprintf(w, "Migrated settings from podcast_manager config '%s'\n", pmConfigPath)
 	}
 	return modified
 }
 
-func handleConfigMigrate(cfg *Config, source string) {
+func handleConfigMigrate(w io.Writer, cfg *Config, source string) {
 	migrated := false
 	source = strings.ToLower(strings.TrimSpace(source))
 
 	checkPM := source == "" || source == "all" || source == "pm" || source == "podcasts_manager" || source == "podcast_manager"
 
 	if checkPM {
-		if migratePodcastsManagerConfig(cfg) {
+		if migratePodcastsManagerConfig(w, cfg) {
 			migrated = true
 		}
 	}
 
 	if migrated {
 		_ = config.SaveConfig(cfg)
-		fmt.Printf("Configuration saved to '%s'\n", config.ConfigPath())
+		fmt.Fprintf(w, "Configuration saved to '%s'\n", config.ConfigPath())
 	} else {
-		fmt.Println("No legacy configuration found to migrate or settings already up-to-date.")
+		fmt.Fprintln(w, "No legacy configuration found to migrate or settings already up-to-date.")
 	}
 }
 
@@ -94,7 +95,7 @@ func resolveProcessorPath(prog string) (string, error) {
 	return "", fmt.Errorf("program '%s' not found or not executable", prog)
 }
 
-func handleConfigProcessor(cfg *Config, cmd string, value string) {
+func handleConfigProcessor(w io.Writer, cfg *Config, cmd string, value string) {
 	switch cmd {
 	case "set":
 		if value == "" {
@@ -115,15 +116,15 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 			cfg.PostProcessors = append(cfg.PostProcessors, fullPath)
 			_ = config.SaveConfig(cfg)
 		}
-		fmt.Printf("Added post-processor: %s\n", fullPath)
+		fmt.Fprintf(w, "Added post-processor: %s\n", fullPath)
 
 	case "list":
 		if len(cfg.PostProcessors) == 0 {
-			fmt.Println("No post-processors configured.")
+			fmt.Fprintln(w, "No post-processors configured.")
 		} else {
-			fmt.Println("=== Configured Post-Processors ===")
+			fmt.Fprintln(w, "=== Configured Post-Processors ===")
 			for i, p := range cfg.PostProcessors {
-				fmt.Printf("  %d. %s\n", i+1, p)
+				fmt.Fprintf(w, "  %d. %s\n", i+1, p)
 			}
 		}
 
@@ -138,7 +139,7 @@ func handleConfigProcessor(cfg *Config, cmd string, value string) {
 		removed := cfg.PostProcessors[idx-1]
 		cfg.PostProcessors = append(cfg.PostProcessors[:idx-1], cfg.PostProcessors[idx:]...)
 		_ = config.SaveConfig(cfg)
-		fmt.Printf("Deleted post-processor #%d: %s\n", idx, removed)
+		fmt.Fprintf(w, "Deleted post-processor #%d: %s\n", idx, removed)
 
 	default:
 		fatalError("%s\n", fmt.Sprintf("Error: unknown processor command '%s'", cmd))

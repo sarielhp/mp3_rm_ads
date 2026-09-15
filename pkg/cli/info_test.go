@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/podcast"
@@ -12,6 +12,8 @@ import (
 )
 
 func TestInfoPodcastCardAndJSON(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Huberman_Lab")
 	_ = os.MkdirAll(podDir, 0755)
@@ -23,21 +25,17 @@ func TestInfoPodcastCardAndJSON(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	// Test text card
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 
 	cli := CLIOptions{Args: []string{podID}}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Podcast: Huberman_Lab") || !strings.Contains(out, podID) {
@@ -48,21 +46,18 @@ func TestInfoPodcastCardAndJSON(t *testing.T) {
 	}
 
 	// Test JSON mode
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	buf.Reset()
 
 	cliJSON := CLIOptions{Args: []string{podID}, JSON: true}
+	cliJSON.Out = &buf
+	cliJSON.Err = &buf
 	err = runInfoCommand(cfg, cliJSON)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand json failed: %v", err)
 	}
 
-	jsonBytes, _ := io.ReadAll(r)
+	jsonBytes, _ := buf.Bytes(), error(nil)
 	var podInfo PodcastInfoJSON
 	if err := json.Unmarshal(jsonBytes, &podInfo); err != nil {
 		t.Fatalf("failed to parse podcast info json: %v", err)
@@ -73,6 +68,8 @@ func TestInfoPodcastCardAndJSON(t *testing.T) {
 }
 
 func TestInfoEpisodeCardAndJSON(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Daily_Cast")
 	_ = os.MkdirAll(podDir, 0755)
@@ -86,21 +83,17 @@ func TestInfoEpisodeCardAndJSON(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	// Text card
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 
 	cli := CLIOptions{Args: []string{epID}}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed for episode: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Episode: ep1") || !strings.Contains(out, epID) {
@@ -108,21 +101,18 @@ func TestInfoEpisodeCardAndJSON(t *testing.T) {
 	}
 
 	// JSON mode
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	buf.Reset()
 
 	cliJSON := CLIOptions{Args: []string{epID}, JSON: true}
+	cliJSON.Out = &buf
+	cliJSON.Err = &buf
 	err = runInfoCommand(cfg, cliJSON)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand json failed for episode: %v", err)
 	}
 
-	jsonBytes, _ := io.ReadAll(r)
+	jsonBytes, _ := buf.Bytes(), error(nil)
 	var epInfo EpisodeInfoJSON
 	if err := json.Unmarshal(jsonBytes, &epInfo); err != nil {
 		t.Fatalf("failed to parse episode info json: %v", err)
@@ -133,6 +123,8 @@ func TestInfoEpisodeCardAndJSON(t *testing.T) {
 }
 
 func TestInfoEpisodeWithCuts(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "ShowWithAds")
 	_ = os.MkdirAll(podDir, 0755)
@@ -162,22 +154,17 @@ func TestInfoEpisodeWithCuts(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-
 	cli := CLIOptions{Args: []string{epID}}
+	cli.Out = &buf
+	cli.Err = &buf
 	cli.ShowCuts = true
 	err := runInfoCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runInfoCommand failed with cuts: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Sponsor segment") || !strings.Contains(out, "00:10") {
@@ -186,6 +173,7 @@ func TestInfoEpisodeWithCuts(t *testing.T) {
 }
 
 func TestFormatPodcastInfoHebrew(t *testing.T) {
+	t.Parallel()
 	info := PodcastInfoJSON{
 		ID:        "pod1",
 		Title:     "פודקאסט חדשות",
@@ -220,6 +208,7 @@ func TestFormatPodcastInfoHebrew(t *testing.T) {
 }
 
 func TestFormatEpisodeInfoHebrew(t *testing.T) {
+	t.Parallel()
 	info := EpisodeInfoJSON{
 		ID:           "ep01",
 		PodcastID:    "pod1",

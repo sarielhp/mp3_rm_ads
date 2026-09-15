@@ -328,49 +328,49 @@ func buildConfigCompletionCommand() clihelp.Command {
 func runConfigCommand(config *Config, cli CLIOptions) error {
 	switch cli.ConfigCmd {
 	case "get":
-		if err := handleConfigGet(*config, cli.ConfigKey); err != nil {
+		if err := handleConfigGet(outFor(cli), *config, cli.ConfigKey); err != nil {
 			return err
 		}
 	case "set":
-		if err := handleConfigSet(config, cli.ConfigKey, cli.ConfigVal); err != nil {
+		if err := handleConfigSet(outFor(cli), config, cli.ConfigKey, cli.ConfigVal); err != nil {
 			return err
 		}
 	case "show":
-		printConfig(*config)
+		printConfig(outFor(cli), *config)
 	case "llm-list":
-		listProfiles(*config)
+		listProfiles(outFor(cli), *config)
 	case "llm-test":
-		return testLLMProfile(*config, cli.ConfigVal)
+		return testLLMProfile(outFor(cli), *config, cli.ConfigVal)
 	case "llm-default":
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
-			setDefaultProfile(config, id)
+			setDefaultProfile(outFor(cli), config, id)
 		} else {
 			return fmt.Errorf("invalid profile ID %q", cli.ConfigVal)
 		}
 	case "llm-import":
-		copyLLMFromOpenCode(config)
+		copyLLMFromOpenCode(outFor(cli), config)
 	case "whisper-list", "whisper-default", "whisper-add", "whisper-del":
 		return runWhisperConfig(config, cli)
 	case "cache-show":
 		dir, entries, size := podcast.CacheStats()
-		fmt.Printf("Cache directory: %q\n", dir)
-		fmt.Printf("  entries: %d\n", entries)
-		fmt.Printf("  size:    %.1f MB\n", float64(size)/(1024*1024))
-		fmt.Println("Run 'pod config cache clear' to delete it.")
+		fmt.Fprintf(outFor(cli), "Cache directory: %q\n", dir)
+		fmt.Fprintf(outFor(cli), "  entries: %d\n", entries)
+		fmt.Fprintf(outFor(cli), "  size:    %.1f MB\n", float64(size)/(1024*1024))
+		fmt.Fprintln(outFor(cli), "Run 'pod config cache clear' to delete it.")
 	case "cache-reset":
 		if err := podcast.ResetCache(); err != nil {
 			return fmt.Errorf("error resetting cache: %w", err)
 		}
-		fmt.Fprintln(outFor(cli), "Cache reset successfully.")
+		fmt.Fprintln(progressFor(cli), "Cache reset successfully.")
 	case "migrate":
-		handleConfigMigrate(config, cli.ConfigVal)
+		handleConfigMigrate(outFor(cli), config, cli.ConfigVal)
 	default:
 		if cli.ProcessorCmd != "" {
-			handleConfigProcessor(config, cli.ProcessorCmd, cli.ProcessorValue)
+			handleConfigProcessor(outFor(cli), config, cli.ProcessorCmd, cli.ProcessorValue)
 		} else if cli.PodcastsDir != "" {
-			setPodcastsDir(config, cli.PodcastsDir)
+			setPodcastsDir(outFor(cli), config, cli.PodcastsDir)
 		} else {
-			printConfig(*config)
+			printConfig(outFor(cli), *config)
 		}
 	}
 	return nil
@@ -379,18 +379,18 @@ func runConfigCommand(config *Config, cli CLIOptions) error {
 func runWhisperConfig(config *Config, cli CLIOptions) error {
 	switch cli.ConfigCmd {
 	case "whisper-list":
-		listWhispers(*config)
+		listWhispers(outFor(cli), *config)
 	case "whisper-default":
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
-			setDefaultWhisperProfile(config, id)
+			setDefaultWhisperProfile(outFor(cli), config, id)
 		} else {
 			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
 		}
 	case "whisper-add":
-		addWhisperProfile(config, cli.ConfigVal)
+		addWhisperProfile(outFor(cli), config, cli.ConfigVal)
 	case "whisper-del":
 		if id, err := strconv.Atoi(cli.ConfigVal); err == nil && id > 0 {
-			removeWhisperProfile(config, id)
+			removeWhisperProfile(outFor(cli), config, id)
 		} else {
 			return fmt.Errorf("invalid Whisper profile ID %q", cli.ConfigVal)
 		}

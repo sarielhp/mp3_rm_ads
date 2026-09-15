@@ -103,13 +103,36 @@ func library(cfg Config, cli CLIOptions, b backend.Backend) *podcast.Library {
 	}, b, reporter(cli))
 }
 
-// out is the stream for ordinary command output: stdout, or a discard when
-// --quiet. Printing through it makes quiet correctness a property of the
-// writer rather than something each call site has to remember to check —
-// which is how `server download --dry-run --quiet` came to print 11 KB.
+// outFor is where a command's results go: the caller's writer if it supplied
+// one, otherwise stdout.
+//
+// It deliberately does NOT consult --quiet. For most commands quiet means "no
+// progress chatter", but for `info ls --quiet` it means "print bare IDs and
+// nothing else" — output that must survive. Conflating the two silently
+// emptied that command.
 func outFor(cli CLIOptions) io.Writer {
+	if cli.Out != nil {
+		return cli.Out
+	}
+	return os.Stdout
+}
+
+// progressFor is the stream for progress and status chatter — the output that
+// --quiet exists to suppress. Printing through it makes that a property of the
+// writer rather than something each call site must remember, which is how
+// `server download --dry-run --quiet` came to print 11 KB.
+func progressFor(cli CLIOptions) io.Writer {
 	if cli.Quiet {
 		return io.Discard
 	}
-	return os.Stdout
+	return outFor(cli)
+}
+
+// errFor is the stream for warnings and errors. Unlike outFor it ignores
+// --quiet: suppressing progress is not the same as hiding a problem.
+func errFor(cli CLIOptions) io.Writer {
+	if cli.Err != nil {
+		return cli.Err
+	}
+	return os.Stderr
 }

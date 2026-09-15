@@ -66,7 +66,7 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 	if backend.IsStandalone(&cfg) {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil {
-			return renderSubscriptionList(store.List(), cfg.PodcastsDir, cli.Verbose)
+			return renderSubscriptionList(outFor(cli), store.List(), cfg.PodcastsDir, cli.Verbose)
 		}
 		return fmt.Errorf("load subscriptions: %w", storeErr)
 	}
@@ -75,7 +75,7 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 	if err != nil {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil && len(store.List()) > 0 {
-			return renderSubscriptionList(store.List(), cfg.PodcastsDir, cli.Verbose)
+			return renderSubscriptionList(outFor(cli), store.List(), cfg.PodcastsDir, cli.Verbose)
 		}
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
@@ -84,19 +84,19 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("failed to fetch podcasts: %w", err)
 	}
 	if len(podcasts) == 0 {
-		fmt.Fprintln(outFor(cli), "No podcasts found on server.")
+		fmt.Fprintln(progressFor(cli), "No podcasts found on server.")
 		return nil
 	}
 	for idx, p := range podcasts {
 		shortID := podcast.GeneratePodcastShortID(p.Media.Metadata.Title)
-		fmt.Printf("%3d. %s [%s] (%d episodes)\n", idx+1, util.Bold(util.DisplayName(p.Media.Metadata.Title)), util.BoldCyan(shortID), len(p.Media.Episodes))
+		fmt.Fprintf(outFor(cli), "%3d. %s [%s] (%d episodes)\n", idx+1, util.Bold(util.DisplayName(p.Media.Metadata.Title)), util.BoldCyan(shortID), len(p.Media.Episodes))
 		if cli.Verbose {
-			fmt.Printf("     ID:      %s\n", p.ID)
+			fmt.Fprintf(outFor(cli), "     ID:      %s\n", p.ID)
 			if p.Media.Metadata.FeedURL != "" {
-				fmt.Printf("     Feed:    %s\n", p.Media.Metadata.FeedURL)
+				fmt.Fprintf(outFor(cli), "     Feed:    %s\n", p.Media.Metadata.FeedURL)
 			}
 			if p.RelPath != "" {
-				fmt.Printf("     Folder:  %s\n", p.RelPath)
+				fmt.Fprintf(outFor(cli), "     Folder:  %s\n", p.RelPath)
 			}
 		}
 	}
@@ -116,8 +116,8 @@ func handleServerGetInfo(config Config, cli CLIOptions) error {
 	for _, p := range podcasts {
 		totalEpisodes += len(p.Media.Episodes)
 	}
-	fmt.Printf("Server:          %s\n", b.Name())
-	fmt.Printf("Total Podcasts:  %d\n", len(podcasts))
-	fmt.Printf("Total Episodes:  %d\n", totalEpisodes)
+	fmt.Fprintf(outFor(cli), "Server:          %s\n", b.Name())
+	fmt.Fprintf(outFor(cli), "Total Podcasts:  %d\n", len(podcasts))
+	fmt.Fprintf(outFor(cli), "Total Episodes:  %d\n", totalEpisodes)
 	return nil
 }

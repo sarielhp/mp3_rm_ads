@@ -148,7 +148,7 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 	}
 
 	if len(candidates) == 0 {
-		fmt.Fprintln(outFor(cli), "No uncleaned episodes found to queue.")
+		fmt.Fprintln(progressFor(cli), "No uncleaned episodes found to queue.")
 		return nil
 	}
 
@@ -169,10 +169,10 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 				}
 			}
 			if isQueued {
-				fmt.Printf("[dry-run] Already in queue: [%s] %s (%s)\n",
+				fmt.Fprintf(outFor(cli), "[dry-run] Already in queue: [%s] %s (%s)\n",
 					it.episodeShortID, util.DisplayName(it.title), util.DisplayName(it.podTitle))
 			} else {
-				fmt.Printf("[dry-run] Would queue for AdR: [%s] %s (%s)\n",
+				fmt.Fprintf(outFor(cli), "[dry-run] Would queue for AdR: [%s] %s (%s)\n",
 					it.episodeShortID, util.DisplayName(it.title), util.DisplayName(it.podTitle))
 			}
 		}
@@ -189,13 +189,13 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 		if added {
 			addedCount++
 			if !cli.Quiet {
-				fmt.Printf("Added to queue: [%s] %s (%s)\n",
+				fmt.Fprintf(outFor(cli), "Added to queue: [%s] %s (%s)\n",
 					util.BoldCyan(it.episodeShortID), util.DisplayName(it.title), util.Bold(util.DisplayName(it.podTitle)))
 			}
 		} else {
 			alreadyCount++
 			if !cli.Quiet {
-				fmt.Printf("Already in queue: [%s] %s (%s)\n",
+				fmt.Fprintf(outFor(cli), "Already in queue: [%s] %s (%s)\n",
 					util.BoldCyan(it.episodeShortID), util.DisplayName(it.title), util.Bold(util.DisplayName(it.podTitle)))
 			}
 		}
@@ -203,9 +203,9 @@ func runQueueLatest(cfg Config, podcastsDir string, limit int, target string, cl
 
 	if !cli.Quiet {
 		if alreadyCount > 0 {
-			fmt.Printf("Added %d uncleaned episode(s) to the AdR queue (%d already queued).\n", addedCount, alreadyCount)
+			fmt.Fprintf(outFor(cli), "Added %d uncleaned episode(s) to the AdR queue (%d already queued).\n", addedCount, alreadyCount)
 		} else {
-			fmt.Printf("Added %d uncleaned episode(s) to the AdR queue.\n", addedCount)
+			fmt.Fprintf(outFor(cli), "Added %d uncleaned episode(s) to the AdR queue.\n", addedCount)
 		}
 	}
 	return nil

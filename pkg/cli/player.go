@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -39,13 +40,13 @@ func runPlayerCommand(cfg Config, cli CLIOptions) error {
 
 	switch subcmd {
 	case "play":
-		return handlePlayerPlay(podcastsDir, args)
+		return handlePlayerPlay(outFor(cli), podcastsDir, args)
 	case "stop":
-		return handlePlayerStop()
+		return handlePlayerStop(outFor(cli))
 	case "pause":
-		return handlePlayerPause()
+		return handlePlayerPause(outFor(cli))
 	case "status":
-		return handlePlayerStatus()
+		return handlePlayerStatus(outFor(cli))
 	case "daemon":
 		return handlePlayerDaemon(args)
 	default:
@@ -53,11 +54,11 @@ func runPlayerCommand(cfg Config, cli CLIOptions) error {
 	}
 }
 
-func handlePlayerPlay(podcastsDir string, args []string) error {
+func handlePlayerPlay(w io.Writer, podcastsDir string, args []string) error {
 	if len(args) == 0 {
 		if player.IsPlayerSocketAlive() {
 			if err := player.ResumePlayerSocket(); err == nil {
-				fmt.Println("Playback resumed.")
+				fmt.Fprintln(w, "Playback resumed.")
 				return nil
 			}
 		}
@@ -74,8 +75,8 @@ func handlePlayerPlay(podcastsDir string, args []string) error {
 	}
 
 	ep := res.Episode
-	fmt.Printf("Playing: %s [%s]\n", util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
-	fmt.Printf("Audio file: %s\n", ep.Path)
+	fmt.Fprintf(w, "Playing: %s [%s]\n", util.Bold(ep.Title), util.BoldCyan(ep.ShortID))
+	fmt.Fprintf(w, "Audio file: %s\n", ep.Path)
 
 	if err := player.StartPlayerTrack(ep.Path, ep.Title, ep.PodcastTitle); err != nil {
 		return fmt.Errorf("failed to start player: %w", err)
@@ -88,26 +89,26 @@ func handlePlayerPlay(podcastsDir string, args []string) error {
 	}
 	globalPlayer.Current = &track
 	globalPlayer.IsPlaying = true
-	fmt.Printf("Started background playback (socket: %s)\n", player.PlayerSocketPath)
+	fmt.Fprintf(w, "Started background playback (socket: %s)\n", player.PlayerSocketPath)
 	return nil
 }
 
-func handlePlayerStop() error {
+func handlePlayerStop(w io.Writer) error {
 	if !player.IsPlayerSocketAlive() {
-		fmt.Println("Player is not running.")
+		fmt.Fprintln(w, "Player is not running.")
 		return nil
 	}
 	if err := player.StopPlayerSocket(); err != nil {
 		return err
 	}
 	globalPlayer.Stop()
-	fmt.Println("Playback stopped.")
+	fmt.Fprintln(w, "Playback stopped.")
 	return nil
 }
 
-func handlePlayerPause() error {
+func handlePlayerPause(w io.Writer) error {
 	if !player.IsPlayerSocketAlive() {
-		fmt.Println("Player is not running.")
+		fmt.Fprintln(w, "Player is not running.")
 		return nil
 	}
 	paused, err := player.PausePlayerSocket()
@@ -115,17 +116,17 @@ func handlePlayerPause() error {
 		return err
 	}
 	if paused {
-		fmt.Println("Playback paused.")
+		fmt.Fprintln(w, "Playback paused.")
 	} else {
-		fmt.Println("Playback resumed.")
+		fmt.Fprintln(w, "Playback resumed.")
 	}
 	return nil
 }
 
-func handlePlayerStatus() error {
+func handlePlayerStatus(w io.Writer) error {
 	st, err := player.QueryPlayerStatus()
 	if err != nil || st == nil || !st.IsRunning {
-		fmt.Println("No active playback session (player is stopped).")
+		fmt.Fprintln(w, "No active playback session (player is stopped).")
 		return nil
 	}
 
@@ -134,16 +135,16 @@ func handlePlayerStatus() error {
 		statusLabel = "Paused"
 	}
 
-	fmt.Printf("Playback Status:  %s\n", util.Bold(statusLabel))
+	fmt.Fprintf(w, "Playback Status:  %s\n", util.Bold(statusLabel))
 	if st.Title != "" {
-		fmt.Printf("Track:            %s\n", util.BoldCyan(st.Title))
+		fmt.Fprintf(w, "Track:            %s\n", util.BoldCyan(st.Title))
 	}
 	pct := 0.0
 	if st.Duration > 0 {
 		pct = (st.Position / st.Duration) * 100
 	}
-	fmt.Printf("Position:         %s / %s (%.0f%%)\n", player.FormatPlayerTime(st.Position), player.FormatPlayerTime(st.Duration), pct)
-	fmt.Printf("Socket:           %s\n", player.PlayerSocketPath)
+	fmt.Fprintf(w, "Position:         %s / %s (%.0f%%)\n", player.FormatPlayerTime(st.Position), player.FormatPlayerTime(st.Duration), pct)
+	fmt.Fprintf(w, "Socket:           %s\n", player.PlayerSocketPath)
 	return nil
 }
 
@@ -166,7 +167,7 @@ func handlePlayerDaemon(args []string) error {
 	return player.RunPlayerDaemon(audioPath, title, podcast)
 }
 
-func printTranscriptText(jsonPath string) error {
+func printTranscriptText(w io.Writer, jsonPath string) error {
 	data, err := os.ReadFile(jsonPath)
 	if err != nil {
 		return err
@@ -176,7 +177,7 @@ func printTranscriptText(jsonPath string) error {
 	if err := json.Unmarshal(data, &td); err == nil && len(td.Segments) > 0 {
 		for _, seg := range td.Segments {
 			timeStr := fmt.Sprintf("[%s -> %s]", format.FormatSRTTime(seg.Start), format.FormatSRTTime(seg.End))
-			fmt.Printf("%s %s\n", util.BoldCyan(timeStr), strings.TrimSpace(seg.Text))
+			fmt.Fprintf(w, "%s %s\n", util.BoldCyan(timeStr), strings.TrimSpace(seg.Text))
 		}
 		return nil
 	}
@@ -184,12 +185,12 @@ func printTranscriptText(jsonPath string) error {
 	var raw map[string]interface{}
 	if err := json.Unmarshal(data, &raw); err == nil {
 		if text, ok := raw["text"].(string); ok && text != "" {
-			fmt.Println(text)
+			fmt.Fprintln(w, text)
 			return nil
 		}
 	}
 
-	fmt.Println(string(data))
+	fmt.Fprintln(w, string(data))
 	return nil
 }
 

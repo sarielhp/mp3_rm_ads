@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"pod/pkg/backend"
 	"pod/pkg/config"
 	"pod/pkg/podcast"
@@ -133,10 +134,10 @@ func handleDefaultPolicy(cli CLIOptions) error {
 			"default_ad_removal":      globalCfg.DefaultAdRemoval,
 		}
 		data, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
-	fmt.Printf("Global default policy updated: download_policy=%s, download_k=%d, ad_removal=%s\n",
+	fmt.Fprintf(outFor(cli), "Global default policy updated: download_policy=%s, download_k=%d, ad_removal=%s\n",
 		globalCfg.DefaultDownloadPolicy, globalCfg.DefaultDownloadK, globalCfg.DefaultAdRemoval)
 	return nil
 }
@@ -202,7 +203,7 @@ func updatePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, c
 			"group":           group.Kind,
 			"group_label":     group.Label,
 		}, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
@@ -215,7 +216,7 @@ func updatePodcastGroupPolicy(cfg Config, group *podcast.ResolvedPodcastGroup, c
 	}
 	dlBadge := config.DownloadPolicyBadge(res.Applied.DownloadPolicy, res.Applied.DownloadK)
 	adBadge := config.AdRemovalModeBadge(res.Applied.AdRemoval)
-	fmt.Printf("Policy updated for %d %s: AutoDownload=%v %s, AdRemoval=%s %s%s\n",
+	fmt.Fprintf(outFor(cli), "Policy updated for %d %s: AutoDownload=%v %s, AdRemoval=%s %s%s\n",
 		res.Updated, scope, res.Applied.IsAutoDownloadEnabled(), dlBadge, res.Applied.AdRemoval, adBadge, defaultMsg)
 	return nil
 }
@@ -242,19 +243,19 @@ func displayPodcastGroupPolicy(group *podcast.ResolvedPodcastGroup, cli CLIOptio
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
-	fmt.Printf("\nPolicies for %s (%d total):\n", group.Label, len(results))
-	fmt.Printf("%-8s  %-30s  %-15s  %-12s\n", "ID", "TITLE", "AUTO DOWNLOAD", "AD REMOVAL")
-	fmt.Println(strings.Repeat("-", 72))
+	fmt.Fprintf(outFor(cli), "\nPolicies for %s (%d total):\n", group.Label, len(results))
+	fmt.Fprintf(outFor(cli), "%-8s  %-30s  %-15s  %-12s\n", "ID", "TITLE", "AUTO DOWNLOAD", "AD REMOVAL")
+	fmt.Fprintln(outFor(cli), strings.Repeat("-", 72))
 	for _, r := range results {
 		dlBadge := config.DownloadPolicyBadge(r.DownloadPolicy, r.DownloadK)
 		title := util.TruncateDisplayName(r.Title, 30)
-		fmt.Printf("%-8s  %s  %-15s  %-12s\n", r.ID, util.PadRight(title, 30), dlBadge, r.AdRemoval)
+		fmt.Fprintf(outFor(cli), "%-8s  %s  %-15s  %-12s\n", r.ID, util.PadRight(title, 30), dlBadge, r.AdRemoval)
 	}
-	fmt.Println()
+	fmt.Fprintln(progressFor(cli))
 	return nil
 }
 
@@ -285,7 +286,7 @@ func handleSinglePodcastPolicy(cfg Config, podcastsDir, target string, cli CLIOp
 		if err := config.SaveConfig(&globalCfg); err != nil {
 			return fmt.Errorf("failed to save global default configuration: %w", err)
 		}
-		fmt.Printf("Global default policy updated: default_download_policy=%s\n", globalCfg.DefaultDownloadPolicy)
+		fmt.Fprintf(outFor(cli), "Global default policy updated: default_download_policy=%s\n", globalCfg.DefaultDownloadPolicy)
 	}
 
 	return nil
@@ -325,32 +326,32 @@ func displayPodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) erro
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
-	printPodcastPolicyDetails(res)
+	printPodcastPolicyDetails(outFor(cli), res)
 	return nil
 }
 
-func printPodcastPolicyDetails(res PodcastPolicyResult) {
-	fmt.Printf("\nPolicy for %s [%s]:\n", util.Bold(util.DisplayName(res.Title)), util.BoldCyan(res.ID))
-	fmt.Printf("%s\n", strings.Repeat("=", 65))
+func printPodcastPolicyDetails(w io.Writer, res PodcastPolicyResult) {
+	fmt.Fprintf(w, "\nPolicy for %s [%s]:\n", util.Bold(util.DisplayName(res.Title)), util.BoldCyan(res.ID))
+	fmt.Fprintf(w, "%s\n", strings.Repeat("=", 65))
 	favStr := "No"
 	if res.Favorite {
 		favStr = util.BoldGreen("⭐ Yes")
 	}
-	fmt.Printf("  Favorite:         %s\n", favStr)
+	fmt.Fprintf(w, "  Favorite:         %s\n", favStr)
 	dlBadge := config.DownloadPolicyBadge(res.DownloadPolicy, res.DownloadK)
-	fmt.Printf("  Auto Download:    %-5v %s\n", res.AutoDownload, dlBadge)
+	fmt.Fprintf(w, "  Auto Download:    %-5v %s\n", res.AutoDownload, dlBadge)
 	retStr := "Disabled"
 	if res.AutoCleanupDays > 0 {
 		retStr = fmt.Sprintf("%d days retention", res.AutoCleanupDays)
 	}
-	fmt.Printf("  Auto Cleanup:     %-5v (%s)\n", res.AutoCleanup, retStr)
+	fmt.Fprintf(w, "  Auto Cleanup:     %-5v (%s)\n", res.AutoCleanup, retStr)
 	adBadge := config.AdRemovalModeBadge(res.AdRemoval)
-	fmt.Printf("  Ad Removal:       %-8s %s\n", res.AdRemoval, adBadge)
-	fmt.Printf("  Backend Sync:     %s\n", res.BackendSync)
-	fmt.Printf("%s\n\n", strings.Repeat("=", 65))
+	fmt.Fprintf(w, "  Ad Removal:       %-8s %s\n", res.AdRemoval, adBadge)
+	fmt.Fprintf(w, "  Backend Sync:     %s\n", res.BackendSync)
+	fmt.Fprintf(w, "%s\n\n", strings.Repeat("=", 65))
 }
 
 func updatePodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) error {
@@ -365,7 +366,7 @@ func updatePodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) error
 
 	if cli.JSON {
 		data, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
@@ -373,7 +374,7 @@ func updatePodcastPolicy(cfg Config, cli CLIOptions, pod *ResolvedPodcast) error
 	if applied.Favorite {
 		favBadge = " ⭐ [Favorite]"
 	}
-	fmt.Printf("Policy updated for %s [%s]%s: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
+	fmt.Fprintf(outFor(cli), "Policy updated for %s [%s]%s: DL=%v (%s), Cleanup=%v (%dd), Ads=%s (%s)\n",
 		util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), favBadge,
 		res.AutoDownload, applied.DownloadPolicy, res.AutoCleanup, applied.AutoCleanupDays,
 		applied.AdRemoval, syncMsg)

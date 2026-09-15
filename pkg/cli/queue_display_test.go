@@ -1,7 +1,7 @@
 package cli
 
 import (
-	"io"
+	"bytes"
 	"os"
 	"path/filepath"
 	"pod/pkg/podcast"
@@ -12,6 +12,7 @@ import (
 )
 
 func TestQueueDisplayContinuesPastAmbiguousEntries(t *testing.T) {
+	t.Parallel()
 	dir := t.TempDir()
 	for _, name := range []string{"first/podcast.mp3", "second/podcast.mp3"} {
 		path := filepath.Join(dir, name)
@@ -66,6 +67,7 @@ func TestQueueDisplayContinuesPastAmbiguousEntries(t *testing.T) {
 }
 
 func TestQueuePublicationRelativeDates(t *testing.T) {
+	t.Parallel()
 	zone, err := time.LoadLocation("America/Chicago")
 	if err != nil {
 		t.Fatal(err)
@@ -83,6 +85,7 @@ func TestQueuePublicationRelativeDates(t *testing.T) {
 }
 
 func TestShortenedQueueTitle(t *testing.T) {
+	t.Parallel()
 	for input, want := range map[string]string{
 		"The Daily Show with Jane":        "Daily Jane",
 		"THE Science SHOW WITH Ada":       "Science Ada",
@@ -97,21 +100,10 @@ func TestShortenedQueueTitle(t *testing.T) {
 }
 
 func assertQueueTableColumns(t *testing.T, items []queueEpisodeItem) {
+	var buf bytes.Buffer
 	t.Helper()
-	r, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	stdout := os.Stdout
-	os.Stdout = w
-	printQueueTable(items)
-	_ = w.Close()
-	os.Stdout = stdout
-	data, err := io.ReadAll(r)
-	_ = r.Close()
-	if err != nil {
-		t.Fatal(err)
-	}
+	printQueueTable(&buf, items)
+	data := buf.Bytes()
 	for _, header := range []string{"Podcast ID", "Episode ID", "Pri", "Length", "P-date", "Title"} {
 		if !strings.Contains(string(data), header) {
 			t.Errorf("missing column %s", header)

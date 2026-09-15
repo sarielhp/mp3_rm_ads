@@ -41,6 +41,6 @@ func handleServerPublication(cfg Config, cli CLIOptions) error {
 	if cli.DryRun {
 		verb = "Would update"
 	}
-	fmt.Printf("%s publication dates in %d status files and %d podcast caches.\n", verb, statuses, caches)
+	fmt.Fprintf(outFor(cli), "%s publication dates in %d status files and %d podcast caches.\n", verb, statuses, caches)
 	return nil
 }

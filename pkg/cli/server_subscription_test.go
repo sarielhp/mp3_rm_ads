@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/config"
@@ -65,7 +66,7 @@ func TestConfigSetGetServerBaseURL(t *testing.T) {
 	defer config.SetTestConfigPath("")
 
 	cfg := Config{}
-	if err := handleConfigSet(&cfg, "server-base-url", "http://test.server:8080/podcasts/"); err != nil {
+	if err := handleConfigSet(io.Discard, &cfg, "server-base-url", "http://test.server:8080/podcasts/"); err != nil {
 		t.Fatalf("handleConfigSet server-base-url failed: %v", err)
 	}
 	if cfg.ServerBaseURL != "http://test.server:8080/podcasts" {

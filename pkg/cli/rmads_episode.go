@@ -29,7 +29,7 @@ func runUrgentEpisode(cfg Config, cli CLIOptions) (bool, error) {
 	}
 	ep := res.Episode
 	if cli.DryRun {
-		fmt.Printf("[dry-run] Would queue [%s] %s at priority 10 and process it first.\n", ep.ShortID, ep.Title)
+		fmt.Fprintf(outFor(cli), "[dry-run] Would queue [%s] %s at priority 10 and process it first.\n", ep.ShortID, ep.Title)
 		return true, nil
 	}
 	item, err := enqueueUrgentEpisode(ep)

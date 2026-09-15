@@ -2,6 +2,7 @@ package cli
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -58,7 +59,7 @@ func TestLLMProfileProbe(t *testing.T) {
 func TestLLMTestRejectsInvalidConfiguration(t *testing.T) {
 	t.Parallel()
 	for _, id := range []string{"bad", "0", "-1", "3"} {
-		if err := testLLMProfile(Config{}, id); err == nil {
+		if err := testLLMProfile(io.Discard, Config{}, id); err == nil {
 			t.Fatalf("accepted missing/invalid profile %q", id)
 		}
 	}

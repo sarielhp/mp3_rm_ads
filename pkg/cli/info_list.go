@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -65,7 +66,7 @@ func podcastExistsByIndexOrID(podcastsDir, query string) bool {
 func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
 	entries := podcast.ScanPodcastDirs(podcastsDir)
 	if len(entries) == 0 {
-		fmt.Fprintln(outFor(cli), "No podcasts found.")
+		fmt.Fprintln(progressFor(cli), "No podcasts found.")
 		return nil
 	}
 
@@ -76,18 +77,18 @@ func listAllPodcasts(podcastsDir string, cli CLIOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
 	if cli.Quiet {
 		for _, item := range items {
-			fmt.Println(item.ShortID)
+			fmt.Fprintln(outFor(cli), item.ShortID)
 		}
 		return nil
 	}
 
-	printPodcastsTable(items)
+	printPodcastsTable(outFor(cli), items)
 	return nil
 }
 
@@ -135,22 +136,22 @@ func collectPodcastListItems(entries []podcast.PodcastDirEntry) []lsPodcastItem 
 	return items
 }
 
-func printPodcastsTable(items []lsPodcastItem) {
-	fmt.Printf("\nPodcasts in Library (%d total):\n", len(items))
+func printPodcastsTable(w io.Writer, items []lsPodcastItem) {
+	fmt.Fprintf(w, "\nPodcasts in Library (%d total):\n", len(items))
 	titleWidth := 22
 	cols := podcastTableColumns(titleWidth)
 
-	fmt.Println(renderTableTop(cols))
-	fmt.Println(renderTableHeader(cols))
-	fmt.Println(renderTableDivider(cols))
+	fmt.Fprintln(w, renderTableTop(cols))
+	fmt.Fprintln(w, renderTableHeader(cols))
+	fmt.Fprintln(w, renderTableDivider(cols))
 
 	for _, item := range items {
 		cells := buildPodcastRowCells(item, titleWidth)
-		fmt.Println(renderTableRow(cells, cols))
+		fmt.Fprintln(w, renderTableRow(cells, cols))
 	}
 
-	fmt.Println(renderTableBottom(cols))
-	fmt.Println("  🎙️ Episodes   ✨ Clean   ⬇️ Download   ✂️ Ad Removal   ⏳ Retention   📅 Last Ep")
+	fmt.Fprintln(w, renderTableBottom(cols))
+	fmt.Fprintln(w, "  🎙️ Episodes   ✨ Clean   ⬇️ Download   ✂️ Ad Removal   ⏳ Retention   📅 Last Ep")
 }
 
 func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
@@ -164,7 +165,7 @@ func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
 
 	allMp3s := util.FindMP3Files(podcastsDir)
 	if len(allMp3s) == 0 {
-		fmt.Fprintln(outFor(cli), "No podcast audio files (.mp3) found.")
+		fmt.Fprintln(progressFor(cli), "No podcast audio files (.mp3) found.")
 		return nil
 	}
 
@@ -179,21 +180,21 @@ func listLatestEpisodes(podcastsDir string, limit int, cli CLIOptions) error {
 	latest := items[:limit]
 
 	if cli.JSON {
-		return outputLatestEpisodesJSON(latest)
+		return outputLatestEpisodesJSON(outFor(cli), latest)
 	}
 
 	if cli.Quiet {
 		for _, item := range latest {
-			fmt.Println(item.path)
+			fmt.Fprintln(outFor(cli), item.path)
 		}
 		return nil
 	}
 
-	printLatestEpisodesTable(latest, limit)
+	printLatestEpisodesTable(outFor(cli), latest, limit)
 	return nil
 }
 
-func outputLatestEpisodesJSON(items []lsEpisodeItem) error {
+func outputLatestEpisodesJSON(w io.Writer, items []lsEpisodeItem) error {
 	var jsonList []lsEpisodeJSON
 	for _, it := range items {
 		jsonList = append(jsonList, lsEpisodeJSON{
@@ -212,7 +213,7 @@ func outputLatestEpisodesJSON(items []lsEpisodeItem) error {
 	if err != nil {
 		return err
 	}
-	fmt.Println(string(data))
+	fmt.Fprintln(w, string(data))
 	return nil
 }
 
@@ -264,23 +265,23 @@ func collectLatestEpisodeItems(allMp3s []string, podTitleMap, podIDMap map[strin
 	return items
 }
 
-func printLatestEpisodesTable(latest []lsEpisodeItem, limit int) {
-	fmt.Printf("\nLatest %d Episodes Across All Podcasts:\n", limit)
+func printLatestEpisodesTable(w io.Writer, latest []lsEpisodeItem, limit int) {
+	fmt.Fprintf(w, "\nLatest %d Episodes Across All Podcasts:\n", limit)
 	podWidth := 16
 	titleWidth := 24
 	cols := latestEpisodeTableColumns(podWidth, titleWidth)
 
-	fmt.Println(renderTableTop(cols))
-	fmt.Println(renderTableHeader(cols))
-	fmt.Println(renderTableDivider(cols))
+	fmt.Fprintln(w, renderTableTop(cols))
+	fmt.Fprintln(w, renderTableHeader(cols))
+	fmt.Fprintln(w, renderTableDivider(cols))
 
 	for _, item := range latest {
 		cells := buildLatestEpisodeRowCells(item, podWidth, titleWidth)
-		fmt.Println(renderTableRow(cells, cols))
+		fmt.Fprintln(w, renderTableRow(cells, cols))
 	}
 
-	fmt.Println(renderTableBottom(cols))
-	fmt.Println()
+	fmt.Fprintln(w, renderTableBottom(cols))
+	fmt.Fprintln(w)
 }
 
 func formatShortStatus(status string) string {

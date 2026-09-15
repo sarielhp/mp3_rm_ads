@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"strconv"
 	"strings"
 
@@ -40,7 +41,7 @@ func resolveActiveWhisperProfile(cfg *Config) {
 	}
 }
 
-func printWhisperProfile(wp WhisperProfile, isDefault bool) {
+func printWhisperProfile(w io.Writer, wp WhisperProfile, isDefault bool) {
 	engine := wp.Engine
 	if engine == "" {
 		engine = config.InferWhisperEngine(wp)
@@ -50,67 +51,67 @@ func printWhisperProfile(wp WhisperProfile, isDefault bool) {
 	if isDefault {
 		defaultBadge = " [DEFAULT]"
 	}
-	fmt.Printf("  [%d] %s %s%s\n", wp.ID, wp.Name, badge, defaultBadge)
-	fmt.Printf("      - Engine:       %s\n", engine)
+	fmt.Fprintf(w, "  [%d] %s %s%s\n", wp.ID, wp.Name, badge, defaultBadge)
+	fmt.Fprintf(w, "      - Engine:       %s\n", engine)
 	if engine == WhisperEngineLocal {
 		if wp.Model != "" {
-			fmt.Printf("      - Model:        %s\n", wp.Model)
+			fmt.Fprintf(w, "      - Model:        %s\n", wp.Model)
 		}
 		if wp.CliBinary != "" {
-			fmt.Printf("      - CLI Binary:   %s\n", wp.CliBinary)
+			fmt.Fprintf(w, "      - CLI Binary:   %s\n", wp.CliBinary)
 		}
 		if wp.Processors > 0 {
-			fmt.Printf("      - Processors:   %d\n", wp.Processors)
+			fmt.Fprintf(w, "      - Processors:   %d\n", wp.Processors)
 		}
 		if wp.Threads > 0 {
-			fmt.Printf("      - Threads:      %d\n", wp.Threads)
+			fmt.Fprintf(w, "      - Threads:      %d\n", wp.Threads)
 		}
 		if wp.Greedy {
-			fmt.Println("      - Greedy:       true")
+			fmt.Fprintln(w, "      - Greedy:       true")
 		}
 	} else {
 		if wp.URL != "" {
-			fmt.Printf("      - URL:          %s\n", wp.URL)
+			fmt.Fprintf(w, "      - URL:          %s\n", wp.URL)
 		}
 		if wp.DockerContainer != "" {
-			fmt.Printf("      - Container:    %s\n", wp.DockerContainer)
+			fmt.Fprintf(w, "      - Container:    %s\n", wp.DockerContainer)
 		}
 		if wp.WakeCommand != "" {
-			fmt.Printf("      - Wake Cmd:     %s\n", wp.WakeCommand)
+			fmt.Fprintf(w, "      - Wake Cmd:     %s\n", wp.WakeCommand)
 		}
 	}
 	if wp.SpeedFactor > 0 {
-		fmt.Printf("      - Speed Factor: %.1f\n", wp.SpeedFactor)
+		fmt.Fprintf(w, "      - Speed Factor: %.1f\n", wp.SpeedFactor)
 	}
 	if len(wp.Languages) > 0 {
-		fmt.Printf("      - Languages:    %s\n", strings.Join(wp.Languages, ", "))
+		fmt.Fprintf(w, "      - Languages:    %s\n", strings.Join(wp.Languages, ", "))
 	}
 	if wp.Language != "" {
-		fmt.Printf("      - Language:     %s\n", wp.Language)
+		fmt.Fprintf(w, "      - Language:     %s\n", wp.Language)
 	}
 	if wp.Prompt != "" {
-		fmt.Printf("      - Prompt:       %s\n", wp.Prompt)
+		fmt.Fprintf(w, "      - Prompt:       %s\n", wp.Prompt)
 	}
-	fmt.Println()
+	fmt.Fprintln(w)
 }
 
-func listWhispers(cfg Config) {
+func listWhispers(w io.Writer, cfg Config) {
 	activeID := cfg.ActiveWhisperID
-	fmt.Printf("\n%s\n", util.RepeatStr("=", 70))
-	fmt.Println("AVAILABLE WHISPER SERVERS:")
-	fmt.Printf("%s\n", util.RepeatStr("=", 70))
+	fmt.Fprintf(w, "\n%s\n", util.RepeatStr("=", 70))
+	fmt.Fprintln(w, "AVAILABLE WHISPER SERVERS:")
+	fmt.Fprintf(w, "%s\n", util.RepeatStr("=", 70))
 
 	if len(cfg.WhisperProfiles) == 0 {
-		fmt.Println("No Whisper profiles configured in configuration file.")
-		fmt.Println("Currently using fallback/legacy configuration:")
+		fmt.Fprintln(w, "No Whisper profiles configured in configuration file.")
+		fmt.Fprintln(w, "Currently using fallback/legacy configuration:")
 		fb := config.GetActiveWhisperProfile(&cfg)
-		printWhisperProfile(fb, true)
+		printWhisperProfile(w, fb, true)
 	} else {
 		for _, wp := range cfg.WhisperProfiles {
-			printWhisperProfile(wp, wp.ID == activeID)
+			printWhisperProfile(w, wp, wp.ID == activeID)
 		}
 	}
-	fmt.Printf("%s\n\n", util.RepeatStr("=", 70))
+	fmt.Fprintf(w, "%s\n\n", util.RepeatStr("=", 70))
 }
 
 func parseEngineFirstSpec(parts []string, nextID int, name string, engine WhisperEngine) WhisperProfile {
@@ -239,7 +240,7 @@ func parseWhisperProfileSpec(spec string, nextID int) WhisperProfile {
 	return parseURLFirstSpec(parts, nextID, name, sec)
 }
 
-func addWhisperProfile(cfg *Config, spec string) {
+func addWhisperProfile(w io.Writer, cfg *Config, spec string) {
 	nextID := 1
 	for _, wp := range cfg.WhisperProfiles {
 		if wp.ID >= nextID {
@@ -254,10 +255,10 @@ func addWhisperProfile(cfg *Config, spec string) {
 	resolveActiveWhisperProfile(cfg)
 	_ = config.SaveConfig(cfg)
 	badge := config.WhisperEngineBadge(newProfile.Engine)
-	fmt.Printf("Added Whisper server profile [%d] %s %s\n", nextID, newProfile.Name, badge)
+	fmt.Fprintf(w, "Added Whisper server profile [%d] %s %s\n", nextID, newProfile.Name, badge)
 }
 
-func removeWhisperProfile(cfg *Config, targetID int) {
+func removeWhisperProfile(w io.Writer, cfg *Config, targetID int) {
 	foundIndex := -1
 	for i, wp := range cfg.WhisperProfiles {
 		if wp.ID == targetID {
@@ -279,15 +280,15 @@ func removeWhisperProfile(cfg *Config, targetID int) {
 	}
 	resolveActiveWhisperProfile(cfg)
 	_ = config.SaveConfig(cfg)
-	fmt.Printf("Removed Whisper server profile [%d] %s\n", targetID, profileName)
+	fmt.Fprintf(w, "Removed Whisper server profile [%d] %s\n", targetID, profileName)
 }
 
-func setDefaultWhisperProfile(cfg *Config, targetID int) {
+func setDefaultWhisperProfile(w io.Writer, cfg *Config, targetID int) {
 	if targetID == 0 {
 		cfg.ActiveWhisperID = 0
 		resolveActiveWhisperProfile(cfg)
 		_ = config.SaveConfig(cfg)
-		fmt.Println("Default Whisper server updated to fallback/legacy configuration.")
+		fmt.Fprintln(w, "Default Whisper server updated to fallback/legacy configuration.")
 		return
 	}
 	for _, wp := range cfg.WhisperProfiles {
@@ -300,7 +301,7 @@ func setDefaultWhisperProfile(cfg *Config, targetID int) {
 				engine = config.InferWhisperEngine(wp)
 			}
 			badge := config.WhisperEngineBadge(engine)
-			fmt.Printf("Default Whisper server profile updated to [%d] %s %s\n", targetID, wp.Name, badge)
+			fmt.Fprintf(w, "Default Whisper server profile updated to [%d] %s %s\n", targetID, wp.Name, badge)
 			return
 		}
 	}

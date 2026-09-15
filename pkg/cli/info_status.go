@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -20,15 +21,15 @@ type podcastStatusEntry struct {
 	needsAdRemoval int
 }
 
-func absStatus(cfg Config, showDetailed bool, quiet bool) {
+func absStatus(w io.Writer, cfg Config, showDetailed bool, quiet bool) {
 	if showDetailed {
-		renderLocalLibraryStatus(cfg, quiet)
+		renderLocalLibraryStatus(w, cfg, quiet)
 		return
 	}
-	renderLocalSummary(cfg, quiet)
+	renderLocalSummary(w, cfg, quiet)
 }
 
-func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
+func renderLocalSummary(w io.Writer, cfg Config, quiet bool) (int, int, int) {
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
@@ -66,29 +67,29 @@ func renderLocalSummary(cfg Config, quiet bool) (int, int, int) {
 	}
 
 	if !quiet {
-		fmt.Println()
-		fmt.Println("=== Local Library Status ===")
-		fmt.Printf("  - Version:           %s\n", getVersion())
-		fmt.Printf("  - Podcasts:          %d\n", podcastsCount)
-		fmt.Printf("  - Total Episodes:    %d\n", totalEpisodes)
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "=== Local Library Status ===")
+		fmt.Fprintf(w, "  - Version:           %s\n", getVersion())
+		fmt.Fprintf(w, "  - Podcasts:          %d\n", podcastsCount)
+		fmt.Fprintf(w, "  - Total Episodes:    %d\n", totalEpisodes)
 		if totalNeedsAd > 0 {
-			fmt.Printf("  - AdR Status:        %s\n", util.BoldYellow(fmt.Sprintf("%d episode(s) need AdR", totalNeedsAd)))
+			fmt.Fprintf(w, "  - AdR Status:        %s\n", util.BoldYellow(fmt.Sprintf("%d episode(s) need AdR", totalNeedsAd)))
 		} else {
-			fmt.Printf("  - AdR Status:        %s\n", util.BoldGreen("0 (All clean)"))
+			fmt.Fprintf(w, "  - AdR Status:        %s\n", util.BoldGreen("0 (All clean)"))
 		}
 	}
 	return podcastsCount, totalEpisodes, totalNeedsAd
 }
 
-func renderLocalLibraryStatus(cfg Config, quiet bool) {
+func renderLocalLibraryStatus(w io.Writer, cfg Config, quiet bool) {
 	podcastsDir := cfg.PodcastsDir
 	if podcastsDir == "" {
 		podcastsDir = "."
 	}
-	renderLocalDiskPodcastStatus(podcastsDir, quiet)
+	renderLocalDiskPodcastStatus(w, podcastsDir, quiet)
 }
 
-func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
+func renderLocalDiskPodcastStatus(w io.Writer, podcastsDir string, quiet bool) {
 	podEntries := podcast.ScanPodcastDirs(podcastsDir)
 	var entries []podcastStatusEntry
 	for _, pe := range podEntries {
@@ -123,11 +124,11 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 		return
 	}
 
-	fmt.Printf("\n%s\n", strings.Repeat("=", 90))
-	fmt.Println("LOCAL LIBRARY PODCAST STATUS REPORT")
-	fmt.Printf("%s\n", strings.Repeat("=", 90))
-	fmt.Printf("  %-3s  %-6s  %-48s │ %-8s │ %-10s\n", "#", "ID", "Title", "Episodes", "NeedAdR")
-	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-10s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 10))
+	fmt.Fprintf(w, "\n%s\n", strings.Repeat("=", 90))
+	fmt.Fprintln(w, "LOCAL LIBRARY PODCAST STATUS REPORT")
+	fmt.Fprintf(w, "%s\n", strings.Repeat("=", 90))
+	fmt.Fprintf(w, "  %-3s  %-6s  %-48s │ %-8s │ %-10s\n", "#", "ID", "Title", "Episodes", "NeedAdR")
+	fmt.Fprintf(w, "  %-3s  %-6s  %-48s ┼ %-8s ┼ %-10s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 10))
 
 	totalEpisodes := 0
 	totalNeedsAdRemoval := 0
@@ -136,12 +137,12 @@ func renderLocalDiskPodcastStatus(podcastsDir string, quiet bool) {
 		dName := util.TruncateDisplayName(e.name, 48)
 		totalEpisodes += e.episodes
 		totalNeedsAdRemoval += e.needsAdRemoval
-		fmt.Printf("  %-3d  %-6s  %s │ %-8d │ %-16d\n", idx+1, e.id, util.PadRight(dName, 48), e.episodes, e.needsAdRemoval)
+		fmt.Fprintf(w, "  %-3d  %-6s  %s │ %-8d │ %-16d\n", idx+1, e.id, util.PadRight(dName, 48), e.episodes, e.needsAdRemoval)
 	}
 
-	fmt.Printf("  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
-	fmt.Printf("  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
-	fmt.Printf("%s\n\n", strings.Repeat("=", 90))
+	fmt.Fprintf(w, "  %-3s  %-6s  %-48s ┼ %-8s ┼ %-16s\n", strings.Repeat("─", 3), strings.Repeat("─", 6), strings.Repeat("─", 48), strings.Repeat("─", 8), strings.Repeat("─", 16))
+	fmt.Fprintf(w, "  %-3s  %-6s  %-48s │ %-8d │ %-16d\n", "", "", "TOTAL", totalEpisodes, totalNeedsAdRemoval)
+	fmt.Fprintf(w, "%s\n\n", strings.Repeat("=", 90))
 }
 
 func runStatusCommand(config *Config, cli CLIOptions) error {
@@ -165,6 +166,6 @@ func runStatusCommand(config *Config, cli CLIOptions) error {
 	if targetDir != "" {
 		config.PodcastsDir = targetDir
 	}
-	absStatus(*config, showDetailedPodcasts, cli.Quiet)
+	absStatus(outFor(cli), *config, showDetailedPodcasts, cli.Quiet)
 	return nil
 }

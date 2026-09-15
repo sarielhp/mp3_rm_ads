@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -103,7 +104,7 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 
 	var eps []backend.FeedEpisode
 	if title == "" {
-		fmt.Fprintf(outFor(cli), "Inspecting feed: %s\n", feedURL)
+		fmt.Fprintf(progressFor(cli), "Inspecting feed: %s\n", feedURL)
 		fetchedEps, _, _, _, err := podcast.FetchFeedDirect(feedURL, "", "")
 		if err == nil && len(fetchedEps) > 0 {
 			eps = fetchedEps
@@ -129,11 +130,11 @@ func handleServerAdd(cfg Config, cli CLIOptions) error {
 
 	added := store.Get(feedURL)
 	if !cli.Quiet && added != nil {
-		fmt.Printf("Added podcast subscription: [%s] %s\n", util.BoldCyan(added.ID), added.Title)
+		fmt.Fprintf(outFor(cli), "Added podcast subscription: [%s] %s\n", util.BoldCyan(added.ID), added.Title)
 		podDir := filepath.Join(cfg.PodcastsDir, added.Folder)
 		if cfg.ServerBaseURL != "" {
 			_ = podcast.PublishPodcast(podDir, *added, cfg.ServerBaseURL, eps)
-			fmt.Printf("Local RSS feed available at: %s/%s/feed.xml\n", strings.TrimRight(cfg.ServerBaseURL, "/"), added.Folder)
+			fmt.Fprintf(outFor(cli), "Local RSS feed available at: %s/%s/feed.xml\n", strings.TrimRight(cfg.ServerBaseURL, "/"), added.Folder)
 		}
 	}
 	return nil
@@ -160,7 +161,7 @@ func handleServerRemove(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("save subscriptions: %w", err)
 	}
 
-	fmt.Fprintf(outFor(cli), "Removed subscription: %s\n", query)
+	fmt.Fprintf(progressFor(cli), "Removed subscription: %s\n", query)
 	return nil
 }
 
@@ -185,7 +186,7 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 		}
 		podDir := filepath.Join(cfg.PodcastsDir, sub.Folder)
 		if err := podcast.PublishPodcast(podDir, sub, cfg.ServerBaseURL, nil); err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: failed to write feed for %s: %v\n", sub.Title, err)
+			fmt.Fprintf(errFor(cli), "Warning: failed to write feed for %s: %v\n", sub.Title, err)
 			continue
 		}
 		if sub.ImageURL == "" {
@@ -196,11 +197,11 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 			}
 		}
 		eps := podcast.CollectLocalEpisodes(podDir, nil)
-		fmt.Printf("Updated feed: %s (%d episodes)\n", filepath.Join(podDir, "feed.xml"), len(eps))
+		fmt.Fprintf(outFor(cli), "Updated feed: %s (%d episodes)\n", filepath.Join(podDir, "feed.xml"), len(eps))
 	}
 	if target == "" && cfg.PodcastsDir != "" {
 		if err := podcast.PublishCatalog(cfg.PodcastsDir, subs); err == nil {
-			fmt.Printf("Updated catalog webpage: %s\n", filepath.Join(cfg.PodcastsDir, "index.html"))
+			fmt.Fprintf(outFor(cli), "Updated catalog webpage: %s\n", filepath.Join(cfg.PodcastsDir, "index.html"))
 		}
 	}
 	return nil
@@ -220,7 +221,7 @@ func handleServerImport(cfg Config, cli CLIOptions) error {
 		if err != nil {
 			return fmt.Errorf("import OPML: %w", err)
 		}
-		fmt.Fprintf(outFor(cli), "Imported %d new subscription(s) from %s\n", n, cli.Args[0])
+		fmt.Fprintf(progressFor(cli), "Imported %d new subscription(s) from %s\n", n, cli.Args[0])
 		return nil
 	}
 
@@ -232,13 +233,13 @@ func handleServerImport(cfg Config, cli CLIOptions) error {
 	if err != nil {
 		return fmt.Errorf("backend import failed: %w", err)
 	}
-	fmt.Fprintf(outFor(cli), "Imported %d new subscription(s) from backend into %s\n", n, store.FilePath())
+	fmt.Fprintf(progressFor(cli), "Imported %d new subscription(s) from backend into %s\n", n, store.FilePath())
 	return nil
 }
 
-func renderSubscriptionList(subs []podcast.Subscription, podcastsDir string, verbose bool) error {
-	fmt.Printf("%-8s %-32s %-6s %-20s %s\n", "ID", "TITLE", "EPS", "FOLDER", "FEED URL")
-	fmt.Println(strings.Repeat("-", 95))
+func renderSubscriptionList(w io.Writer, subs []podcast.Subscription, podcastsDir string, verbose bool) error {
+	fmt.Fprintf(w, "%-8s %-32s %-6s %-20s %s\n", "ID", "TITLE", "EPS", "FOLDER", "FEED URL")
+	fmt.Fprintln(w, strings.Repeat("-", 95))
 	for _, s := range subs {
 		title := util.TruncateDisplayName(s.Title, 30)
 		folder := util.TruncateDisplayName(s.Folder, 18)
@@ -251,9 +252,9 @@ func renderSubscriptionList(subs []podcast.Subscription, podcastsDir string, ver
 		if !verbose && len([]rune(feedURL)) > 35 {
 			feedURL = util.Truncate(feedURL, 35)
 		}
-		fmt.Printf("%-8s %s %-6d %s %s\n", s.ID, util.PadRight(title, 32), epCount, util.PadRight(folder, 20), feedURL)
+		fmt.Fprintf(w, "%-8s %s %-6d %s %s\n", s.ID, util.PadRight(title, 32), epCount, util.PadRight(folder, 20), feedURL)
 	}
-	fmt.Printf("\nTotal: %d subscription(s)\n", len(subs))
+	fmt.Fprintf(w, "\nTotal: %d subscription(s)\n", len(subs))
 	return nil
 }
 
@@ -286,13 +287,13 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 	opts := subscriptionDownloadOptions(cfg, cli)
 	targets := podcast.SubscriptionTargets(subs, opts.Target)
 	if len(targets) == 0 {
-		fmt.Fprintln(outFor(cli), "No matching podcast subscriptions found.")
+		fmt.Fprintln(progressFor(cli), "No matching podcast subscriptions found.")
 		return nil
 	}
 
 	start := time.Now()
 	plans := lib.PlanSubscriptionDownloads(targets, opts, feedCheckProgress(cli, len(targets)))
-	fmt.Fprint(outFor(cli), "\r\x1b[K")
+	fmt.Fprint(progressFor(cli), "\r\x1b[K")
 	reportSubDownloadPlans(plans, time.Since(start), cli)
 
 	if cli.DryRun {
@@ -302,10 +303,10 @@ func runSubscriptionDirectDownloads(store *podcast.SubscriptionStore, cfg Config
 
 	res := lib.ExecuteSubscriptionDownloads(plans, store, opts)
 	for _, err := range res.Failures {
-		fmt.Fprintf(os.Stderr, "Warning: failed downloading %v\n", err)
+		fmt.Fprintf(errFor(cli), "Warning: failed downloading %v\n", err)
 	}
 	if !cli.Quiet && res.Downloaded > 0 {
-		fmt.Printf("Downloaded %d episode(s) across %d podcast(s).\n", res.Downloaded, res.Podcasts)
+		fmt.Fprintf(outFor(cli), "Downloaded %d episode(s) across %d podcast(s).\n", res.Downloaded, res.Podcasts)
 	}
 	return nil
 }
@@ -317,7 +318,7 @@ func feedCheckProgress(cli CLIOptions, total int) func(done, total int) {
 		return nil
 	}
 	return func(done, total int) {
-		fmt.Printf("\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
+		fmt.Fprintf(outFor(cli), "\rChecking feeds for new episodes (%d/%d)...\x1b[K", done, total)
 		os.Stdout.Sync()
 	}
 }
@@ -336,20 +337,20 @@ func reportSubDownloadPlans(plans []podcast.SubscriptionPlan, elapsed time.Durat
 			episodes += len(plans[i].ToDownload)
 		}
 	}
-	fmt.Printf("Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
+	fmt.Fprintf(outFor(cli), "Checked %d feed(s) in %.1fs: %d episode(s) to download across %d podcast(s)",
 		len(plans), elapsed.Seconds(), episodes, selected)
 	if failed > 0 {
-		fmt.Printf(", %d unreadable", failed)
+		fmt.Fprintf(outFor(cli), ", %d unreadable", failed)
 	}
-	fmt.Println(".")
+	fmt.Fprintln(outFor(cli), ".")
 
 	for i := range plans {
 		pTitle := util.DisplayName(plans[i].Sub.Title)
 		switch {
 		case plans[i].Err != nil:
-			fmt.Printf("  ! %s: %v\n", pTitle, plans[i].Err)
+			fmt.Fprintf(outFor(cli), "  ! %s: %v\n", pTitle, plans[i].Err)
 		case cli.Verbose && len(plans[i].ToDownload) == 0:
-			fmt.Printf("  - %s: up to date\n", pTitle)
+			fmt.Fprintf(outFor(cli), "  - %s: up to date\n", pTitle)
 		}
 	}
 }
@@ -362,10 +363,10 @@ func printDryRunPlans(plans []podcast.SubscriptionPlan, cli CLIOptions) {
 		if len(plan.ToDownload) == 0 {
 			continue
 		}
-		fmt.Printf("\n=== Podcast: %s ===\n", util.BoldCyan(plan.Sub.Title))
-		fmt.Printf("Found %d episode(s) to download:\n", len(plan.ToDownload))
+		fmt.Fprintf(outFor(cli), "\n=== Podcast: %s ===\n", util.BoldCyan(plan.Sub.Title))
+		fmt.Fprintf(outFor(cli), "Found %d episode(s) to download:\n", len(plan.ToDownload))
 		for idx, ep := range plan.ToDownload {
-			fmt.Printf("  %d. %s\n", idx+1, ep.Title)
+			fmt.Fprintf(outFor(cli), "  %d. %s\n", idx+1, ep.Title)
 		}
 	}
 }

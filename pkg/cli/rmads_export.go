@@ -13,7 +13,7 @@ import (
 func runExportCommand(cli CLIOptions) {
 	targetArgs := cli.Args
 	if len(targetArgs) == 0 {
-		fmt.Println("No input files or directories specified for export.")
+		fmt.Fprintln(outFor(cli), "No input files or directories specified for export.")
 		return
 	}
 	for _, arg := range targetArgs {

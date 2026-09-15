@@ -1,6 +1,7 @@
 package types
 
 import (
+	"io"
 	"os"
 )
 
@@ -219,6 +220,14 @@ type CLIOptions struct {
 	StatusSubcmd   string
 	Latest         bool
 	ShowExamples   bool
+
+	// Out and Err are where this invocation's output goes. Both nil means the
+	// process streams, which is what a real command line wants. Tests supply
+	// buffers instead, so that checking what a command printed does not mean
+	// reassigning os.Stdout — a process-wide mutation that made every such
+	// test unable to run in parallel with any other.
+	Out io.Writer
+	Err io.Writer
 }
 
 type WhisperConfig struct {

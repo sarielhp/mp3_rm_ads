@@ -3,20 +3,21 @@ package cli
 import (
 	"fmt"
 	"image/color"
+	"io"
 	"os"
 
 	"github.com/eliukblau/pixterm/pkg/ansimage"
 	"golang.org/x/term"
 )
 
-func testKittyImage(args []string) {
+func testKittyImage(w io.Writer, args []string) {
 	if len(args) > 0 && args[0] == "kitty" {
 		args = args[1:]
 	}
 	if len(args) == 0 {
-		fmt.Println("Usage: pod test kitty <image-file>")
-		fmt.Println()
-		fmt.Println("Displays an image using ANSI true-color half-block rendering.")
+		fmt.Fprintln(w, "Usage: pod test kitty <image-file>")
+		fmt.Fprintln(w)
+		fmt.Fprintln(w, "Displays an image using ANSI true-color half-block rendering.")
 		fatalError("%s\n", "Supported formats: PNG, JPEG, GIF, BMP, TIFF, WebP")
 	}
 
@@ -36,6 +37,6 @@ func testKittyImage(args []string) {
 	}
 
 	ai.Draw()
-	fmt.Println("Press Enter to exit.")
+	fmt.Fprintln(w, "Press Enter to exit.")
 	fmt.Scanln()
 }

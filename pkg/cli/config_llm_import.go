@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 
@@ -10,7 +11,7 @@ import (
 	"pod/pkg/util"
 )
 
-func copyLLMFromOpenCode(cfg *Config) {
+func copyLLMFromOpenCode(w io.Writer, cfg *Config) {
 	cleanModel, cleanSmallModel, ok := readOpenCodeConfig()
 	if !ok {
 		return
@@ -24,13 +25,13 @@ func copyLLMFromOpenCode(cfg *Config) {
 		apiKey = util.ZeroWipeKey(apiKey)
 	}
 
-	fmt.Println("Copying LLM settings from OpenCode...")
-	fmt.Printf("   - Imported Primary Model: '%s'\n", cleanModel)
-	fmt.Printf("   - Imported Small Model:   '%s'\n", cleanSmallModel)
+	fmt.Fprintln(w, "Copying LLM settings from OpenCode...")
+	fmt.Fprintf(w, "   - Imported Primary Model: '%s'\n", cleanModel)
+	fmt.Fprintf(w, "   - Imported Small Model:   '%s'\n", cleanSmallModel)
 	if apiKey != "" {
-		fmt.Println("   - API Key detected: Yes")
+		fmt.Fprintln(w, "   - API Key detected: Yes")
 	} else {
-		fmt.Println("   - API Key detected: No key in ENV (Set OPENROUTER_API_KEY)")
+		fmt.Fprintln(w, "   - API Key detected: No key in ENV (Set OPENROUTER_API_KEY)")
 	}
 
 	nextID := 0
@@ -43,7 +44,7 @@ func copyLLMFromOpenCode(cfg *Config) {
 
 	updated := false
 	for _, mod := range []string{cleanModel, cleanSmallModel} {
-		if mod != "" && upsertOpenCodeProfile(cfg, mod, apiKey, &nextID) {
+		if mod != "" && upsertOpenCodeProfile(w, cfg, mod, apiKey, &nextID) {
 			updated = true
 		}
 	}
@@ -56,7 +57,7 @@ func copyLLMFromOpenCode(cfg *Config) {
 			}
 		}
 		_ = config.SaveConfig(cfg)
-		fmt.Println("Successfully imported OpenCode configuration!")
+		fmt.Fprintln(w, "Successfully imported OpenCode configuration!")
 	}
 }
 
@@ -85,7 +86,7 @@ func readOpenCodeConfig() (string, string, bool) {
 	return strings.TrimPrefix(ocConfig.Model, "openrouter/"), strings.TrimPrefix(ocConfig.SmallModel, "openrouter/"), true
 }
 
-func upsertOpenCodeProfile(cfg *Config, mod, apiKey string, nextID *int) bool {
+func upsertOpenCodeProfile(w io.Writer, cfg *Config, mod, apiKey string, nextID *int) bool {
 	for i := range cfg.Profiles {
 		if cfg.Profiles[i].Model == mod || strings.Contains(cfg.Profiles[i].Name, mod) {
 			if apiKey != "" {
@@ -93,7 +94,7 @@ func upsertOpenCodeProfile(cfg *Config, mod, apiKey string, nextID *int) bool {
 			}
 			cfg.Profiles[i].URL = "https://openrouter.ai/api/v1/chat/completions"
 			cfg.Profiles[i].Type = "openrouter"
-			fmt.Printf("   Updated existing profile [%d] for model '%s'\n", cfg.Profiles[i].ID, mod)
+			fmt.Fprintf(w, "   Updated existing profile [%d] for model '%s'\n", cfg.Profiles[i].ID, mod)
 			return true
 		}
 	}
@@ -107,7 +108,7 @@ func upsertOpenCodeProfile(cfg *Config, mod, apiKey string, nextID *int) bool {
 		APIKey: apiKey,
 	}
 	cfg.Profiles = append(cfg.Profiles, newProfile)
-	fmt.Printf("   Added new profile [%d] for model '%s'\n", *nextID, mod)
+	fmt.Fprintf(w, "   Added new profile [%d] for model '%s'\n", *nextID, mod)
 	*nextID++
 	return true
 }

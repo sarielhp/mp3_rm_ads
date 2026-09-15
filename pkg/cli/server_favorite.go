@@ -120,25 +120,25 @@ func listFavoritePodcasts(podcastsDir string, cli CLIOptions) error {
 
 	if cli.JSON {
 		data, _ := json.MarshalIndent(favorites, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
 	if len(favorites) == 0 {
-		fmt.Println("No favorite podcasts set. Use 'pod server favorite <podcast>' to favorite one.")
+		fmt.Fprintln(outFor(cli), "No favorite podcasts set. Use 'pod server favorite <podcast>' to favorite one.")
 		return nil
 	}
 
-	fmt.Printf("\nFavorite Podcasts (%d total):\n", len(favorites))
-	fmt.Printf("%-8s  %-32s  %-12s  %-12s  %-16s\n", "ID", "TITLE", "DOWNLOAD", "AD REMOVAL", "FAVORITE SINCE")
-	fmt.Println(strings.Repeat("-", 84))
+	fmt.Fprintf(outFor(cli), "\nFavorite Podcasts (%d total):\n", len(favorites))
+	fmt.Fprintf(outFor(cli), "%-8s  %-32s  %-12s  %-12s  %-16s\n", "ID", "TITLE", "DOWNLOAD", "AD REMOVAL", "FAVORITE SINCE")
+	fmt.Fprintln(outFor(cli), strings.Repeat("-", 84))
 	for _, f := range favorites {
 		title := util.TruncateDisplayName(f.Title, 32)
 		dlBadge := config.DownloadPolicyBadge(f.DownloadPolicy, 0)
 		adBadge := config.AdRemovalModeBadge(f.AdRemoval)
-		fmt.Printf("%-8s  %s  %-12s  %-12s  %-16s\n", f.ID, util.PadRight(title, 32), dlBadge, adBadge, f.FavoriteSince)
+		fmt.Fprintf(outFor(cli), "%-8s  %s  %-12s  %-12s  %-16s\n", f.ID, util.PadRight(title, 32), dlBadge, adBadge, f.FavoriteSince)
 	}
-	fmt.Println()
+	fmt.Fprintln(progressFor(cli))
 	return nil
 }
 
@@ -179,15 +179,15 @@ func setSingleFavorite(cfg Config, podcastsDir, target string, favorite bool, cl
 
 	if cli.JSON {
 		data, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
 	if favorite {
-		fmt.Printf("⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %s)\n",
+		fmt.Fprintf(outFor(cli), "⭐ Marked as favorite: %s [%s] (AutoDownload=true [DL: New], AdRemoval=all, %s)\n",
 			util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), syncMsg)
 	} else {
-		fmt.Printf("Removed from favorites: %s [%s] (Policy=none, %s)\n",
+		fmt.Fprintf(outFor(cli), "Removed from favorites: %s [%s] (Policy=none, %s)\n",
 			util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID), syncMsg)
 	}
 	return nil
@@ -211,15 +211,15 @@ func setEpisodeFavorite(ep *podcast.ResolvedEpisode, favorite bool, cli CLIOptio
 			"favorite":   isFav,
 		}
 		data, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
 	if favorite {
-		fmt.Printf("⭐ Marked episode as favorite: %s [%s]\n",
+		fmt.Fprintf(outFor(cli), "⭐ Marked episode as favorite: %s [%s]\n",
 			util.Bold(util.DisplayName(ep.Title)), util.BoldCyan(ep.ShortID))
 	} else {
-		fmt.Printf("Removed episode from favorites: %s [%s]\n",
+		fmt.Fprintf(outFor(cli), "Removed episode from favorites: %s [%s]\n",
 			util.Bold(util.DisplayName(ep.Title)), util.BoldCyan(ep.ShortID))
 	}
 	return nil
@@ -244,7 +244,7 @@ func setAllFavorites(cfg Config, podcastsDir string, favorite bool, cli CLIOptio
 	if cli.JSON {
 		res := map[string]any{"updated_count": count, "favorite": favorite}
 		data, _ := json.MarshalIndent(res, "", "  ")
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
@@ -252,6 +252,6 @@ func setAllFavorites(cfg Config, podcastsDir string, favorite bool, cli CLIOptio
 	if !favorite {
 		action = "Removed"
 	}
-	fmt.Printf("%s %d podcast(s) as favorite (AutoDownload=%v, AdRemoval=all, Policy=new)\n", action, count, favorite)
+	fmt.Fprintf(outFor(cli), "%s %d podcast(s) as favorite (AutoDownload=%v, AdRemoval=all, Policy=new)\n", action, count, favorite)
 	return nil
 }

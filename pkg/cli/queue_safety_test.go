@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/pipeline"
@@ -60,14 +61,14 @@ func TestQueueReadOnlyAndEligibility(t *testing.T) {
 	if !reflect.DeepEqual(before, queueTree(t, root)) {
 		t.Fatal("read-only command changed metadata")
 	}
-	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
+	if err := handleQueueAdd(io.Discard, podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
 		t.Fatal(err)
 	}
 	entries, err := pipeline.ReadQueue(dir)
 	if err != nil || len(entries) != 1 {
 		t.Fatalf("queue=%v error=%v", entries, err)
 	}
-	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"episode.precut.mp3"}); err == nil {
+	if err := handleQueueAdd(io.Discard, podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"episode.precut.mp3"}); err == nil {
 		t.Fatal("direct precut target accepted")
 	}
 }

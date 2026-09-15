@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/config"
@@ -12,6 +12,8 @@ import (
 )
 
 func TestPolicyDisplayAndJSON(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Tech_Show")
 	_ = os.MkdirAll(podDir, 0755)
@@ -20,21 +22,17 @@ func TestPolicyDisplayAndJSON(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	// Text mode
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 
 	cli := CLIOptions{Args: []string{podID}}
+	cli.Out = &buf
+	cli.Err = &buf
 	err := runPolicyCommand(cfg, cli)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand failed: %v", err)
 	}
 
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 	out := string(outBytes)
 
 	if !strings.Contains(out, "Policy for Tech_Show") || !strings.Contains(out, podID) {
@@ -45,21 +43,18 @@ func TestPolicyDisplayAndJSON(t *testing.T) {
 	}
 
 	// JSON mode
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	buf.Reset()
 
 	cliJSON := CLIOptions{Args: []string{podID}, JSON: true}
+	cliJSON.Out = &buf
+	cliJSON.Err = &buf
 	err = runPolicyCommand(cfg, cliJSON)
-
-	_ = w.Close()
-	os.Stdout = oldStdout
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand json failed: %v", err)
 	}
 
-	jsonBytes, _ := io.ReadAll(r)
+	jsonBytes, _ := buf.Bytes(), error(nil)
 	var policyRes PodcastPolicyResult
 	if err := json.Unmarshal(jsonBytes, &policyRes); err != nil {
 		t.Fatalf("failed to unmarshal policy json: %v", err)
@@ -70,6 +65,8 @@ func TestPolicyDisplayAndJSON(t *testing.T) {
 }
 
 func TestPolicyUpdate(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "News_Cast")
 	_ = os.MkdirAll(podDir, 0755)
@@ -87,16 +84,12 @@ func TestPolicyUpdate(t *testing.T) {
 			AdRemovalMode:   "latest",
 		},
 	}
-
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
+	cli.Out = &buf
+	cli.Err = &buf
 
 	err := runPolicyCommand(cfg, cli)
 
-	_ = w.Close()
-	os.Stdout = oldStdout
-	_, _ = io.ReadAll(r)
+	_, _ = buf.Bytes(), error(nil)
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand update failed: %v", err)
@@ -118,6 +111,8 @@ func TestPolicyUpdate(t *testing.T) {
 }
 
 func TestPolicyShorthandNumber(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Shorthand_Show")
 	_ = os.MkdirAll(podDir, 0755)
@@ -128,13 +123,10 @@ func TestPolicyShorthandNumber(t *testing.T) {
 	cli1 := CLIOptions{
 		Args: []string{podID, "1"},
 	}
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
+	cli1.Out = &buf
+	cli1.Err = &buf
 	err := runPolicyCommand(cfg, cli1)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	_, _ = io.ReadAll(r)
+	_, _ = buf.Bytes(), error(nil)
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand with shorthand 1 failed: %v", err)
@@ -157,13 +149,11 @@ func TestPolicyShorthandNumber(t *testing.T) {
 	cli5 := CLIOptions{
 		Args: []string{podID, "5"},
 	}
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	cli5.Out = &buf
+	cli5.Err = &buf
+	buf.Reset()
 	err = runPolicyCommand(cfg, cli5)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	_, _ = io.ReadAll(r)
+	_, _ = buf.Bytes(), error(nil)
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand with shorthand 5 failed: %v", err)
@@ -175,16 +165,22 @@ func TestPolicyShorthandNumber(t *testing.T) {
 	}
 
 	cliInvalid := CLIOptions{Args: []string{podID, "0"}}
+	cliInvalid.Out = &buf
+	cliInvalid.Err = &buf
 	if err := runPolicyCommand(cfg, cliInvalid); err == nil {
 		t.Errorf("expected error for count 0")
 	}
 	cliInvalidStr := CLIOptions{Args: []string{podID, "abc"}}
+	cliInvalidStr.Out = &buf
+	cliInvalidStr.Err = &buf
 	if err := runPolicyCommand(cfg, cliInvalidStr); err == nil {
 		t.Errorf("expected error for non-integer count")
 	}
 }
 
 func TestPolicyAllPodcasts(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "Podcast_One")
 	pod2 := filepath.Join(tempDir, "Podcast_Two")
@@ -202,14 +198,11 @@ func TestPolicyAllPodcasts(t *testing.T) {
 			AdRemovalMode:   "latest",
 		},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 	err := runPolicyCommand(cfg, cli)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand all failed: %v", err)
@@ -229,6 +222,8 @@ func TestPolicyAllPodcasts(t *testing.T) {
 }
 
 func TestPolicyNonFavoritesUpdate(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	pod1 := filepath.Join(tempDir, "regular_show")
 	pod2 := filepath.Join(tempDir, "favorite_show")
@@ -251,14 +246,11 @@ func TestPolicyNonFavoritesUpdate(t *testing.T) {
 			DownloadPolicy: "none",
 		},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 	err := runPolicyCommand(cfg, cli)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand non-favorites failed: %v", err)
@@ -278,6 +270,7 @@ func TestPolicyNonFavoritesUpdate(t *testing.T) {
 }
 
 func TestPolicyDefaultUpdate(t *testing.T) {
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "config")
 	_ = os.MkdirAll(configDir, 0755)
@@ -291,14 +284,11 @@ func TestPolicyDefaultUpdate(t *testing.T) {
 			DownloadPolicy:  "none",
 		},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 	err := runPolicyCommand(cfg, cli)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand default failed: %v", err)
@@ -317,6 +307,7 @@ func TestPolicyDefaultUpdate(t *testing.T) {
 }
 
 func TestPolicyAllWithSetDefault(t *testing.T) {
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	configDir := filepath.Join(tempDir, "config")
 	_ = os.MkdirAll(configDir, 0755)
@@ -335,14 +326,11 @@ func TestPolicyAllWithSetDefault(t *testing.T) {
 			SetDefaultPolicy: true,
 		},
 	}
+	cli.Out = &buf
+	cli.Err = &buf
 
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
 	err := runPolicyCommand(cfg, cli)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("runPolicyCommand --all --set-default failed: %v", err)

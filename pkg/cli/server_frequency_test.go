@@ -145,6 +145,9 @@ func TestHandleServerDisableHourly(t *testing.T) {
 	}
 }
 
+// This one still captures os.Stderr, and stays sequential because of it.
+// Execute goes through clihelp, which writes its own diagnostics straight to
+// os.Stderr; there is no writer to inject short of changing that dependency.
 func TestExecuteBlockUnknownCommand(t *testing.T) {
 	oldStderr := os.Stderr
 	r, w, _ := os.Pipe()

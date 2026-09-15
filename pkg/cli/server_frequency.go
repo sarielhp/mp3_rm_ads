@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"io"
 	"sort"
 	"strings"
 
@@ -77,7 +78,7 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 		return err
 	}
 	if len(targetItems) == 0 {
-		fmt.Fprintln(outFor(cli), "No podcasts found to analyze.")
+		fmt.Fprintln(progressFor(cli), "No podcasts found to analyze.")
 		return nil
 	}
 
@@ -87,7 +88,7 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 		if shouldDisable {
 			desc = "Analyzing podcast frequency and updating hourly policies"
 		}
-		fmt.Printf("\n%s (%d podcast(s))...\n\n", desc, len(targetItems))
+		fmt.Fprintf(outFor(cli), "\n%s (%d podcast(s))...\n\n", desc, len(targetItems))
 	}
 
 	results := library(config, cli, b).AnalyzeFrequencies(targetItems, podcast.FrequencyOptions{
@@ -96,7 +97,7 @@ func handleServerFrequency(config Config, cli CLIOptions) error {
 	})
 
 	if !cli.Quiet {
-		printFrequencyTable(results, cli.Verbose, shouldDisable)
+		printFrequencyTable(outFor(cli), results, cli.Verbose, shouldDisable)
 	}
 	return nil
 }
@@ -155,7 +156,7 @@ func collectFrequencyTargetPodcasts(config Config, cli CLIOptions) (backend.Back
 	return b, nil, nil
 }
 
-func printFrequencyTable(results []podcast.PodcastFreqResult, verbose bool, disableMode bool) {
+func printFrequencyTable(w io.Writer, results []podcast.PodcastFreqResult, verbose bool, disableMode bool) {
 	cadenceGroups := []struct {
 		cadence backend.PodcastCadence
 		title   string
@@ -189,10 +190,10 @@ func printFrequencyTable(results []podcast.PodcastFreqResult, verbose bool, disa
 		})
 	}
 
-	fmt.Printf("  %-3s │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
+	fmt.Fprintf(w, "  %-3s │ %-38s │ %-9s │ %-11s │ %-11s │ %s\n",
 		"#", "Podcast", "Analyzed", "Episodes/Wk", "Median Int", "Status")
 	doubleDivider := strings.Repeat("═", 98)
-	fmt.Println("  " + doubleDivider)
+	fmt.Fprintln(w, "  "+doubleDivider)
 
 	globalIdx := 1
 	for _, g := range cadenceGroups {
@@ -200,23 +201,23 @@ func printFrequencyTable(results []podcast.PodcastFreqResult, verbose bool, disa
 		if len(list) == 0 {
 			continue
 		}
-		printCadenceGroup(g.title, list, &globalIdx, verbose, disableMode)
+		printCadenceGroup(w, g.title, list, &globalIdx, verbose, disableMode)
 	}
 
 	if len(errors) > 0 {
-		printFrequencyErrors(errors, &globalIdx)
+		printFrequencyErrors(w, errors, &globalIdx)
 	}
 
-	fmt.Println("  " + doubleDivider)
+	fmt.Fprintln(w, "  "+doubleDivider)
 
 	if disableMode {
-		fmt.Printf("\nCompleted hourly check: %d podcast(s) updated with download_policy=none and ad_removal=none.\n\n", disabledCount)
+		fmt.Fprintf(w, "\nCompleted hourly check: %d podcast(s) updated with download_policy=none and ad_removal=none.\n\n", disabledCount)
 	} else {
-		fmt.Println()
+		fmt.Fprintln(w)
 	}
 }
 
-func printCadenceGroup(groupTitle string, list []podcast.PodcastFreqResult, globalIdx *int, verbose, disableMode bool) {
+func printCadenceGroup(w io.Writer, groupTitle string, list []podcast.PodcastFreqResult, globalIdx *int, verbose, disableMode bool) {
 	suffix := "s"
 	if len(list) == 1 {
 		suffix = ""
@@ -225,7 +226,7 @@ func printCadenceGroup(groupTitle string, list []podcast.PodcastFreqResult, glob
 	if len(headerTitle) < 98 {
 		headerTitle += strings.Repeat("─", 98-len(headerTitle))
 	}
-	fmt.Println("  " + headerTitle)
+	fmt.Fprintln(w, "  "+headerTitle)
 
 	for _, r := range list {
 		status := "saved"
@@ -249,33 +250,33 @@ func printCadenceGroup(groupTitle string, list []podcast.PodcastFreqResult, glob
 
 		epsStr := fmt.Sprintf("%d eps", r.Freq.EpisodesAnalyzed)
 		title := util.TruncateDisplayName(r.Title, 38)
-		fmt.Printf("  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
+		fmt.Fprintf(w, "  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
 			*globalIdx, util.PadRight(title, 38), epsStr, epWk, medInt, status)
 		*globalIdx++
 
 		if verbose {
 			spanDays := r.Freq.AvgDaysInterval * float64(max(1, r.Freq.EpisodesAnalyzed-1))
-			fmt.Printf("       ↳ Span: %.1fd | Avg Interval: %.1fd | Median: %.1fh | Analyzed: %s\n",
+			fmt.Fprintf(w, "       ↳ Span: %.1fd | Avg Interval: %.1fd | Median: %.1fh | Analyzed: %s\n",
 				spanDays,
 				r.Freq.AvgDaysInterval,
 				r.Freq.MedianHoursInterval,
 				r.Freq.AnalyzedAt.Format("2006-01-02 15:04:05 UTC"))
 		}
 	}
-	fmt.Println("  " + strings.Repeat("─", 98))
+	fmt.Fprintln(w, "  "+strings.Repeat("─", 98))
 }
 
-func printFrequencyErrors(errors []podcast.PodcastFreqResult, globalIdx *int) {
+func printFrequencyErrors(w io.Writer, errors []podcast.PodcastFreqResult, globalIdx *int) {
 	headerTitle := fmt.Sprintf("─── ERRORS (%d) ", len(errors))
 	if len(headerTitle) < 98 {
 		headerTitle += strings.Repeat("─", 98-len(headerTitle))
 	}
-	fmt.Println("  " + headerTitle)
+	fmt.Fprintln(w, "  "+headerTitle)
 	for _, r := range errors {
 		title := util.TruncateDisplayName(r.Title, 38)
-		fmt.Printf("  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
+		fmt.Fprintf(w, "  %2d. │ %s │ %-9s │ %-11s │ %-11s │ %s\n",
 			*globalIdx, util.PadRight(title, 38), "-", "-", "-", r.Err.Error())
 		*globalIdx++
 	}
-	fmt.Println("  " + strings.Repeat("─", 98))
+	fmt.Fprintln(w, "  "+strings.Repeat("─", 98))
 }

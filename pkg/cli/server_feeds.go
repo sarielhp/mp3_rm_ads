@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"time"
 
 	"pod/pkg/backend"
@@ -83,37 +84,37 @@ func reportFeedCheck(summary *feedCheckSummary, cli CLIOptions) {
 	for i := range summary.Results {
 		r := &summary.Results[i]
 		if cli.Verbose || r.Status != podcast.FeedUnchanged || len(r.New) > 0 {
-			printFeedCheckLine(r, cli.Verbose)
+			printFeedCheckLine(outFor(cli), r, cli.Verbose)
 		}
 	}
 
 	total := len(summary.Results)
-	fmt.Printf("\nChecked %d feed(s) in %.1fs: %d unchanged, %d changed, %d unreadable.\n",
+	fmt.Fprintf(outFor(cli), "\nChecked %d feed(s) in %.1fs: %d unchanged, %d changed, %d unreadable.\n",
 		total, summary.Elapsed.Seconds(), summary.Unchanged, summary.Changed, summary.Unreadable)
-	fmt.Printf("%d new episode(s) not yet in the server catalog (%d undownloaded episode(s) available).\n",
+	fmt.Fprintf(outFor(cli), "%d new episode(s) not yet in the server catalog (%d undownloaded episode(s) available).\n",
 		summary.NewEpisodes, summary.Undownloaded)
 	if summary.Refreshed > 0 {
-		fmt.Printf("Woke the server for %d podcast(s); the rest needed no server work.\n", summary.Refreshed)
+		fmt.Fprintf(outFor(cli), "Woke the server for %d podcast(s); the rest needed no server work.\n", summary.Refreshed)
 	} else {
-		fmt.Println("No server work was needed.")
+		fmt.Fprintln(outFor(cli), "No server work was needed.")
 	}
 }
 
-func printFeedCheckLine(r *podcast.FeedCheckResult, verbose bool) {
+func printFeedCheckLine(w io.Writer, r *podcast.FeedCheckResult, verbose bool) {
 	title := util.DisplayName(r.Title)
 	switch {
 	case r.Status == podcast.FeedUnknown:
-		fmt.Printf("! %s: could not read feed: %v\n", title, r.Err)
+		fmt.Fprintf(w, "! %s: could not read feed: %v\n", title, r.Err)
 	case len(r.New) > 0:
-		fmt.Printf("+ %s: %d new episode(s) (%d in feed, %d undownloaded)\n",
+		fmt.Fprintf(w, "+ %s: %d new episode(s) (%d in feed, %d undownloaded)\n",
 			title, len(r.New), r.EpisodeCount, r.Undownloaded)
 		if verbose {
 			for _, ep := range r.New {
-				fmt.Printf("    + %s (%s)\n", util.DisplayName(ep.Title), ep.PubDate)
+				fmt.Fprintf(w, "    + %s (%s)\n", util.DisplayName(ep.Title), ep.PubDate)
 			}
 		}
 	default:
-		fmt.Printf("  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
+		fmt.Fprintf(w, "  %s: unchanged (%s, %d episodes, %d undownloaded)\n",
 			title, r.Reason, r.EpisodeCount, r.Undownloaded)
 	}
 }
@@ -212,7 +213,7 @@ func handleServerFeeds(config Config, cli CLIOptions) error {
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(outFor(cli), "Checking %d podcast feed(s) directly for new episodes...\n", len(podcasts))
+	fmt.Fprintf(progressFor(cli), "Checking %d podcast feed(s) directly for new episodes...\n", len(podcasts))
 	reportFeedCheck(checkServerFeeds(b, podcasts, cli), cli)
 	return nil
 }

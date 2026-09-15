@@ -2,6 +2,7 @@ package cli
 
 import (
 	"errors"
+	"io"
 	"path/filepath"
 	"reflect"
 	"testing"
@@ -17,10 +18,10 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 	root := t.TempDir()
 	a, ap := createTestPodcastWithEpisodes(t, root, "Alpha", []string{"episode"})
 	b, bp := createTestPodcastWithEpisodes(t, root, "Beta", []string{"episode"})
-	if err := handleQueueAdd(podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
+	if err := handleQueueAdd(io.Discard, podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil), []string{"all"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := handleQueuePriority(root, []string{"Beta", "8"}); err != nil {
+	if err := handleQueuePriority(io.Discard, root, []string{"Beta", "8"}); err != nil {
 		t.Fatal(err)
 	}
 	items, err := podcast.Open(podcast.Config{PodcastsDir: root}, nil, nil).QueueItems("")
@@ -39,7 +40,7 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 	if st.Priority != 0 {
 		t.Fatal("inherited priority became an episode override")
 	}
-	if err := handleQueuePriority(root, []string{"Beta", "0"}); err != nil {
+	if err := handleQueuePriority(io.Discard, root, []string{"Beta", "0"}); err != nil {
 		t.Fatal(err)
 	}
 	if podcast.EpisodePriority(b, bp[0]) != 0 {
@@ -47,12 +48,12 @@ func TestPodcastPriorityPersistsAndReordersQueue(t *testing.T) {
 	}
 	before := queueTree(t, root)
 	for _, value := range []string{"-1", "11", "invalid"} {
-		if err := handleQueuePriority(root, []string{"Alpha", value}); err == nil {
+		if err := handleQueuePriority(io.Discard, root, []string{"Alpha", value}); err == nil {
 			t.Errorf("accepted %s", value)
 		}
 	}
 	id := podcast.EpisodeShortIDReadOnly(a, podcast.GeneratePodcastShortID("Alpha"), ap[0])
-	if err := handleQueuePriority(root, []string{id, "8"}); err == nil {
+	if err := handleQueuePriority(io.Discard, root, []string{id, "8"}); err == nil {
 		t.Fatal("accepted permanent episode priority")
 	}
 	if !reflect.DeepEqual(before, queueTree(t, root)) {
@@ -111,11 +112,11 @@ func TestQueuePriorityStringMatching(t *testing.T) {
 	createTestPodcastWithEpisodes(t, root, "History Show", []string{"episode1"})
 	createTestPodcastWithEpisodes(t, root, "Science Show", []string{"episode2"})
 
-	if err := handleQueuePriority(root, []string{"hist", "7"}); err != nil {
+	if err := handleQueuePriority(io.Discard, root, []string{"hist", "7"}); err != nil {
 		t.Fatalf("expected unique substring match: %v", err)
 	}
 
-	err := handleQueuePriority(root, []string{"show", "5"})
+	err := handleQueuePriority(io.Discard, root, []string{"show", "5"})
 	if err == nil || !errors.Is(err, podcast.ErrAmbiguousPodcast) {
 		t.Fatalf("expected ambiguous error, got %v", err)
 	}

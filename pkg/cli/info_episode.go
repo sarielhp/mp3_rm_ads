@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"pod/pkg/format"
 	"pod/pkg/pipeline"
@@ -55,17 +56,17 @@ func runTranscriptForEpisode(ep *ResolvedEpisode, cli CLIOptions) error {
 
 	if exportFormat == "txt" {
 		out, _ := format.ConvertJSONToTXT(jsonPath, nil, 0, cli.Output, cli.Quiet)
-		fmt.Fprintf(outFor(cli), "Exported TXT: %s\n", out)
+		fmt.Fprintf(progressFor(cli), "Exported TXT: %s\n", out)
 		return nil
 	}
 
 	if exportFormat == "srt" {
 		out, _ := format.ConvertJSONToSRT(jsonPath, nil, cli.Output, cli.Quiet)
-		fmt.Fprintf(outFor(cli), "Exported SRT: %s\n", out)
+		fmt.Fprintf(progressFor(cli), "Exported SRT: %s\n", out)
 		return nil
 	}
 
-	return printTranscriptText(jsonPath)
+	return printTranscriptText(outFor(cli), jsonPath)
 }
 
 func inspectEpisodeInfo(ep *ResolvedEpisode, cli CLIOptions) error {
@@ -76,11 +77,11 @@ func inspectEpisodeInfo(ep *ResolvedEpisode, cli CLIOptions) error {
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
-	printEpisodeInfoCard(dto, cli.ShowCuts)
+	printEpisodeInfoCard(outFor(cli), dto, cli.ShowCuts)
 	return nil
 }
 
@@ -262,6 +263,6 @@ func formatEpisodeCutsAndTranscript(info EpisodeInfoJSON, showCuts bool) string 
 	return sb.String()
 }
 
-func printEpisodeInfoCard(info EpisodeInfoJSON, showCuts bool) {
-	fmt.Print(formatEpisodeInfo(info, showCuts))
+func printEpisodeInfoCard(w io.Writer, info EpisodeInfoJSON, showCuts bool) {
+	fmt.Fprint(w, formatEpisodeInfo(info, showCuts))
 }

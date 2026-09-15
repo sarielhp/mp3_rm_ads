@@ -1,8 +1,8 @@
 package cli
 
 import (
+	"bytes"
 	"encoding/json"
-	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/config"
@@ -14,6 +14,8 @@ import (
 )
 
 func TestFavoriteSubcommandMarkAndUnmark(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_Fav")
 	_ = os.MkdirAll(podDir, 0755)
@@ -23,13 +25,10 @@ func TestFavoriteSubcommandMarkAndUnmark(t *testing.T) {
 
 	// 1. Mark as favorite
 	cliMark := CLIOptions{Args: []string{podID}}
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
+	cliMark.Out = &buf
+	cliMark.Err = &buf
 	err := handleServerFavorite(cfg, cliMark)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("handleServerFavorite mark failed: %v", err)
@@ -57,13 +56,11 @@ func TestFavoriteSubcommandMarkAndUnmark(t *testing.T) {
 
 	// 2. Unmark as favorite
 	cliUnmark := CLIOptions{Args: []string{podID, "off"}}
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
+	cliUnmark.Out = &buf
+	cliUnmark.Err = &buf
+	buf.Reset()
 	err = handleServerFavorite(cfg, cliUnmark)
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ = io.ReadAll(r)
+	outBytes = buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("handleServerFavorite unmark failed: %v", err)
@@ -82,6 +79,8 @@ func TestFavoriteSubcommandMarkAndUnmark(t *testing.T) {
 }
 
 func TestFavoriteSubcommandList(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_List")
 	_ = os.MkdirAll(podDir, 0755)
@@ -94,13 +93,8 @@ func TestFavoriteSubcommandList(t *testing.T) {
 	_ = config.SavePodcastConfig(podDir, pCfg)
 
 	// List text
-	r, w, _ := os.Pipe()
-	oldStdout := os.Stdout
-	os.Stdout = w
-	err := handleServerFavorite(cfg, CLIOptions{})
-	_ = w.Close()
-	os.Stdout = oldStdout
-	outBytes, _ := io.ReadAll(r)
+	err := handleServerFavorite(cfg, CLIOptions{Out: &buf, Err: &buf})
+	outBytes := buf.Bytes()
 
 	if err != nil {
 		t.Fatalf("handleServerFavorite list failed: %v", err)
@@ -110,13 +104,9 @@ func TestFavoriteSubcommandList(t *testing.T) {
 	}
 
 	// List JSON
-	r, w, _ = os.Pipe()
-	oldStdout = os.Stdout
-	os.Stdout = w
-	err = handleServerFavorite(cfg, CLIOptions{JSON: true})
-	_ = w.Close()
-	os.Stdout = oldStdout
-	jsonBytes, _ := io.ReadAll(r)
+	buf.Reset()
+	err = handleServerFavorite(cfg, CLIOptions{JSON: true, Out: &buf, Err: &buf})
+	jsonBytes, _ := buf.Bytes(), error(nil)
 
 	if err != nil {
 		t.Fatalf("handleServerFavorite list json failed: %v", err)
@@ -131,6 +121,8 @@ func TestFavoriteSubcommandList(t *testing.T) {
 }
 
 func TestFavoritePodcastDoesNotMarkExistingEpisodes(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_EpFav")
 	_ = os.MkdirAll(podDir, 0755)
@@ -148,6 +140,8 @@ func TestFavoritePodcastDoesNotMarkExistingEpisodes(t *testing.T) {
 
 	cfg := Config{PodcastsDir: tempDir}
 	cliMark := CLIOptions{Args: []string{podID}}
+	cliMark.Out = &buf
+	cliMark.Err = &buf
 	if err := handleServerFavorite(cfg, cliMark); err != nil {
 		t.Fatalf("handleServerFavorite failed: %v", err)
 	}
@@ -172,6 +166,8 @@ func TestFavoritePodcastDoesNotMarkExistingEpisodes(t *testing.T) {
 }
 
 func TestFavoriteSingleEpisode(t *testing.T) {
+	t.Parallel()
+	var buf bytes.Buffer
 	tempDir := t.TempDir()
 	podDir := filepath.Join(tempDir, "Show_SingleEp")
 	_ = os.MkdirAll(podDir, 0755)
@@ -185,6 +181,8 @@ func TestFavoriteSingleEpisode(t *testing.T) {
 	cfg := Config{PodcastsDir: tempDir}
 
 	cliMark := CLIOptions{Args: []string{epID}}
+	cliMark.Out = &buf
+	cliMark.Err = &buf
 	if err := handleServerFavorite(cfg, cliMark); err != nil {
 		t.Fatalf("handleServerFavorite single episode failed: %v", err)
 	}
@@ -203,6 +201,8 @@ func TestFavoriteSingleEpisode(t *testing.T) {
 	}
 
 	cliUnmark := CLIOptions{Args: []string{epID, "off"}}
+	cliUnmark.Out = &buf
+	cliUnmark.Err = &buf
 	if err := handleServerFavorite(cfg, cliUnmark); err != nil {
 		t.Fatalf("handleServerFavorite single episode unmark failed: %v", err)
 	}

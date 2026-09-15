@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/sarielhp/clihelp"
+	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/config"
@@ -25,7 +26,7 @@ func buildQueuePrioritySubcommand(opts *CLIOptions, action *string) clihelp.Comm
 	}
 }
 
-func handleQueuePriority(root string, args []string) error {
+func handleQueuePriority(w io.Writer, root string, args []string) error {
 	if len(args) < 1 || len(args) > 2 {
 		return fmt.Errorf("use queue priority <podcast-id> [0–10]")
 	}
@@ -61,6 +62,6 @@ func handleQueuePriority(root string, args []string) error {
 			return err
 		}
 	}
-	fmt.Printf("Podcast %s [%s] priority: %d\n", pod.Title, pod.ShortID, cfg.Priority)
+	fmt.Fprintf(w, "Podcast %s [%s] priority: %d\n", pod.Title, pod.ShortID, cfg.Priority)
 	return nil
 }

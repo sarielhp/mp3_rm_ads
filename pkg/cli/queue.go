@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"pod/pkg/adremoval"
@@ -43,7 +44,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 
 	switch subcmd {
 	case "priority":
-		return handleQueuePriority(podcastsDir, args)
+		return handleQueuePriority(outFor(cli), podcastsDir, args)
 	case "list", "ls":
 		target := ""
 		if len(args) > 0 {
@@ -61,7 +62,7 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 			}
 			return runQueueLatest(cfg, podcastsDir, limit, target, cli)
 		}
-		return handleQueueAdd(lib, args)
+		return handleQueueAdd(outFor(cli), lib, args)
 	case "today":
 		if len(args) != 0 {
 			return fmt.Errorf("queue today accepts no arguments")
@@ -77,13 +78,13 @@ func runQueueCommand(cfg Config, cli CLIOptions) error {
 		if len(args) == 0 {
 			return fmt.Errorf("missing target ID(s) to remove from queue")
 		}
-		return handleQueueRemove(lib, args)
+		return handleQueueRemove(outFor(cli), lib, args)
 	case "clear":
 		target := ""
 		if len(args) > 0 {
 			target = args[0]
 		}
-		return handleQueueClear(lib, target)
+		return handleQueueClear(outFor(cli), lib, target)
 	case "run":
 		target := ""
 		if len(args) > 0 {
@@ -136,45 +137,45 @@ func handleQueueList(lib *podcast.Library, target string, cli CLIOptions) error 
 		if err != nil {
 			return err
 		}
-		fmt.Println(string(data))
+		fmt.Fprintln(outFor(cli), string(data))
 		return nil
 	}
 
 	if cli.Quiet {
 		for _, it := range allItems {
-			fmt.Println(strings.Join(queueDisplayCells(it), " | "))
+			fmt.Fprintln(outFor(cli), strings.Join(queueDisplayCells(it), " | "))
 		}
 		return nil
 	}
 
-	printQueueTable(allItems)
+	printQueueTable(outFor(cli), allItems)
 	return nil
 }
 
-func printQueueTable(items []queueEpisodeItem) {
+func printQueueTable(w io.Writer, items []queueEpisodeItem) {
 	if len(items) == 0 {
-		fmt.Println("AdR queue is currently empty.")
+		fmt.Fprintln(w, "AdR queue is currently empty.")
 		return
 	}
 
-	fmt.Printf("\nAdR Queue (%d queued):\n", len(items))
+	fmt.Fprintf(w, "\nAdR Queue (%d queued):\n", len(items))
 	cols := queueTableColumns(48)
 
-	fmt.Println(renderTableTop(cols))
-	fmt.Println(renderTableHeader(cols))
-	fmt.Println(renderTableDivider(cols))
+	fmt.Fprintln(w, renderTableTop(cols))
+	fmt.Fprintln(w, renderTableHeader(cols))
+	fmt.Fprintln(w, renderTableDivider(cols))
 
 	for _, it := range items {
 		cells := queueDisplayCells(it)
 		cells[1] = util.BoldCyan(cells[1])
-		fmt.Println(renderTableRow(cells, cols))
+		fmt.Fprintln(w, renderTableRow(cells, cols))
 	}
 
-	fmt.Println(renderTableBottom(cols))
-	fmt.Println()
+	fmt.Fprintln(w, renderTableBottom(cols))
+	fmt.Fprintln(w)
 }
 
-func handleQueueAdd(lib *podcast.Library, targets []string) error {
+func handleQueueAdd(w io.Writer, lib *podcast.Library, targets []string) error {
 	for _, query := range targets {
 		if strings.EqualFold(query, "all") || query == "*" || query == "--all" {
 			entries := lib.QueuePodcasts()
@@ -185,12 +186,12 @@ func handleQueueAdd(lib *podcast.Library, targets []string) error {
 					return err
 				}
 				if count > 0 {
-					fmt.Printf("Added %d uncleaned episode(s) of %s [%s] to queue\n",
+					fmt.Fprintf(w, "Added %d uncleaned episode(s) of %s [%s] to queue\n",
 						count, util.Bold(util.DisplayName(p.Title)), util.BoldCyan(p.ShortID))
 					totalAdded += count
 				}
 			}
-			fmt.Printf("Added a total of %d uncleaned episode(s) across %d podcast(s) to queue.\n", totalAdded, len(entries))
+			fmt.Fprintf(w, "Added a total of %d uncleaned episode(s) across %d podcast(s) to queue.\n", totalAdded, len(entries))
 			continue
 		}
 
@@ -206,9 +207,9 @@ func handleQueueAdd(lib *podcast.Library, targets []string) error {
 				return err
 			}
 			if added {
-				fmt.Printf("Added to queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
+				fmt.Fprintf(w, "Added to queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
 			} else {
-				fmt.Printf("Already in queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
+				fmt.Fprintf(w, "Already in queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
@@ -216,14 +217,14 @@ func handleQueueAdd(lib *podcast.Library, targets []string) error {
 			if err != nil {
 				return err
 			}
-			fmt.Printf("Added %d uncleaned episode(s) of %s [%s] to queue\n",
+			fmt.Fprintf(w, "Added %d uncleaned episode(s) of %s [%s] to queue\n",
 				count, util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID))
 		}
 	}
 	return nil
 }
 
-func handleQueueRemove(lib *podcast.Library, targets []string) error {
+func handleQueueRemove(w io.Writer, lib *podcast.Library, targets []string) error {
 	for _, query := range targets {
 		res, err := lib.ResolveQueueTarget(query)
 		if err != nil {
@@ -237,22 +238,22 @@ func handleQueueRemove(lib *podcast.Library, targets []string) error {
 				return err
 			}
 			if removed {
-				fmt.Printf("Removed from queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
+				fmt.Fprintf(w, "Removed from queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
 			} else {
-				fmt.Printf("Not found in queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
+				fmt.Fprintf(w, "Not found in queue: [%s] %s\n", util.BoldCyan(ep.ShortID), util.DisplayName(ep.Title))
 			}
 		} else if res.IsPodcast() {
 			pod := res.Podcast
 			if err := podcast.ClearPodcastQueue(pod.Dir); err != nil {
 				return err
 			}
-			fmt.Printf("Cleared queue for %s [%s]\n", util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID))
+			fmt.Fprintf(w, "Cleared queue for %s [%s]\n", util.Bold(util.DisplayName(pod.Title)), util.BoldCyan(pod.ShortID))
 		}
 	}
 	return nil
 }
 
-func handleQueueClear(lib *podcast.Library, target string) error {
+func handleQueueClear(w io.Writer, lib *podcast.Library, target string) error {
 	if target != "" {
 		res, err := lib.ResolveQueueTarget(target)
 		if err != nil {
@@ -262,13 +263,13 @@ func handleQueueClear(lib *podcast.Library, target string) error {
 			if err := podcast.ClearPodcastQueue(res.Podcast.Dir); err != nil {
 				return err
 			}
-			fmt.Printf("Queue cleared for %s [%s]\n", util.Bold(util.DisplayName(res.Podcast.Title)), util.BoldCyan(res.Podcast.ShortID))
+			fmt.Fprintf(w, "Queue cleared for %s [%s]\n", util.Bold(util.DisplayName(res.Podcast.Title)), util.BoldCyan(res.Podcast.ShortID))
 			return nil
 		} else if res.IsEpisode() {
 			if _, err := pipeline.RemoveQueuedAudio(res.Episode.PodcastDir, res.Episode.Path); err != nil {
 				return err
 			}
-			fmt.Printf("Removed [%s] from queue\n", util.BoldCyan(res.Episode.ShortID))
+			fmt.Fprintf(w, "Removed [%s] from queue\n", util.BoldCyan(res.Episode.ShortID))
 			return nil
 		}
 	}
@@ -284,7 +285,7 @@ func handleQueueClear(lib *podcast.Library, target string) error {
 			clearedCount++
 		}
 	}
-	fmt.Printf("Queue cleared across %d podcast(s).\n", clearedCount)
+	fmt.Fprintf(w, "Queue cleared across %d podcast(s).\n", clearedCount)
 	return nil
 }
 
@@ -295,15 +296,15 @@ func handleQueueRun(lib *podcast.Library, cfg Config, cli CLIOptions, target str
 	}
 	podcast.SortQueueItems(items)
 	if len(items) == 0 {
-		fmt.Fprintln(outFor(cli), "AdR queue is currently empty.")
+		fmt.Fprintln(progressFor(cli), "AdR queue is currently empty.")
 		return nil
 	}
 
-	fmt.Fprintf(outFor(cli), "Found %d episode(s) in AdR queue.\n", len(items))
+	fmt.Fprintf(progressFor(cli), "Found %d episode(s) in AdR queue.\n", len(items))
 
 	if cli.DryRun {
 		for _, it := range items {
-			fmt.Printf("[dry-run] Would process ad removal for: [%s] %s (%s)\n", it.EpisodeID, util.DisplayName(it.Title), it.Filename)
+			fmt.Fprintf(outFor(cli), "[dry-run] Would process ad removal for: [%s] %s (%s)\n", it.EpisodeID, util.DisplayName(it.Title), it.Filename)
 		}
 		return nil
 	}
@@ -320,16 +321,16 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 	for i := range items {
 		podcast.SortQueueItems(items[i:])
 		it := items[i]
-		fmt.Fprintf(outFor(cli), "\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, util.DisplayName(it.Title), util.BoldCyan(it.EpisodeID))
+		fmt.Fprintf(progressFor(cli), "\n[%d/%d] Processing queued episode: %s [%s]\n", i+1, total, util.DisplayName(it.Title), util.BoldCyan(it.EpisodeID))
 
 		if !util.FileExists(it.AudioPath) {
-			fmt.Fprintf(outFor(cli), "Audio file not found on disk: %s (retained in queue)\n", it.Filename)
+			fmt.Fprintf(progressFor(cli), "Audio file not found on disk: %s (retained in queue)\n", it.Filename)
 			failedEpisodes = append(failedEpisodes, it.Filename)
 			continue
 		}
 
 		if !cli.ForceTranscribe && !cli.ForceLLM && !cli.Recut && pipeline.IsEpisodeClean(it.AudioPath) {
-			fmt.Fprintf(outFor(cli), "Episode already has ads removed: %s (removing from queue)\n", it.Filename)
+			fmt.Fprintf(progressFor(cli), "Episode already has ads removed: %s (removing from queue)\n", it.Filename)
 			if _, err := pipeline.RemoveQueuedAudio(it.PodcastDir, it.AudioPath); err != nil {
 				return err
 			}
@@ -339,7 +340,7 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 		err := adremoval.ProcessQueuedTarget(it.PodcastDir, it.AudioPath, "rm_ads", cli.ProcOptions, cfg)
 		if err != nil {
 			if !cli.Quiet {
-				fmt.Fprintf(os.Stderr, "Error processing %s: %v\n", it.Filename, err)
+				fmt.Fprintf(errFor(cli), "Error processing %s: %v\n", it.Filename, err)
 			}
 			failedEpisodes = append(failedEpisodes, it.Filename)
 			continue
@@ -348,9 +349,9 @@ func executeQueueRun(items []queueEpisodeItem, cli CLIOptions, cfg Config) error
 	}
 
 	if !cli.Quiet {
-		fmt.Printf("\nFinished queue run: %d/%d episode(s) processed successfully.\n", processedCount, total)
+		fmt.Fprintf(outFor(cli), "\nFinished queue run: %d/%d episode(s) processed successfully.\n", processedCount, total)
 		if len(failedEpisodes) > 0 {
-			fmt.Printf("Failed episode(s): %s\n", strings.Join(failedEpisodes, ", "))
+			fmt.Fprintf(outFor(cli), "Failed episode(s): %s\n", strings.Join(failedEpisodes, ", "))
 		}
 	}
 

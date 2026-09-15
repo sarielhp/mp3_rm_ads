@@ -6,11 +6,11 @@ import (
 
 func runCheckCommand(config Config, cli CLIOptions) error {
 	if cli.TestKitty {
-		testKittyImage(cli.Args)
+		testKittyImage(outFor(cli), cli.Args)
 	} else if cli.TestGemini {
-		return testGeminiAPI(&config, cli.Quiet)
+		return testGeminiAPI(outFor(cli), &config, cli.Quiet)
 	} else {
-		if !testWhisperServer(config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
+		if !testWhisperServer(outFor(cli), config.WhisperURL, config.WhisperWakeCommand, cli.Quiet) {
 			return fmt.Errorf("whisper test failed")
 		}
 	}

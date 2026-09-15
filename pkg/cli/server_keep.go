@@ -61,9 +61,9 @@ func handleServerKeep(config Config, cli CLIOptions) error {
 		}
 		deleted, err := b.ApplyKeepPolicy(item.ID, title, keep, cli.DryRun)
 		if err != nil && !cli.Quiet {
-			fmt.Printf("! Error applying keep policy to %s: %v\n", title, err)
+			fmt.Fprintf(outFor(cli), "! Error applying keep policy to %s: %v\n", title, err)
 		} else if !cli.Quiet {
-			fmt.Printf("✓ %s: pruned %d episode(s) (limit: %d)\n", title, deleted, keep)
+			fmt.Fprintf(outFor(cli), "✓ %s: pruned %d episode(s) (limit: %d)\n", title, deleted, keep)
 		}
 	}
 	return nil
