@@ -67,7 +67,7 @@ func TestPodFetchDBDirectSync(t *testing.T) {
 	dbPath := setupTestPodFetchDB(t)
 	be := NewPodFetch(Config{DBPath: dbPath})
 
-	ok, err := be.TestConnection(true)
+	ok, err := be.TestConnection(nil)
 	if !ok || err != nil {
 		t.Fatalf("TestConnection on DB failed: %v", err)
 	}

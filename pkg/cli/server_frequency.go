@@ -114,7 +114,7 @@ func handleServerDisableHourly(config Config, cli CLIOptions) error {
 }
 
 func collectFrequencyTargetPodcasts(config Config, cli CLIOptions) (backend.Backend, []backend.Podcast, error) {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+	b, err := backend.FromAppConfig(&config, reporter(cli))
 	if err == nil && b != nil {
 		podcasts, pErr := resolveServerTargetPodcasts(b, cli)
 		if pErr != nil && errors.Is(pErr, podcast.ErrAmbiguousPodcast) {

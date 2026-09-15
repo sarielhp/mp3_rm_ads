@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"pod/pkg/backend"
 	"pod/pkg/podcast"
 
@@ -31,7 +32,7 @@ func buildServerCleanOrphansSubcommand(opts *CLIOptions, action *string) clihelp
 }
 
 func handleServerCleanOrphans(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+	b, err := backend.FromAppConfig(&config, reporter(cli))
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
@@ -40,6 +41,8 @@ func handleServerCleanOrphans(config Config, cli CLIOptions) error {
 		Force:   cli.ForceDelete,
 		Quiet:   cli.Quiet,
 		Verbose: cli.Verbose,
+		In:      os.Stdin,
+		Out:     os.Stdout,
 	}
 	_, err = podcast.RunCleanOrphans(b, opts)
 	return err

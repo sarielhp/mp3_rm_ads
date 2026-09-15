@@ -127,12 +127,18 @@ func QuarantineAbandonedDuplicates(podDir string, trackedEpisodes []backend.Epis
 	return quarantined
 }
 
-func PrintQuarantinedSummary(quarantined []string, podName string) {
+// FormatQuarantinedSummary renders the result of QuarantineAbandonedDuplicates
+// for display, returning "" when nothing was quarantined. It returns the text
+// rather than printing it: the TUI is a caller, and writing to stdout from
+// under a full-screen UI corrupts the display.
+func FormatQuarantinedSummary(quarantined []string, podName string) string {
 	if len(quarantined) == 0 {
-		return
+		return ""
 	}
-	fmt.Printf("Quarantined %d abandoned duplicate(s) in '%s' to .bak:\n", len(quarantined), podName)
+	var b strings.Builder
+	fmt.Fprintf(&b, "Quarantined %d abandoned duplicate(s) in '%s' to .bak:\n", len(quarantined), podName)
 	for _, q := range quarantined {
-		fmt.Printf("  - %s -> %s.bak\n", q, q)
+		fmt.Fprintf(&b, "  - %s -> %s.bak\n", q, q)
 	}
+	return b.String()
 }

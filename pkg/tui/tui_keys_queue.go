@@ -158,7 +158,7 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 		if m.podcastsDir != "" {
 			cfg, err := config.LoadConfig()
 			if err == nil {
-				bCli, _ = backend.FromAppConfig(cfg, true)
+				bCli, _ = backend.FromAppConfig(cfg, nil)
 			}
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)

@@ -14,6 +14,7 @@ import (
 	"pod/pkg/config"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
+	"pod/pkg/progress"
 	"pod/pkg/util"
 )
 
@@ -233,7 +234,7 @@ func handleServerImport(cfg Config, cli CLIOptions) error {
 		return nil
 	}
 
-	reader, err := backend.ReaderFromAppConfig(&cfg, cli.Quiet)
+	reader, err := backend.ReaderFromAppConfig(&cfg, reporter(cli))
 	if err != nil {
 		return fmt.Errorf("backend not available for import: %w", err)
 	}
@@ -592,11 +593,13 @@ func executeSingleEpisodeDownload(d *podcast.Downloader, podDir string, ep backe
 	fn := podcast.FormatEpisodeFilename(pubTime, ep.Episode, ep.Title)
 	destPath := filepath.Join(podDir, fn)
 
+	rep := progress.Discard
 	if !quiet {
-		fmt.Printf("  Downloading: %s\n", ep.Title)
+		rep = progress.Writer(os.Stdout, os.Stderr, false)
 	}
+	rep.Infof("  Downloading: %s", ep.Title)
 
-	if err := d.DownloadEpisode(context.Background(), encURL, destPath, quiet); err != nil {
+	if err := d.DownloadEpisode(context.Background(), encURL, destPath, rep); err != nil {
 		return err
 	}
 

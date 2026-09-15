@@ -138,6 +138,9 @@ func (m *tuiModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		} else {
 			m.podcasts = msg.podcasts
 			m.queue = msg.queue
+			if n := countLoadNotices(msg.podcasts); n > 0 {
+				m.showToast(fmt.Sprintf("Quarantined abandoned duplicates in %d podcast(s)", n), ToastWarning)
+			}
 			if len(msg.podcasts) > 0 && m.showCover {
 				prewarmPodcastCovers(msg.podcasts, 24, 7)
 			}
@@ -337,6 +340,16 @@ func RunTUI(cfg *types.Config, podcastsDir string) error {
 	p := tea.NewProgram(newTuiModel(bk, podcastsDir, cfg), tea.WithAltScreen())
 	_, err := p.Run()
 	return err
+}
+
+func countLoadNotices(podcasts []tuiPodcast) int {
+	n := 0
+	for _, p := range podcasts {
+		if p.notice != "" {
+			n++
+		}
+	}
+	return n
 }
 
 func prewarmPodcastCovers(podcasts []tuiPodcast, cols, rows int) {

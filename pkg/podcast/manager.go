@@ -37,17 +37,3 @@ func (m *PodcastManager) ScanPodcasts() []PodcastDirEntry {
 func (m *PodcastManager) CleanOrphans(opts CleanOrphansOptions) (CleanOrphansResult, error) {
 	return RunCleanOrphans(m.Backend, opts)
 }
-
-func (m *PodcastManager) AuditTranscripts(targets []string, minRatio float64, minChars int) []*TranscriptAuditItem {
-	if len(targets) == 0 && m.Config.PodcastsDir != "" {
-		targets = []string{m.Config.PodcastsDir}
-	}
-	audioFiles := CollectAudioFilesForAudit(targets)
-	var results []*TranscriptAuditItem
-	for _, f := range audioFiles {
-		if item := InspectEpisodeTranscript(f, minRatio, minChars); item != nil {
-			results = append(results, item)
-		}
-	}
-	return results
-}

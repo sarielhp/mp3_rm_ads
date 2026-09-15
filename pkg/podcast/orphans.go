@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"io"
-	"os"
 	"sort"
 	"strings"
 
@@ -138,10 +137,10 @@ func RunCleanOrphans(client backend.Backend, opts CleanOrphansOptions) (CleanOrp
 		return CleanOrphansResult{}, fmt.Errorf("backend client is nil")
 	}
 	if opts.In == nil {
-		opts.In = os.Stdin
+		opts.In = strings.NewReader("")
 	}
 	if opts.Out == nil {
-		opts.Out = os.Stdout
+		opts.Out = io.Discard
 	}
 
 	if !opts.Quiet {

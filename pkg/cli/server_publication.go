@@ -25,7 +25,7 @@ func handleServerPublication(cfg Config, cli CLIOptions) error {
 	if cfg.PodcastsDir == "" {
 		return fmt.Errorf("podcasts_dir is not configured")
 	}
-	b, err := backend.FromAppConfig(&cfg, true)
+	b, err := backend.FromAppConfig(&cfg, nil)
 	if err != nil {
 		return err
 	}

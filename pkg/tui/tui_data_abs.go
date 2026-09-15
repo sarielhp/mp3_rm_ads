@@ -17,7 +17,7 @@ func loadTUIPodcastsABS(podcastsDir string, cfg types.Config) ([]tuiPodcast, err
 		return nil, err
 	}
 
-	b, err := backend.FromAppConfig(&cfg, true)
+	b, err := backend.FromAppConfig(&cfg, nil)
 	if err != nil || b == nil {
 		return podcasts, nil
 	}
@@ -77,9 +77,7 @@ func enrichSinglePodcastABS(pod *tuiPodcast, b backend.Backend, itemSummary back
 	_ = b.DownloadCover(fullItem.ID, coverDest)
 
 	quarantined := pipeline.QuarantineAbandonedDuplicates(pod.dir, fullItem.Media.Episodes)
-	if len(quarantined) > 0 {
-		pipeline.PrintQuarantinedSummary(quarantined, pod.name)
-	}
+	pod.notice = pipeline.FormatQuarantinedSummary(quarantined, pod.name)
 
 	episodeMap := buildABSEpisodeMap(fullItem.Media.Episodes)
 	matchAndEnrichEpisodes(pod.episodes, episodeMap)

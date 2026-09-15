@@ -134,7 +134,7 @@ func handleServerOPML(cfg Config, cli CLIOptions) error {
 	if cfg.BackendType == "standalone" || cfg.BackendType == "local" {
 		return handleStandaloneOPML(cfg, cli)
 	}
-	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
+	b, err := backend.FromAppConfig(&cfg, reporter(cli))
 	if err != nil {
 		return handleStandaloneOPML(cfg, cli)
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"pod/pkg/backend"
+	"pod/pkg/progress"
 )
 
 type mockTestBackend struct {
@@ -85,7 +86,7 @@ func (m *mockTestBackend) ResetPodcastDateCheckAPI(itemID string) error { return
 
 func (m *mockTestBackend) SyncDuration(filePath string, duration float64) error { return nil }
 
-func (m *mockTestBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error) {
+func (m *mockTestBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun bool) (int, error) {
 	return 0, nil
 }
 
@@ -93,7 +94,7 @@ func (m *mockTestBackend) UpdatePodcastSettings(podcastID string, autoDownload, 
 	return nil
 }
 
-func (m *mockTestBackend) TestConnection(quiet bool) (bool, error) { return true, nil }
+func (m *mockTestBackend) TestConnection(progress.Reporter) (bool, error) { return true, nil }
 
 func (m *mockTestBackend) Login() (string, error) { return "", nil }
 
@@ -113,10 +114,10 @@ func (m *mockTestBackend) ImportOPML(data []byte, opts backend.OPMLImportOptions
 	return backend.OPMLImportResult{}, nil
 }
 
-func (m *mockTestBackend) FetchPodcastFeeds(silent, verbose bool) ([]backend.OPMLFeed, error) {
+func (m *mockTestBackend) FetchPodcastFeeds() ([]backend.OPMLFeed, error) {
 	return nil, nil
 }
 
-func (m *mockTestBackend) WaitForActiveDownloads(podcasts []backend.Podcast, quiet bool, timeout time.Duration) error {
+func (m *mockTestBackend) WaitForActiveDownloads(podcasts []backend.Podcast, timeout time.Duration) error {
 	return nil
 }

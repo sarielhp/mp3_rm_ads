@@ -42,7 +42,7 @@ func buildServerPruneSubcommand(opts *CLIOptions, action *string, keepVal *int) 
 }
 
 func handleServerKeep(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+	b, err := backend.FromAppConfig(&config, reporter(cli))
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}
@@ -59,7 +59,7 @@ func handleServerKeep(config Config, cli CLIOptions) error {
 		if title == "" {
 			title = "Untitled"
 		}
-		deleted, err := b.ApplyKeepPolicy(item.ID, title, keep, cli.DryRun, cli.Verbose, cli.Quiet)
+		deleted, err := b.ApplyKeepPolicy(item.ID, title, keep, cli.DryRun)
 		if err != nil && !cli.Quiet {
 			fmt.Printf("! Error applying keep policy to %s: %v\n", title, err)
 		} else if !cli.Quiet {

@@ -71,7 +71,7 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("load subscriptions: %w", storeErr)
 	}
 
-	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
+	b, err := backend.FromAppConfig(&cfg, reporter(cli))
 	if err != nil {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil && len(store.List()) > 0 {
@@ -106,7 +106,7 @@ func handleServerList(cfg Config, cli CLIOptions) error {
 }
 
 func handleServerGetInfo(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+	b, err := backend.FromAppConfig(&config, reporter(cli))
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}

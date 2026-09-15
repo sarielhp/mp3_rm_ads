@@ -41,7 +41,7 @@ func Execute(args []string) int {
 		if errors.Is(err, podcast.ErrAmbiguousPodcast) {
 			var ambErr *podcast.AmbiguousPodcastError
 			if errors.As(err, &ambErr) {
-				podcast.PrintAmbiguousMatches(ambErr.Matches)
+				fmt.Println(podcast.FormatPodcastMatches(ambErr.Matches))
 			} else {
 				fmt.Println(err.Error())
 			}

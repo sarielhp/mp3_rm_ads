@@ -409,7 +409,7 @@ func parseBoolString(s string) bool {
 }
 
 func getBackendSyncInfo(pod *ResolvedPodcast, cfg Config) string {
-	b, err := backend.FromAppConfig(&cfg, true)
+	b, err := backend.FromAppConfig(&cfg, nil)
 	if err != nil || b == nil {
 		return "Backend not connected"
 	}
@@ -418,7 +418,7 @@ func getBackendSyncInfo(pod *ResolvedPodcast, cfg Config) string {
 
 func syncPolicyWithBackend(pod *ResolvedPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) string {
 	cfg := loadConfig()
-	b, err := backend.FromAppConfig(&cfg, true)
+	b, err := backend.FromAppConfig(&cfg, nil)
 	if err != nil || b == nil {
 		return "Local only (no backend)"
 	}

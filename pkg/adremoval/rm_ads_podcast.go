@@ -100,7 +100,7 @@ func resolveTargetEpisodeForRmAds(pod *podcast.ResolvedPodcast, opts types.ProcO
 }
 
 func getActiveBackendForPodcast(cfg types.Config, quiet bool) backend.Backend {
-	b, err := backend.FromAppConfig(&cfg, quiet)
+	b, err := backend.FromAppConfig(&cfg, stdoutReporter(quiet))
 	if err == nil {
 		return b
 	}
@@ -412,7 +412,7 @@ func tryDirectDownloadEpisode(podDir string, fe backend.FeedEpisode, quiet bool)
 	safeTitle := podcast.SanitizeTitle(fe.Title)
 	destPath := filepath.Join(podDir, safeTitle+".mp3")
 	d := podcast.NewDownloader()
-	if err := d.DownloadEpisode(context.Background(), encURL, destPath, quiet); err == nil {
+	if err := d.DownloadEpisode(context.Background(), encURL, destPath, stdoutReporter(quiet)); err == nil {
 		return destPath, true
 	}
 	return "", false

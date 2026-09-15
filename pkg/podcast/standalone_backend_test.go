@@ -42,7 +42,6 @@ func TestStandaloneBackend(t *testing.T) {
 
 	cfg := backend.Config{
 		PodcastsDir: podcastsDir,
-		Quiet:       true,
 	}
 	be := &StandaloneBackend{
 		cfg:        cfg,

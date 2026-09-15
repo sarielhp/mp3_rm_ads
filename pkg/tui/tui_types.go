@@ -22,6 +22,11 @@ type tuiPodcast struct {
 	episodes    []tuiEpisode
 	absData     *backend.Podcast
 	config      config.PodcastConfig
+
+	// notice is library output produced while loading this podcast, held for
+	// the model to surface as a toast. It must not be printed: stdout is the
+	// alt-screen.
+	notice string
 }
 
 func (p tuiPodcast) transcribedCount() int {

@@ -7,6 +7,7 @@ import (
 	"pod/pkg/backend"
 	"pod/pkg/config"
 	"pod/pkg/podcast"
+	"pod/pkg/progress"
 	"pod/pkg/remote"
 	"pod/pkg/types"
 	"pod/pkg/util"
@@ -77,4 +78,14 @@ func loadConfig() Config {
 		return c
 	}
 	return *cfg
+}
+
+// reporter turns the CLI's quiet/verbose flags into the progress.Reporter that
+// library calls take. Quiet discards; otherwise info goes to stdout, warnings
+// to stderr, and detail only when --verbose.
+func reporter(cli CLIOptions) progress.Reporter {
+	if cli.Quiet {
+		return progress.Discard
+	}
+	return progress.Writer(os.Stdout, os.Stderr, cli.Verbose)
 }

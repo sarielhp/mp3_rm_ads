@@ -32,7 +32,7 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 		def := config.DefaultConfig()
 		cfg = &def
 	}
-	bCli, _ := backend.FromAppConfig(cfg, true)
+	bCli, _ := backend.FromAppConfig(cfg, nil)
 	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, *cfg, bCli, feedURL)
 	if err != nil && len(feedEpisodes) == 0 {
 		m.showPopup(fmt.Sprintf("Failed to fetch feed: %v", err))
@@ -198,7 +198,7 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 
 	cfg, _ := config.LoadConfig()
 	if cfg != nil {
-		client, _ := backend.FromAppConfig(cfg, true)
+		client, _ := backend.FromAppConfig(cfg, nil)
 		if client != nil && len(toDownload) > 0 && pod.absData != nil {
 			_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
 		}

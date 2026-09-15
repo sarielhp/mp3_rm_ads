@@ -9,6 +9,7 @@ import (
 
 	"pod/pkg/backend"
 	"pod/pkg/config"
+	"pod/pkg/progress"
 	"pod/pkg/types"
 )
 
@@ -23,8 +24,10 @@ type DownloadOptions struct {
 	ForceNewOnly bool
 	DownloadAll  bool
 	Keep         *int
-	Verbose      bool
-	Quiet        bool
+
+	// Progress receives human-readable progress. A nil Reporter is silent,
+	// which is what every non-interactive caller wants.
+	Progress progress.Reporter
 
 	// Jobs caps how many feeds are read at once; zero takes the default.
 	Jobs int
@@ -174,7 +177,7 @@ func ResolveEpisodesToDownload(item backend.Podcast, sortedCatalog []backend.Fee
 		return selectForceNewEpisodes(sortedCatalog, downloadedIndices, isDownloaded, opts.Count, opts.CountGiven, opts.Oldest)
 	}
 	if opts.Fill {
-		eps, reasons := selectFillEpisodes(sortedCatalog, downloadedIndices, isDownloaded, opts.CheckNew, opts.Oldest, opts.Quiet, item.Media.Metadata.Title)
+		eps, reasons := selectFillEpisodes(sortedCatalog, downloadedIndices, isDownloaded, opts.CheckNew, opts.Oldest, progress.Or(opts.Progress), item.Media.Metadata.Title)
 		if opts.CountGiven && len(eps) > opts.Count {
 			eps = eps[:opts.Count]
 		}
@@ -229,7 +232,7 @@ func selectForceNewEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndic
 	return episodesToDownload, reasons
 }
 
-func selectFillEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, checkNew, oldest, quiet bool, podcastTitle string) ([]backend.FeedEpisode, []string) {
+func selectFillEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices []int, isDownloaded func(backend.FeedEpisode) bool, checkNew, oldest bool, rep progress.Reporter, podcastTitle string) ([]backend.FeedEpisode, []string) {
 	var episodesToDownload []backend.FeedEpisode
 	var reasons []string
 
@@ -293,8 +296,8 @@ func selectFillEpisodes(sortedCatalog []backend.FeedEpisode, downloadedIndices [
 	if len(episodesToDownload) > 0 && len(reasons) == 0 {
 		reasons = append(reasons, fmt.Sprintf("%d gap/fill episode(s)", len(episodesToDownload)))
 	}
-	if gapTerminated && !quiet {
-		fmt.Printf("Search for %s terminated: gap larger than 10 undownloaded episodes encountered.\n", podcastTitle)
+	if gapTerminated {
+		rep.Infof("Search for %s terminated: gap larger than 10 undownloaded episodes encountered.", podcastTitle)
 	}
 	return episodesToDownload, reasons
 }
@@ -362,18 +365,17 @@ func ExecuteEpisodeDownloads(client backend.Backend, item backend.Podcast, episo
 	if len(episodesToDownload) == 0 {
 		return 0, nil
 	}
-	sortAndPrintSelectedEpisodes(episodesToDownload, podcastTitle, reasons, opts.Oldest, opts.Verbose, opts.Quiet)
-	if err := queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, opts.Quiet); err != nil {
+	rep := progress.Or(opts.Progress)
+	sortAndReportSelectedEpisodes(episodesToDownload, podcastTitle, reasons, opts.Oldest, rep)
+	if err := queueAndTrackDownloads(client, item, episodesToDownload, opts.NoWait, opts.DryRun, rep); err != nil {
 		return 0, err
 	}
 
 	return len(episodesToDownload), nil
 }
 
-func sortAndPrintSelectedEpisodes(episodesToDownload []backend.FeedEpisode, podcastTitle string, reasons []string, oldest, verbose, quiet bool) {
-	if !quiet {
-		fmt.Printf("\n=== Podcast: %s ===\n", podcastTitle)
-	}
+func sortAndReportSelectedEpisodes(episodesToDownload []backend.FeedEpisode, podcastTitle string, reasons []string, oldest bool, rep progress.Reporter) {
+	rep.Infof("\n=== Podcast: %s ===", podcastTitle)
 	sort.Slice(episodesToDownload, func(i, j int) bool {
 		return GetPubMS(episodesToDownload[i]) < GetPubMS(episodesToDownload[j])
 	})
@@ -387,47 +389,37 @@ func sortAndPrintSelectedEpisodes(episodesToDownload []backend.FeedEpisode, podc
 	if oldest {
 		directionStr = "oldest -> newest"
 	}
-	if !quiet {
-		fmt.Printf("Found %s (%s).\n", strings.Join(reasons, " and "), directionStr)
-		fmt.Printf("\n=== Selected %d Episode(s) for Download ===\n", len(episodesToDownload))
-		for idx, ep := range episodesToDownload {
-			pub := ep.PubDate
-			if pub == "" {
-				pub = fmt.Sprintf("%d", ep.PublishedAt)
-			}
-			encURL := ""
-			if ep.Enclosure != nil {
-				encURL = ep.Enclosure.URL
-			}
-			fmt.Printf("  %d. %s\n", idx+1, ep.Title)
-			fmt.Printf("     Published: %s\n", pub)
-			if verbose {
-				fmt.Printf("     URL: %s\n", encURL)
-			}
+	rep.Infof("Found %s (%s).", strings.Join(reasons, " and "), directionStr)
+	rep.Infof("\n=== Selected %d Episode(s) for Download ===", len(episodesToDownload))
+	for idx, ep := range episodesToDownload {
+		pub := ep.PubDate
+		if pub == "" {
+			pub = fmt.Sprintf("%d", ep.PublishedAt)
+		}
+		rep.Infof("  %d. %s", idx+1, ep.Title)
+		rep.Infof("     Published: %s", pub)
+		if ep.Enclosure != nil {
+			rep.Detailf("     URL: %s", ep.Enclosure.URL)
+		} else {
+			rep.Detailf("     URL: ")
 		}
 	}
 }
 
-func queueAndTrackDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, noWait, dryRun, quiet bool) error {
+func queueAndTrackDownloads(client backend.Backend, item backend.Podcast, episodesToDownload []backend.FeedEpisode, noWait, dryRun bool, rep progress.Reporter) error {
 	if dryRun {
-		if !quiet {
-			fmt.Println("Dry run mode enabled. Skipping actual download request.")
-		}
+		rep.Infof("Dry run mode enabled. Skipping actual download request.")
 		return nil
 	}
 
-	if !quiet {
-		fmt.Printf("Queueing download request for %d episode(s)...\n", len(episodesToDownload))
-	}
+	rep.Infof("Queueing download request for %d episode(s)...", len(episodesToDownload))
 	if err := client.DownloadEpisodes(item.ID, episodesToDownload); err != nil {
 		return fmt.Errorf("queue episode download: %w", err)
 	}
 
-	if !quiet {
-		fmt.Println("Download request successfully sent!")
-	}
+	rep.Infof("Download request successfully sent!")
 	if !noWait {
-		return client.WaitForActiveDownloads([]backend.Podcast{item}, quiet, 5*time.Minute)
+		return client.WaitForActiveDownloads([]backend.Podcast{item}, 5*time.Minute)
 	}
 	return nil
 }

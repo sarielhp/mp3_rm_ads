@@ -36,7 +36,7 @@ func TestPodFetchLoginAndTestConnection(t *testing.T) {
 	if err != nil || tok != "my-api-key" {
 		t.Fatalf("Login with API key failed: %v", err)
 	}
-	ok, err := beAPIKey.TestConnection(true)
+	ok, err := beAPIKey.TestConnection(nil)
 	if !ok || err != nil {
 		t.Fatalf("TestConnection with API key failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestPodFetchLoginAndTestConnection(t *testing.T) {
 	if err != nil || tokBasic != "admin" {
 		t.Fatalf("Login with Basic auth failed: %v", err)
 	}
-	okBasic, err := beBasic.TestConnection(true)
+	okBasic, err := beBasic.TestConnection(nil)
 	if !okBasic || err != nil {
 		t.Fatalf("TestConnection with Basic auth failed: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestPodFetchLoginAndTestConnection(t *testing.T) {
 		User: "admin",
 		Pass: "wrong",
 	})
-	okFail, _ := beFail.TestConnection(true)
+	okFail, _ := beFail.TestConnection(nil)
 	if okFail {
 		t.Errorf("expected TestConnection to fail with invalid credentials")
 	}

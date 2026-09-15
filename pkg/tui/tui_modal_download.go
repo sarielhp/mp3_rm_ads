@@ -241,7 +241,7 @@ func syncPolicyToBackend(pod *tuiPodcast, autoDownload, autoCleanup bool, autoCl
 	if err != nil {
 		return
 	}
-	b, err := backend.FromAppConfig(cfg, true)
+	b, err := backend.FromAppConfig(cfg, nil)
 	if err != nil || b == nil {
 		return
 	}

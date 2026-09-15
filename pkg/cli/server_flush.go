@@ -39,7 +39,7 @@ func handleServerFlush(cfg Config, cli CLIOptions) error {
 	if len(cli.Args) != 1 || cfg.PodcastsDir == "" {
 		return fmt.Errorf("flush requires one podcast ID and a configured podcasts_dir")
 	}
-	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
+	b, err := backend.FromAppConfig(&cfg, reporter(cli))
 	if err != nil {
 		return err
 	}

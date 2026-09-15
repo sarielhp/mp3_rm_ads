@@ -159,7 +159,15 @@ Always use `workDirFor(path)` to compute the `.work/` path, then call
 ## Code Style
 
 - Go 1.26+, no external dependencies beyond stdlib
-- No comments in code (keep it self-documenting)
+- No comments in code (keep it self-documenting), except doc comments on exported
+  library API — a package boundary has to say what it is for
+- **Library packages must not write to the terminal.** `pkg/podcast`, `pkg/backend`
+  and `pkg/podsite` take a `progress.Reporter` and let the caller decide where
+  output goes; a nil Reporter is silent. `fmt.Print*` and `os.Stdout`/`os.Stderr`
+  are banned there and the ban is enforced by
+  `TestLibraryPackagesDoNotWriteToTheTerminal` in `pkg/progress`. Writing to an
+  `io.Writer` the caller supplied is fine. The processing packages (`pipeline`,
+  `adremoval`, `remote`) still print and are not yet on the list
 - `os/exec` for external commands (ffmpeg, ffprobe, docker)
 - Custom `syncMu` / `syncMutex` / `syncWG` for thread safety (no sync package)
 - All errors are returned; `os.Exit(1)` only in `main()` and fatal helpers
@@ -185,6 +193,7 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
 | `pkg/player` | Background audio playback daemon, IPC control socket (`/tmp/pod_player.sock`), MPRIS |
 | `pkg/podcast` | Standalone podcast manager, subscription store, native downloader; owns publishing (`PublishPodcast`, `PublishCatalog`) |
 | `pkg/podsite` | Pure static-site renderer: RSS feed and HTML player bytes. Imports no podcast code — callers pass in resolved data |
+| `pkg/progress` | `progress.Reporter`: how library packages report progress without choosing where it goes. A nil Reporter is silent |
 | `pkg/remote` | Distributed processing cluster: remote worker daemon, job manifests, SSH/rsync transport |
 | `pkg/kitty` | Kitty graphics protocol image rendering and cover art caching |
 | `pkg/tui` | Full-featured interactive terminal UI (Bubbletea/Lipgloss) spanning 19 screens and modes |

@@ -69,7 +69,7 @@ func (b *serverDownloadTestBackend) DownloadEpisodes(_ string, episodes []backen
 	b.selected = episodes
 	return b.queueErr
 }
-func (b *serverDownloadTestBackend) WaitForActiveDownloads([]backend.Podcast, bool, time.Duration) error {
+func (b *serverDownloadTestBackend) WaitForActiveDownloads([]backend.Podcast, time.Duration) error {
 	b.waits++
 	return b.waitErr
 }

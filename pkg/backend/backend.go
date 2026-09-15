@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"time"
+
+	"pod/pkg/progress"
 )
 
 type PodcastReader interface {
@@ -26,19 +28,19 @@ type PodcastWriter interface {
 	ResetPodcastDateCheck(itemID, title string) error
 	ResetPodcastDateCheckAPI(itemID string) error
 	SyncDuration(filePath string, duration float64) error
-	ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error)
+	ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun bool) (int, error)
 	UpdatePodcastSettings(podcastID string, autoDownload, autoCleanup bool, autoCleanupDays int) error
 }
 
 type PodcastAdmin interface {
-	TestConnection(quiet bool) (bool, error)
+	TestConnection(rep progress.Reporter) (bool, error)
 	Login() (string, error)
 	Scan(opts ScanOptions) (ScanResult, error)
 	Rescan(opts RescanOptions) (RescanResult, error)
 	ExportOPML(opts OPMLExportOptions) ([]byte, error)
 	ImportOPML(data []byte, opts OPMLImportOptions) (OPMLImportResult, error)
-	FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, error)
-	WaitForActiveDownloads(podcasts []Podcast, quiet bool, timeout time.Duration) error
+	FetchPodcastFeeds() ([]OPMLFeed, error)
+	WaitForActiveDownloads(podcasts []Podcast, timeout time.Duration) error
 }
 
 type Backend interface {
@@ -61,8 +63,10 @@ type Config struct {
 	Timeout           time.Duration
 	MaxAttempts       int
 	RetryDelay        time.Duration
-	Quiet             bool
-	Verbose           bool
+
+	// Progress receives human-readable progress from operations this backend
+	// performs. A nil Reporter is silent.
+	Progress progress.Reporter
 }
 
 type FactoryFunc func(cfg Config) (Backend, error)

@@ -17,7 +17,7 @@ func runQueueToday(cfg Config, root string, cli CLIOptions, now time.Time) error
 	if cfg.PodfetchDBPath == "" && cfg.PodfetchURL == "" {
 		return handleQueueToday(root, cli, now)
 	}
-	b, err := backend.FromAppConfig(&cfg, true)
+	b, err := backend.FromAppConfig(&cfg, nil)
 	if err != nil {
 		return err
 	}

@@ -72,7 +72,7 @@ func handleServerDownload(cfg Config, cli CLIOptions) error {
 		return fmt.Errorf("load subscriptions: %w", storeErr)
 	}
 
-	b, err := backend.FromAppConfig(&cfg, cli.Quiet)
+	b, err := backend.FromAppConfig(&cfg, reporter(cli))
 	if err != nil {
 		store, storeErr := podcast.NewSubscriptionStore(config.SubscriptionsFilePath(&cfg))
 		if storeErr == nil && len(store.List()) > 0 {
@@ -196,8 +196,7 @@ func downloadOptions(config Config, cli CLIOptions) podcast.DownloadOptions {
 		CheckNew:              cli.CheckNew,
 		DownloadAll:           cli.DownloadAll,
 		Keep:                  cli.KeepCount,
-		Verbose:               cli.Verbose,
-		Quiet:                 cli.Quiet,
+		Progress:              reporter(cli),
 		Jobs:                  cli.FeedJobs,
 		PodcastsDir:           config.PodcastsDir,
 		DefaultDownloadPolicy: config.DefaultDownloadPolicy,
@@ -232,7 +231,7 @@ func finalizeServerDownloads(b backend.Backend, config Config, cli CLIOptions, p
 		if !cli.Quiet {
 			fmt.Printf("Waiting for server to complete %d queued download(s)...\n", totalDownloaded)
 		}
-		if err := b.WaitForActiveDownloads(podcasts, cli.Quiet, 5*time.Minute); err != nil {
+		if err := b.WaitForActiveDownloads(podcasts, 5*time.Minute); err != nil {
 			return fmt.Errorf("waiting for downloads: %w", err)
 		}
 	}

@@ -31,7 +31,7 @@ func buildServerRescanSubcommand(opts *CLIOptions, action *string) clihelp.Comma
 }
 
 func handleServerRescan(config Config, cli CLIOptions) error {
-	b, err := backend.FromAppConfig(&config, cli.Quiet)
+	b, err := backend.FromAppConfig(&config, reporter(cli))
 	if err != nil {
 		return fmt.Errorf("podcast server not configured: %w", err)
 	}

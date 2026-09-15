@@ -6,9 +6,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"strings"
 	"time"
+
+	"pod/pkg/progress"
 )
 
 type PodFetchBackend struct {
@@ -21,8 +22,6 @@ type PodFetchBackend struct {
 	PodcastsDir string
 	MaxAttempts int
 	RetryDelay  time.Duration
-	Quiet       bool
-	Verbose     bool
 	httpClient  *http.Client
 }
 
@@ -61,8 +60,6 @@ func NewPodFetch(cfg Config) *PodFetchBackend {
 		PodcastsDir: cfg.PodcastsDir,
 		MaxAttempts: maxAttempts,
 		RetryDelay:  cfg.RetryDelay,
-		Quiet:       cfg.Quiet,
-		Verbose:     cfg.Verbose,
 		httpClient: &http.Client{
 			Timeout: timeout,
 		},
@@ -99,18 +96,15 @@ func (c *PodFetchBackend) Login() (string, error) {
 	return "", nil
 }
 
-func (c *PodFetchBackend) TestConnection(quiet bool) (bool, error) {
+func (c *PodFetchBackend) TestConnection(rep progress.Reporter) (bool, error) {
+	r := progress.Or(rep)
 	if c.Host == "" && c.DBPath == "" {
-		if !quiet {
-			fmt.Println("ERROR: podfetch_url or podfetch_db_path is not configured.")
-		}
+		r.Warnf("ERROR: podfetch_url or podfetch_db_path is not configured.")
 		return false, fmt.Errorf("podfetch_url or podfetch_db_path is not configured")
 	}
 
 	if c.Host != "" {
-		if !quiet {
-			fmt.Printf("Testing PodFetch server at: %s\n", c.Host)
-		}
+		r.Infof("Testing PodFetch server at: %s", c.Host)
 		body, err := c.Request("/api/v1/podcasts", "GET", nil)
 		if err != nil {
 			body, err = c.Request("/api/v1/common/health", "GET", nil)
@@ -119,32 +113,22 @@ func (c *PodFetchBackend) TestConnection(quiet bool) (bool, error) {
 			body, err = c.Request("/", "GET", nil)
 		}
 		if err != nil {
-			if !quiet {
-				fmt.Fprintf(os.Stderr, "FAIL: Could not connect to PodFetch server: %v\n", err)
-			}
+			r.Warnf("FAIL: Could not connect to PodFetch server: %v", err)
 			return false, err
 		}
 		_ = body
-		if !quiet {
-			fmt.Println("OK: PodFetch server is reachable.")
-		}
+		r.Infof("OK: PodFetch server is reachable.")
 		return true, nil
 	}
 
 	if c.DBPath != "" {
-		if !quiet {
-			fmt.Printf("Testing PodFetch SQLite database at: %s\n", c.DBPath)
-		}
+		r.Infof("Testing PodFetch SQLite database at: %s", c.DBPath)
 		_, err := fetchPodFetchPodcastsDB(c.DBPath)
 		if err != nil {
-			if !quiet {
-				fmt.Fprintf(os.Stderr, "FAIL: Could not query PodFetch database: %v\n", err)
-			}
+			r.Warnf("FAIL: Could not query PodFetch database: %v", err)
 			return false, err
 		}
-		if !quiet {
-			fmt.Println("OK: PodFetch SQLite database is valid and readable.")
-		}
+		r.Infof("OK: PodFetch SQLite database is valid and readable.")
 		return true, nil
 	}
 
@@ -316,7 +300,7 @@ func (c *PodFetchBackend) SyncDuration(filePath string, duration float64) error 
 	return nil
 }
 
-func (c *PodFetchBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error) {
+func (c *PodFetchBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun bool) (int, error) {
 	return 0, fmt.Errorf("podfetch is an import-only backend")
 }
 
@@ -340,11 +324,11 @@ func (c *PodFetchBackend) ImportOPML(data []byte, opts OPMLImportOptions) (OPMLI
 	return OPMLImportResult{}, fmt.Errorf("podfetch is an import-only backend")
 }
 
-func (c *PodFetchBackend) FetchPodcastFeeds(silent, verbose bool) ([]OPMLFeed, error) {
+func (c *PodFetchBackend) FetchPodcastFeeds() ([]OPMLFeed, error) {
 	return nil, nil
 }
 
-func (c *PodFetchBackend) WaitForActiveDownloads(podcasts []Podcast, quiet bool, timeout time.Duration) error {
+func (c *PodFetchBackend) WaitForActiveDownloads(podcasts []Podcast, timeout time.Duration) error {
 	return nil
 }
 

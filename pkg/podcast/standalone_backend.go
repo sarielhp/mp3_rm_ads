@@ -12,6 +12,7 @@ import (
 
 	"pod/pkg/backend"
 	"pod/pkg/pipeline"
+	"pod/pkg/progress"
 	"pod/pkg/util"
 )
 
@@ -290,7 +291,7 @@ func (b *StandaloneBackend) DownloadEpisodes(podcastID string, episodes []backen
 		}
 		fn := FormatEpisodeFilename(pubTime, ep.Episode, ep.Title)
 		destPath := filepath.Join(p.Path, fn)
-		if err := b.downloader.DownloadEpisode(context.Background(), encURL, destPath, b.cfg.Quiet); err != nil {
+		if err := b.downloader.DownloadEpisode(context.Background(), encURL, destPath, b.cfg.Progress); err != nil {
 			return fmt.Errorf("download %s: %w", ep.Title, err)
 		}
 		initDownloadedEpisodeStatus(destPath, fn, ep, pubTime)
@@ -356,7 +357,7 @@ func (b *StandaloneBackend) SyncDuration(filePath string, duration float64) erro
 	return nil
 }
 
-func (b *StandaloneBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun, verbose, quiet bool) (int, error) {
+func (b *StandaloneBackend) ApplyKeepPolicy(podcastID, podcastTitle string, keep int, dryRun bool) (int, error) {
 	if keep <= 0 {
 		return 0, nil
 	}
@@ -409,7 +410,7 @@ func (b *StandaloneBackend) UpdatePodcastSettings(podcastID string, autoDownload
 	return store.Save()
 }
 
-func (b *StandaloneBackend) TestConnection(quiet bool) (bool, error) {
+func (b *StandaloneBackend) TestConnection(rep progress.Reporter) (bool, error) {
 	return true, nil
 }
 
@@ -442,7 +443,7 @@ func (b *StandaloneBackend) ImportOPML(data []byte, opts backend.OPMLImportOptio
 	return backend.OPMLImportResult{Subscribed: n, TotalFeeds: n}, err
 }
 
-func (b *StandaloneBackend) FetchPodcastFeeds(silent, verbose bool) ([]backend.OPMLFeed, error) {
+func (b *StandaloneBackend) FetchPodcastFeeds() ([]backend.OPMLFeed, error) {
 	store, err := b.getStore()
 	if err != nil {
 		return nil, err
@@ -459,6 +460,6 @@ func (b *StandaloneBackend) FetchPodcastFeeds(silent, verbose bool) ([]backend.O
 	return feeds, nil
 }
 
-func (b *StandaloneBackend) WaitForActiveDownloads(podcasts []backend.Podcast, quiet bool, timeout time.Duration) error {
+func (b *StandaloneBackend) WaitForActiveDownloads(podcasts []backend.Podcast, timeout time.Duration) error {
 	return nil
 }

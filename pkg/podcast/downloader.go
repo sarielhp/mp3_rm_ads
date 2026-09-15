@@ -10,6 +10,7 @@ import (
 	"strings"
 	"time"
 
+	"pod/pkg/progress"
 	"pod/pkg/util"
 )
 
@@ -27,7 +28,7 @@ func NewDownloader() *Downloader {
 	}
 }
 
-func (d *Downloader) DownloadEpisode(ctx context.Context, enclosureURL, destPath string, quiet bool) error {
+func (d *Downloader) DownloadEpisode(ctx context.Context, enclosureURL, destPath string, rep progress.Reporter) error {
 	if enclosureURL == "" {
 		return fmt.Errorf("empty enclosure URL")
 	}
@@ -48,7 +49,7 @@ func (d *Downloader) DownloadEpisode(ctx context.Context, enclosureURL, destPath
 		_ = os.Remove(tempPath)
 	}()
 
-	if err := d.fetchToFile(ctx, enclosureURL, tempPath, quiet); err != nil {
+	if err := d.fetchToFile(ctx, enclosureURL, tempPath, rep); err != nil {
 		return err
 	}
 
@@ -58,7 +59,7 @@ func (d *Downloader) DownloadEpisode(ctx context.Context, enclosureURL, destPath
 	return nil
 }
 
-func (d *Downloader) fetchToFile(ctx context.Context, enclosureURL, tempPath string, quiet bool) error {
+func (d *Downloader) fetchToFile(ctx context.Context, enclosureURL, tempPath string, rep progress.Reporter) error {
 	req, err := http.NewRequestWithContext(ctx, "GET", enclosureURL, nil)
 	if err != nil {
 		return fmt.Errorf("build request: %w", err)
@@ -89,9 +90,7 @@ func (d *Downloader) fetchToFile(ctx context.Context, enclosureURL, tempPath str
 		return fmt.Errorf("downloaded 0 bytes from %s", enclosureURL)
 	}
 
-	if !quiet {
-		fmt.Printf("Downloaded %s (%.2f MB)\n", filepath.Base(tempPath), float64(written)/(1024*1024))
-	}
+	progress.Or(rep).Infof("Downloaded %s (%.2f MB)", filepath.Base(tempPath), float64(written)/(1024*1024))
 	return nil
 }
 

@@ -26,7 +26,7 @@ func TestDownloaderSuccess(t *testing.T) {
 	destFile := filepath.Join(tmpDir, "episode.mp3")
 
 	d := NewDownloader()
-	err := d.DownloadEpisode(context.Background(), ts.URL+"/audio.mp3", destFile, true)
+	err := d.DownloadEpisode(context.Background(), ts.URL+"/audio.mp3", destFile, nil)
 	if err != nil {
 		t.Fatalf("DownloadEpisode failed: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestDownloaderHTTPError(t *testing.T) {
 	destFile := filepath.Join(tmpDir, "missing.mp3")
 
 	d := NewDownloader()
-	err := d.DownloadEpisode(context.Background(), ts.URL+"/missing.mp3", destFile, true)
+	err := d.DownloadEpisode(context.Background(), ts.URL+"/missing.mp3", destFile, nil)
 	if err == nil {
 		t.Fatalf("expected error on 404, got nil")
 	}
@@ -74,7 +74,7 @@ func TestDownloaderContextCancelled(t *testing.T) {
 	defer cancel()
 
 	d := NewDownloader()
-	err := d.DownloadEpisode(ctx, ts.URL, destFile, true)
+	err := d.DownloadEpisode(ctx, ts.URL, destFile, nil)
 	if err == nil {
 		t.Fatalf("expected error on cancelled context")
 	}

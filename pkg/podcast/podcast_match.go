@@ -46,10 +46,6 @@ func FormatPodcastMatches(matches []AmbiguousPodcastMatch) string {
 	return strings.TrimRight(sb.String(), "\n")
 }
 
-func PrintAmbiguousMatches(matches []AmbiguousPodcastMatch) {
-	fmt.Println(FormatPodcastMatches(matches))
-}
-
 func NewAmbiguousPodcastError(query string, matches []AmbiguousPodcastMatch) error {
 	return &AmbiguousPodcastError{
 		Query:   query,

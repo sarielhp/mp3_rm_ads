@@ -135,7 +135,7 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		cfg, err := config.LoadConfig()
 		var bCli backend.Backend
 		if err == nil {
-			bCli, _ = backend.FromAppConfig(cfg, true)
+			bCli, _ = backend.FromAppConfig(cfg, nil)
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else if reason == "already_queued" {
@@ -199,7 +199,7 @@ func (m *tuiModel) batchQueueDownload() {
 		cfg, err := config.LoadConfig()
 		var bCli backend.Backend
 		if err == nil {
-			bCli, _ = backend.FromAppConfig(cfg, true)
+			bCli, _ = backend.FromAppConfig(cfg, nil)
 		}
 		podcast.DefaultDownloadQueue().TriggerWorker(bCli)
 	} else {
