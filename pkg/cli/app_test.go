@@ -62,6 +62,7 @@ func TestSelectProfile(t *testing.T) {
 }
 
 func TestTopLevelCommandsUniqueFirstLetters(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -118,6 +119,7 @@ func checkUsageOutputNoRepeatedSections(t *testing.T, path []string, out string)
 }
 
 func TestUsageHelpNoRepeatedText(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	var action string
 	var opts CLIOptions

@@ -127,6 +127,7 @@ func readTodayTestQueue(t *testing.T, dir string) []string {
 }
 
 func TestQueueTodayParsing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)

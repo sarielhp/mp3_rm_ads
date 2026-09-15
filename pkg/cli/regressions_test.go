@@ -11,6 +11,7 @@ import (
 )
 
 func TestRegressionIssue1_TestKittyArgSlicing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -27,6 +28,7 @@ func TestRegressionIssue1_TestKittyArgSlicing(t *testing.T) {
 }
 
 func TestRegressionIssue2_TestCommandTargetValidation(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -72,6 +74,7 @@ func TestRegressionIssue3_ConfigGetErrorHandling(t *testing.T) {
 }
 
 func TestRegressionIssue4_HelpUnknownCommand(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -97,6 +100,7 @@ func findTestCommand(app *clihelp.App, name string) *clihelp.Command {
 }
 
 func TestRegressionIssue5_TranscriptConflictingFlags(t *testing.T) {
+	t.Parallel()
 	tmpDir := t.TempDir()
 	jsonPath := filepath.Join(tmpDir, "ep1.transcript.json")
 	if err := os.WriteFile(jsonPath, []byte(`{"segments":[]}`), 0644); err != nil {
@@ -152,6 +156,7 @@ func TestRegressionIssue5_TranscriptConflictingFlags(t *testing.T) {
 }
 
 func TestRegressionIssue6_CanonicalSubcommandsAndNoAliases(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -196,6 +201,7 @@ func TestRegressionIssue6_CanonicalSubcommandsAndNoAliases(t *testing.T) {
 }
 
 func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -217,6 +223,7 @@ func TestRegressionIssue7_ServerKebabCaseAndAliases(t *testing.T) {
 }
 
 func TestRegressionIssue9_ProcHelpLineLimitAndBrevity(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)
@@ -244,6 +251,7 @@ func TestRegressionIssue9_ProcHelpLineLimitAndBrevity(t *testing.T) {
 }
 
 func TestCheckGeminiCommandTargetValidation(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)

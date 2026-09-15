@@ -10,6 +10,7 @@ import (
 // tests, read whenever a command renders its version. Run under -race, this
 // fails if the guard is removed.
 func TestEmbeddedVersionIsRaceFree(t *testing.T) {
+	t.Parallel()
 	orig := embeddedVersionValue()
 	t.Cleanup(func() { SetEmbeddedVersion(orig) })
 

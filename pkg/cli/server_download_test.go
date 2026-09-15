@@ -12,6 +12,7 @@ import (
 )
 
 func TestServerDownloadArguments(t *testing.T) {
+	t.Parallel()
 	for _, target := range []string{"My Show", "123"} {
 		for _, args := range [][]string{
 			{"server", "download", target, "-k", "3"},
@@ -88,6 +89,7 @@ func newServerDownloadTestBackend(t *testing.T) *serverDownloadTestBackend {
 }
 
 func TestServerDownloadDryRunAndNoWait(t *testing.T) {
+	t.Parallel()
 	for _, dryRun := range []bool{true, false} {
 		b := newServerDownloadTestBackend(t)
 		marker := filepath.Join(t.TempDir(), "processed")
@@ -117,6 +119,7 @@ func TestServerDownloadDryRunAndNoWait(t *testing.T) {
 }
 
 func TestServerDownloadFailureStopsPostprocessing(t *testing.T) {
+	t.Parallel()
 	for _, failQueue := range []bool{true, false} {
 		b := newServerDownloadTestBackend(t)
 		failure := errors.New("backend unavailable")
@@ -145,6 +148,7 @@ func TestServerDownloadFailureStopsPostprocessing(t *testing.T) {
 }
 
 func TestServerDownloadCountSelectsNewestOrOldest(t *testing.T) {
+	t.Parallel()
 	for _, oldest := range []bool{false, true} {
 		b := newServerDownloadTestBackend(t)
 		b.item.Media.Episodes = []backend.Episode{{Title: "Old", GUID: "Old", AudioFile: &backend.PodcastAudioFile{Duration: 1}}}

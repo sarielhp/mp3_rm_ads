@@ -5,6 +5,7 @@ import (
 )
 
 func TestServerCommandFlagParsing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 

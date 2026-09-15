@@ -37,6 +37,7 @@ func TestQueueListEmpty(t *testing.T) {
 }
 
 func TestQueueLsShowsQueuedEpisodes(t *testing.T) {
+	t.Parallel()
 	var buf bytes.Buffer
 	root := t.TempDir()
 	podDir, paths := createTestPodcastWithEpisodes(t, root, "Show", []string{"Episode One"})
@@ -471,6 +472,7 @@ func TestQueueRunResolvesLegacyNestedFilename(t *testing.T) {
 }
 
 func TestQueueRun_CLIHelpParsing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)

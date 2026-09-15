@@ -144,6 +144,7 @@ func TestQueueLatestDryRun(t *testing.T) {
 }
 
 func TestQueueLatestParsing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	app := buildCLIApp(&action, &opts)

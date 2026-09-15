@@ -107,6 +107,7 @@ func TestFlushRejectsUnsafeTargets(t *testing.T) {
 }
 
 func TestFlushCommandParsing(t *testing.T) {
+	t.Parallel()
 	var action string
 	var opts CLIOptions
 	if err := buildCLIApp(&action, &opts).Execute([]string{"server", "flush", "123", "--dry-run"}); err != nil {

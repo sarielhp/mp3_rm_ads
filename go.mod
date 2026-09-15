@@ -12,7 +12,7 @@ require (
 	github.com/fatih/color v1.19.0
 	github.com/gofrs/flock v0.13.1
 	github.com/mattn/go-sqlite3 v1.14.50
-	github.com/sarielhp/clihelp v0.3.4
+	github.com/sarielhp/clihelp v0.3.8
 	github.com/tcolgate/mp3 v0.0.0-20170426193717-e79c5a46d300
 	golang.org/x/image v0.45.0
 	golang.org/x/term v0.45.0
