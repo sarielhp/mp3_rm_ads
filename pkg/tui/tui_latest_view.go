@@ -5,9 +5,6 @@ import (
 	"sort"
 	"strings"
 
-	"pod/pkg/backend"
-	"pod/pkg/config"
-	"pod/pkg/pipeline"
 	"pod/pkg/player"
 	"pod/pkg/podcast"
 	"pod/pkg/util"
@@ -214,40 +211,12 @@ func renderLatestEpisodesFooter(m *tuiModel, totalItems, maxVis, dividerWidth in
 
 func (m *tuiModel) enqueueDownloadForLatestItem(item tuiLatestItem) {
 	ep := item.episode
-	epGUID := ""
-	pubDate := ""
-	var pubAt int64
-	if ep.absData != nil {
-		epGUID = ep.absData.ID
-		pubDate = ep.absData.PubDate
-		pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
-	}
-	if pubAt == 0 && ep.publishedAt > 0 {
-		pubAt = ep.publishedAt
-	}
-
-	dlItem := podcast.DownloadQueueItem{
-		PodcastTitle: item.podcastName,
-		PodcastDir:   item.podcastDir,
-		PodcastID:    item.podcastID,
-		EpisodeTitle: ep.displayTitle(),
-		GUID:         epGUID,
-		PubDate:      pubDate,
-		PublishedAt:  pubAt,
-		DurationSec:  ep.duration,
-	}
+	dlItem := downloadQueueItemFor(item.podcastName, item.podcastDir, item.podcastID, ep)
 
 	ok, reason := m.lib.Queue().Enqueue(dlItem)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
-		var bCli backend.Backend
-		if m.podcastsDir != "" {
-			cfg, err := config.LoadConfig()
-			if err == nil {
-				bCli, _ = backend.FromAppConfig(cfg, nil)
-			}
-		}
-		m.lib.Queue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(m.lib.Backend())
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {

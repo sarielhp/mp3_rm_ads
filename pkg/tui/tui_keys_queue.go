@@ -1,9 +1,6 @@
 package tui
 
 import (
-	"pod/pkg/backend"
-	"pod/pkg/config"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -153,14 +150,7 @@ func (m *tuiModel) handleDownloadQueueKey(s string) (tea.Model, tea.Cmd) {
 		m.dlqIdx = 0
 		m.dlqScroll = 0
 	case "enter":
-		var bCli backend.Backend
-		if m.podcastsDir != "" {
-			cfg, err := config.LoadConfig()
-			if err == nil {
-				bCli, _ = backend.FromAppConfig(cfg, nil)
-			}
-		}
-		m.lib.Queue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(m.lib.Backend())
 		m.showToast("Triggered download processing", ToastInfo)
 	case "esc", "q", "Q":
 		m.handleEscape()

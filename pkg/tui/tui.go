@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"pod/pkg/audio"
+	"pod/pkg/backend"
 	"pod/pkg/kitty"
 	"pod/pkg/podcast"
 	"pod/pkg/types"
@@ -21,6 +22,12 @@ type tuiModel struct {
 	// to reach podcast.DefaultDownloadQueue() goes through it, so the TUI
 	// holds library state instead of sharing a process global with the CLI.
 	lib *podcast.Library
+
+	// cfg is the application config this session was started with. The TUI
+	// used to reload it from disk at seven call sites; a full-screen session
+	// should act on the configuration it was launched with, not on whatever
+	// the file happens to say mid-run.
+	cfg *types.Config
 
 	width                   int
 	height                  int
@@ -107,6 +114,7 @@ func newTuiModel(bk *TuiBackend, podcastsDir string, cfg *types.Config, lib *pod
 	}
 	return &tuiModel{
 		lib:              lib,
+		cfg:              cfg,
 		screen:           screenPodcasts,
 		loading:          true,
 		bk:               bk,
@@ -333,15 +341,18 @@ func RunTUI(cfg *types.Config, podcastsDir string) error {
 	}
 	podcastsDir = resolveLocalPath(podcastsDir)
 
+	// The backend is built once here. Reaching it through the Library is what
+	// lets the screens stop constructing their own.
+	b, _ := backend.FromAppConfig(cfg, nil)
 	lib := podcast.Open(podcast.Config{
 		PodcastsDir:       podcastsDir,
 		SubscriptionsFile: cfg.SubscriptionsFile,
 		ServerBaseURL:     cfg.ServerBaseURL,
-	}, nil, nil)
+	}, b, nil)
 
 	bk := &TuiBackend{
 		LoadPodcasts: func(dir string) ([]tuiPodcast, error) {
-			return loadTUIPodcastsABS(dir, *cfg)
+			return loadTUIPodcastsABS(dir, b)
 		},
 		LoadQueues: loadAllQueues,
 		SaveQueue: func(dir string, entries []string) {

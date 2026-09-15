@@ -2,11 +2,6 @@ package tui
 
 import (
 	"fmt"
-
-	"pod/pkg/backend"
-	"pod/pkg/config"
-	"pod/pkg/pipeline"
-	"pod/pkg/podcast"
 )
 
 func (m *tuiModel) toggleEpisodeSelection(path string) {
@@ -100,44 +95,11 @@ func (m *tuiModel) enqueueCurrentEpisodeDownload() {
 		return
 	}
 	ep := eps[m.epIdx]
-	epGUID := ""
-	pubDate := ""
-	var pubAt int64
-	if ep.absData != nil {
-		epGUID = ep.absData.ID
-		pubDate = ep.absData.PubDate
-		pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
-	}
-	if epGUID == "" && ep.guid != "" {
-		epGUID = ep.guid
-	}
-	if pubAt == 0 && ep.publishedAt > 0 {
-		pubAt = ep.publishedAt
-	}
-	podID := ""
-	if pod.absData != nil {
-		podID = pod.absData.ID
-	}
-	item := podcast.DownloadQueueItem{
-		PodcastTitle: pod.name,
-		PodcastDir:   pod.dir,
-		PodcastID:    podID,
-		EpisodeTitle: ep.displayTitle(),
-		GUID:         epGUID,
-		PubDate:      pubDate,
-		PublishedAt:  pubAt,
-		DurationSec:  ep.duration,
-		EnclosureURL: ep.enclosureURL,
-	}
+	item := downloadQueueItemFor(pod.name, pod.dir, podcastBackendID(&pod), ep)
 	ok, reason := m.lib.Queue().Enqueue(item)
 	if ok {
 		m.showToast("Enqueued for download: "+ep.displayTitle(), ToastSuccess)
-		cfg, err := config.LoadConfig()
-		var bCli backend.Backend
-		if err == nil {
-			bCli, _ = backend.FromAppConfig(cfg, nil)
-		}
-		m.lib.Queue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(m.lib.Backend())
 	} else if reason == "already_queued" {
 		m.showToast("Already in download queue", ToastWarning)
 	} else if reason == "already_downloaded" {
@@ -159,35 +121,7 @@ func (m *tuiModel) batchQueueDownload() {
 		if !m.isEpisodeSelected(ep.path) {
 			continue
 		}
-		epGUID := ""
-		pubDate := ""
-		var pubAt int64
-		if ep.absData != nil {
-			epGUID = ep.absData.ID
-			pubDate = ep.absData.PubDate
-			pubAt = pipeline.ParseABSEpisodePublishedAt(ep.absData)
-		}
-		if epGUID == "" && ep.guid != "" {
-			epGUID = ep.guid
-		}
-		if pubAt == 0 && ep.publishedAt > 0 {
-			pubAt = ep.publishedAt
-		}
-		podID := ""
-		if pod.absData != nil {
-			podID = pod.absData.ID
-		}
-		item := podcast.DownloadQueueItem{
-			PodcastTitle: pod.name,
-			PodcastDir:   pod.dir,
-			PodcastID:    podID,
-			EpisodeTitle: ep.displayTitle(),
-			GUID:         epGUID,
-			PubDate:      pubDate,
-			PublishedAt:  pubAt,
-			DurationSec:  ep.duration,
-			EnclosureURL: ep.enclosureURL,
-		}
+		item := downloadQueueItemFor(pod.name, pod.dir, podcastBackendID(&pod), ep)
 		ok, _ := m.lib.Queue().Enqueue(item)
 		if ok {
 			queuedCount++
@@ -196,12 +130,7 @@ func (m *tuiModel) batchQueueDownload() {
 	m.clearSelectedEpisodes()
 	if queuedCount > 0 {
 		m.showToast(fmt.Sprintf("Batch enqueued %d episode(s) for download", queuedCount), ToastSuccess)
-		cfg, err := config.LoadConfig()
-		var bCli backend.Backend
-		if err == nil {
-			bCli, _ = backend.FromAppConfig(cfg, nil)
-		}
-		m.lib.Queue().TriggerWorker(bCli)
+		m.lib.Queue().TriggerWorker(m.lib.Backend())
 	} else {
 		m.showToast("No new episodes enqueued", ToastWarning)
 	}

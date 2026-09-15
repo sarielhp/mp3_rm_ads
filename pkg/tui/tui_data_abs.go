@@ -8,17 +8,14 @@ import (
 	"pod/pkg/backend"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
-	"pod/pkg/types"
 )
 
-func loadTUIPodcastsABS(podcastsDir string, cfg types.Config) ([]tuiPodcast, error) {
+func loadTUIPodcastsABS(podcastsDir string, b backend.Backend) ([]tuiPodcast, error) {
 	podcasts, err := loadTUIPodcasts(podcastsDir)
 	if err != nil {
 		return nil, err
 	}
-
-	b, err := backend.FromAppConfig(&cfg, nil)
-	if err != nil || b == nil {
+	if b == nil {
 		return podcasts, nil
 	}
 

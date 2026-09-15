@@ -10,6 +10,7 @@ import (
 	"pod/pkg/config"
 	"pod/pkg/pipeline"
 	"pod/pkg/podcast"
+	"pod/pkg/types"
 )
 
 type tuiPodcast struct {
@@ -134,4 +135,13 @@ type TuiBackend struct {
 	LoadQueues   func(pods []tuiPodcast) map[string][]string
 	SaveQueue    func(dir string, entries []string)
 	GetDuration  func(path string) float64
+}
+
+// appConfig returns the configuration this session was started with, falling
+// back to defaults if the TUI was constructed without one (tests do this).
+func (m *tuiModel) appConfig() types.Config {
+	if m.cfg != nil {
+		return *m.cfg
+	}
+	return config.DefaultConfig()
 }

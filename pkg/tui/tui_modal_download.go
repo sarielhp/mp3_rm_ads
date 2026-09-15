@@ -222,12 +222,12 @@ func (m *tuiModel) applyDownloadPolicyModal() {
 				log.Printf("panic syncing policy to backend: %v\n%s", r, debug.Stack())
 			}
 		}()
-		syncPolicyToBackend(pod, autoDownload, autoCleanup, cleanupDays)
+		syncPolicyToBackend(m.lib.Backend(), pod, autoDownload, autoCleanup, cleanupDays)
 	}()
 	m.showDownloadPolicyModal = false
 }
 
-func syncPolicyToBackend(pod *tuiPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) {
+func syncPolicyToBackend(b backend.Backend, pod *tuiPodcast, autoDownload, autoCleanup bool, autoCleanupDays int) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("panic in syncPolicyToBackend: %v\n%s", r, debug.Stack())
@@ -237,12 +237,7 @@ func syncPolicyToBackend(pod *tuiPodcast, autoDownload, autoCleanup bool, autoCl
 		hook(pod)
 		return
 	}
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		return
-	}
-	b, err := backend.FromAppConfig(cfg, nil)
-	if err != nil || b == nil {
+	if b == nil {
 		return
 	}
 	id := pod.config.ID

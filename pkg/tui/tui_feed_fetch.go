@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"pod/pkg/backend"
-	"pod/pkg/config"
 	"pod/pkg/podcast"
 	"pod/pkg/types"
 )
@@ -27,13 +26,7 @@ func (m *tuiModel) fetchPodcastFullFeed() {
 		return
 	}
 
-	cfg, err := config.LoadConfig()
-	if err != nil {
-		def := config.DefaultConfig()
-		cfg = &def
-	}
-	bCli, _ := backend.FromAppConfig(cfg, nil)
-	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, *cfg, bCli, feedURL)
+	feedEpisodes, err := fetchFeedEpisodesForPodcast(pod, m.appConfig(), m.lib.Backend(), feedURL)
 	if err != nil && len(feedEpisodes) == 0 {
 		m.showPopup(fmt.Sprintf("Failed to fetch feed: %v", err))
 		return
@@ -177,31 +170,14 @@ func (m *tuiModel) downloadAllForSelectedPodcast() {
 				Description:     ep.description,
 			}
 			toDownload = append(toDownload, fe)
-			podID := ""
-			if pod.absData != nil {
-				podID = pod.absData.ID
-			}
-			item := podcast.DownloadQueueItem{
-				PodcastTitle: pod.name,
-				PodcastDir:   pod.dir,
-				PodcastID:    podID,
-				EpisodeTitle: ep.title,
-				GUID:         ep.guid,
-				PublishedAt:  ep.publishedAt,
-				DurationSec:  ep.duration,
-				EnclosureURL: encURL,
-			}
-			_, _ = m.lib.Queue().Enqueue(item)
+			_, _ = m.lib.Queue().Enqueue(
+				downloadQueueItemFor(pod.name, pod.dir, podcastBackendID(pod), ep))
 			count++
 		}
 	}
 
-	cfg, _ := config.LoadConfig()
-	if cfg != nil {
-		client, _ := backend.FromAppConfig(cfg, nil)
-		if client != nil && len(toDownload) > 0 && pod.absData != nil {
-			_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
-		}
+	if client := m.lib.Backend(); client != nil && len(toDownload) > 0 && pod.absData != nil {
+		_ = client.DownloadEpisodes(pod.absData.ID, toDownload)
 	}
 
 	if count > 0 {

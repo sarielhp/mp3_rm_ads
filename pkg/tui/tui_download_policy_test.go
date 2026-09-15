@@ -170,5 +170,5 @@ func TestSyncPolicyToBackend_PanicRecovery(t *testing.T) {
 			t.Fatalf("syncPolicyToBackend failed to catch internal panic: %v", r)
 		}
 	}()
-	syncPolicyToBackend(&m.podcasts[0], true, false, 0)
+	syncPolicyToBackend(nil, &m.podcasts[0], true, false, 0)
 }
