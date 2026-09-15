@@ -278,3 +278,20 @@ func ResolvePodcastDirForSub(sub Subscription, podcastsDir string) string {
 	target := filepath.Join(podcastsDir, safeTitle)
 	return target
 }
+
+// SubscriptionMatches reports whether a query selects this subscription: an
+// exact case-insensitive ID, or a case-insensitive substring of the title. An
+// empty query selects everything, which is how "act on all subscriptions" is
+// spelled at the call sites.
+//
+// This is deliberately narrower than MatchesPodcastName, which also accepts a
+// regular expression. The two should converge, but widening subscription
+// matching to regexes changes which podcasts a command touches, so it is a
+// behaviour change rather than a refactor.
+func SubscriptionMatches(sub Subscription, query string) bool {
+	if query == "" {
+		return true
+	}
+	return strings.EqualFold(sub.ID, query) ||
+		strings.Contains(strings.ToLower(sub.Title), strings.ToLower(query))
+}

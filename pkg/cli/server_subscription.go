@@ -188,7 +188,7 @@ func handleServerFeed(cfg Config, cli CLIOptions) error {
 	}
 
 	for _, sub := range subs {
-		if target != "" && !strings.EqualFold(sub.ID, target) && !strings.Contains(strings.ToLower(sub.Title), strings.ToLower(target)) {
+		if !podcast.SubscriptionMatches(sub, target) {
 			continue
 		}
 		podDir := filepath.Join(cfg.PodcastsDir, sub.Folder)
@@ -304,7 +304,7 @@ func resolveSubTargets(subs []podcast.Subscription, cli CLIOptions) []podcast.Su
 		if sub.Disabled {
 			continue
 		}
-		if target != "" && !strings.EqualFold(sub.ID, target) && !strings.Contains(strings.ToLower(sub.Title), strings.ToLower(target)) {
+		if !podcast.SubscriptionMatches(sub, target) {
 			continue
 		}
 		targets = append(targets, sub)

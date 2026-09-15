@@ -249,24 +249,6 @@ func assignUniqueShortIDsMode(entries []PodcastDirEntry, persist bool) {
 	}
 }
 
-func ResolvePodcastDirByIDOrName(podcastsDir, query string) (string, string, bool) {
-	search := strings.TrimSpace(query)
-	if search == "" {
-		return "", "", false
-	}
-
-	podcasts := ScanPodcastDirs(podcastsDir)
-	if len(podcasts) == 0 {
-		return "", "", false
-	}
-
-	matched, err := MatchLocalPodcasts(podcasts, search)
-	if err != nil || matched == nil {
-		return "", "", false
-	}
-	return matched.Dir, matched.Title, true
-}
-
 func FindPodcastDirForItem(item backend.Podcast, podcastsDir string) string {
 	if podcastsDir == "" {
 		return ""

@@ -68,19 +68,33 @@ func MatchesPodcastName(name, query string) bool {
 	return false
 }
 
-func buildLocalAmbiguousMatches(matches []PodcastDirEntry) []AmbiguousPodcastMatch {
-	var result []AmbiguousPodcastMatch
-	for _, m := range matches {
-		title := m.Title
-		if title == "" {
-			title = m.FolderName
+// matchByName runs the fuzzy-name phase that both the local and backend
+// matchers share: one hit wins, several are ambiguous, none falls through to
+// the caller's ID lookup. The ID phases stay separate because they genuinely
+// differ — local matches folder names case-insensitively, backend matches
+// opaque server IDs exactly — and collapsing them would change which podcast a
+// query selects.
+func matchByName[T any](items []T, search string, names func(T) []string, describe func(T) AmbiguousPodcastMatch, byID func([]T, string) (*T, error)) (*T, error) {
+	var hits []T
+	for _, it := range items {
+		for _, n := range names(it) {
+			if n != "" && MatchesPodcastName(n, search) {
+				hits = append(hits, it)
+				break
+			}
 		}
-		result = append(result, AmbiguousPodcastMatch{
-			ID:   m.ShortID,
-			Name: title,
-		})
 	}
-	return result
+	if len(hits) == 1 {
+		return &hits[0], nil
+	}
+	if len(hits) >= 2 {
+		described := make([]AmbiguousPodcastMatch, 0, len(hits))
+		for _, h := range hits {
+			described = append(described, describe(h))
+		}
+		return nil, NewAmbiguousPodcastError(search, described)
+	}
+	return byID(items, search)
 }
 
 func resolveLocalPodcastByID(entries []PodcastDirEntry, search string) (*PodcastDirEntry, error) {
@@ -114,24 +128,23 @@ func MatchLocalPodcasts(entries []PodcastDirEntry, query string) (*PodcastDirEnt
 		return nil, fmt.Errorf("empty podcast query")
 	}
 
-	var nameMatches []PodcastDirEntry
-	for _, p := range entries {
-		title := p.Title
-		if title == "" {
-			title = p.FolderName
-		}
-		if MatchesPodcastName(title, search) || (p.FolderName != "" && MatchesPodcastName(p.FolderName, search)) {
-			nameMatches = append(nameMatches, p)
-		}
-	}
+	return matchByName(entries, search, localMatchNames, describeLocalPodcast, resolveLocalPodcastByID)
+}
 
-	if len(nameMatches) == 1 {
-		return &nameMatches[0], nil
+func localMatchNames(p PodcastDirEntry) []string {
+	title := p.Title
+	if title == "" {
+		title = p.FolderName
 	}
-	if len(nameMatches) >= 2 {
-		return nil, NewAmbiguousPodcastError(search, buildLocalAmbiguousMatches(nameMatches))
+	return []string{title, p.FolderName}
+}
+
+func describeLocalPodcast(p PodcastDirEntry) AmbiguousPodcastMatch {
+	title := p.Title
+	if title == "" {
+		title = p.FolderName
 	}
-	return resolveLocalPodcastByID(entries, search)
+	return AmbiguousPodcastMatch{ID: p.ShortID, Name: title}
 }
 
 func BackendPodcastTitle(p backend.Podcast) string {
@@ -142,25 +155,6 @@ func BackendPodcastTitle(p backend.Podcast) string {
 		return filepath.Base(p.RelPath)
 	}
 	return p.ID
-}
-
-func buildBackendAmbiguousMatches(matches []backend.Podcast) []AmbiguousPodcastMatch {
-	var result []AmbiguousPodcastMatch
-	for _, m := range matches {
-		title := BackendPodcastTitle(m)
-		id := m.ID
-		if id == "" {
-			id = m.Media.ID
-		}
-		if id == "" {
-			id = GeneratePodcastShortID(title)
-		}
-		result = append(result, AmbiguousPodcastMatch{
-			ID:   id,
-			Name: title,
-		})
-	}
-	return result
 }
 
 func resolveBackendPodcastByID(podcasts []backend.Podcast, search string) (*backend.Podcast, error) {
@@ -194,19 +188,21 @@ func MatchBackendPodcasts(podcasts []backend.Podcast, query string) (*backend.Po
 		return nil, fmt.Errorf("empty podcast query")
 	}
 
-	var nameMatches []backend.Podcast
-	for _, p := range podcasts {
-		title := BackendPodcastTitle(p)
-		if MatchesPodcastName(title, search) {
-			nameMatches = append(nameMatches, p)
-		}
-	}
+	return matchByName(podcasts, search, backendMatchNames, describeBackendPodcast, resolveBackendPodcastByID)
+}
 
-	if len(nameMatches) == 1 {
-		return &nameMatches[0], nil
+func backendMatchNames(p backend.Podcast) []string {
+	return []string{BackendPodcastTitle(p)}
+}
+
+func describeBackendPodcast(p backend.Podcast) AmbiguousPodcastMatch {
+	title := BackendPodcastTitle(p)
+	id := p.ID
+	if id == "" {
+		id = p.Media.ID
 	}
-	if len(nameMatches) >= 2 {
-		return nil, NewAmbiguousPodcastError(search, buildBackendAmbiguousMatches(nameMatches))
+	if id == "" {
+		id = GeneratePodcastShortID(title)
 	}
-	return resolveBackendPodcastByID(podcasts, search)
+	return AmbiguousPodcastMatch{ID: id, Name: title}
 }

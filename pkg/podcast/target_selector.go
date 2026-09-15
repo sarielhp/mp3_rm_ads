@@ -51,7 +51,11 @@ func ResolvePodcastGroup(podcastsDir, query string) (*ResolvedPodcastGroup, erro
 	}
 
 	if kind, ok := ParsePodcastGroupKind(q); ok {
-		return filterLocalGroupEntries(entries, kind)
+		members, label, err := filterGroup(entries, kind, isLocalEntryFavorite)
+		if err != nil {
+			return nil, err
+		}
+		return &ResolvedPodcastGroup{Kind: kind, Label: label, Entries: members}, nil
 	}
 
 	matched, err := MatchLocalPodcasts(entries, q)
@@ -65,43 +69,48 @@ func ResolvePodcastGroup(podcastsDir, query string) (*ResolvedPodcastGroup, erro
 	}, nil
 }
 
-func filterLocalGroupEntries(entries []PodcastDirEntry, kind PodcastGroupKind) (*ResolvedPodcastGroup, error) {
-	switch kind {
-	case GroupKindAll:
-		return &ResolvedPodcastGroup{
-			Kind:    GroupKindAll,
-			Label:   "all podcasts",
-			Entries: entries,
-		}, nil
-	case GroupKindFavorites:
-		var favs []PodcastDirEntry
-		for _, e := range entries {
-			pCfg := config.LoadPodcastConfig(e.Dir, config.PodcastConfig{})
-			if pCfg.Favorite {
-				favs = append(favs, e)
-			}
-		}
-		return &ResolvedPodcastGroup{
-			Kind:    GroupKindFavorites,
-			Label:   "favorite podcasts",
-			Entries: favs,
-		}, nil
-	case GroupKindNonFavorites:
-		var nonFavs []PodcastDirEntry
-		for _, e := range entries {
-			pCfg := config.LoadPodcastConfig(e.Dir, config.PodcastConfig{})
-			if !pCfg.Favorite {
-				nonFavs = append(nonFavs, e)
-			}
-		}
-		return &ResolvedPodcastGroup{
-			Kind:    GroupKindNonFavorites,
-			Label:   "non-favorite podcasts",
-			Entries: nonFavs,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown group kind %q", kind)
+// groupLabels are the display labels for each group kind. Local and backend
+// group resolution render the same words; they differed only by element type.
+var groupLabels = map[PodcastGroupKind]string{
+	GroupKindAll:          "all podcasts",
+	GroupKindFavorites:    "favorite podcasts",
+	GroupKindNonFavorites: "non-favorite podcasts",
+}
+
+// filterGroup selects the members of a group kind from items, using isFavorite
+// to decide membership for the favorite and non-favorite kinds.
+func filterGroup[T any](items []T, kind PodcastGroupKind, isFavorite func(T) bool) ([]T, string, error) {
+	label, ok := groupLabels[kind]
+	if !ok {
+		return nil, "", fmt.Errorf("unknown group kind %q", kind)
 	}
+	if kind == GroupKindAll {
+		return items, label, nil
+	}
+	want := kind == GroupKindFavorites
+	var out []T
+	for _, it := range items {
+		if isFavorite(it) == want {
+			out = append(out, it)
+		}
+	}
+	return out, label, nil
+}
+
+func isLocalEntryFavorite(e PodcastDirEntry) bool {
+	return config.LoadPodcastConfig(e.Dir, config.PodcastConfig{}).Favorite
+}
+
+func isBackendPodcastFavorite(p backend.Podcast, podcastsDir string) bool {
+	dir := p.Path
+	if dir == "" {
+		dir = FindPodcastDirForItem(p, podcastsDir)
+	}
+	if dir == "" {
+		return false
+	}
+	pCfg := config.LoadPodcastConfig(dir, config.PodcastConfig{})
+	return pCfg.Favorite
 }
 
 type ResolvedBackendGroup struct {
@@ -117,7 +126,13 @@ func ResolveBackendPodcastGroup(podcasts []backend.Podcast, podcastsDir, query s
 	}
 
 	if kind, ok := ParsePodcastGroupKind(q); ok {
-		return filterBackendGroup(podcasts, podcastsDir, kind)
+		members, label, err := filterGroup(podcasts, kind, func(p backend.Podcast) bool {
+			return isBackendPodcastFavorite(p, podcastsDir)
+		})
+		if err != nil {
+			return nil, err
+		}
+		return &ResolvedBackendGroup{Kind: kind, Label: label, Podcasts: members}, nil
 	}
 
 	matched, err := MatchBackendPodcasts(podcasts, q)
@@ -129,53 +144,4 @@ func ResolveBackendPodcastGroup(podcasts []backend.Podcast, podcastsDir, query s
 		Label:    BackendPodcastTitle(*matched),
 		Podcasts: []backend.Podcast{*matched},
 	}, nil
-}
-
-func isBackendPodcastFavorite(p backend.Podcast, podcastsDir string) bool {
-	dir := p.Path
-	if dir == "" {
-		dir = FindPodcastDirForItem(p, podcastsDir)
-	}
-	if dir == "" {
-		return false
-	}
-	pCfg := config.LoadPodcastConfig(dir, config.PodcastConfig{})
-	return pCfg.Favorite
-}
-
-func filterBackendGroup(podcasts []backend.Podcast, podcastsDir string, kind PodcastGroupKind) (*ResolvedBackendGroup, error) {
-	switch kind {
-	case GroupKindAll:
-		return &ResolvedBackendGroup{
-			Kind:     GroupKindAll,
-			Label:    "all podcasts",
-			Podcasts: podcasts,
-		}, nil
-	case GroupKindFavorites:
-		var favs []backend.Podcast
-		for _, p := range podcasts {
-			if isBackendPodcastFavorite(p, podcastsDir) {
-				favs = append(favs, p)
-			}
-		}
-		return &ResolvedBackendGroup{
-			Kind:     GroupKindFavorites,
-			Label:    "favorite podcasts",
-			Podcasts: favs,
-		}, nil
-	case GroupKindNonFavorites:
-		var nonFavs []backend.Podcast
-		for _, p := range podcasts {
-			if !isBackendPodcastFavorite(p, podcastsDir) {
-				nonFavs = append(nonFavs, p)
-			}
-		}
-		return &ResolvedBackendGroup{
-			Kind:     GroupKindNonFavorites,
-			Label:    "non-favorite podcasts",
-			Podcasts: nonFavs,
-		}, nil
-	default:
-		return nil, fmt.Errorf("unknown group kind %q", kind)
-	}
 }
