@@ -262,6 +262,12 @@ The codebase is organized into modular Go packages under `pkg/` with a lean entr
    compiler and has silently dropped control flow here twice (see **Sizing**).
 8. **Commit Messages**: Use conventional commits format:
    `feat:`, `fix:`, `chore:`, `docs:`, `refactor:`, `test:`
+8a. **Changelog**: A change a user could notice — a command or flag removed, an
+   exit code or output format changed, a bug they may have been working around —
+   goes in `CHANGELOG.md` under the version it ships in. Internal refactoring
+   does not. The file went unmaintained through 0.2.x; do not let that happen
+   again, because the entries most worth having are exactly the ones that are
+   hard to reconstruct later.
 9. **Subdirectory Isolation**: Under no circumstances modify files outside this
    subdirectory. Find operations must be restricted to this subdirectory.
 10. **Dependency Updates**: Use standard Go tooling to check for updates (`go list -m -u all`
